@@ -2,15 +2,12 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore, type TradeJournalEntry } from "@/store/portfolioStore";
-import { StockDetailExpandPanel } from "@/components/stock/StockDetailExpandPanel";
 import { runRefreshPipeline } from "@/lib/refresh";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
 import { PortfolioAllocationChart } from "@/components/portfolio/PortfolioAllocationChart";
 import { PortfolioNetWorthChart } from "@/components/portfolio/PortfolioNetWorthChart";
-import { AppModal } from "@/components/ui/AppModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SymbolTradeCombobox } from "@/components/portfolio/SymbolTradeCombobox";
 import { isValidTicker } from "@/lib/csvPortfolio";
@@ -51,7 +48,6 @@ export default function PortfolioPage() {
   const [tradeSide, setTradeSide] = useState<"BUY" | "SELL">("BUY");
   const [tradeQty, setTradeQty] = useState("1");
   const [tradePrice, setTradePrice] = useState("");
-  const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
   const [undoConfirmOpen, setUndoConfirmOpen] = useState(false);
 
@@ -283,7 +279,7 @@ export default function PortfolioPage() {
       </div>
 
       <div className="ui-hover-lift overflow-x-auto rounded-2xl border border-border bg-elevated">
-        <table className="w-full min-w-[1080px] text-sm">
+        <table className="w-full min-w-[980px] text-sm">
           <thead className="text-subtle">
             <tr>
               <th scope="col" className="px-4 pb-2 pt-3 text-left text-xs font-semibold tracking-wide">
@@ -293,16 +289,16 @@ export default function PortfolioPage() {
                 Qty
               </th>
               <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold tabular-nums tracking-wide">
-                Avg
+                Avg cost
+              </th>
+              <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold tabular-nums tracking-wide">
+                Cost basis
               </th>
               <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold tabular-nums tracking-wide">
                 Last
               </th>
               <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold tabular-nums tracking-wide">
                 Current value
-              </th>
-              <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold tabular-nums tracking-wide">
-                Cost basis
               </th>
               <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold tabular-nums tracking-wide">
                 Gain / loss (%)
@@ -332,23 +328,19 @@ export default function PortfolioPage() {
                 >
                   <td className="px-4 py-3 align-middle">
                     <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setDetailSymbol(s.symbol)}
-                        className="ui-hover-text inline-flex items-center gap-1 font-medium text-foreground"
-                        aria-haspopup="dialog"
-                        aria-expanded={detailSymbol === s.symbol}
+                      <Link
+                        href={`/stock/${encodeURIComponent(s.symbol)}`}
+                        className="ui-hover-text inline-flex items-center gap-1 font-medium text-foreground hover:underline"
                       >
                         {s.symbol}
-                        <ChevronDown className="h-4 w-4 shrink-0 text-subtle" aria-hidden />
-                      </button>
+                      </Link>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-foreground">{s.quantity}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-foreground">${s.averageCost.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-foreground">${costBasis.toFixed(2)}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-foreground">${(s.lastPrice ?? 0).toFixed(2)}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-foreground">${value.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-foreground">${costBasis.toFixed(2)}</td>
                   <td
                     className={`px-4 py-3 text-right tabular-nums font-medium ${
                       gainLoss > 0
@@ -404,20 +396,6 @@ export default function PortfolioPage() {
           </p>
         )}
       </div>
-
-      <AppModal
-        open={detailSymbol != null}
-        onClose={() => setDetailSymbol(null)}
-        size="lg"
-        stagger={false}
-        panelClassName="sm:max-w-[min(94vw,1120px)]"
-      >
-        {detailSymbol ? (
-          <div className="min-h-0 overflow-auto">
-            <StockDetailExpandPanel symbol={detailSymbol} onClose={() => setDetailSymbol(null)} />
-          </div>
-        ) : null}
-      </AppModal>
 
       <section className="ui-hover-lift rounded-2xl border border-border bg-elevated p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
