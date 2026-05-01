@@ -14,7 +14,12 @@ import { RecommendedActionsWidget } from "@/components/dashboard/RecommendedActi
 import { DashboardReturnComparison } from "@/components/dashboard/DashboardReturnComparison";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
-import { computeTodayChangeFromHistory, fetchCloudNetWorthHistory, type NetWorthPoint } from "@/lib/portfolio-net-worth-series";
+import {
+  computeTodayChangeFromHistory,
+  computeTodayChangeFromLiveQuotes,
+  fetchCloudNetWorthHistory,
+  type NetWorthPoint,
+} from "@/lib/portfolio-net-worth-series";
 
 const PALETTE = {
   cash: "var(--dashboard-chart-cash)",
@@ -55,10 +60,12 @@ export default function DashboardPage() {
   const totalBalance = holdingsValue + cash;
   const isProfitable = holdingsPnL >= 0;
   const totalPnLPct = holdingsCostBasis > 0 ? (holdingsPnL / holdingsCostBasis) * 100 : 0;
-  const todayChange = useMemo(
+  const todaySnapshotChange = useMemo(
     () => computeTodayChangeFromHistory(cloudHistory ?? [], totalBalance),
     [cloudHistory, totalBalance]
   );
+  const todayQuoteChange = useMemo(() => computeTodayChangeFromLiveQuotes(stocks, cash), [stocks, cash]);
+  const todayChange = todaySnapshotChange.hasBaseline ? todaySnapshotChange : todayQuoteChange;
   const showTodayChange = todayChange.hasBaseline && Math.abs(todayChange.change) > 0.01;
   const todayValueClassName =
     todayChange.change >= 0
@@ -282,10 +289,12 @@ export default function DashboardPage() {
         </div>
         <p className="mt-4 text-[11px] leading-relaxed text-subtle">
           {showTodayChange
-            ? "Today compares your live total against the latest saved portfolio snapshot before today in U.S. Eastern time."
+            ? todaySnapshotChange.hasBaseline
+              ? "Today compares your live total against the latest saved portfolio snapshot before today in U.S. Eastern time."
+              : "Today is estimated from live quote changes across your current holdings when a prior saved snapshot is not available."
             : todayStatusLoading
               ? "Loading today change from your saved portfolio snapshots…"
-              : "Today appears once at least one prior U.S. trading-day portfolio snapshot is available."}
+              : "Today appears once live quote deltas or at least one prior U.S. trading-day portfolio snapshot is available."}
         </p>
       </motion.section>
 

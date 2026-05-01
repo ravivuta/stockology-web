@@ -14,6 +14,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SymbolTradeCombobox } from "@/components/portfolio/SymbolTradeCombobox";
 import { isValidTicker } from "@/lib/csvPortfolio";
 import { recommendationActionDisplay } from "@/lib/recommendation";
+import { computeTodayChangeFromLiveQuotes } from "@/lib/portfolio-net-worth-series";
 
 type SortKey = "symbol" | "value" | "pnl";
 
@@ -72,19 +73,11 @@ export default function PortfolioPage() {
     return r;
   }, [holdings, sort, query]);
 
-  const { assetsValue, netWorth, portfolioTodayPct } = useMemo(() => {
+  const { assetsValue, netWorth, portfolioTodayChange } = useMemo(() => {
     const assets = stocks.reduce((a, s) => a + s.quantity * (s.lastPrice ?? 0), 0);
     const net = assets + cash;
-    let wNum = 0;
-    let wDen = 0;
-    for (const s of stocks) {
-      const v = s.quantity * (s.lastPrice ?? 0);
-      if (v <= 0 || s.dailyChangePercent == null || !Number.isFinite(s.dailyChangePercent)) continue;
-      wNum += v * s.dailyChangePercent;
-      wDen += v;
-    }
-    const portfolioTodayPct = wDen > 0 ? wNum / wDen : null;
-    return { assetsValue: assets, netWorth: net, portfolioTodayPct };
+    const portfolioTodayChange = computeTodayChangeFromLiveQuotes(stocks, cash);
+    return { assetsValue: assets, netWorth: net, portfolioTodayChange };
   }, [stocks, cash]);
 
   const journalChronological = useMemo(() => [...tradeJournal].reverse(), [tradeJournal]);
@@ -182,19 +175,24 @@ export default function PortfolioPage() {
         </div>
         <div className="rounded-xl border border-border/80 bg-elevated px-4 py-3 shadow-sm dark:border-white/[0.08]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Today (portfolio)</p>
-          {portfolioTodayPct != null ? (
+          {portfolioTodayChange.hasBaseline ? (
             <p
               className={`mt-1 text-lg font-semibold tabular-nums ${
-                portfolioTodayPct > 0 ? "text-emerald-600 dark:text-primary" : portfolioTodayPct < 0 ? "text-red-600 dark:text-red-400" : "text-foreground"
+                portfolioTodayChange.change > 0
+                  ? "text-emerald-600 dark:text-primary"
+                  : portfolioTodayChange.change < 0
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-foreground"
               }`}
             >
-              {portfolioTodayPct >= 0 ? "+" : ""}
-              {portfolioTodayPct.toFixed(2)}%
+              {portfolioTodayChange.change >= 0 ? "+" : "−"}$
+              {Math.abs(portfolioTodayChange.change).toFixed(2)} ({portfolioTodayChange.percent >= 0 ? "+" : ""}
+              {portfolioTodayChange.percent.toFixed(2)}%)
             </p>
           ) : (
             <p className="mt-1 text-lg font-semibold tabular-nums text-subtle">—</p>
           )}
-          <p className="mt-0.5 text-[11px] text-subtle">Value-weighted across holdings</p>
+          <p className="mt-0.5 text-[11px] text-subtle">Estimated from live quote changes across holdings</p>
         </div>
       </div>
 

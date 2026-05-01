@@ -59,6 +59,45 @@ export function computeTodayChangeFromHistory(
   return { change, percent, hasBaseline: true };
 }
 
+export function computeTodayChangeFromLiveQuotes(
+  stocks: Array<{ quantity: number; lastPrice?: number; dailyChangePercent?: number }>,
+  cash: number
+): TodayChangeDelta {
+  let currentHoldings = 0;
+  let previousHoldings = 0;
+  let hasAnyQuoteDelta = false;
+
+  for (const stock of stocks) {
+    const value = stock.quantity * (stock.lastPrice ?? 0);
+    if (!Number.isFinite(value) || value <= 0) continue;
+    currentHoldings += value;
+
+    const pct = stock.dailyChangePercent;
+    if (pct != null && Number.isFinite(pct)) {
+      const ratio = 1 + pct / 100;
+      if (ratio > 0) {
+        previousHoldings += value / ratio;
+        hasAnyQuoteDelta = true;
+        continue;
+      }
+    }
+
+    previousHoldings += value;
+  }
+
+  if (!hasAnyQuoteDelta) return { change: 0, percent: 0, hasBaseline: false };
+
+  const currentTotal = currentHoldings + cash;
+  const previousTotal = previousHoldings + cash;
+  if (!Number.isFinite(previousTotal) || previousTotal <= 0) {
+    return { change: 0, percent: 0, hasBaseline: false };
+  }
+
+  const change = currentTotal - previousTotal;
+  const percent = (change / previousTotal) * 100;
+  return { change, percent, hasBaseline: true };
+}
+
 export function computeLivePortfolioTotal(
   stocks: { quantity: number; lastPrice?: number }[],
   cash: number
