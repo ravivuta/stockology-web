@@ -63,7 +63,7 @@ export function PortfolioPageSkeleton() {
 
       <div className="ui-hover-lift overflow-x-auto rounded-2xl border border-border bg-elevated">
         <table className="w-full min-w-[640px] text-sm">
-          <thead className="text-subtle">
+          <thead className="bg-muted/60 text-subtle dark:bg-white/[0.05]">
             <tr>
               <th scope="col" className="px-4 pb-2 pt-3 text-left text-xs font-semibold tracking-wide">
                 <Sk className="h-3 w-14 rounded" />

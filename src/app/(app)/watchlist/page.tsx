@@ -153,59 +153,61 @@ export default function WatchlistPage() {
         </div>
       </div>
 
-      <div className="ui-hover-lift rounded-2xl border border-border bg-elevated p-4">
-        <h2 className="text-lg font-semibold text-foreground">Add to watchlist</h2>
-        <p className="mt-1 text-sm text-subtle">
-          New symbols start at 0 shares as watch-only rows. Buying shares from Portfolio still keeps them listed here.
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <input
-            value={newSymbol}
-            onChange={(e) => setNewSymbol(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addWatchlistSymbol()}
-            placeholder="Symbol (e.g. AAPL)"
-            className="min-w-[8rem] flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground sm:max-w-xs"
-          />
+      <div className="ui-hover-lift rounded-2xl border border-border bg-elevated p-3">
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-[11px] text-subtle sm:max-w-xs">
+            Filter
+            <input
+              type="search"
+              placeholder="Filter symbol…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+            />
+          </label>
+          <label className="flex min-w-[9rem] flex-col gap-1 text-[11px] text-subtle">
+            Add symbol
+            <input
+              value={newSymbol}
+              onChange={(e) => setNewSymbol(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addWatchlistSymbol()}
+              placeholder="AAPL"
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+            />
+          </label>
           <button
             type="button"
             onClick={addWatchlistSymbol}
-            className={appCtaButton("ui-hover-pop px-4 py-2 text-sm")}
+            className={appCtaButton("ui-hover-pop px-3 py-2 text-sm")}
           >
-            Add symbol
+            Add
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowShortlisted((v) => !v)}
+            className={`rounded-full border px-3 py-2 text-xs font-semibold transition-colors ${
+              showShortlisted
+                ? "border-transparent bg-amber-300 text-black"
+                : "border-border bg-background text-subtle hover:text-foreground"
+            }`}
+          >
+            Shortlisted
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowActionable((v) => !v)}
+            className={`rounded-full border px-3 py-2 text-xs font-semibold transition-colors ${
+              showActionable
+                ? "border-transparent bg-emerald-300 text-black"
+                : "border-border bg-background text-subtle hover:text-foreground"
+            }`}
+          >
+            Actionable
           </button>
         </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => setShowShortlisted((v) => !v)}
-          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-            showShortlisted
-              ? "border-transparent bg-amber-300 text-black"
-              : "border-border bg-elevated text-subtle hover:text-foreground"
-          }`}
-        >
-          Shortlisted
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowActionable((v) => !v)}
-          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-            showActionable
-              ? "border-transparent bg-emerald-300 text-black"
-              : "border-border bg-elevated text-subtle hover:text-foreground"
-          }`}
-        >
-          Actionable
-        </button>
-        <input
-          type="search"
-          placeholder="Filter symbol…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="min-w-[10rem] flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground sm:max-w-xs"
-        />
+        <p className="mt-2 text-xs text-subtle">
+          Add watch-only symbols here or filter the tracked list. Holdings stay on this list automatically.
+        </p>
       </div>
 
       <div className="w-full overflow-x-auto rounded-2xl border border-border bg-elevated">
@@ -220,7 +222,7 @@ export default function WatchlistPage() {
             <col style={{ width: "12%" }} />
             <col style={{ width: "8%" }} />
           </colgroup>
-          <thead className="text-xs font-semibold uppercase tracking-wide text-subtle">
+          <thead className="bg-muted/60 text-xs font-semibold uppercase tracking-wide text-subtle dark:bg-white/[0.05]">
             <tr>
               <SortableHeaderCell label="Symbol" column="symbol" activeColumn={sort} direction={sortDirection} onSort={toggleSort} className="px-2 py-3 pl-4 sm:px-3 sm:pl-5" />
               <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
@@ -238,7 +240,7 @@ export default function WatchlistPage() {
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-8 text-center text-subtle sm:px-5">
-                  No symbols yet. Add a symbol above, import CSV, or finish onboarding.
+                  No symbols yet. Add a symbol in the toolbar above, import CSV, or finish onboarding.
                 </td>
               </tr>
             ) : (

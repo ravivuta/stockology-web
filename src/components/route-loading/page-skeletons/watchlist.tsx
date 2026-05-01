@@ -45,7 +45,7 @@ export function WatchlistPageSkeleton() {
               <col key={i} style={{ width: "12.5%" }} />
             ))}
           </colgroup>
-          <thead className="text-xs font-semibold uppercase tracking-wide text-subtle">
+          <thead className="bg-muted/60 text-xs font-semibold uppercase tracking-wide text-subtle dark:bg-white/[0.05]">
             <tr>
               <th scope="col" className="px-2 py-3 pl-4 text-left sm:px-3 sm:pl-5">
                 <Sk className="h-3 w-14 rounded" />

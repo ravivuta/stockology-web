@@ -214,7 +214,7 @@ export default function PortfolioPage() {
             <col style={{ width: "8%" }} />
             <col style={{ width: "12%" }} />
           </colgroup>
-          <thead className="text-subtle">
+          <thead className="bg-muted/60 text-subtle dark:bg-white/[0.05]">
             <tr>
               <SortableHeaderCell label="Symbol" column="symbol" activeColumn={sort} direction={sortDirection} onSort={toggleSort} />
               <SortableHeaderCell label="Qty" column="quantity" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
@@ -230,6 +230,7 @@ export default function PortfolioPage() {
           <tbody>
             {rows.flatMap((s) => {
               const value = s.quantity * (s.lastPrice ?? 0);
+              const valueWeightPct = assetsValue > 0 ? (value / assetsValue) * 100 : null;
               const costBasis = s.quantity * s.averageCost;
               const gainLoss = value - costBasis;
               const gainLossPct = costBasis > 0 ? (gainLoss / costBasis) * 100 : null;
@@ -253,7 +254,10 @@ export default function PortfolioPage() {
                   <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatCurrency(s.averageCost)}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatCurrency(costBasis)}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatCurrency(s.lastPrice ?? 0)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatCurrency(value)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-foreground">
+                    {formatCurrency(value)}
+                    {valueWeightPct != null ? ` (${formatPercent(valueWeightPct)})` : ""}
+                  </td>
                   <td
                     className={`px-4 py-3 text-right tabular-nums font-medium ${
                       gainLoss > 0

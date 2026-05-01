@@ -59,6 +59,8 @@ function ActionRow({ stock, dimmed }: { stock: StockHolding; dimmed?: boolean })
 export function RecommendedActionsWidget({ stocks }: { stocks: StockHolding[] }) {
   const reduceMotion = useReducedMotion();
   const { items, source } = useMemo(() => pickActions(stocks), [stocks]);
+  if (items.length === 0) return null;
+
   const hasOverflow = items.length > MAX_VISIBLE;
   const visible = hasOverflow ? items.slice(0, MAX_VISIBLE) : items;
   const peek = hasOverflow ? items[MAX_VISIBLE] : null;
@@ -73,49 +75,41 @@ export function RecommendedActionsWidget({ stocks }: { stocks: StockHolding[] })
       <div className="mb-4">
         <h2 className="text-base font-semibold tracking-tight">Recommended actions</h2>
         <p className="mt-0.5 text-xs text-subtle">
-          {items.length === 0
-            ? "BUY, ADD, SELL, and REDUCE signals from the same rules as iOS (WAIT hidden)."
-            : source === "holdings"
-              ? "Signals for positions you hold (aligned with iOS Recommendation tab)."
-              : "No held positions need action — showing watchlist entry signals."}
+          {source === "holdings"
+            ? "Signals for positions you hold (aligned with iOS Recommendation tab)."
+            : "No held positions need action — showing watchlist entry signals."}
         </p>
       </div>
 
-      {items.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-border bg-background/40 py-10 text-center text-sm text-subtle dark:bg-white/5">
-          No actions needed
-        </p>
-      ) : (
-        <div className="space-y-2">
-          <ul className="space-y-2">
-            {visible.map((s) => (
-              <li key={s.symbol}>
-                <ActionRow stock={s} />
-              </li>
-            ))}
-          </ul>
+      <div className="space-y-2">
+        <ul className="space-y-2">
+          {visible.map((s) => (
+            <li key={s.symbol}>
+              <ActionRow stock={s} />
+            </li>
+          ))}
+        </ul>
 
-          {peek && (
-            <div className="pt-1">
-              <div
-                className="relative h-[2.125rem] overflow-hidden rounded-xl border border-border/60 bg-background/30 dark:bg-white/5"
-                aria-hidden
-              >
-                <div className="absolute inset-x-0 top-0 origin-top scale-[0.98] blur-[3px] opacity-[0.45]">
-                  <ActionRow stock={peek} dimmed />
-                </div>
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-[color-mix(in_srgb,var(--theme-surface-elevated)_50%,transparent)] to-[var(--theme-surface-elevated)] dark:via-[color-mix(in_srgb,var(--theme-surface-elevated)_35%,transparent)] dark:to-[var(--theme-surface-elevated)]" />
+        {peek && (
+          <div className="pt-1">
+            <div
+              className="relative h-[2.125rem] overflow-hidden rounded-xl border border-border/60 bg-background/30 dark:bg-white/5"
+              aria-hidden
+            >
+              <div className="absolute inset-x-0 top-0 origin-top scale-[0.98] blur-[3px] opacity-[0.45]">
+                <ActionRow stock={peek} dimmed />
               </div>
-              <Link
-                href="/watchlist"
-                className="ui-hover-text mt-3 block text-center text-sm font-semibold text-primary"
-              >
-                View more
-              </Link>
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-[color-mix(in_srgb,var(--theme-surface-elevated)_50%,transparent)] to-[var(--theme-surface-elevated)] dark:via-[color-mix(in_srgb,var(--theme-surface-elevated)_35%,transparent)] dark:to-[var(--theme-surface-elevated)]" />
             </div>
-          )}
-        </div>
-      )}
+            <Link
+              href="/watchlist"
+              className="ui-hover-text mt-3 block text-center text-sm font-semibold text-primary"
+            >
+              View more
+            </Link>
+          </div>
+        )}
+      </div>
     </motion.section>
   );
 }
