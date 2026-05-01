@@ -11,11 +11,9 @@ const baseSecurityHeaders: { key: string; value: string }[] = [
   },
 ];
 
-const BASE_PATH = "/stocksPM";
+const BASE_PATH = "";
 
 const nextConfig: NextConfig = {
-  // Serve the entire app under /stocksPM so it lives at appaitech.net/stocksPM
-  basePath: BASE_PATH,
   // Expose basePath to client & server code for manual fetch() calls and redirects
   env: {
     NEXT_PUBLIC_BASE_PATH: BASE_PATH,

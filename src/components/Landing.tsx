@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import Link from "next/link";
 import { useRef } from "react";
 import { motion, useReducedMotion, useScroll, useSpring, type MotionValue } from "framer-motion";
@@ -92,6 +93,10 @@ function LandingMarketingTopChrome({
             </span>
           </Link>
           <nav className="flex shrink-0 items-center gap-0.5 sm:gap-1" aria-label="Marketing">
+            <Link href="/#features" className={linkQuiet + " hidden sm:inline-flex"}>Features</Link>
+            <Link href="/#pricing" className={linkQuiet + " hidden sm:inline-flex"}>Pricing</Link>
+            <Link href="/about" className={linkQuiet + " hidden sm:inline-flex"}>About</Link>
+            <Link href="/contact" className={linkQuiet + " hidden sm:inline-flex"}>Contact</Link>
             {hasSession ? (
               <TransitionLink href="/dashboard" prefetch={false} className={pillOutline}>
                 Dashboard
@@ -302,6 +307,168 @@ export function Landing({ hasSession }: { hasSession: boolean }) {
           <LandingProductDepth reduce={reduce ?? false} scrollLockRootRef={landingScrollLockRootRef} />
 
           <LandingTutorialJourney reduce={reduce ?? false} />
+
+          {/* ── Features ── */}
+          <section id="features" className="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
+            <motion.h2
+              className="mb-12 text-center text-2xl font-bold tracking-tight text-white sm:text-3xl"
+              initial={reduce ? false : { opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={scrollAppearViewport}
+              transition={{ duration: 0.6, ease }}
+            >
+              Powerful features built for investors
+            </motion.h2>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {[
+                { icon: "📊", title: "Real-Time Dashboard", body: "Track your portfolio with live market data. Monitor holdings, gains/losses, and performance metrics all in one place." },
+                { icon: "⚙️", title: "Optimization Engine", body: "Advanced optimization analyzes your portfolio and delivers data-driven buy/sell/hold recommendations tailored to your investments." },
+                { icon: "📈", title: "Backtesting & Simulation", body: "Test investment strategies against years of historical data with paper trading. Practice risk-free before committing capital." },
+                { icon: "⭐", title: "Watchlist Management", body: "Monitor stocks before investing. Create custom watchlists and analyze multiple symbols with advanced filtering." },
+                { icon: "📍", title: "Portfolio Comparison", body: "Compare your portfolio performance against S&P 500 benchmarks. Understand how you're doing versus the market." },
+                { icon: "🎯", title: "Smart Filtering", body: "Organize stocks by actionable recommendations, holdings, or custom filters. Focus on what matters most for your strategy." },
+              ].map((f, i) => (
+                <motion.div
+                  key={f.title}
+                  className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6 transition-colors hover:border-emerald-400/20 hover:bg-white/[0.05]"
+                  initial={reduce ? false : { opacity: 0, y: 18 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={scrollAppearViewport}
+                  transition={{ duration: 0.55, ease, delay: i * 0.06 }}
+                >
+                  <div className="mb-3 text-2xl">{f.icon}</div>
+                  <h3 className="mb-2 text-base font-semibold text-white">{f.title}</h3>
+                  <p className="text-sm leading-relaxed text-zinc-400">{f.body}</p>
+                </motion.div>
+              ))}
+            </div>
+          </section>
+
+          {/* ── Screenshots ── */}
+          <section className="relative overflow-hidden border-y border-white/[0.05] bg-white/[0.018] py-20 sm:py-28">
+            <div className="mx-auto max-w-6xl px-4 sm:px-6">
+              <h2 className="mb-4 text-center text-2xl font-bold tracking-tight text-white sm:text-3xl">See Stocks PM in action</h2>
+              <p className="mx-auto mb-12 max-w-xl text-center text-sm text-zinc-400">Manage your portfolio, get personalised recommendations, and backtest strategies—all from one app.</p>
+              <div className="grid gap-6 sm:grid-cols-3">
+                {[
+                  { src: "/images/portfolio_graph.png", label: "Portfolio Performance" },
+                  { src: "/images/portfolio_vs_sp_graph.png", label: "vs. S&P 500" },
+                  { src: "/images/recommended_actions.png", label: "Recommendations" },
+                ].map((img) => (
+                  <div key={img.src} className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03]">
+                    <Image src={img.src} alt={img.label} width={600} height={192} className="h-48 w-full object-cover" />
+                    <p className="px-4 py-3 text-center text-sm font-medium text-zinc-300">{img.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* ── Pricing ── */}
+          <section id="pricing" className="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
+            <motion.h2
+              className="mb-4 text-center text-2xl font-bold tracking-tight text-white sm:text-3xl"
+              initial={reduce ? false : { opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={scrollAppearViewport}
+              transition={{ duration: 0.6, ease }}
+            >
+              Simple, transparent pricing
+            </motion.h2>
+            <p className="mx-auto mb-12 max-w-md text-center text-sm text-zinc-400">Start free for 30 days—no credit card required.</p>
+            <div className="grid gap-6 sm:grid-cols-3">
+              {[
+                {
+                  name: "Free Trial", period: "30 days", price: "Free", note: "Full access, no card needed",
+                  features: ["Full Dashboard & Portfolio", "Optimization Engine", "Backtesting & Simulation", "Up to 100 stocks", "Real-time market data"],
+                  highlight: false,
+                },
+                {
+                  name: "Monthly", period: "Auto-renews", price: "$3.99", note: "per month",
+                  features: ["Everything in Free Trial", "Unlimited stocks", "Advanced analytics", "Priority support", "Continuous updates"],
+                  highlight: true,
+                },
+                {
+                  name: "Yearly", period: "Save 27%", price: "$34.99", note: "per year",
+                  features: ["Everything in Monthly", "27% savings vs monthly", "Dedicated support email", "Early feature access", "Annual portfolio report"],
+                  highlight: false,
+                },
+              ].map((plan, i) => (
+                <motion.div
+                  key={plan.name}
+                  className={`flex flex-col rounded-2xl border p-7 ${plan.highlight ? "border-emerald-400/35 bg-emerald-500/[0.07] shadow-[0_0_40px_-12px_rgba(52,211,153,0.2)]" : "border-white/[0.08] bg-white/[0.03]"}`}
+                  initial={reduce ? false : { opacity: 0, y: 18 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={scrollAppearViewport}
+                  transition={{ duration: 0.55, ease, delay: i * 0.08 }}
+                >
+                  <div className="mb-1 text-xs font-semibold uppercase tracking-widest text-zinc-500">{plan.period}</div>
+                  <div className="mb-1 text-xl font-bold text-white">{plan.name}</div>
+                  <div className="mb-1 text-3xl font-bold text-white">{plan.price}</div>
+                  <div className="mb-5 text-xs text-zinc-500">{plan.note}</div>
+                  <ul className="mb-8 flex flex-col gap-2">
+                    {plan.features.map((f) => (
+                      <li key={f} className="flex items-start gap-2 text-sm text-zinc-300">
+                        <span className="mt-0.5 shrink-0 text-emerald-400">✓</span>{f}
+                      </li>
+                    ))}
+                  </ul>
+                  <TransitionLink
+                    href="/signup"
+                    prefetch={false}
+                    className={`mt-auto rounded-xl px-5 py-2.5 text-center text-sm font-semibold no-underline transition-colors ${plan.highlight ? "bg-emerald-500 text-white hover:bg-emerald-400" : "border border-white/15 bg-white/5 text-white hover:bg-white/10"}`}
+                  >
+                    Get started
+                  </TransitionLink>
+                </motion.div>
+              ))}
+            </div>
+          </section>
+
+          {/* ── FAQ ── */}
+          <section id="faq" className="relative overflow-hidden border-t border-white/[0.05] bg-white/[0.018] py-20 sm:py-28">
+            <div className="mx-auto max-w-3xl px-4 sm:px-6">
+              <h2 className="mb-12 text-center text-2xl font-bold tracking-tight text-white sm:text-3xl">Frequently asked questions</h2>
+              <div className="flex flex-col gap-4">
+                {[
+                  { q: "How secure is my portfolio data?", a: "Your data is encrypted with industry-standard AES-256 encryption in transit (HTTPS) and at rest. We never sell your data." },
+                  { q: "Can I export my data?", a: "Yes! You can export your portfolio holdings as a CSV file at any time. Your data belongs to you." },
+                  { q: "Do I need technical knowledge?", a: "No. Stocks PM is designed for everyone, from beginners to experienced investors, with clear explanations at every step." },
+                  { q: "Can I cancel my subscription anytime?", a: "Yes. Cancel anytime from the Profile settings page—no questions asked." },
+                  { q: "Does Stocks PM execute trades automatically?", a: "No. Stocks PM provides recommendations and analysis only. All trades are executed by you through your brokerage." },
+                  { q: "What data sources does Stocks PM use?", a: "We pull real-time and historical stock data from trusted financial data providers including MarketStack and Yahoo Finance." },
+                  { q: "Can I use Stocks PM on multiple devices?", a: "Your portfolio syncs across all devices. Sign in on any browser and access your data instantly." },
+                ].map((item, i) => (
+                  <motion.div
+                    key={item.q}
+                    className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5"
+                    initial={reduce ? false : { opacity: 0, y: 12 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={scrollAppearViewport}
+                    transition={{ duration: 0.5, ease, delay: i * 0.04 }}
+                  >
+                    <h4 className="mb-2 text-sm font-semibold text-emerald-300">{item.q}</h4>
+                    <p className="text-sm leading-relaxed text-zinc-400">{item.a}</p>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* ── Footer links ── */}
+          <section className="border-t border-white/[0.05] py-10">
+            <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-6 gap-y-2 px-4 sm:px-6">
+              {[
+                { label: "About", href: "/about" },
+                { label: "Contact", href: "/contact" },
+                { label: "Privacy", href: "/privacy" },
+                { label: "Terms", href: "/terms" },
+              ].map((l) => (
+                <Link key={l.href} href={l.href} className="text-xs text-zinc-500 no-underline transition-colors hover:text-zinc-300">{l.label}</Link>
+              ))}
+              <span className="w-full text-center text-xs text-zinc-600 sm:w-auto sm:text-left">© 2026 Stocks PM by AppAiTech</span>
+            </div>
+          </section>
 
           {/* CTA band */}
           <section className="relative mx-auto max-w-6xl px-4 pb-24 sm:px-6 sm:pb-32">
