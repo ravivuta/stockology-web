@@ -2,10 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
-import { StockDetailExpandPanel } from "@/components/stock/StockDetailExpandPanel";
 import { runRefreshPipeline } from "@/lib/refresh";
 import { analystTargetUpsidePct, formatMarketCapCompact, formatUpsidePct } from "@/lib/marketFormat";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
@@ -22,7 +20,6 @@ export default function WatchlistPage() {
   const [query, setQuery] = useState("");
   const [newSymbol, setNewSymbol] = useState("");
   const [refreshing, setRefreshing] = useState(false);
-  const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
 
   const rows = useMemo(() => {
@@ -154,25 +151,21 @@ export default function WatchlistPage() {
                 </td>
               </tr>
             ) : (
-              rows.flatMap((s) => {
+              rows.map((s) => {
                 const upside = analystTargetUpsidePct(s.lastPrice, s.analystTarget);
                 const rating = s.analystAvg?.trim();
-                const expanded = detailSymbol === s.symbol;
-                const main = (
+                return (
                   <tr
                     key={s.symbol}
                     className="transition-colors duration-150 hover:bg-muted/50 dark:hover:bg-white/[0.04]"
                   >
                     <td className="min-w-0 px-2 py-3 pl-4 align-middle font-medium text-foreground sm:px-3 sm:pl-5">
-                      <button
-                        type="button"
-                        onClick={() => setDetailSymbol(expanded ? null : s.symbol)}
-                        className="ui-hover-text inline-flex max-w-full min-w-0 items-center gap-1 text-left text-primary"
-                        aria-expanded={expanded}
+                      <Link
+                        href={`/stock/${encodeURIComponent(s.symbol)}`}
+                        className="ui-hover-text inline-flex max-w-full min-w-0 text-left text-primary hover:underline"
                       >
                         <span className="min-w-0 truncate">{s.symbol}</span>
-                        <ChevronDown className={`h-4 w-4 shrink-0 opacity-80 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden />
-                      </button>
+                      </Link>
                     </td>
                     <td className="px-2 py-3 text-right tabular-nums text-subtle sm:px-3">${(s.lastPrice ?? 0).toFixed(2)}</td>
                     <td className="px-2 py-3 text-right tabular-nums text-subtle sm:px-3">
@@ -215,15 +208,6 @@ export default function WatchlistPage() {
                     </td>
                   </tr>
                 );
-                if (!expanded) return [main];
-                return [
-                  main,
-                  <tr key={`${s.symbol}-detail`} className="bg-muted/25 dark:bg-white/[0.03]">
-                    <td colSpan={8} className="p-0 align-top">
-                      <StockDetailExpandPanel symbol={s.symbol} embedded onClose={() => setDetailSymbol(null)} />
-                    </td>
-                  </tr>,
-                ];
               })
             )}
           </tbody>
