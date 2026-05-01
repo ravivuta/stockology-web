@@ -9,12 +9,24 @@ import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
 import { PortfolioAllocationChart } from "@/components/portfolio/PortfolioAllocationChart";
 import { PortfolioNetWorthChart } from "@/components/portfolio/PortfolioNetWorthChart";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
 import { SymbolTradeCombobox } from "@/components/portfolio/SymbolTradeCombobox";
 import { isValidTicker } from "@/lib/csvPortfolio";
 import { recommendationActionDisplay } from "@/lib/recommendation";
 import { computeTodayChangeFromLiveQuotes } from "@/lib/portfolio-net-worth-series";
 
-type SortKey = "symbol" | "value" | "pnl";
+type SortKey = "symbol" | "quantity" | "averageCost" | "costBasis" | "lastPrice" | "value" | "gainLoss" | "today";
+
+const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
+  symbol: "asc",
+  quantity: "desc",
+  averageCost: "desc",
+  costBasis: "desc",
+  lastPrice: "desc",
+  value: "desc",
+  gainLoss: "desc",
+  today: "desc",
+};
 
 function recBadgeClass(action: string): string {
   const u = action.toUpperCase();
@@ -40,6 +52,7 @@ export default function PortfolioPage() {
   const undoLastTrade = usePortfolioStore((s) => s.undoLastTrade);
 
   const [sort, setSort] = useState<SortKey>("symbol");
+  const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION.symbol);
   const [query, setQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
@@ -52,21 +65,62 @@ export default function PortfolioPage() {
   /** Portfolio page lists positions only; watchlist-only symbols (0 qty) stay in store for trading elsewhere. */
   const holdings = useMemo(() => stocks.filter((s) => s.quantity > 0), [stocks]);
 
+  function toggleSort(next: SortKey) {
+    if (sort === next) {
+      setSortDirection((dir) => (dir === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSort(next);
+    setSortDirection(DEFAULT_SORT_DIRECTION[next]);
+  }
+
   const rows = useMemo(() => {
     let r = [...holdings];
     const q = query.trim().toUpperCase();
     if (q) r = r.filter((s) => s.symbol.includes(q));
     r.sort((a, b) => {
-      if (sort === "symbol") return a.symbol.localeCompare(b.symbol);
-      const va = a.quantity * (a.lastPrice ?? 0);
-      const vb = b.quantity * (b.lastPrice ?? 0);
-      if (sort === "value") return vb - va;
-      const pa = (a.lastPrice ?? 0) - a.averageCost;
-      const pb = (b.lastPrice ?? 0) - b.averageCost;
-      return pb * b.quantity - pa * a.quantity;
+      const valueA = a.quantity * (a.lastPrice ?? 0);
+      const valueB = b.quantity * (b.lastPrice ?? 0);
+      const costBasisA = a.quantity * a.averageCost;
+      const costBasisB = b.quantity * b.averageCost;
+      const gainLossA = valueA - costBasisA;
+      const gainLossB = valueB - costBasisB;
+      const todayA = a.dailyChangePercent ?? Number.NEGATIVE_INFINITY;
+      const todayB = b.dailyChangePercent ?? Number.NEGATIVE_INFINITY;
+
+      let cmp = 0;
+      switch (sort) {
+        case "symbol":
+          cmp = a.symbol.localeCompare(b.symbol);
+          break;
+        case "quantity":
+          cmp = a.quantity - b.quantity;
+          break;
+        case "averageCost":
+          cmp = a.averageCost - b.averageCost;
+          break;
+        case "costBasis":
+          cmp = costBasisA - costBasisB;
+          break;
+        case "lastPrice":
+          cmp = (a.lastPrice ?? 0) - (b.lastPrice ?? 0);
+          break;
+        case "value":
+          cmp = valueA - valueB;
+          break;
+        case "gainLoss":
+          cmp = gainLossA - gainLossB;
+          break;
+        case "today":
+          cmp = todayA - todayB;
+          break;
+      }
+
+      if (cmp === 0) return a.symbol.localeCompare(b.symbol);
+      return sortDirection === "asc" ? cmp : -cmp;
     });
     return r;
-  }, [holdings, sort, query]);
+  }, [holdings, query, sort, sortDirection]);
 
   const { assetsValue, netWorth, portfolioTodayChange } = useMemo(() => {
     const assets = stocks.reduce((a, s) => a + s.quantity * (s.lastPrice ?? 0), 0);
@@ -269,41 +323,21 @@ export default function PortfolioPage() {
           onChange={(e) => setQuery(e.target.value)}
           className="min-w-[10rem] flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground sm:max-w-xs"
         />
-        <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground">
-          <option value="symbol">Sort: Symbol</option>
-          <option value="value">Sort: Value</option>
-          <option value="pnl">Sort: P/L</option>
-        </select>
+        <p className="text-xs text-subtle">Click a column header to sort</p>
       </div>
 
       <div className="ui-hover-lift overflow-x-auto rounded-2xl border border-border bg-elevated">
         <table className="w-full min-w-[840px] text-sm">
           <thead className="text-subtle">
             <tr>
-              <th scope="col" className="px-4 pb-2 pt-3 text-left text-xs font-semibold tracking-wide">
-                Symbol
-              </th>
-              <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold tabular-nums tracking-wide">
-                Qty
-              </th>
-              <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold tabular-nums tracking-wide">
-                Avg
-              </th>
-              <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold tabular-nums tracking-wide">
-                Cost basis
-              </th>
-              <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold tabular-nums tracking-wide">
-                Last
-              </th>
-              <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold tabular-nums tracking-wide">
-                Current value
-              </th>
-              <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold tabular-nums tracking-wide">
-                Gain / loss (%)
-              </th>
-              <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold tabular-nums tracking-wide">
-                Today %
-              </th>
+              <SortableHeaderCell label="Symbol" column="symbol" activeColumn={sort} direction={sortDirection} onSort={toggleSort} />
+              <SortableHeaderCell label="Qty" column="quantity" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
+              <SortableHeaderCell label="Avg" column="averageCost" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
+              <SortableHeaderCell label="Cost basis" column="costBasis" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
+              <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
+              <SortableHeaderCell label="Current value" column="value" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
+              <SortableHeaderCell label="Gain / loss (%)" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
+              <SortableHeaderCell label="Today %" column="today" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
             </tr>
           </thead>
           <tbody>

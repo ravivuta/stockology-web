@@ -8,6 +8,19 @@ import { runRefreshPipeline } from "@/lib/refresh";
 import { analystTargetUpsidePct, formatMarketCapCompact, formatUpsidePct } from "@/lib/marketFormat";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
+
+type SortKey = "symbol" | "lastPrice" | "change" | "analyst" | "upside" | "marketCap" | "signal";
+
+const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
+  symbol: "asc",
+  lastPrice: "desc",
+  change: "desc",
+  analyst: "desc",
+  upside: "desc",
+  marketCap: "desc",
+  signal: "asc",
+};
 
 /**
  * Watchlist includes every tracked symbol: zero-qty names and all holdings (they stay on the watchlist automatically).
@@ -22,6 +35,8 @@ export default function WatchlistPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [showShortlisted, setShowShortlisted] = useState(false);
   const [showActionable, setShowActionable] = useState(false);
+  const [sort, setSort] = useState<SortKey>("symbol");
+  const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION.symbol);
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
 
   function isActionable(action: string | undefined): boolean {
@@ -30,11 +45,20 @@ export default function WatchlistPage() {
     return normalized === "BUY" || normalized === "ADD" || normalized === "SELL" || normalized === "REDUCE";
   }
 
+  function toggleSort(next: SortKey) {
+    if (sort === next) {
+      setSortDirection((dir) => (dir === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSort(next);
+    setSortDirection(DEFAULT_SORT_DIRECTION[next]);
+  }
+
   const totalTrackedCount = stocks.length;
 
   const rows = useMemo(() => {
     const q = query.trim().toUpperCase();
-    return stocks
+    const filtered = stocks
       .filter((s) => {
         if (showShortlisted && !s.isShortlisted) return false;
         if (showActionable && !isActionable(s.recommendation?.action)) return false;
@@ -43,14 +67,45 @@ export default function WatchlistPage() {
           s.symbol.includes(q) ||
           (s.name ?? "").toUpperCase().includes(q)
         );
-      })
-      .sort((a, b) => {
-        const ah = a.quantity > 0 ? 0 : 1;
-        const bh = b.quantity > 0 ? 0 : 1;
-        if (ah !== bh) return ah - bh;
-        return a.symbol.localeCompare(b.symbol);
       });
-  }, [stocks, query, showActionable, showShortlisted]);
+
+    filtered.sort((a, b) => {
+      const analystA = Number.parseFloat(a.analystAvg ?? "");
+      const analystB = Number.parseFloat(b.analystAvg ?? "");
+      const upsideA = analystTargetUpsidePct(a.lastPrice, a.analystTarget);
+      const upsideB = analystTargetUpsidePct(b.lastPrice, b.analystTarget);
+
+      let cmp = 0;
+      switch (sort) {
+        case "symbol":
+          cmp = a.symbol.localeCompare(b.symbol);
+          break;
+        case "lastPrice":
+          cmp = (a.lastPrice ?? 0) - (b.lastPrice ?? 0);
+          break;
+        case "change":
+          cmp = (a.dailyChangePercent ?? Number.NEGATIVE_INFINITY) - (b.dailyChangePercent ?? Number.NEGATIVE_INFINITY);
+          break;
+        case "analyst":
+          cmp = (Number.isFinite(analystA) ? analystA : Number.NEGATIVE_INFINITY) - (Number.isFinite(analystB) ? analystB : Number.NEGATIVE_INFINITY);
+          break;
+        case "upside":
+          cmp = (upsideA ?? Number.NEGATIVE_INFINITY) - (upsideB ?? Number.NEGATIVE_INFINITY);
+          break;
+        case "marketCap":
+          cmp = (a.marketCap ?? Number.NEGATIVE_INFINITY) - (b.marketCap ?? Number.NEGATIVE_INFINITY);
+          break;
+        case "signal":
+          cmp = (a.recommendation?.action ?? "").localeCompare(b.recommendation?.action ?? "");
+          break;
+      }
+
+      if (cmp === 0) return a.symbol.localeCompare(b.symbol);
+      return sortDirection === "asc" ? cmp : -cmp;
+    });
+
+    return filtered;
+  }, [query, showActionable, showShortlisted, sort, sortDirection, stocks]);
 
   const hasActiveFilters = showShortlisted || showActionable || query.trim().length > 0;
   const watchlistCountText = hasActiveFilters ? `Showing ${rows.length} of ${totalTrackedCount}` : `Total: ${totalTrackedCount}`;
@@ -161,27 +216,13 @@ export default function WatchlistPage() {
           </colgroup>
           <thead className="text-xs font-semibold uppercase tracking-wide text-subtle">
             <tr>
-              <th scope="col" className="px-2 py-3 pl-4 text-left sm:px-3 sm:pl-5">
-                Symbol
-              </th>
-              <th scope="col" className="px-2 py-3 text-right tabular-nums sm:px-3">
-                Last
-              </th>
-              <th scope="col" className="px-2 py-3 text-right tabular-nums sm:px-3">
-                Change
-              </th>
-              <th scope="col" className="px-2 py-3 text-right tabular-nums sm:px-3">
-                Analyst
-              </th>
-              <th scope="col" className="px-2 py-3 text-right tabular-nums sm:px-3">
-                Upside
-              </th>
-              <th scope="col" className="px-2 py-3 text-right tabular-nums sm:px-3">
-                Mkt cap
-              </th>
-              <th scope="col" className="min-w-0 px-2 py-3 text-left sm:px-3">
-                Signal
-              </th>
+              <SortableHeaderCell label="Symbol" column="symbol" activeColumn={sort} direction={sortDirection} onSort={toggleSort} className="px-2 py-3 pl-4 sm:px-3 sm:pl-5" />
+              <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
+              <SortableHeaderCell label="Change" column="change" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
+              <SortableHeaderCell label="Analyst" column="analyst" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
+              <SortableHeaderCell label="Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
+              <SortableHeaderCell label="Mkt cap" column="marketCap" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
+              <SortableHeaderCell label="Signal" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} className="min-w-0 px-2 py-3 sm:px-3" />
               <th scope="col" className="px-2 py-3 pr-4 text-right sm:px-3 sm:pr-5">
                 <span className="sr-only">Actions</span>
               </th>
