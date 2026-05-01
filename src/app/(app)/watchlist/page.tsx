@@ -20,19 +20,40 @@ export default function WatchlistPage() {
   const [query, setQuery] = useState("");
   const [newSymbol, setNewSymbol] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [showShortlisted, setShowShortlisted] = useState(false);
+  const [showActionable, setShowActionable] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
+
+  function isActionable(action: string | undefined): boolean {
+    if (!action) return false;
+    const normalized = action.toUpperCase();
+    return normalized === "BUY" || normalized === "ADD" || normalized === "SELL" || normalized === "REDUCE";
+  }
+
+  const totalTrackedCount = stocks.length;
 
   const rows = useMemo(() => {
     const q = query.trim().toUpperCase();
     return stocks
-      .filter((s) => !q || s.symbol.includes(q))
+      .filter((s) => {
+        if (showShortlisted && !s.isShortlisted) return false;
+        if (showActionable && !isActionable(s.recommendation?.action)) return false;
+        if (!q) return true;
+        return (
+          s.symbol.includes(q) ||
+          (s.name ?? "").toUpperCase().includes(q)
+        );
+      })
       .sort((a, b) => {
         const ah = a.quantity > 0 ? 0 : 1;
         const bh = b.quantity > 0 ? 0 : 1;
         if (ah !== bh) return ah - bh;
         return a.symbol.localeCompare(b.symbol);
       });
-  }, [stocks, query]);
+  }, [stocks, query, showActionable, showShortlisted]);
+
+  const hasActiveFilters = showShortlisted || showActionable || query.trim().length > 0;
+  const watchlistCountText = hasActiveFilters ? `Showing ${rows.length} of ${totalTrackedCount}` : `Total: ${totalTrackedCount}`;
 
   async function refresh() {
     if (stocks.length === 0) return;
@@ -58,6 +79,7 @@ export default function WatchlistPage() {
           <p className="mt-1 text-sm text-subtle">
             All symbols you track, including every holding. Positions with shares still appear here alongside watch-only names.
           </p>
+          <p className="mt-2 text-xs text-subtle">{watchlistCountText}</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <button
@@ -99,6 +121,28 @@ export default function WatchlistPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setShowShortlisted((v) => !v)}
+          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+            showShortlisted
+              ? "border-transparent bg-amber-300 text-black"
+              : "border-border bg-elevated text-subtle hover:text-foreground"
+          }`}
+        >
+          Shortlisted
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowActionable((v) => !v)}
+          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+            showActionable
+              ? "border-transparent bg-emerald-300 text-black"
+              : "border-border bg-elevated text-subtle hover:text-foreground"
+          }`}
+        >
+          Actionable
+        </button>
         <input
           type="search"
           placeholder="Filter symbol…"
