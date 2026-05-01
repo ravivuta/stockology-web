@@ -277,7 +277,7 @@ export default function PortfolioPage() {
       </div>
 
       <div className="ui-hover-lift overflow-x-auto rounded-2xl border border-border bg-elevated">
-        <table className="w-full min-w-[980px] text-sm">
+        <table className="w-full min-w-[840px] text-sm">
           <thead className="text-subtle">
             <tr>
               <th scope="col" className="px-4 pb-2 pt-3 text-left text-xs font-semibold tracking-wide">
@@ -287,7 +287,7 @@ export default function PortfolioPage() {
                 Qty
               </th>
               <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold tabular-nums tracking-wide">
-                Avg cost
+                Avg
               </th>
               <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold tabular-nums tracking-wide">
                 Cost basis
@@ -304,9 +304,6 @@ export default function PortfolioPage() {
               <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold tabular-nums tracking-wide">
                 Today %
               </th>
-              <th scope="col" className="px-4 pb-2 pt-3 text-left text-xs font-semibold tracking-wide">
-                Recommendation
-              </th>
             </tr>
           </thead>
           <tbody>
@@ -322,13 +319,27 @@ export default function PortfolioPage() {
                   className="transition-colors duration-150 hover:bg-muted/50 dark:hover:bg-white/[0.04]"
                 >
                   <td className="px-4 py-3 align-middle">
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex min-w-0 flex-col gap-1">
                       <Link
                         href={`/stock/${encodeURIComponent(s.symbol)}`}
                         className="ui-hover-text inline-flex items-center gap-1 font-medium text-foreground hover:underline"
                       >
                         {s.symbol}
                       </Link>
+                      {s.recommendation ? (
+                        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                          <span
+                            className={`inline-flex w-fit rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${recBadgeClass(s.recommendation.action)}`}
+                          >
+                            {recommendationActionDisplay(s.recommendation.action)}
+                          </span>
+                          {s.recommendation.comments ? (
+                            <span className="truncate text-xs text-subtle" title={s.recommendation.comments}>
+                              {s.recommendation.comments}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-foreground">{s.quantity}</td>
@@ -354,24 +365,6 @@ export default function PortfolioPage() {
                     }`}
                   >
                     {d != null && Number.isFinite(d) ? `${d >= 0 ? "+" : ""}${d.toFixed(2)}%` : "—"}
-                  </td>
-                  <td className="max-w-[14rem] px-4 py-3 align-middle">
-                    {s.recommendation ? (
-                      <div className="flex flex-col gap-1">
-                        <span
-                          className={`inline-flex w-fit rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${recBadgeClass(s.recommendation.action)}`}
-                        >
-                          {recommendationActionDisplay(s.recommendation.action)}
-                        </span>
-                        {s.recommendation.comments ? (
-                          <p className="line-clamp-2 text-xs text-subtle" title={s.recommendation.comments}>
-                            {s.recommendation.comments}
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <span className="text-subtle">—</span>
-                    )}
                   </td>
                 </tr>
               );
