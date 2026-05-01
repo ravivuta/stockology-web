@@ -35,13 +35,13 @@ export function useDashboardChartTheme(): DashboardChartTheme {
       isDark: true,
       tickFill: "rgba(161,161,170,0.9)",
       tooltipBg: "rgba(24,24,27,0.96)",
-      tooltipBorder: "rgba(34,197,94,0.28)",
+      tooltipBorder: "var(--dashboard-chart-tooltip-border)",
       tooltipLabelColor: "#fafafa",
       referenceStroke: "rgba(161,161,170,0.35)",
       legendBg: "rgba(24,24,27,0.92)",
       legendText: "#fafafa",
       plotShellClass:
-        "relative overflow-hidden rounded-xl border border-border bg-[linear-gradient(165deg,var(--theme-surface-elevated)_0%,color-mix(in_srgb,var(--theme-primary)_6%,var(--theme-surface))_100%)] shadow-inner",
+        "relative overflow-hidden rounded-xl border border-[color:color-mix(in_srgb,var(--dashboard-chart-cost-basis)_20%,var(--theme-border))] bg-[linear-gradient(165deg,var(--dashboard-chart-surface-start)_0%,var(--dashboard-chart-surface-end)_100%)] shadow-inner",
       gridLineClass: gridDark,
     };
   }
@@ -52,13 +52,13 @@ export function useDashboardChartTheme(): DashboardChartTheme {
       isDark: true,
       tickFill: "rgba(161,161,170,0.9)",
       tooltipBg: "rgba(24,24,27,0.96)",
-      tooltipBorder: "rgba(34,197,94,0.28)",
+      tooltipBorder: "var(--dashboard-chart-tooltip-border)",
       tooltipLabelColor: "#fafafa",
       referenceStroke: "rgba(161,161,170,0.35)",
-      legendBg: "rgba(24,24,27,0.92)",
+      legendBg: "rgba(16,40,77,0.86)",
       legendText: "#fafafa",
       plotShellClass:
-        "relative overflow-hidden rounded-xl border border-border bg-[linear-gradient(165deg,var(--theme-surface-elevated)_0%,color-mix(in_srgb,var(--theme-primary)_8%,var(--theme-surface))_100%)] shadow-inner",
+        "relative overflow-hidden rounded-xl border border-[color:color-mix(in_srgb,var(--dashboard-chart-cost-basis)_24%,var(--theme-border))] bg-[linear-gradient(165deg,var(--dashboard-chart-surface-start)_0%,var(--dashboard-chart-surface-end)_100%)] shadow-inner",
       gridLineClass: gridDark,
     };
   }
@@ -68,13 +68,13 @@ export function useDashboardChartTheme(): DashboardChartTheme {
     isDark: false,
     tickFill: "rgba(82,82,91,0.88)",
     tooltipBg: "rgba(255,255,255,0.98)",
-    tooltipBorder: "rgba(22,163,74,0.35)",
+    tooltipBorder: "var(--dashboard-chart-tooltip-border)",
     tooltipLabelColor: "#18181b",
     referenceStroke: "rgba(82,82,91,0.25)",
-    legendBg: "rgba(255,255,255,0.96)",
+    legendBg: "rgba(255,255,255,0.88)",
     legendText: "#18181b",
     plotShellClass:
-      "relative overflow-hidden rounded-xl border border-border bg-gradient-to-b from-white to-muted/50 shadow-inner",
+      "relative overflow-hidden rounded-xl border border-[color:color-mix(in_srgb,var(--dashboard-chart-cost-basis)_18%,var(--theme-border))] bg-[linear-gradient(165deg,var(--dashboard-chart-surface-start)_0%,var(--dashboard-chart-surface-end)_100%)] shadow-inner",
     gridLineClass: gridLight,
   };
 }

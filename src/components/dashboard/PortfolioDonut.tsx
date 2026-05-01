@@ -38,11 +38,15 @@ export function PortfolioDonut({
   totalLabel = "Total",
   totalValue,
   className = "",
+  totalLabelClassName = "",
+  totalValueClassName = "",
 }: {
   segments: Segment[];
   totalLabel?: string;
   totalValue: string;
   className?: string;
+  totalLabelClassName?: string;
+  totalValueClassName?: string;
 }) {
   const reduceMotion = useReducedMotion();
 
@@ -108,17 +112,16 @@ export function PortfolioDonut({
         className="h-full w-full overflow-visible drop-shadow-sm dark:drop-shadow-[0_2px_14px_rgba(0,0,0,0.4)]"
         aria-hidden
       >
-        {/* Track ring */}
-        <circle
-          cx={CX}
-          cy={CY}
-          r={midR}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={strokeW}
-          strokeLinecap="round"
-          className="text-primary/28 dark:text-primary/45"
-        />
+      {/* Track ring */}
+      <circle
+        cx={CX}
+        cy={CY}
+        r={midR}
+        fill="none"
+        stroke="color-mix(in srgb, var(--dashboard-chart-cost-basis) 20%, transparent)"
+        strokeWidth={strokeW}
+        strokeLinecap="round"
+      />
         {arcs.map((arc, i) => (
           <motion.path
             key={`${arc.name}-${i}`}
@@ -135,13 +138,13 @@ export function PortfolioDonut({
       </svg>
 
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-2 text-center">
-        <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-subtle">{totalLabel}</span>
+        <span className={`text-[9px] font-semibold uppercase tracking-[0.14em] text-subtle ${totalLabelClassName}`}>{totalLabel}</span>
         <motion.span
           key={totalValue}
           initial={reduceMotion ? false : { opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 420, damping: 32, mass: 0.65 }}
-          className="mt-0.5 max-w-[5.5rem] truncate text-sm font-bold tabular-nums tracking-tight text-foreground sm:text-[0.95rem]"
+          className={`mt-0.5 max-w-[5.5rem] truncate text-sm font-bold tabular-nums tracking-tight text-foreground sm:text-[0.95rem] ${totalValueClassName}`}
         >
           {totalValue}
         </motion.span>

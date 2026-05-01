@@ -1,13 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { appCtaButton } from "@/lib/appCtaClasses";
+import { usePortfolioStore } from "@/store/portfolioStore";
 
 export default function SimulationPage() {
   const [symbol, setSymbol] = useState("AAPL");
   const [capital, setCapital] = useState("10000");
+  const [years, setYears] = useState("1");
   const [result, setResult] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const stocks = usePortfolioStore((s) => s.stocks);
+  const etfProfitTarget = usePortfolioStore((s) => s.etfProfitTarget);
+  const stockProfitTarget = usePortfolioStore((s) => s.stockProfitTarget);
+  const useRSIGatingForRecommendations = usePortfolioStore((s) => s.useRSIGatingForRecommendations);
+  const trackedStock = useMemo(
+    () => stocks.find((stock) => stock.symbol === symbol.trim().toUpperCase()),
+    [stocks, symbol]
+  );
 
   async function run() {
     setLoading(true);
@@ -17,7 +27,29 @@ export default function SimulationPage() {
       const res = await fetch(`${basePath}/api/python/simulation`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symbol: symbol.trim().toUpperCase(), capital: parseFloat(capital) || 0 }),
+        body: JSON.stringify({
+          symbol: symbol.trim().toUpperCase(),
+          capital: parseFloat(capital) || 0,
+          years: parseInt(years, 10) || 1,
+          shortSMA: trackedStock?.shortSMA,
+          dynamicFactor: trackedStock?.dynamicFactor,
+          stockLimit: trackedStock?.stockLimit,
+          transactionLimit: trackedStock?.transactionLimit,
+          analystTarget: trackedStock?.analystTarget,
+          analystAvg: trackedStock?.analystAvg,
+          marketCap: trackedStock?.marketCap,
+          peg: trackedStock?.peg,
+          isETF: trackedStock?.isETF,
+          enableRSIReversalGate: trackedStock?.enableRSIReversalGate,
+          rsiPeriod: trackedStock?.rsiPeriod,
+          rsiOversoldThreshold: trackedStock?.rsiOversoldThreshold,
+          rsiOverboughtThreshold: trackedStock?.rsiOverboughtThreshold,
+          rsiHysteresisPoints: trackedStock?.rsiHysteresisPoints,
+          rsiMinRisingDays: trackedStock?.rsiMinRisingDays,
+          etfProfitTargetPercent: etfProfitTarget,
+          stockProfitTargetPercent: stockProfitTarget,
+          useRSIGating: useRSIGatingForRecommendations,
+        }),
       });
       const data = await res.json();
       setResult(data.message ?? JSON.stringify(data));
@@ -32,7 +64,7 @@ export default function SimulationPage() {
     <div className="mx-auto max-w-lg space-y-6">
       <h1 className="text-2xl font-bold text-foreground">Simulation</h1>
       <p className="text-sm text-subtle">
-        Try different prices and limits to see how recommendations respond. This page may be limited while we finish the experience.
+        Backtests the iOS-style strategy on saved historical prices. Tracked symbols reuse your saved SMA, limits, and RSI settings automatically.
       </p>
       <div className="ui-hover-lift space-y-4 rounded-2xl border border-border bg-elevated p-6">
         <label className="block text-sm font-medium text-foreground">
@@ -43,6 +75,21 @@ export default function SimulationPage() {
           Starting capital
           <input value={capital} onChange={(e) => setCapital(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background text-foreground px-3 py-2" />
         </label>
+        <label className="block text-sm font-medium text-foreground">
+          Years
+          <select value={years} onChange={(e) => setYears(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background text-foreground px-3 py-2">
+            <option value="1">1 year</option>
+            <option value="2">2 years</option>
+            <option value="3">3 years</option>
+            <option value="4">4 years</option>
+          </select>
+        </label>
+        {trackedStock ? (
+          <p className="rounded-lg border border-border/70 bg-background/50 px-3 py-2 text-xs text-subtle">
+            Using saved strategy for {trackedStock.symbol}: SMA {trackedStock.shortSMA}, dynamic {trackedStock.dynamicFactor}%, stock limit $
+            {trackedStock.stockLimit.toFixed(0)}, transaction limit ${trackedStock.transactionLimit.toFixed(0)}.
+          </p>
+        ) : null}
         <button
           type="button"
           disabled={loading}

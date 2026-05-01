@@ -16,6 +16,13 @@ type RawHolding = {
   targetPrice?: number | null;
   isShortlisted?: boolean | null;
   moving_avg?: number | null;
+  noAutoBuy?: boolean | null;
+  enableRSIReversalGate?: boolean | null;
+  rsiPeriod?: number | null;
+  rsiOversoldThreshold?: number | null;
+  rsiOverboughtThreshold?: number | null;
+  rsiHysteresisPoints?: number | null;
+  rsiMinRisingDays?: number | null;
   name?: string | null;
   analystTarget?: number | null;
   analyst_target?: number | null;
@@ -155,6 +162,17 @@ function parseRawHolding(raw: unknown): { stock: StockHolding; lots: { open: Tra
     isShortlisted: h.isShortlisted !== false,
     isVisibleInRisk: true,
     isInWatchlistSize: true,
+    suppressTradeActions: h.noAutoBuy === true,
+    enableRSIReversalGate: h.enableRSIReversalGate ?? true,
+    rsiPeriod: h.rsiPeriod != null && Number.isFinite(Number(h.rsiPeriod)) ? Math.round(Number(h.rsiPeriod)) : 14,
+    rsiOversoldThreshold:
+      h.rsiOversoldThreshold != null && Number.isFinite(Number(h.rsiOversoldThreshold)) ? Number(h.rsiOversoldThreshold) : 30,
+    rsiOverboughtThreshold:
+      h.rsiOverboughtThreshold != null && Number.isFinite(Number(h.rsiOverboughtThreshold)) ? Number(h.rsiOverboughtThreshold) : 70,
+    rsiHysteresisPoints:
+      h.rsiHysteresisPoints != null && Number.isFinite(Number(h.rsiHysteresisPoints)) ? Number(h.rsiHysteresisPoints) : 5,
+    rsiMinRisingDays:
+      h.rsiMinRisingDays != null && Number.isFinite(Number(h.rsiMinRisingDays)) ? Math.round(Number(h.rsiMinRisingDays)) : 2,
     recommendation: undefined,
   };
 

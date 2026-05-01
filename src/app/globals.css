@@ -42,6 +42,18 @@
     0 1px 0 color-mix(in srgb, var(--theme-foreground) 8%, transparent),
     0 12px 32px -10px color-mix(in srgb, var(--theme-foreground) 18%, transparent);
 
+  --dashboard-chart-surface-start: #eceef2;
+  --dashboard-chart-surface-end: #d1d6e0;
+  --dashboard-chart-tooltip-border: #3a7ca5;
+  --dashboard-chart-center-text: #da8800;
+  --dashboard-chart-cash: #da8800;
+  --dashboard-chart-cost-basis: #3370c2;
+  --dashboard-chart-holdings: #4dccbf;
+  --dashboard-chart-gain: #009900;
+  --dashboard-chart-loss: #a60000;
+  --dashboard-chart-portfolio-line: var(--dashboard-chart-gain);
+  --dashboard-chart-benchmark-line: var(--dashboard-chart-loss);
+
   --chart-portfolio-line: var(--palette-cerulean);
   --chart-benchmark-line: #c2410c;
 
@@ -83,6 +95,18 @@
     0 1px 0 color-mix(in srgb, white 8%, transparent),
     0 16px 48px -12px rgba(0, 0, 0, 0.72),
     0 0 0 1px color-mix(in srgb, var(--theme-primary) 12%, transparent);
+
+  --dashboard-chart-surface-start: #10284d;
+  --dashboard-chart-surface-end: #1a3359;
+  --dashboard-chart-tooltip-border: #66abf5;
+  --dashboard-chart-center-text: #facc15;
+  --dashboard-chart-cash: #facc15;
+  --dashboard-chart-cost-basis: #66abf5;
+  --dashboard-chart-holdings: #4dccbf;
+  --dashboard-chart-gain: #34c759;
+  --dashboard-chart-loss: #db2e2e;
+  --dashboard-chart-portfolio-line: var(--dashboard-chart-gain);
+  --dashboard-chart-benchmark-line: var(--dashboard-chart-loss);
 
   --chart-portfolio-line: var(--theme-primary-light);
   --chart-benchmark-line: #fb923c;

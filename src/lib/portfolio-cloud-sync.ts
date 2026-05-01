@@ -1,17 +1,33 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { StockHolding } from "@/store/portfolioStore";
+import type { SoldLot, StockHolding, TradeLot } from "@/store/portfolioStore";
 
 type PortfolioSlice = {
   cashBalance: number;
   stocks: StockHolding[];
+  lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }>;
 };
 
 function etCalendarDateString(d = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(d);
 }
 
-function holdingPayload(s: StockHolding) {
+function holdingPayload(s: StockHolding, lots: { open: TradeLot[]; sold: SoldLot[] } | undefined) {
   const optimized = !s.pendingOptimization;
+  const openLots = (lots?.open ?? []).map((lot) => ({
+    symbol: s.symbol,
+    quantity: lot.quantity,
+    costBasis: lot.costBasis,
+    purchaseDate: lot.purchaseDate,
+    status: lot.status,
+    account: lot.account ?? null,
+  }));
+  const soldLots = (lots?.sold ?? []).map((lot) => ({
+    salePrice: lot.salePrice,
+    quantity: lot.quantity,
+    originalCostBasis:
+      lot.quantity > 0 ? lot.salePrice - lot.realizedGainLoss / lot.quantity : null,
+    saleDateIntervalSince1970: Date.parse(lot.saleDate) / 1000,
+  }));
   return {
     symbol: s.symbol,
     quantity: s.quantity,
@@ -25,7 +41,18 @@ function holdingPayload(s: StockHolding) {
     recommendation: s.recommendation?.action ?? null,
     moving_avg: s.movingAvg ?? s.recommendation?.movingAvg ?? null,
     isShortlisted: s.isShortlisted ?? true,
-    lotHistory: null,
+    noAutoBuy: s.suppressTradeActions ?? null,
+    enableRSIReversalGate: s.enableRSIReversalGate ?? true,
+    rsiPeriod: s.rsiPeriod ?? null,
+    rsiOversoldThreshold: s.rsiOversoldThreshold ?? null,
+    rsiOverboughtThreshold: s.rsiOverboughtThreshold ?? null,
+    rsiHysteresisPoints: s.rsiHysteresisPoints ?? null,
+    rsiMinRisingDays: s.rsiMinRisingDays ?? null,
+    lotHistory: {
+      symbol: s.symbol,
+      openLots,
+      soldLots,
+    },
   };
 }
 
@@ -56,7 +83,21 @@ export function portfolioSyncFingerprint(state: PortfolioSlice): string {
       s.stockLimit,
       s.transactionLimit,
       s.targetPrice,
+      s.suppressTradeActions,
+      s.enableRSIReversalGate,
+      s.rsiPeriod,
+      s.rsiOversoldThreshold,
+      s.rsiOverboughtThreshold,
+      s.rsiHysteresisPoints,
+      s.rsiMinRisingDays,
     ]),
+    lots: Object.entries(state.lotsBySymbol)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([symbol, lots]) => [
+        symbol,
+        lots.open.map((lot) => [lot.purchaseDate, lot.quantity, lot.costBasis, lot.status]),
+        lots.sold.map((lot) => [lot.saleDate, lot.quantity, lot.salePrice, lot.realizedGainLoss]),
+      ]),
   });
 }
 
@@ -70,7 +111,7 @@ export async function upsertPortfolioSnapshotForCloudUser(
   dataUserId: string,
   state: PortfolioSlice
 ): Promise<{ error: Error | null }> {
-  const holdings = state.stocks.map(holdingPayload);
+  const holdings = state.stocks.map((stock) => holdingPayload(stock, state.lotsBySymbol[stock.symbol]));
   const t = totals(state);
 
   const { error } = await supabase.rpc("save_portfolio_snapshot", {

@@ -33,8 +33,8 @@ import {
 import { fetchHistoricalPricePoints } from "@/lib/supabase-stock-history";
 
 const PALETTE = {
-  portfolioLine: "var(--chart-portfolio-line)",
-  spyLine: "var(--chart-benchmark-line)",
+  portfolioLine: "var(--dashboard-chart-portfolio-line)",
+  spyLine: "var(--dashboard-chart-benchmark-line)",
 } as const;
 
 function fmtCurrency(n: number) {
@@ -276,7 +276,7 @@ export function DashboardReturnComparison() {
               <span className="flex items-center gap-1.5">
                 <span
                   className="h-0.5 w-4 rounded-full"
-                  style={{ backgroundColor: "var(--chart-portfolio-line)" }}
+                  style={{ backgroundColor: "var(--dashboard-chart-portfolio-line)" }}
                 />{" "}
                 Portfolio
               </span>
@@ -284,7 +284,7 @@ export function DashboardReturnComparison() {
                 <span className="flex items-center gap-1.5">
                   <span
                     className="h-0.5 w-4 rounded-full"
-                    style={{ backgroundColor: "var(--chart-benchmark-line)" }}
+                    style={{ backgroundColor: "var(--dashboard-chart-benchmark-line)" }}
                   />{" "}
                   S&amp;P 500
                 </span>
@@ -296,7 +296,7 @@ export function DashboardReturnComparison() {
             <span className="flex items-center gap-1.5">
               <span
                 className="h-0.5 w-4 rounded-full"
-                style={{ backgroundColor: "var(--chart-portfolio-line)" }}
+                style={{ backgroundColor: "var(--dashboard-chart-portfolio-line)" }}
               />{" "}
               Portfolio value
             </span>

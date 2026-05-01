@@ -8,7 +8,7 @@
  *   export SUPABASE_SERVICE_ROLE_KEY="..."
  *
  * Run from repo:
- *   cd website/next && node scripts/seed-demo-account.mjs
+ *   cd stockology-web && node scripts/seed-demo-account.mjs
  *
  * Optional: SEED_TARGET_EMAIL (default appaitechmanager@gmail.com)
  */

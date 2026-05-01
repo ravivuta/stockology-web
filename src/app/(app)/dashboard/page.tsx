@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Loader2, TrendingDown, TrendingUp } from "lucide-react";
@@ -12,13 +12,16 @@ import { PortfolioDonut } from "@/components/dashboard/PortfolioDonut";
 import { StockDetailExpandPanel } from "@/components/stock/StockDetailExpandPanel";
 import { RecommendedActionsWidget } from "@/components/dashboard/RecommendedActionsWidget";
 import { DashboardReturnComparison } from "@/components/dashboard/DashboardReturnComparison";
+import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
+import { computeTodayChangeFromHistory, fetchCloudNetWorthHistory, type NetWorthPoint } from "@/lib/portfolio-net-worth-series";
 
 const PALETTE = {
-  cash: "var(--palette-baby)",
-  costBasis: "var(--theme-text-secondary)",
-  gain: "var(--theme-primary)",
-  holdingsValue: "var(--theme-primary-light)",
-  loss: "var(--palette-battleship)",
+  cash: "var(--dashboard-chart-cash)",
+  costBasis: "var(--dashboard-chart-cost-basis)",
+  gain: "var(--dashboard-chart-gain)",
+  holdingsValue: "var(--dashboard-chart-holdings)",
+  loss: "var(--dashboard-chart-loss)",
 } as const;
 
 function fmtCurrency(n: number) {
@@ -29,6 +32,10 @@ function fmtPct(n: number, digits = 1) {
   return `${n >= 0 ? "+" : ""}${n.toFixed(digits)}%`;
 }
 
+function fmtAbsPct(n: number, digits = 1) {
+  return `${Math.abs(n).toFixed(digits)}%`;
+}
+
 export default function DashboardPage() {
   const reduceMotion = useReducedMotion();
   const stocks = usePortfolioStore((s) => s.stocks);
@@ -37,6 +44,7 @@ export default function DashboardPage() {
   const [bars, setBars] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [dashStockDetail, setDashStockDetail] = useState<string | null>(null);
+  const [cloudHistory, setCloudHistory] = useState<NetWorthPoint[] | null>(null);
 
   const debouncedRecalc = useDebouncedCallback(() => recalc(), 300);
 
@@ -47,6 +55,16 @@ export default function DashboardPage() {
   const totalBalance = holdingsValue + cash;
   const isProfitable = holdingsPnL >= 0;
   const totalPnLPct = holdingsCostBasis > 0 ? (holdingsPnL / holdingsCostBasis) * 100 : 0;
+  const todayChange = useMemo(
+    () => computeTodayChangeFromHistory(cloudHistory ?? [], totalBalance),
+    [cloudHistory, totalBalance]
+  );
+  const showTodayChange = todayChange.hasBaseline && Math.abs(todayChange.change) > 0.01;
+  const todayValueClassName =
+    todayChange.change >= 0
+      ? "font-semibold text-[color:var(--dashboard-chart-gain)]"
+      : "font-semibold text-[color:var(--dashboard-chart-loss)]";
+  const todayStatusLoading = cloudHistory === null && hasSupabaseConfig();
 
   const pieData = useMemo(() => {
     if (isProfitable) {
@@ -89,6 +107,37 @@ export default function DashboardPage() {
     const a = s.recommendation?.action ?? "";
     return a && !a.startsWith("WAIT");
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    setCloudHistory(null);
+
+    async function run() {
+      if (!hasSupabaseConfig()) {
+        if (!cancelled) setCloudHistory([]);
+        return;
+      }
+      try {
+        const supabase = createClient();
+        const { data: auth } = await supabase.auth.getUser();
+        const uid = auth.user?.id;
+        if (!uid) {
+          if (!cancelled) setCloudHistory([]);
+          return;
+        }
+        const dataUserId = await resolveStocksPmDataUserId(supabase, uid);
+        const rows = await fetchCloudNetWorthHistory(supabase, dataUserId);
+        if (!cancelled) setCloudHistory(rows);
+      } catch {
+        if (!cancelled) setCloudHistory([]);
+      }
+    }
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function manualRefresh() {
     setRefreshing(true);
@@ -162,6 +211,8 @@ export default function DashboardPage() {
               <PortfolioDonut
                 segments={pieData.map((p) => ({ name: p.name, value: p.value, color: p.color }))}
                 totalValue={fmtCurrency(totalBalance)}
+                totalLabelClassName="text-[color:var(--dashboard-chart-center-text)]"
+                totalValueClassName="text-[color:var(--dashboard-chart-center-text)]"
               />
             </motion.div>
             <ul className="min-w-[9rem] max-w-xs flex-1 space-y-2 text-left sm:min-w-[10.5rem]" aria-label="Allocation breakdown">
@@ -184,28 +235,57 @@ export default function DashboardPage() {
           </div>
 
           <dl className="grid w-full max-w-lg grid-cols-1 gap-0 lg:shrink-0">
-            <StatRow label="Cash" value={fmtCurrency(cash)} accent="baby" />
+            <StatRow label="Cash" value={fmtCurrency(cash)} valueClassName="text-[color:var(--dashboard-chart-cash)]" />
             {isProfitable ? (
               <>
-                <StatRow label="Cost" value={fmtCurrency(holdingsCostBasis)} accent="cerulean" />
-                <StatRow label="Gain" value={`${fmtCurrency(holdingsPnL)} (${fmtPct(Math.abs(totalPnLPct))})`} accent="yale" last />
+                <StatRow
+                  label="Cost"
+                  value={fmtCurrency(holdingsCostBasis)}
+                  valueClassName="text-[color:var(--dashboard-chart-cost-basis)]"
+                />
+                <StatRow
+                  label="Gain"
+                  value={`${fmtCurrency(holdingsPnL)} (${fmtAbsPct(totalPnLPct)})`}
+                  valueClassName="font-semibold text-[color:var(--dashboard-chart-gain)]"
+                  last={!showTodayChange}
+                />
               </>
             ) : (
               <>
-                <StatRow label="Cost basis" value={fmtCurrency(holdingsCostBasis)} accent="cerulean" />
-                <StatRow label="Current value" value={fmtCurrency(holdingsValue)} accent="cerulean" />
+                <StatRow
+                  label="Cost basis"
+                  value={fmtCurrency(holdingsCostBasis)}
+                  valueClassName="text-[color:var(--dashboard-chart-cost-basis)]"
+                />
+                <StatRow
+                  label="Current value"
+                  value={fmtCurrency(holdingsValue)}
+                  valueClassName="text-[color:var(--dashboard-chart-holdings)]"
+                />
                 <StatRow
                   label="Loss"
-                  value={`${fmtCurrency(Math.abs(holdingsPnL))} (${fmtPct(Math.abs(totalPnLPct))})`}
-                  accent="battleship"
-                  last
+                  value={`${fmtCurrency(Math.abs(holdingsPnL))} (${fmtAbsPct(totalPnLPct)})`}
+                  valueClassName="font-semibold text-[color:var(--dashboard-chart-loss)]"
+                  last={!showTodayChange}
                 />
               </>
             )}
+            {showTodayChange ? (
+              <StatRow
+                label="Today"
+                value={`${fmtCurrency(Math.abs(todayChange.change))} (${fmtPct(todayChange.percent)})`}
+                valueClassName={todayValueClassName}
+                last
+              />
+            ) : null}
           </dl>
         </div>
         <p className="mt-4 text-[11px] leading-relaxed text-subtle">
-          Today vs prior close: — (uses U.S. market calendar when price history is available)
+          {showTodayChange
+            ? "Today compares your live total against the latest saved portfolio snapshot before today in U.S. Eastern time."
+            : todayStatusLoading
+              ? "Loading today change from your saved portfolio snapshots…"
+              : "Today appears once at least one prior U.S. trading-day portfolio snapshot is available."}
         </p>
       </motion.section>
 
@@ -284,22 +364,14 @@ export default function DashboardPage() {
 function StatRow({
   label,
   value,
-  accent,
+  valueClassName,
   last,
 }: {
   label: string;
   value: string;
-  accent: "baby" | "cerulean" | "yale" | "battleship";
+  valueClassName?: string;
   last?: boolean;
 }) {
-  const valueClass =
-    accent === "baby"
-      ? "text-primary"
-      : accent === "cerulean"
-        ? "text-subtle"
-        : accent === "yale"
-          ? "font-semibold text-primary"
-          : "text-subtle";
   return (
     <div
       className={`flex items-baseline justify-between gap-4 py-2.5 ${
@@ -307,7 +379,7 @@ function StatRow({
       }`}
     >
       <dt className="text-sm font-medium text-subtle">{label}</dt>
-      <dd className={`text-right text-sm tabular-nums ${valueClass}`}>{value}</dd>
+      <dd className={`text-right text-sm tabular-nums ${valueClassName ?? "text-subtle"}`}>{value}</dd>
     </div>
   );
 }

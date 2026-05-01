@@ -9,14 +9,54 @@ export type NetWorthSeriesMeta = {
   source: "cloud" | "journal" | "live_only";
 };
 
+export type TodayChangeDelta = {
+  change: number;
+  percent: number;
+  hasBaseline: boolean;
+};
+
 function etCalendarDateString(d = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(d);
+}
+
+function etWeekdayShort(d = new Date()): string {
+  return new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short" }).format(d);
 }
 
 function parseYmdUtcNoon(ymd: string): number {
   const p = ymd.trim().split("-").map((x) => parseInt(x, 10));
   if (p.length !== 3 || p.some((n) => !Number.isFinite(n))) return Date.now();
   return Date.UTC(p[0], p[1] - 1, p[2], 12, 0, 0);
+}
+
+export function computeTodayChangeFromHistory(
+  cloudHistory: NetWorthPoint[],
+  liveTotal: number,
+  now = new Date()
+): TodayChangeDelta {
+  const weekday = etWeekdayShort(now);
+  if (weekday === "Sat" || weekday === "Sun") {
+    return { change: 0, percent: 0, hasBaseline: false };
+  }
+
+  if (!Number.isFinite(liveTotal) || liveTotal <= 0) {
+    return { change: 0, percent: 0, hasBaseline: false };
+  }
+
+  const todayEt = etCalendarDateString(now);
+  const todayT = parseYmdUtcNoon(todayEt);
+  const baseline = [...cloudHistory]
+    .filter((point) => Number.isFinite(point.value) && point.value > 0 && point.t < todayT)
+    .sort((a, b) => a.t - b.t)
+    .at(-1);
+
+  if (!baseline || baseline.value <= 0) {
+    return { change: 0, percent: 0, hasBaseline: false };
+  }
+
+  const change = liveTotal - baseline.value;
+  const percent = (change / baseline.value) * 100;
+  return { change, percent, hasBaseline: true };
 }
 
 export function computeLivePortfolioTotal(

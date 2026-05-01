@@ -7,7 +7,7 @@
  * If a symbol fails, fills with deterministic synthetic prices for that window so the script always finishes.
  *
  * NOT wired into the Next app. Run from repo:
- *   cd website/next && npx tsx scripts/backtest-recommendation-runs.ts
+ *   cd stockology-web && npx tsx scripts/backtest-recommendation-runs.ts
  */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";

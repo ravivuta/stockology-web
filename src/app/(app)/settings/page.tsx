@@ -75,6 +75,9 @@ export default function SettingsPage() {
   const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
   const etfProfitTarget = usePortfolioStore((s) => s.etfProfitTarget);
   const stockProfitTarget = usePortfolioStore((s) => s.stockProfitTarget);
+  const useAISentimentForRecommendations = usePortfolioStore((s) => s.useAISentimentForRecommendations);
+  const useRSIGatingForRecommendations = usePortfolioStore((s) => s.useRSIGatingForRecommendations);
+  const sellOnlyLongTermQualified = usePortfolioStore((s) => s.sellOnlyLongTermQualified);
   const timezone = usePortfolioStore((s) => s.timezone);
   const region = usePortfolioStore((s) => s.region);
   const setCash = usePortfolioStore((s) => s.setCash);
@@ -335,6 +338,45 @@ export default function SettingsPage() {
                     onChange={(e) => setSettings({ stockProfitTarget: Number(e.target.value) })}
                     className={inputClass}
                   />
+                </label>
+              </div>
+
+              <div className="md:col-span-2 grid gap-2">
+                <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
+                    checked={useAISentimentForRecommendations}
+                    onChange={(e) => setSettings({ useAISentimentForRecommendations: e.target.checked })}
+                  />
+                  <span>
+                    <span className="block text-[12px] font-medium leading-snug text-foreground">Use AI sentiment gate</span>
+                    <span className="mt-px block text-[10px] leading-snug text-subtle">Matches the iOS BUY/ADD sentiment override.</span>
+                  </span>
+                </label>
+                <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
+                    checked={useRSIGatingForRecommendations}
+                    onChange={(e) => setSettings({ useRSIGatingForRecommendations: e.target.checked })}
+                  />
+                  <span>
+                    <span className="block text-[12px] font-medium leading-snug text-foreground">Use RSI reversal gating</span>
+                    <span className="mt-px block text-[10px] leading-snug text-subtle">Applies the same RSI confirmation rules iOS uses for entries and trims.</span>
+                  </span>
+                </label>
+                <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
+                    checked={sellOnlyLongTermQualified}
+                    onChange={(e) => setSettings({ sellOnlyLongTermQualified: e.target.checked })}
+                  />
+                  <span>
+                    <span className="block text-[12px] font-medium leading-snug text-foreground">Only sell long-term qualified lots</span>
+                    <span className="mt-px block text-[10px] leading-snug text-subtle">Matches the iOS long-term SELL/REDUCE restriction.</span>
+                  </span>
                 </label>
               </div>
 

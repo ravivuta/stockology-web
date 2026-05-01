@@ -24,7 +24,7 @@ import { evenlySpacedTimeTickValues, evenlySpacedValueTicks } from "@/lib/chart-
 import { APP_CTA_FILL } from "@/lib/appCtaClasses";
 import { cn } from "@/lib/utils";
 
-const LINE_COLOR = "var(--chart-portfolio-line)";
+const LINE_COLOR = "var(--dashboard-chart-portfolio-line)";
 
 export type NetWorthRangePreset = ChartRangePreset;
 

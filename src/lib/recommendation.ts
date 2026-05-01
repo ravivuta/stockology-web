@@ -10,6 +10,11 @@ export type RecOut = ReturnType<typeof computeIosRecommendation>;
 export type BuildRecommendationOptions = Pick<IosRecOptions, "closes"> & {
   etfProfitTarget?: number;
   stockProfitTarget?: number;
+  useAISentiment?: boolean;
+  useRSIGating?: boolean;
+  sellOnlyLongTermQualified?: boolean;
+  openLots?: IosStockInput["openLots"];
+  soldLots?: IosStockInput["soldLots"];
 };
 
 /**
@@ -17,13 +22,23 @@ export type BuildRecommendationOptions = Pick<IosRecOptions, "closes"> & {
  * Caller should set `stock.score` via `computeRiskReturnScore` (except ETFs) before calling.
  */
 export function buildRecommendation(stock: RecInput, options?: BuildRecommendationOptions): RecOut {
-  return computeIosRecommendation(stock, {
-    closes: options?.closes,
-    etfProfitTargetPercent: options?.etfProfitTarget ?? 50,
-    stockProfitTargetPercent: options?.stockProfitTarget ?? 50,
-    skipWashSaleCheck: true,
-    relaxScoreRequirement: false,
-  });
+  return computeIosRecommendation(
+    {
+      ...stock,
+      openLots: options?.openLots,
+      soldLots: options?.soldLots,
+    },
+    {
+      closes: options?.closes,
+      etfProfitTargetPercent: options?.etfProfitTarget ?? 50,
+      stockProfitTargetPercent: options?.stockProfitTarget ?? 50,
+      skipWashSaleCheck: false,
+      relaxScoreRequirement: false,
+      useAISentiment: options?.useAISentiment ?? true,
+      useRSIGating: options?.useRSIGating ?? true,
+      sellOnlyLongTermQualified: options?.sellOnlyLongTermQualified ?? false,
+    }
+  );
 }
 
 /** Actionable signals (excludes WAIT_*). */

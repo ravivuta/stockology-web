@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Settings, X } from "lucide-react";
+import { computeRecommendationFactors, scoreBreakdownRows } from "@/lib/ios-recommendation";
 import { usePortfolioStore, type TradeJournalEntry } from "@/store/portfolioStore";
 import { useSupabaseStockHistory } from "@/hooks/useSupabaseStockHistory";
 import { lastSma } from "@/lib/stock-chart";
@@ -112,6 +113,8 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const updateStock = usePortfolioStore((s) => s.updateStock);
   const etfProfitTarget = usePortfolioStore((s) => s.etfProfitTarget);
   const stockProfitTarget = usePortfolioStore((s) => s.stockProfitTarget);
+  const useRSIGatingForRecommendations = usePortfolioStore((s) => s.useRSIGatingForRecommendations);
+  const sellOnlyLongTermQualified = usePortfolioStore((s) => s.sellOnlyLongTermQualified);
   const tradeJournal = usePortfolioStore((s) => s.tradeJournal ?? []);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
 
@@ -141,6 +144,20 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   );
 
   const lots = lotsBySymbol[symbol];
+  const closes = useMemo(
+    () => (points ?? []).map((point) => point.close).filter((value) => Number.isFinite(value)),
+    [points]
+  );
+  const rec = stock?.recommendation;
+  const recommendationFactors = useMemo(() => {
+    if (!stock || !rec) return [];
+    return computeRecommendationFactors(stock, rec, {
+      useRSIGating: useRSIGatingForRecommendations,
+      sellOnlyLongTermQualified,
+      closes,
+    });
+  }, [closes, rec, sellOnlyLongTermQualified, stock, useRSIGatingForRecommendations]);
+  const scoreRows = useMemo(() => (stock ? scoreBreakdownRows(stock) : null), [stock]);
 
   if (!stock) {
     return (
@@ -169,8 +186,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     recordTrade(symbol, side, q, tradePrice, new Date().toISOString().slice(0, 10));
     setPrice("");
   }
-
-  const rec = stock.recommendation;
 
   const detailTabOrder = ["recommendation", "chart", "snapshot"] as const;
   const dense = Boolean(embedded);
@@ -431,6 +446,66 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                         />
                       )}
                     </div>
+
+                    <div className={cn("grid items-start xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.95fr)]", dense ? "gap-3" : "gap-4")}>
+                      <div
+                        className={cn(
+                          "rounded-xl border border-border/70 bg-background/45 dark:border-white/[0.07] dark:bg-white/[0.03]",
+                          dense ? "p-3" : "p-4"
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Why this signal</p>
+                            <p className={cn("text-subtle", dense ? "mt-0.5 text-[11px]" : "mt-1 text-xs")}>
+                              Rules checked for the current recommendation, with pass/fail flags.
+                            </p>
+                          </div>
+                          <span className={cn("font-medium text-subtle", dense ? "text-[10px]" : "text-xs")}>
+                            {recommendationFactors.filter((factor) => factor.passes).length}/{recommendationFactors.length} passed
+                          </span>
+                        </div>
+                        <div className={dense ? "mt-3 space-y-2" : "mt-4 space-y-2.5"}>
+                          {recommendationFactors.map((factor) => (
+                            <FactorFlagRow
+                              key={`${factor.label}-${factor.detail}`}
+                              compact={dense}
+                              label={factor.label}
+                              detail={factor.detail}
+                              passes={factor.passes}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      <div
+                        className={cn(
+                          "rounded-xl border border-border/70 bg-background/45 dark:border-white/[0.07] dark:bg-white/[0.03]",
+                          dense ? "p-3" : "p-4"
+                        )}
+                      >
+                        <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Score inputs</p>
+                        <p className={cn("text-subtle", dense ? "mt-0.5 text-[11px]" : "mt-1 text-xs")}>
+                          Components used for the iOS-aligned risk-return score.
+                        </p>
+                        {scoreRows ? (
+                          <div className={dense ? "mt-3 space-y-2" : "mt-4 space-y-2.5"}>
+                            <SnapshotRow compact={dense} label="Analyst rating" value={scoreRows.analystLine} hint={scoreRows.analystPoints} />
+                            <SnapshotRow compact={dense} label="Upside to target" value={scoreRows.upsideLine} hint={scoreRows.upsidePoints} />
+                            <SnapshotRow compact={dense} label="Market cap" value={scoreRows.capLine} hint={scoreRows.capPoints} />
+                            <SnapshotRow compact={dense} label="PEG ratio" value={scoreRows.pegLine} hint={scoreRows.pegPoints} />
+                            {stock.score != null ? (
+                              <SnapshotRow
+                                compact={dense}
+                                label="Composite score"
+                                value={formatScoreDisplay(stock.score)}
+                                hint="Final rules score used by recommendation gating"
+                              />
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <p className={cn("text-subtle", dense ? "text-sm" : "text-base")}>
@@ -655,6 +730,44 @@ function RecMetric({ label, value, hint, compact }: { label: string; value: stri
       {hint ? (
         <p className={cn("leading-snug text-subtle", compact ? "mt-0.5 text-[10px]" : "mt-1 text-xs")}>{hint}</p>
       ) : null}
+    </div>
+  );
+}
+
+function FactorFlagRow({
+  label,
+  detail,
+  passes,
+  compact,
+}: {
+  label: string;
+  detail: string;
+  passes: boolean;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-start justify-between gap-3 rounded-lg border",
+        passes
+          ? "border-emerald-500/25 bg-emerald-500/10"
+          : "border-amber-500/25 bg-amber-500/10",
+        compact ? "px-2.5 py-2" : "px-3 py-2.5"
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <p className={cn("font-semibold text-foreground", compact ? "text-xs" : "text-sm")}>{label}</p>
+        <p className={cn("leading-snug text-subtle", compact ? "mt-0.5 text-[10px]" : "mt-1 text-xs")}>{detail}</p>
+      </div>
+      <span
+        className={cn(
+          "shrink-0 rounded-full px-2 py-1 font-semibold uppercase tracking-[0.12em]",
+          passes ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+          compact ? "text-[9px]" : "text-[10px]"
+        )}
+      >
+        {passes ? "Pass" : "Blocked"}
+      </span>
     </div>
   );
 }

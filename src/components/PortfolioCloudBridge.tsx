@@ -77,7 +77,7 @@ export function PortfolioCloudBridge({
       if (timer) clearTimeout(timer);
       timer = setTimeout(async () => {
         const state = usePortfolioStore.getState();
-        const slice = { cashBalance: state.cashBalance, stocks: state.stocks };
+        const slice = { cashBalance: state.cashBalance, stocks: state.stocks, lotsBySymbol: state.lotsBySymbol };
         const fp = portfolioSyncFingerprint(slice);
         if (fp === lastPushedRef.current) return;
         const supabase = createClient();
@@ -89,8 +89,8 @@ export function PortfolioCloudBridge({
     };
 
     const unsub = usePortfolioStore.subscribe((state, prev) => {
-      const a = portfolioSyncFingerprint({ cashBalance: prev.cashBalance, stocks: prev.stocks });
-      const b = portfolioSyncFingerprint({ cashBalance: state.cashBalance, stocks: state.stocks });
+      const a = portfolioSyncFingerprint({ cashBalance: prev.cashBalance, stocks: prev.stocks, lotsBySymbol: prev.lotsBySymbol });
+      const b = portfolioSyncFingerprint({ cashBalance: state.cashBalance, stocks: state.stocks, lotsBySymbol: state.lotsBySymbol });
       if (a === b) return;
       schedulePush();
     });

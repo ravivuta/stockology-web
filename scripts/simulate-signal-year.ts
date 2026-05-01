@@ -9,7 +9,7 @@
  * Usage:
  *   SQL file:  npx tsx scripts/simulate-signal-year.ts --email=you@gmail.com > demo.sql
  *   Apply DB:  npx tsx scripts/simulate-signal-year.ts --apply --email=you@gmail.com
- *              (uses SUPABASE_SERVICE_ROLE_KEY from website/next/.env.local — no DB password)
+ *              (uses SUPABASE_SERVICE_ROLE_KEY from stockology-web/.env.local — no DB password)
  */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";

@@ -10,43 +10,38 @@ import { evenlySpacedValueTicks } from "@/lib/chart-axis-ticks";
 
 const MAX_SLICES = 14;
 
-/**
- * Distinct muted greens / golds / oranges (not neon). Avoids near-black and duplicate primaries.
- * Dark: slightly lighter so bars read on elevated dark surfaces.
- * Light: slightly deeper for contrast on white/off-white.
- */
 const BAR_COLORS_DARK = [
-  "#5f7268",
-  "#6a7d62",
-  "#6f7a58",
-  "#7a8258",
-  "#8a7d52",
-  "#8f7348",
-  "#957a50",
-  "#9d7048",
-  "#a67855",
-  "#9a6850",
-  "#8a6248",
-  "#7a6d58",
-  "#647a62",
-  "#857560",
+  "#66abf5",
+  "#4dccbf",
+  "#34c759",
+  "#facc15",
+  "#7dd3fc",
+  "#93c5fd",
+  "#5eead4",
+  "#86efac",
+  "#fde68a",
+  "#a5b4fc",
+  "#c4b5fd",
+  "#94a3b8",
+  "#67e8f9",
+  "#d8b4fe",
 ] as const;
 
 const BAR_COLORS_LIGHT = [
-  "#4a5f52",
-  "#4f6348",
-  "#556244",
-  "#5f6a40",
-  "#6a623c",
-  "#6f5a38",
-  "#755a36",
-  "#7a5238",
-  "#805540",
-  "#7a4a38",
-  "#6a4838",
-  "#5a5248",
-  "#445a4a",
-  "#5a5448",
+  "#3370c2",
+  "#4dccbf",
+  "#009900",
+  "#da8800",
+  "#5b9bd5",
+  "#6fa8dc",
+  "#76c7c0",
+  "#82c58a",
+  "#d4a64a",
+  "#7d8cc4",
+  "#9f9fc4",
+  "#8b97a8",
+  "#57b8cc",
+  "#b59ac8",
 ] as const;
 
 function fmtCurrency(n: number) {
