@@ -1,10 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { getSupabaseEnv, hasValidSupabaseConfig } from "@/lib/supabase/config";
 
 export async function createClient() {
   const cookieStore = await cookies();
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const { url, key } = getSupabaseEnv();
+  if (!hasValidSupabaseConfig()) {
+    throw new Error("Set valid NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in stockology-web/.env.local");
+  }
   return createServerClient(url, key, {
     cookies: {
       getAll() { return cookieStore.getAll(); },

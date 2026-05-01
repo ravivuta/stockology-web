@@ -18,6 +18,7 @@ function SignupInner() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const cloudAuthReady = hasSupabaseConfig();
 
   useEffect(() => {
     const q = safeQueryMessage(searchParams.get("error"));
@@ -25,7 +26,7 @@ function SignupInner() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (!hasSupabaseConfig()) return;
+    if (!cloudAuthReady) return;
     let cancelled = false;
     void createClient()
       .auth.getSession()
@@ -36,12 +37,12 @@ function SignupInner() {
     return () => {
       cancelled = true;
     };
-  }, [replaceWithTransition]);
+  }, [cloudAuthReady, replaceWithTransition]);
 
   async function onGoogle() {
     setError(null);
-    if (!hasSupabaseConfig()) {
-      setError("Sign-up isn’t configured for this site.");
+    if (!cloudAuthReady) {
+      setError("Google sign-up is disabled until a valid Supabase URL and anon key are set in .env.local.");
       return;
     }
     setLoading(true);
@@ -75,9 +76,9 @@ function SignupInner() {
           automatically.
         </p>
 
-        {!hasSupabaseConfig() && (
+        {!cloudAuthReady && (
           <p className="mt-5 rounded-xl border border-primary/30 bg-primary/10 p-3.5 text-sm font-medium leading-snug text-zinc-100">
-            Cloud sign-in isn’t set up for this deployment. For local dev, add your Supabase URL and anon key to{" "}
+            Google sign-up isn’t configured for this local app. Set a valid Supabase URL and anon key in{" "}
             <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-xs text-emerald-200/90">.env.local</code>.
           </p>
         )}
@@ -88,7 +89,12 @@ function SignupInner() {
         )}
 
         <div className="mt-8">
-          <GoogleOAuthButton loading={loading} onClick={onGoogle} label="Continue with Google" />
+          <GoogleOAuthButton
+            loading={loading}
+            disabled={!cloudAuthReady}
+            onClick={onGoogle}
+            label={cloudAuthReady ? "Continue with Google" : "Google sign-up unavailable"}
+          />
         </div>
 
         <div className="mt-6 flex items-start gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3.5 py-3">

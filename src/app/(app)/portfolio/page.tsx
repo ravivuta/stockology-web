@@ -35,7 +35,6 @@ export default function PortfolioPage() {
   const cash = usePortfolioStore((s) => s.cashBalance);
   const tradeJournal = usePortfolioStore((s) => s.tradeJournal ?? []);
   const recalc = usePortfolioStore((s) => s.recalcMetrics);
-  const removeStock = usePortfolioStore((s) => s.removeStock);
   const addStock = usePortfolioStore((s) => s.addStock);
   const recordTrade = usePortfolioStore((s) => s.recordTrade);
   const undoLastTrade = usePortfolioStore((s) => s.undoLastTrade);
@@ -48,7 +47,6 @@ export default function PortfolioPage() {
   const [tradeSide, setTradeSide] = useState<"BUY" | "SELL">("BUY");
   const [tradeQty, setTradeQty] = useState("1");
   const [tradePrice, setTradePrice] = useState("");
-  const [removeTarget, setRemoveTarget] = useState<string | null>(null);
   const [undoConfirmOpen, setUndoConfirmOpen] = useState(false);
 
   /** Portfolio page lists positions only; watchlist-only symbols (0 qty) stay in store for trading elsewhere. */
@@ -309,9 +307,6 @@ export default function PortfolioPage() {
               <th scope="col" className="px-4 pb-2 pt-3 text-left text-xs font-semibold tracking-wide">
                 Recommendation
               </th>
-              <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold">
-                <span className="sr-only">Actions</span>
-              </th>
             </tr>
           </thead>
           <tbody>
@@ -377,11 +372,6 @@ export default function PortfolioPage() {
                     ) : (
                       <span className="text-subtle">—</span>
                     )}
-                  </td>
-                  <td className="px-4 py-3 text-right align-middle">
-                    <button type="button" className="ui-hover-text text-xs text-error hover:underline" onClick={() => setRemoveTarget(s.symbol)}>
-                      Remove
-                    </button>
                   </td>
                 </tr>
               );
@@ -487,25 +477,6 @@ export default function PortfolioPage() {
           <PortfolioNetWorthChart stocks={stocks} cash={cash} tradeJournal={tradeJournal} />
         </div>
       </section>
-
-      <ConfirmModal
-        open={removeTarget != null}
-        onClose={() => setRemoveTarget(null)}
-        onConfirm={() => {
-          if (removeTarget) removeStock(removeTarget);
-        }}
-        title="Remove from portfolio?"
-        description={
-          removeTarget ? (
-            <>
-              <span className="font-medium text-foreground">{removeTarget}</span> will be removed from your tracked list. You can add it again later from Portfolio or Watchlist.
-            </>
-          ) : null
-        }
-        confirmLabel="Remove"
-        cancelLabel="Keep"
-        variant="danger"
-      />
 
       <ConfirmModal
         open={undoConfirmOpen}
