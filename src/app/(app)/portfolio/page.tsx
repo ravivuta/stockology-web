@@ -10,6 +10,7 @@ import { runRefreshPipeline } from "@/lib/refresh";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
 import { PortfolioAllocationChart } from "@/components/portfolio/PortfolioAllocationChart";
 import { PortfolioNetWorthChart } from "@/components/portfolio/PortfolioNetWorthChart";
+import { AppModal } from "@/components/ui/AppModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SymbolTradeCombobox } from "@/components/portfolio/SymbolTradeCombobox";
 import { isValidTicker } from "@/lib/csvPortfolio";
@@ -282,7 +283,7 @@ export default function PortfolioPage() {
       </div>
 
       <div className="ui-hover-lift overflow-x-auto rounded-2xl border border-border bg-elevated">
-        <table className="w-full min-w-[800px] text-sm">
+        <table className="w-full min-w-[1080px] text-sm">
           <thead className="text-subtle">
             <tr>
               <th scope="col" className="px-4 pb-2 pt-3 text-left text-xs font-semibold tracking-wide">
@@ -298,7 +299,13 @@ export default function PortfolioPage() {
                 Last
               </th>
               <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold tabular-nums tracking-wide">
-                Value
+                Current value
+              </th>
+              <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold tabular-nums tracking-wide">
+                Cost basis
+              </th>
+              <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold tabular-nums tracking-wide">
+                Gain / loss (%)
               </th>
               <th scope="col" className="px-4 pb-2 pt-3 text-right text-xs font-semibold tabular-nums tracking-wide">
                 Today %
@@ -314,9 +321,11 @@ export default function PortfolioPage() {
           <tbody>
             {rows.flatMap((s) => {
               const value = s.quantity * (s.lastPrice ?? 0);
-              const expanded = detailSymbol === s.symbol;
+              const costBasis = s.quantity * s.averageCost;
+              const gainLoss = value - costBasis;
+              const gainLossPct = costBasis > 0 ? (gainLoss / costBasis) * 100 : null;
               const d = s.dailyChangePercent;
-              const main = (
+              return (
                 <tr
                   key={s.symbol}
                   className="transition-colors duration-150 hover:bg-muted/50 dark:hover:bg-white/[0.04]"
@@ -325,19 +334,33 @@ export default function PortfolioPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setDetailSymbol(expanded ? null : s.symbol)}
+                        onClick={() => setDetailSymbol(s.symbol)}
                         className="ui-hover-text inline-flex items-center gap-1 font-medium text-foreground"
-                        aria-expanded={expanded}
+                        aria-haspopup="dialog"
+                        aria-expanded={detailSymbol === s.symbol}
                       >
                         {s.symbol}
-                        <ChevronDown className={`h-4 w-4 shrink-0 text-subtle transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden />
+                        <ChevronDown className="h-4 w-4 shrink-0 text-subtle" aria-hidden />
                       </button>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-foreground">{s.quantity}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-foreground">${s.averageCost.toFixed(2)}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-foreground">${(s.lastPrice ?? 0).toFixed(2)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-foreground">${value.toFixed(0)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-foreground">${value.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-foreground">${costBasis.toFixed(2)}</td>
+                  <td
+                    className={`px-4 py-3 text-right tabular-nums font-medium ${
+                      gainLoss > 0
+                        ? "text-emerald-700 dark:text-primary"
+                        : gainLoss < 0
+                          ? "text-red-700 dark:text-red-400"
+                          : "text-subtle"
+                    }`}
+                  >
+                    {`${gainLoss >= 0 ? "+" : "−"}$${Math.abs(gainLoss).toFixed(2)}`}
+                    {gainLossPct != null ? ` (${gainLossPct >= 0 ? "+" : ""}${gainLossPct.toFixed(2)}%)` : ""}
+                  </td>
                   <td
                     className={`px-4 py-3 text-right tabular-nums font-medium ${
                       d == null ? "text-subtle" : d > 0 ? "text-emerald-700 dark:text-primary" : d < 0 ? "text-red-700 dark:text-red-400" : "text-subtle"
@@ -370,15 +393,6 @@ export default function PortfolioPage() {
                   </td>
                 </tr>
               );
-              if (!expanded) return [main];
-              return [
-                main,
-                <tr key={`${s.symbol}-detail`} className="bg-muted/25 dark:bg-white/[0.03]">
-                  <td colSpan={8} className="p-0 align-top">
-                    <StockDetailExpandPanel symbol={s.symbol} embedded onClose={() => setDetailSymbol(null)} />
-                  </td>
-                </tr>,
-              ];
             })}
           </tbody>
         </table>
@@ -390,6 +404,20 @@ export default function PortfolioPage() {
           </p>
         )}
       </div>
+
+      <AppModal
+        open={detailSymbol != null}
+        onClose={() => setDetailSymbol(null)}
+        size="lg"
+        stagger={false}
+        panelClassName="sm:max-w-[min(94vw,1120px)]"
+      >
+        {detailSymbol ? (
+          <div className="min-h-0 overflow-auto">
+            <StockDetailExpandPanel symbol={detailSymbol} onClose={() => setDetailSymbol(null)} />
+          </div>
+        ) : null}
+      </AppModal>
 
       <section className="ui-hover-lift rounded-2xl border border-border bg-elevated p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">

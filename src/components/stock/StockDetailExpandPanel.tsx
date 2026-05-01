@@ -255,12 +255,12 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
             <Settings className={dense ? "h-3.5 w-3.5" : "h-4 w-4"} />
             Parameters
           </button>
-          {embedded && onClose && (
+          {onClose && (
             <button
               type="button"
               onClick={onClose}
               className={cn("rounded-lg text-subtle hover:bg-border/40 hover:text-foreground sm:rounded-xl", dense ? "p-1.5" : "p-2.5")}
-              aria-label="Collapse"
+              aria-label="Close stock details"
             >
               <X className={dense ? "h-4 w-4" : "h-5 w-5"} />
             </button>
