@@ -137,6 +137,7 @@ export default function PortfolioPage() {
           >
             {refreshing ? "Refreshing…" : "Refresh"}
           </button>
+          <CsvImportExportBar exportFilename="stocks-pm-portfolio.csv" compact />
           <Link href="/csv-help" className="ui-hover-pop rounded-lg border border-primary/30 px-3 py-2 text-sm text-foreground dark:border-primary/25">
             CSV help
           </Link>
@@ -191,13 +192,9 @@ export default function PortfolioPage() {
               className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
             />
           </label>
-          <CsvImportExportBar exportFilename="stocks-pm-portfolio.csv" compact />
-          <Link href="/csv-help" className="ui-hover-pop rounded-lg border border-primary/30 px-2.5 py-1.5 text-xs text-foreground dark:border-primary/25">
-            CSV help
-          </Link>
         </div>
         <p className="mt-2 text-xs text-subtle">
-          Filter holdings here, or open a stock to record trades and review lot details. CSV import and export stay available on this page.
+          Filter holdings here, or open a stock to record trades and review lot details. CSV import and export are available in the top-right actions.
         </p>
       </div>
 
