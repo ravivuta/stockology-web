@@ -14,12 +14,14 @@ function etCalendarDateString(d = new Date()): string {
 function holdingPayload(s: StockHolding, lots: { open: TradeLot[]; sold: SoldLot[] } | undefined) {
   const optimized = !s.pendingOptimization;
   const openLots = (lots?.open ?? []).map((lot) => ({
+    lotId: lot.id,
     symbol: s.symbol,
     quantity: lot.quantity,
     costBasis: lot.costBasis,
     purchaseDate: lot.purchaseDate,
     status: lot.status,
     account: lot.account ?? null,
+    isRetirementAccount: lot.isRetirementAccount ?? null,
   }));
   const soldLots = (lots?.sold ?? []).map((lot) => ({
     salePrice: lot.salePrice,
@@ -95,7 +97,7 @@ export function portfolioSyncFingerprint(state: PortfolioSlice): string {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([symbol, lots]) => [
         symbol,
-        lots.open.map((lot) => [lot.purchaseDate, lot.quantity, lot.costBasis, lot.status]),
+        lots.open.map((lot) => [lot.purchaseDate, lot.quantity, lot.costBasis, lot.status, lot.account ?? "", lot.isRetirementAccount ?? null]),
         lots.sold.map((lot) => [lot.saleDate, lot.quantity, lot.salePrice, lot.realizedGainLoss]),
       ]),
   });

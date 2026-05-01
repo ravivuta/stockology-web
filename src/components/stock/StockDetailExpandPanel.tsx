@@ -3,8 +3,14 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Settings, X } from "lucide-react";
-import { computeRecommendationFactors, scoreBreakdownRows } from "@/lib/ios-recommendation";
-import { usePortfolioStore, type TradeJournalEntry } from "@/store/portfolioStore";
+import {
+  computeRecommendationFactors,
+  getOldestOpenLotDate,
+  getWashSaleInfo,
+  isUnknownPurchaseDate,
+  scoreBreakdownRows,
+} from "@/lib/ios-recommendation";
+import { usePortfolioStore } from "@/store/portfolioStore";
 import { useSupabaseStockHistory } from "@/hooks/useSupabaseStockHistory";
 import { lastSma } from "@/lib/stock-chart";
 import { APP_CTA_FILL, appCtaButton } from "@/lib/appCtaClasses";
@@ -12,9 +18,62 @@ import { cn } from "@/lib/utils";
 import { StockHistoricalChart } from "./StockHistoricalChart";
 import { StockStrategyModal } from "./StockStrategyModal";
 
-function fmtJournalCash(e: TradeJournalEntry) {
-  if (e.side === "BUY") return -(e.quantity * e.price);
-  return e.quantity * e.price;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function formatDateLabel(value: string | undefined): string {
+  if (!value) return "Unknown";
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms)) return value;
+  return new Date(ms).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function lotHoldingStatus(purchaseDate: string | undefined): {
+  label: string;
+  className: string;
+} {
+  const ms = purchaseDate ? Date.parse(purchaseDate) : Number.NaN;
+  const parsed = Number.isFinite(ms) ? new Date(ms) : null;
+  if (parsed == null || isUnknownPurchaseDate(parsed)) {
+    return {
+      label: "Unknown term",
+      className: "bg-muted/80 text-subtle dark:bg-white/[0.08]",
+    };
+  }
+
+  if (Date.now() - parsed.getTime() > 365 * DAY_MS) {
+    return {
+      label: "Long-term",
+      className: "bg-emerald-500/15 text-emerald-800 dark:bg-emerald-400/20 dark:text-emerald-200",
+    };
+  }
+
+  return {
+    label: "Short-term",
+    className: "bg-amber-500/15 text-amber-800 dark:bg-amber-400/20 dark:text-amber-200",
+  };
+}
+
+function lotStatusTone(status: string): string {
+  if (status === "washSaleRestricted") return "bg-red-500/15 text-red-700 dark:bg-red-400/20 dark:text-red-200";
+  if (status === "partiallySold") return "bg-amber-500/15 text-amber-800 dark:bg-amber-400/20 dark:text-amber-200";
+  return "bg-muted/80 text-subtle dark:bg-white/[0.08]";
+}
+
+function formatLotStatus(status: string): string {
+  if (status === "partiallySold") return "Partially sold";
+  if (status === "fullySold") return "Fully sold";
+  if (status === "washSaleRestricted") return "Wash sale";
+  return "Open";
+}
+
+function formatAccountType(isRetirementAccount: boolean | null | undefined): string {
+  if (isRetirementAccount === true) return "Retirement";
+  if (isRetirementAccount === false) return "Taxable";
+  return "Unknown type";
 }
 
 /** Human-readable score (avoid long float noise). */
@@ -115,7 +174,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const stockProfitTarget = usePortfolioStore((s) => s.stockProfitTarget);
   const useRSIGatingForRecommendations = usePortfolioStore((s) => s.useRSIGatingForRecommendations);
   const sellOnlyLongTermQualified = usePortfolioStore((s) => s.sellOnlyLongTermQualified);
-  const tradeJournal = usePortfolioStore((s) => s.tradeJournal ?? []);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
 
   const stock = useMemo(() => stocks.find((s) => s.symbol === symbol), [stocks, symbol]);
@@ -126,6 +184,8 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [qty, setQty] = useState("1");
   const [price, setPrice] = useState("");
+  const [tradeAccountName, setTradeAccountName] = useState("");
+  const [tradeAccountType, setTradeAccountType] = useState<"unknown" | "retirement" | "taxable">("unknown");
 
   const smaFromHistory = useMemo(() => {
     if (!points || !stock) return null;
@@ -138,16 +198,58 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       ? stock.movingAvg
       : smaFromHistory;
 
-  const symbolJournal = useMemo(
-    () => [...tradeJournal].filter((e) => e.symbol === symbol).reverse(),
-    [tradeJournal, symbol]
-  );
-
   const lots = lotsBySymbol[symbol];
   const closes = useMemo(
     () => (points ?? []).map((point) => point.close).filter((value) => Number.isFinite(value)),
     [points]
   );
+  const lotSummary = useMemo(() => {
+    const openLots = [...(lots?.open ?? [])].sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate));
+    const soldLots = [...(lots?.sold ?? [])].sort((a, b) => b.saleDate.localeCompare(a.saleDate));
+    if (!stock) {
+      return {
+        openLots,
+        soldLots,
+        washSale: null,
+        oldestOpenLotDate: null,
+        oldestOpenLotQualified: false,
+        openCostBasis: openLots.reduce((sum, lot) => sum + lot.quantity * lot.costBasis, 0),
+        realizedGainLoss: soldLots.reduce((sum, lot) => sum + lot.realizedGainLoss, 0),
+      };
+    }
+
+    const stockWithLots = {
+      ...stock,
+      openLots: openLots.map((lot) => ({
+        purchaseDate: lot.purchaseDate,
+        quantity: lot.quantity,
+        costBasis: lot.costBasis,
+        status: lot.status,
+      })),
+      soldLots: soldLots.map((lot) => ({
+        saleDate: lot.saleDate,
+        quantity: lot.quantity,
+        salePrice: lot.salePrice,
+        realizedGainLoss: lot.realizedGainLoss,
+      })),
+    };
+    const washSale = getWashSaleInfo(stockWithLots);
+    const oldestOpenLotDate = getOldestOpenLotDate(stockWithLots);
+    const oldestOpenLotQualified =
+      oldestOpenLotDate != null &&
+      !isUnknownPurchaseDate(oldestOpenLotDate) &&
+      Date.now() - oldestOpenLotDate.getTime() > 365 * DAY_MS;
+
+    return {
+      openLots,
+      soldLots,
+      washSale,
+      oldestOpenLotDate,
+      oldestOpenLotQualified,
+      openCostBasis: openLots.reduce((sum, lot) => sum + lot.quantity * lot.costBasis, 0),
+      realizedGainLoss: soldLots.reduce((sum, lot) => sum + lot.realizedGainLoss, 0),
+    };
+  }, [lots, stock]);
   const rec = stock?.recommendation;
   const recommendationFactors = useMemo(() => {
     if (!stock || !rec) return [];
@@ -183,7 +285,11 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   function applyTrade() {
     const q = parseFloat(qty) || 0;
     if (q <= 0 || !Number.isFinite(tradePrice) || tradePrice <= 0) return;
-    recordTrade(symbol, side, q, tradePrice, new Date().toISOString().slice(0, 10));
+    recordTrade(symbol, side, q, tradePrice, new Date().toISOString().slice(0, 10), {
+      account: tradeAccountName.trim() || undefined,
+      isRetirementAccount:
+        tradeAccountType === "unknown" ? null : tradeAccountType === "retirement",
+    });
     setPrice("");
   }
 
@@ -627,6 +733,40 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                 )}
               />
             </label>
+            <label
+              className={cn(
+                "flex min-w-[8rem] flex-1 flex-col font-medium text-foreground sm:min-w-[10rem]",
+                dense ? "gap-1 text-xs" : "gap-1.5 text-sm"
+              )}
+            >
+              Account name
+              <input
+                value={tradeAccountName}
+                onChange={(e) => setTradeAccountName(e.target.value)}
+                placeholder="Brokerage / IRA"
+                disabled={side === "SELL"}
+                className={cn(
+                  "border border-border bg-background text-foreground disabled:opacity-60 dark:border-white/10",
+                  dense ? "rounded-lg px-2 py-1.5 text-xs" : "rounded-xl px-3 py-2.5 text-sm"
+                )}
+              />
+            </label>
+            <label className={cn("flex flex-col font-medium text-foreground", dense ? "gap-1 text-xs" : "gap-1.5 text-sm")}>
+              Account type
+              <select
+                value={tradeAccountType}
+                onChange={(e) => setTradeAccountType(e.target.value as "unknown" | "retirement" | "taxable")}
+                disabled={side === "SELL"}
+                className={cn(
+                  "rounded-lg border border-border bg-background text-foreground disabled:opacity-60 dark:border-white/10",
+                  dense ? "px-2 py-1.5 text-xs" : "rounded-xl px-3 py-2.5 text-sm"
+                )}
+              >
+                <option value="unknown">Unknown</option>
+                <option value="retirement">Retirement</option>
+                <option value="taxable">Taxable</option>
+              </select>
+            </label>
             <button
               type="button"
               onClick={applyTrade}
@@ -638,65 +778,182 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               Apply trade
             </button>
           </div>
+          <p className={cn("text-subtle", dense ? "mt-2 text-[11px]" : "mt-3 text-xs")}>
+            Account fields are stored on new buy lots and carried into CSV export and stock-detail lot history.
+          </p>
         </SectionCard>
 
-        {(symbolJournal.length > 0 || (lots && (lots.open.length > 0 || lots.sold.length > 0))) && (
+        {(hasPosition || lotSummary.openLots.length > 0 || lotSummary.soldLots.length > 0) && (
           <SectionCard
             compact={dense}
-            title="Activity"
-            description="Open tax lots and recent trades for this symbol."
+            title="Tax lots"
+            description="Lot-level holding data for this symbol, including wash-sale status and long-term eligibility using the same rules as the iOS app."
           >
-            {lots && lots.open.length > 0 && (
-              <div>
-                <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>Open lots</p>
-                <ul className={cn("mt-2 space-y-2", dense ? "text-xs" : "text-sm")}>
-                  {lots.open.map((lot) => (
-                    <li
-                      key={lot.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.06] sm:px-3 sm:py-2"
-                    >
-                      <span className="tabular-nums text-foreground">
-                        {lot.quantity} @ ${lot.costBasis.toFixed(2)}
-                      </span>
-                      <span className={cn("text-subtle", dense ? "text-[11px]" : "text-sm")}>{lot.purchaseDate}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {symbolJournal.length > 0 && (
-              <div className={lots && lots.open.length > 0 ? (dense ? "mt-3" : "mt-6") : ""}>
-                <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>
-                  Recent trades ({symbol})
-                </p>
-                <ul
-                  className={cn(
-                    "mt-2 space-y-2 overflow-y-auto",
-                    dense ? "max-h-36 text-xs" : "max-h-56 text-sm"
-                  )}
-                >
-                  {symbolJournal.map((e) => (
-                    <li
-                      key={e.id}
+            <div className={cn("grid sm:grid-cols-2 xl:grid-cols-4", dense ? "gap-2" : "gap-3")}>
+              <StatTile compact={dense} label="Open lots" value={String(lotSummary.openLots.length)} />
+              <StatTile compact={dense} label="Open basis" value={`$${lotSummary.openCostBasis.toFixed(2)}`} />
+              <StatTile
+                compact={dense}
+                label="Realized P/L"
+                value={`${lotSummary.realizedGainLoss >= 0 ? "+" : "−"}$${Math.abs(lotSummary.realizedGainLoss).toFixed(2)}`}
+                valueClassName={lotSummary.realizedGainLoss >= 0 ? "text-primary" : "text-error"}
+              />
+              <StatTile
+                compact={dense}
+                label="Wash sale"
+                value={
+                  lotSummary.washSale == null
+                    ? "—"
+                    : lotSummary.washSale.canBuy
+                      ? "Clear"
+                      : `${lotSummary.washSale.daysRemaining}d left`
+                }
+                valueClassName={lotSummary.washSale?.canBuy === false ? "text-error" : undefined}
+              />
+            </div>
+
+            <div className={dense ? "mt-3 space-y-3" : "mt-4 space-y-4"}>
+              <div className="rounded-xl border border-border/70 bg-background/40 p-3 dark:border-white/[0.07] dark:bg-white/[0.03]">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>Tax rule status</p>
+                    <p className={cn("text-subtle", dense ? "mt-1 text-[11px]" : "mt-1 text-xs")}>
+                      {lotSummary.washSale?.displayText ?? "No lot-level rule data available yet."}
+                    </p>
+                  </div>
+                  {sellOnlyLongTermQualified && hasPosition ? (
+                    <span
                       className={cn(
-                        "rounded-lg border border-border/60 bg-background/30 dark:border-white/[0.06]",
-                        dense ? "px-2.5 py-1.5" : "px-3 py-2.5"
+                        "inline-flex rounded-md px-2 py-1 font-semibold",
+                        dense ? "text-[10px]" : "text-xs",
+                        lotSummary.oldestOpenLotQualified
+                          ? "bg-emerald-500/15 text-emerald-800 dark:bg-emerald-400/20 dark:text-emerald-200"
+                          : "bg-amber-500/15 text-amber-800 dark:bg-amber-400/20 dark:text-amber-200"
                       )}
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="font-medium tabular-nums text-foreground">
-                          {e.side} {e.quantity} @ ${e.price.toFixed(2)}
-                        </span>
-                        <span className={cn("text-subtle", dense ? "text-[11px]" : "text-sm")}>{e.tradeDate}</span>
-                      </div>
-                      <p className={cn("mt-0.5 font-mono text-subtle", dense ? "text-[10px]" : "mt-1 text-xs")}>
-                        Cash Δ ${fmtJournalCash(e).toFixed(2)}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
+                      {lotSummary.oldestOpenLotQualified ? "Sell gate satisfied" : "Sell gate blocked"}
+                    </span>
+                  ) : null}
+                </div>
+                {sellOnlyLongTermQualified && hasPosition ? (
+                  <p className={cn("text-subtle", dense ? "mt-2 text-[11px]" : "mt-2 text-xs")}>
+                    {lotSummary.oldestOpenLotDate == null || isUnknownPurchaseDate(lotSummary.oldestOpenLotDate)
+                      ? "Long-term sales are enabled in settings, but no dated open lot is available."
+                      : lotSummary.oldestOpenLotQualified
+                        ? `Oldest open lot qualifies for long-term treatment since ${formatDateLabel(lotSummary.oldestOpenLotDate.toISOString())}.`
+                        : `Oldest open lot has not reached the 365-day threshold yet (${formatDateLabel(lotSummary.oldestOpenLotDate.toISOString())}).`}
+                  </p>
+                ) : null}
               </div>
-            )}
+
+              {lotSummary.openLots.length > 0 ? (
+                <div>
+                  <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>Open lots</p>
+                  <ul className={cn("mt-2 space-y-2", dense ? "text-xs" : "text-sm")}>
+                    {lotSummary.openLots.map((lot) => {
+                      const holdingStatus = lotHoldingStatus(lot.purchaseDate);
+                      const lotMarketValue = lot.quantity * last;
+                      const lotCostBasis = lot.quantity * lot.costBasis;
+                      const lotUnrealized = lotMarketValue - lotCostBasis;
+
+                      return (
+                        <li
+                          key={lot.id}
+                          className="rounded-xl border border-border/60 bg-background/40 p-3 dark:border-white/[0.06]"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <p className="font-medium tabular-nums text-foreground">
+                                {lot.quantity} shares @ ${lot.costBasis.toFixed(2)}
+                              </p>
+                              <p className={cn("text-subtle", dense ? "mt-1 text-[11px]" : "mt-1 text-xs")}>
+                                Bought {formatDateLabel(lot.purchaseDate)}
+                              </p>
+                              {(lot.account || lot.isRetirementAccount != null) && (
+                                <p className={cn("text-subtle", dense ? "mt-1 text-[11px]" : "mt-1 text-xs")}>
+                                  {lot.account?.trim() ? lot.account : "No account name"} · {formatAccountType(lot.isRetirementAccount)}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              <span className={cn("inline-flex rounded-md px-2 py-1 font-semibold", dense ? "text-[10px]" : "text-xs", holdingStatus.className)}>
+                                {holdingStatus.label}
+                              </span>
+                              <span className={cn("inline-flex rounded-md px-2 py-1 font-semibold", dense ? "text-[10px]" : "text-xs", lotStatusTone(lot.status))}>
+                                {formatLotStatus(lot.status)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className={cn("mt-2 grid grid-cols-2 sm:grid-cols-3", dense ? "gap-2" : "gap-3")}>
+                            <SnapshotRow compact={dense} label="Lot basis" value={`$${lotCostBasis.toFixed(2)}`} />
+                            <SnapshotRow compact={dense} label="Market value" value={`$${lotMarketValue.toFixed(2)}`} />
+                            <SnapshotRow
+                              compact={dense}
+                              label="Unrealized P/L"
+                              value={`${lotUnrealized >= 0 ? "+" : "−"}$${Math.abs(lotUnrealized).toFixed(2)}`}
+                              hint={last > 0 ? `Last price $${last.toFixed(2)}` : undefined}
+                            />
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : (
+                <p className={cn("text-subtle", dense ? "text-xs" : "text-sm")}>
+                  No open lot records are available for this symbol yet.
+                </p>
+              )}
+
+              {lotSummary.soldLots.length > 0 ? (
+                <div>
+                  <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>Closed lots</p>
+                  <ul className={cn("mt-2 space-y-2", dense ? "text-xs" : "text-sm")}>
+                    {lotSummary.soldLots.map((lot, index) => (
+                      <li
+                        key={`${lot.saleDate}-${lot.quantity}-${lot.salePrice}-${index}`}
+                        className="rounded-xl border border-border/60 bg-background/40 p-3 dark:border-white/[0.06]"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <p className="font-medium tabular-nums text-foreground">
+                              Sold {lot.quantity} shares @ ${lot.salePrice.toFixed(2)}
+                            </p>
+                            <p className={cn("text-subtle", dense ? "mt-1 text-[11px]" : "mt-1 text-xs")}>
+                              Sale date {formatDateLabel(lot.saleDate)}
+                            </p>
+                          </div>
+                          <span
+                            className={cn(
+                              "inline-flex rounded-md px-2 py-1 font-semibold",
+                              dense ? "text-[10px]" : "text-xs",
+                              lot.realizedGainLoss >= 0
+                                ? "bg-emerald-500/15 text-emerald-800 dark:bg-emerald-400/20 dark:text-emerald-200"
+                                : "bg-red-500/15 text-red-700 dark:bg-red-400/20 dark:text-red-200"
+                            )}
+                          >
+                            {lot.realizedGainLoss >= 0 ? "Realized gain" : "Realized loss"}
+                          </span>
+                        </div>
+                        <div className={cn("mt-2 grid grid-cols-2", dense ? "gap-2" : "gap-3")}>
+                          <SnapshotRow compact={dense} label="Proceeds" value={`$${(lot.quantity * lot.salePrice).toFixed(2)}`} />
+                          <SnapshotRow
+                            compact={dense}
+                            label="Realized P/L"
+                            value={`${lot.realizedGainLoss >= 0 ? "+" : "−"}$${Math.abs(lot.realizedGainLoss).toFixed(2)}`}
+                          />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+            {lotSummary.openLots.length === 0 && lotSummary.soldLots.length === 0 ? (
+              <p className={cn("mt-3 text-subtle", dense ? "text-xs" : "text-sm")}>
+                Record trades here or sync from the iOS app to populate tax lots for this symbol.
+              </p>
+            ) : null}
           </SectionCard>
         )}
       </div>

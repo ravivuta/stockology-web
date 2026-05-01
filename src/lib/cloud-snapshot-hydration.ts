@@ -43,6 +43,7 @@ type RawHolding = {
 };
 
 type RawOpenLot = {
+  lotId?: string;
   symbol?: string;
   quantity?: number;
   costBasis?: number;
@@ -50,6 +51,7 @@ type RawOpenLot = {
   initialQuantity?: number;
   status?: string;
   account?: string | null;
+  isRetirementAccount?: boolean | null;
 };
 
 type RawSoldLot = {
@@ -103,11 +105,12 @@ function mapOpenLot(raw: RawOpenLot, symbol: string): TradeLot | null {
   const pd = parsePurchaseDate(raw.purchaseDate);
   if (!Number.isFinite(qty) || !Number.isFinite(cost) || !pd) return null;
   return {
-    id: `${symbol}_${pd}_${cost}`,
+    id: typeof raw.lotId === "string" && raw.lotId.trim() ? raw.lotId : `${symbol}_${pd}_${cost}`,
     quantity: qty,
     costBasis: cost,
     purchaseDate: pd,
     account: typeof raw.account === "string" ? raw.account : "",
+    isRetirementAccount: typeof raw.isRetirementAccount === "boolean" ? raw.isRetirementAccount : null,
     status: mapLotStatus(raw.status),
   };
 }

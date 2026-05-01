@@ -13,6 +13,7 @@ export type TradeLot = {
   costBasis: number;
   purchaseDate: string;
   account?: string;
+  isRetirementAccount?: boolean | null;
   status: LotStatus;
 };
 
@@ -111,7 +112,14 @@ type State = {
   /** Merge fields into an existing symbol and rebuild recommendation. */
   updateStock: (symbol: string, patch: Partial<StockHolding>) => void;
   removeStock: (symbol: string) => void;
-  recordTrade: (symbol: string, side: "BUY" | "SELL", qty: number, price: number, date: string) => void;
+  recordTrade: (
+    symbol: string,
+    side: "BUY" | "SELL",
+    qty: number,
+    price: number,
+    date: string,
+    options?: { account?: string; isRetirementAccount?: boolean | null }
+  ) => void;
   /** Reverses the last journal entry only. Returns false if nothing to undo. */
   undoLastTrade: () => boolean;
   recalcMetrics: () => void;
@@ -130,6 +138,12 @@ type State = {
 
 function uid() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+const UNKNOWN_PURCHASE_DATE_BASE_MS = Date.UTC(1970, 0, 1, 0, 0, 0, 0);
+
+function unknownPurchaseDateForOffset(offset: number): string {
+  return new Date(UNKNOWN_PURCHASE_DATE_BASE_MS + (offset * 1000)).toISOString();
 }
 
 type RecalcContext = {
@@ -298,7 +312,7 @@ export const usePortfolioStore = create<State>()(
           const total = stocks.reduce((a, x) => a + x.quantity * (x.lastPrice ?? 0), 0) + st.cashBalance;
           return { stocks, lotsBySymbol: lots, portfolioSize: total };
         }),
-      recordTrade: (symbol, side, qty, price, date) => {
+      recordTrade: (symbol, side, qty, price, date, options) => {
         if (qty <= 0 || !Number.isFinite(price)) return;
         const sym = symbol.toUpperCase();
         set((st) => {
@@ -330,7 +344,8 @@ export const usePortfolioStore = create<State>()(
                 quantity: qty,
                 costBasis: price,
                 purchaseDate: date,
-                account: "",
+                account: options?.account?.trim() || "",
+                isRetirementAccount: options?.isRetirementAccount ?? null,
                 status: "open" as const,
               },
             ].sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate));
@@ -529,21 +544,83 @@ export const usePortfolioStore = create<State>()(
       setOptimizing: (v) => set({ optimizing: v }),
       setOnboardingComplete: (v) => set({ onboardingComplete: v }),
       importHoldings: (rows) => {
-        rows.forEach((r) => {
-          const lastPrice = r.qty === 0 && r.price === 0 ? 0 : r.price > 0 ? r.price : undefined;
-          get().addStock({
-            symbol: r.symbol.toUpperCase(),
-            quantity: r.qty,
-            averageCost: r.price,
-            lastPrice,
-            shortSMA: r.shortSMA,
-            dynamicFactor: r.dynamicFactor,
-            stockLimit: r.stockLimit,
-            transactionLimit: r.transactionLimit,
-            targetPrice: r.targetPrice,
-            name: r.name,
-            pendingOptimization: true,
-          });
+        set((st) => {
+          const grouped = new Map<string, CsvImportRow[]>();
+          for (const row of rows) {
+            const symbol = row.symbol.toUpperCase();
+            const existing = grouped.get(symbol);
+            if (existing) existing.push({ ...row, symbol });
+            else grouped.set(symbol, [{ ...row, symbol }]);
+          }
+
+          const lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }> = {};
+          const importedStocks: StockHolding[] = [];
+
+          for (const [symbol, symbolRows] of grouped.entries()) {
+            let totalQty = 0;
+            let totalBasis = 0;
+            let unknownDateOffset = 0;
+
+            const openLots: TradeLot[] = [];
+            for (const row of symbolRows) {
+              const qty = Math.max(0, row.qty);
+              const price = Math.max(0, row.price);
+              if (qty > 0) {
+                totalQty += qty;
+                totalBasis += qty * price;
+                openLots.push({
+                  id: uid(),
+                  quantity: qty,
+                  costBasis: price,
+                  purchaseDate: row.purchaseDate || unknownPurchaseDateForOffset(unknownDateOffset++),
+                  account: row.account?.trim() || "",
+                  isRetirementAccount: row.isRetirementAccount ?? null,
+                  status: "open",
+                });
+              }
+            }
+
+            if (openLots.length > 0) {
+              lotsBySymbol[symbol] = {
+                open: openLots.sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate)),
+                sold: [],
+              };
+            }
+
+            const template = symbolRows[symbolRows.length - 1];
+            const averageCost = totalQty > 0 ? totalBasis / totalQty : 0;
+            const lastPrice = totalQty === 0 && (template?.price ?? 0) === 0 ? 0 : (template?.price ?? 0) > 0 ? template.price : undefined;
+
+            importedStocks.push(
+              defaultStock({
+                symbol,
+                quantity: totalQty,
+                averageCost,
+                lastPrice,
+                shortSMA: template?.shortSMA,
+                dynamicFactor: template?.dynamicFactor,
+                stockLimit: template?.stockLimit,
+                transactionLimit: template?.transactionLimit,
+                targetPrice: template?.targetPrice,
+                name: template?.name,
+                pendingOptimization: true,
+              })
+            );
+          }
+
+          const ctx: RecalcContext = {
+            etfProfitTarget: st.etfProfitTarget,
+            stockProfitTarget: st.stockProfitTarget,
+            useAISentimentForRecommendations: st.useAISentimentForRecommendations,
+            useRSIGatingForRecommendations: st.useRSIGatingForRecommendations,
+            sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
+            lotsBySymbol,
+          };
+          const stocks = importedStocks.map((s) => recalcHolding(s, ctx));
+          const tradeJournal = buildTradeJournalFromLots(lotsBySymbol);
+          const portfolioSize = stocks.reduce((a, x) => a + x.quantity * (x.lastPrice ?? 0), 0) + st.cashBalance;
+
+          return { stocks, lotsBySymbol, tradeJournal, portfolioSize };
         });
       },
       replaceFromCloudSync: (payload) =>

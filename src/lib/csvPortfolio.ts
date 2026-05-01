@@ -5,6 +5,9 @@ export type CsvImportRow = {
   symbol: string;
   qty: number;
   price: number;
+  purchaseDate?: string;
+  account?: string;
+  isRetirementAccount?: boolean;
   shortSMA?: number;
   dynamicFactor?: number;
   stockLimit?: number;
@@ -65,10 +68,41 @@ function isBuyTransaction(text: string): boolean {
   return u.includes("BUY") || u.includes("BOUGHT") || u.includes("ADD");
 }
 
+function normalizeImportedDate(raw: string): string | undefined {
+  const value = raw.trim();
+  if (!value) return undefined;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+
+  const slashMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (slashMatch) {
+    const month = slashMatch[1].padStart(2, "0");
+    const day = slashMatch[2].padStart(2, "0");
+    const year = slashMatch[3].length === 2 ? `20${slashMatch[3]}` : slashMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms)) return value;
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+function parseRetirementAccountFlag(raw: string): boolean | undefined {
+  const value = raw.trim().toLowerCase();
+  if (!value) return undefined;
+  if (["yes", "y", "true", "1", "retirement", "ira", "roth", "401k", "tax-exempt", "tax exempt"].includes(value)) {
+    return true;
+  }
+  if (["no", "n", "false", "0", "taxable", "brokerage"].includes(value)) {
+    return false;
+  }
+  return undefined;
+}
+
 /**
  * Parse CSV from iOS-compatible formats:
  * - Extended: Symbol, Quantity, AverageCost, ShortSMA, DynamicFactor, …
- * - Lots: purchaseDate, transaction, symbol, qty, price [, account]
+ * - Lots: purchaseDate, transaction, symbol, qty, price [, account, retirementAccount]
  * - Simple: symbol + quantity/qty + price/average cost (flexible headers)
  */
 export async function parsePortfolioCsv(
@@ -114,6 +148,9 @@ export async function parsePortfolioCsv(
     const kTL = findHeaderKey(headers, ["TransactionLimit", "transaction limit"]);
     const kTp = findHeaderKey(headers, ["TargetPrice", "target price"]);
     const kName = findHeaderKey(headers, ["Name", "name"]);
+    const kDate = findHeaderKey(headers, ["purchaseDate", "purchase date", "tradeDate", "trade date"]);
+    const kAccount = findHeaderKey(headers, ["account", "Account", "profile", "profileName", "accountName"]);
+    const kRetirement = findHeaderKey(headers, ["retirementAccount", "retirement account", "accountType", "account type"]);
     if (!kSymbol || !kQty || !kAvg) {
       return { ok: false, error: "Extended CSV is missing Symbol, Quantity, or AverageCost." };
     }
@@ -133,10 +170,16 @@ export async function parsePortfolioCsv(
       const transactionLimit = parseNumber(getCell(row, kTL ?? "")) ?? undefined;
       const targetPrice = parseNumber(getCell(row, kTp ?? "")) ?? undefined;
       const nameRaw = getCell(row, kName ?? "");
+      const purchaseDate = normalizeImportedDate(getCell(row, kDate ?? ""));
+      const account = getCell(row, kAccount ?? "") || undefined;
+      const isRetirementAccount = parseRetirementAccountFlag(getCell(row, kRetirement ?? ""));
       out.push({
         symbol: sym,
         qty: Math.max(0, qty),
         price: Math.max(0, price),
+        purchaseDate,
+        account,
+        isRetirementAccount,
         shortSMA: shortSMA != null ? Math.round(shortSMA) : undefined,
         dynamicFactor: dynamicFactor ?? undefined,
         stockLimit: stockLimit ?? undefined,
@@ -148,7 +191,7 @@ export async function parsePortfolioCsv(
     if (out.length === 0) {
       return { ok: false, error: "No valid symbol rows in extended CSV." };
     }
-    return { ok: true, rows: mergeCsvLotRows(out), skipped };
+    return { ok: true, rows: out, skipped };
   }
 
   const kSymLot = findHeaderKey(headers, ["symbol", "Symbol", "ticker"]);
@@ -162,6 +205,9 @@ export async function parsePortfolioCsv(
     const kQty = kQtyLot;
     const kPrice = findHeaderKey(headers, ["price", "Price", "average cost", "AverageCost", "cost"]);
     const kTxn = kTxnLot;
+    const kDate = findHeaderKey(headers, ["purchaseDate", "purchase date", "tradeDate", "trade date"]);
+    const kAccount = findHeaderKey(headers, ["account", "Account", "profile", "profileName", "accountName"]);
+    const kRetirement = findHeaderKey(headers, ["retirementAccount", "retirement account", "accountType", "account type"]);
 
     for (const row of data) {
       const sym = getCell(row, kSym).toUpperCase();
@@ -176,12 +222,19 @@ export async function parsePortfolioCsv(
 
       const qty = kQty ? parseNumber(getCell(row, kQty)) ?? 0 : 0;
       const price = kPrice ? parseNumber(getCell(row, kPrice)) ?? 0 : 0;
-      out.push({ symbol: sym, qty: Math.max(0, qty), price: Math.max(0, price) });
+      out.push({
+        symbol: sym,
+        qty: Math.max(0, qty),
+        price: Math.max(0, price),
+        purchaseDate: normalizeImportedDate(getCell(row, kDate ?? "")),
+        account: getCell(row, kAccount ?? "") || undefined,
+        isRetirementAccount: parseRetirementAccountFlag(getCell(row, kRetirement ?? "")),
+      });
     }
     if (out.length === 0) {
       return { ok: false, error: "No importable rows (all SELL, invalid symbols, or empty)." };
     }
-    return { ok: true, rows: mergeCsvLotRows(out), skipped };
+    return { ok: true, rows: out, skipped };
   }
 
   /* Simple / broker-style */
@@ -200,6 +253,9 @@ export async function parsePortfolioCsv(
     "average price",
     "last price",
   ]);
+  const kDate = findHeaderKey(headers, ["purchaseDate", "purchase date", "tradeDate", "trade date"]);
+  const kAccount = findHeaderKey(headers, ["account", "Account", "profile", "profileName", "accountName"]);
+  const kRetirement = findHeaderKey(headers, ["retirementAccount", "retirement account", "accountType", "account type"]);
 
   for (const row of data) {
     const sym = getCell(row, kSym).toUpperCase();
@@ -210,55 +266,53 @@ export async function parsePortfolioCsv(
     }
     const qty = kQty ? parseNumber(getCell(row, kQty)) ?? 0 : 0;
     const price = kPrice ? parseNumber(getCell(row, kPrice)) ?? 0 : 0;
-    out.push({ symbol: sym, qty: Math.max(0, qty), price: Math.max(0, price) });
+    out.push({
+      symbol: sym,
+      qty: Math.max(0, qty),
+      price: Math.max(0, price),
+      purchaseDate: normalizeImportedDate(getCell(row, kDate ?? "")),
+      account: getCell(row, kAccount ?? "") || undefined,
+      isRetirementAccount: parseRetirementAccountFlag(getCell(row, kRetirement ?? "")),
+    });
   }
 
   if (out.length === 0) {
     return { ok: false, error: "No valid symbol rows found." };
   }
-  return { ok: true, rows: mergeCsvLotRows(out), skipped };
+  return { ok: true, rows: out, skipped };
 }
 
-/** Merge multiple lot lines per symbol (weighted average cost). */
-export function mergeCsvLotRows(rows: CsvImportRow[]): CsvImportRow[] {
-  const m = new Map<string, { basis: number; qty: number; template: CsvImportRow }>();
-
-  for (const r of rows) {
-    const sym = r.symbol.toUpperCase();
-    const q = Math.max(0, r.qty);
-    const p = Math.max(0, r.price);
-    const cur = m.get(sym);
-    if (!cur) {
-      m.set(sym, { basis: q * p, qty: q, template: { ...r, symbol: sym, qty: q, price: p } });
-    } else {
-      cur.basis += q * p;
-      cur.qty += q;
-      cur.template = {
-        ...cur.template,
-        qty: cur.qty,
-        price: cur.qty > 0 ? cur.basis / cur.qty : cur.template.price,
-      };
-    }
-  }
-
-  return Array.from(m.values()).map((v) => ({
-    ...v.template,
-    symbol: v.template.symbol.toUpperCase(),
-    qty: v.qty,
-    price: v.qty > 0 ? v.basis / v.qty : v.template.price,
-  }));
-}
-
-/** Matches iOS `PortfolioPageView.generateCSV` (+ empty account column). */
-export function exportPortfolioCsv(stocks: CsvExportStock[]): string {
-  const header = "purchaseDate,transaction,symbol,qty,price,account";
+/** Matches iOS `PortfolioPageView.generateCSV`, including account metadata. */
+export function exportPortfolioCsv(
+  stocks: CsvExportStock[],
+  lotsBySymbol?: Record<string, { open: Array<{ quantity: number; costBasis: number; purchaseDate: string; account?: string; isRetirementAccount?: boolean | null }>; sold: unknown[] }>
+): string {
+  const header = "purchaseDate,transaction,symbol,qty,price,account,retirementAccount";
   const esc = (f: string) => {
     if (f.includes(",") || f.includes('"') || f.includes("\n")) return `"${f.replace(/"/g, '""')}"`;
     return f;
   };
   const lines = [header];
   for (const s of stocks) {
-    const row = ["", "BUY", s.symbol, String(s.quantity), s.averageCost.toFixed(2), ""].map(esc);
+    const bundle = lotsBySymbol?.[s.symbol];
+    const openLots = bundle?.open ?? [];
+    if (openLots.length > 0) {
+      for (const lot of openLots) {
+        const row = [
+          lot.purchaseDate || "",
+          "BUY",
+          s.symbol,
+          String(lot.quantity),
+          lot.costBasis.toFixed(2),
+          lot.account ?? "",
+          lot.isRetirementAccount == null ? "" : lot.isRetirementAccount ? "yes" : "no",
+        ].map(esc);
+        lines.push(row.join(","));
+      }
+      continue;
+    }
+
+    const row = ["", "BUY", s.symbol, String(s.quantity), s.averageCost.toFixed(2), "", ""].map(esc);
     lines.push(row.join(","));
   }
   return lines.join("\n");

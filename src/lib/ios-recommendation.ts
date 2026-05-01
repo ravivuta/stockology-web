@@ -66,7 +66,7 @@ export type IosRecOptions = {
   sellOnlyLongTermQualified?: boolean;
 };
 
-type WashSaleInfo = {
+export type WashSaleInfo = {
   canBuy: boolean;
   restrictedUntil: Date | null;
   daysRemaining: number;
@@ -197,12 +197,12 @@ function parseDate(value: string | undefined): Date | null {
   return new Date(ms);
 }
 
-function isUnknownPurchaseDate(date: Date | null): boolean {
+export function isUnknownPurchaseDate(date: Date | null): boolean {
   if (!date) return true;
   return date.getTime() < UNKNOWN_PURCHASE_DATE_MAX_MS;
 }
 
-function getOldestOpenLotDate(stock: IosStockInput): Date | null {
+export function getOldestOpenLotDate(stock: IosStockInput): Date | null {
   const dates = (stock.openLots ?? [])
     .map((lot) => parseDate(lot.purchaseDate))
     .filter((date): date is Date => date != null)
@@ -210,7 +210,7 @@ function getOldestOpenLotDate(stock: IosStockInput): Date | null {
   return dates[0] ?? null;
 }
 
-function getWashSaleInfo(stock: IosStockInput, now = new Date()): WashSaleInfo {
+export function getWashSaleInfo(stock: IosStockInput, now = new Date()): WashSaleInfo {
   let restrictedUntil: Date | null = null;
   let restrictingLoss: number | null = null;
 

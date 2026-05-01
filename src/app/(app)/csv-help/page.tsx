@@ -10,9 +10,12 @@ export default function CsvHelpPage() {
       <div className="ui-hover-lift rounded-xl border border-border bg-elevated p-4 text-sm text-subtle">
         <p className="font-medium text-foreground">1. Lot export (from mobile portfolio share)</p>
         <p className="mt-2">
-          Header: <code className="rounded bg-border/60 px-1 py-0.5 text-xs">purchaseDate,transaction,symbol,qty,price</code> (optional trailing{" "}
-          <code className="rounded bg-border/60 px-1 py-0.5 text-xs">account</code>). Rows with SELL / SOLD in the transaction column are skipped on import. Multiple BUY lines for
-          the same symbol are merged into one position with weighted average cost.
+          Header: <code className="rounded bg-border/60 px-1 py-0.5 text-xs">purchaseDate,transaction,symbol,qty,price,account,retirementAccount</code>.{" "}
+          <code className="rounded bg-border/60 px-1 py-0.5 text-xs">account</code> is the account/profile name and{" "}
+          <code className="rounded bg-border/60 px-1 py-0.5 text-xs">retirementAccount</code> accepts values like <code className="rounded bg-border/60 px-1 py-0.5 text-xs">yes</code>,{" "}
+          <code className="rounded bg-border/60 px-1 py-0.5 text-xs">no</code>, <code className="rounded bg-border/60 px-1 py-0.5 text-xs">retirement</code>, or{" "}
+          <code className="rounded bg-border/60 px-1 py-0.5 text-xs">taxable</code>. Rows with SELL / SOLD in the transaction column are skipped on import. BUY rows are preserved as
+          separate lots so account metadata and purchase dates remain visible in stock details.
         </p>
       </div>
 
@@ -29,8 +32,8 @@ export default function CsvHelpPage() {
         <p className="mt-2">
           If the header includes <code className="rounded bg-border/60 px-1 py-0.5 text-xs">Symbol</code>, <code className="rounded bg-border/60 px-1 py-0.5 text-xs">Quantity</code>,{" "}
           <code className="rounded bg-border/60 px-1 py-0.5 text-xs">AverageCost</code>, <code className="rounded bg-border/60 px-1 py-0.5 text-xs">ShortSMA</code>, and{" "}
-          <code className="rounded bg-border/60 px-1 py-0.5 text-xs">DynamicFactor</code>, optional columns such as StockLimit, TransactionLimit, TargetPrice, and Name are applied
-          on import.
+          <code className="rounded bg-border/60 px-1 py-0.5 text-xs">DynamicFactor</code>, optional columns such as StockLimit, TransactionLimit, TargetPrice, Name, Account, and
+          retirement/account type are applied on import.
         </p>
       </div>
     </div>

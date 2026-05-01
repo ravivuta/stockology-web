@@ -15,12 +15,14 @@ type Props = {
   exportFilename: string;
   /** Defaults to all symbols in the store (same as iOS: full tracked list). */
   exportStocks?: CsvExportStock[];
+  compact?: boolean;
 };
 
-export function CsvImportExportBar({ exportFilename, exportStocks }: Props) {
+export function CsvImportExportBar({ exportFilename, exportStocks, compact = false }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const importHoldings = usePortfolioStore((s) => s.importHoldings);
   const storeStocks = usePortfolioStore((s) => s.stocks);
+  const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
   const toExport = exportStocks ?? storeStocks;
   const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [pendingImport, setPendingImport] = useState<{ rows: CsvImportRow[]; skipped: string[] } | null>(null);
@@ -43,11 +45,12 @@ export function CsvImportExportBar({ exportFilename, exportStocks }: Props) {
           return;
         }
         importHoldings(res.rows);
+        const importedSymbols = new Set(res.rows.map((row) => row.symbol)).size;
         const skipNote =
           res.skipped.length > 0
             ? ` Skipped invalid tickers: ${res.skipped.slice(0, 8).join(", ")}${res.skipped.length > 8 ? "…" : ""}.`
             : "";
-        setFlash({ kind: "ok", text: `Imported ${res.rows.length} symbol(s).${skipNote}` });
+        setFlash({ kind: "ok", text: `Imported ${importedSymbols} symbol(s).${skipNote}` });
       })();
     };
     reader.readAsText(file, "utf-8");
@@ -58,7 +61,7 @@ export function CsvImportExportBar({ exportFilename, exportStocks }: Props) {
       setFlash({ kind: "err", text: "Nothing to export yet." });
       return;
     }
-    downloadCsv(exportFilename, exportPortfolioCsv(toExport));
+    downloadCsv(exportFilename, exportPortfolioCsv(toExport, lotsBySymbol));
     setFlash({ kind: "ok", text: "CSV downloaded." });
   }
 
@@ -76,20 +79,24 @@ export function CsvImportExportBar({ exportFilename, exportStocks }: Props) {
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="ui-hover-pop rounded-lg border border-primary/40 bg-background px-3 py-2 text-sm font-medium text-foreground dark:border-primary/30"
+          className={`ui-hover-pop rounded-lg border border-primary/40 bg-background font-medium text-foreground dark:border-primary/30 ${
+            compact ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm"
+          }`}
         >
           Import CSV
         </button>
         <button
           type="button"
           onClick={onExport}
-          className="ui-hover-pop rounded-lg border border-primary/40 bg-background px-3 py-2 text-sm font-medium text-foreground dark:border-primary/30"
+          className={`ui-hover-pop rounded-lg border border-primary/40 bg-background font-medium text-foreground dark:border-primary/30 ${
+            compact ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm"
+          }`}
         >
           Export CSV
         </button>
       </div>
       {flash ? (
-        <p className={`text-sm ${flash.kind === "err" ? "text-error" : "text-subtle"}`} role="status">
+        <p className={`${compact ? "text-xs" : "text-sm"} ${flash.kind === "err" ? "text-error" : "text-subtle"}`} role="status">
           {flash.text}
         </p>
       ) : null}
@@ -101,11 +108,12 @@ export function CsvImportExportBar({ exportFilename, exportStocks }: Props) {
           if (!pendingImport) return;
           const { rows, skipped } = pendingImport;
           importHoldings(rows);
+          const importedSymbols = new Set(rows.map((row) => row.symbol)).size;
           const skipNote =
             skipped.length > 0
               ? ` Skipped invalid tickers: ${skipped.slice(0, 8).join(", ")}${skipped.length > 8 ? "…" : ""}.`
               : "";
-          setFlash({ kind: "ok", text: `Imported ${rows.length} symbol(s).${skipNote}` });
+          setFlash({ kind: "ok", text: `Imported ${importedSymbols} symbol(s).${skipNote}` });
         }}
         title="Replace portfolio from CSV?"
         description={

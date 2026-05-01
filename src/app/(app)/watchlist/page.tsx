@@ -208,20 +208,25 @@ export default function WatchlistPage() {
       </div>
 
       <div className="w-full overflow-x-auto rounded-2xl border border-border bg-elevated">
-        <table className="w-full min-w-[42rem] table-fixed border-collapse text-sm lg:min-w-full">
+        <table className="w-full table-fixed border-collapse text-sm">
           <colgroup>
-            {Array.from({ length: 8 }, (_, i) => (
-              <col key={i} style={{ width: "12.5%" }} />
-            ))}
+            <col style={{ width: "14%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "12%" }} />
+            <col style={{ width: "12%" }} />
+            <col style={{ width: "8%" }} />
           </colgroup>
           <thead className="text-xs font-semibold uppercase tracking-wide text-subtle">
             <tr>
               <SortableHeaderCell label="Symbol" column="symbol" activeColumn={sort} direction={sortDirection} onSort={toggleSort} className="px-2 py-3 pl-4 sm:px-3 sm:pl-5" />
               <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
-              <SortableHeaderCell label="Change" column="change" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
+              <SortableHeaderCell label="Chg" column="change" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
               <SortableHeaderCell label="Analyst" column="analyst" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
               <SortableHeaderCell label="Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
-              <SortableHeaderCell label="Mkt cap" column="marketCap" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
+              <SortableHeaderCell label="Cap" column="marketCap" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
               <SortableHeaderCell label="Signal" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} className="min-w-0 px-2 py-3 sm:px-3" />
               <th scope="col" className="px-2 py-3 pr-4 text-right sm:px-3 sm:pr-5">
                 <span className="sr-only">Actions</span>
