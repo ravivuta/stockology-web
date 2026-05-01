@@ -22,15 +22,12 @@ import {
 import { paddedValueDomain } from "@/lib/chart-y-domain";
 import { evenlySpacedTimeTickValues, evenlySpacedValueTicks } from "@/lib/chart-axis-ticks";
 import { APP_CTA_FILL } from "@/lib/appCtaClasses";
+import { formatCompactCurrency, formatCurrency } from "@/lib/numberFormat";
 import { cn } from "@/lib/utils";
 
 const LINE_COLOR = "var(--dashboard-chart-portfolio-line)";
 
 export type NetWorthRangePreset = ChartRangePreset;
-
-function fmtCurrency(n: number) {
-  return n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-}
 
 function axisDate(ms: number) {
   return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -131,13 +128,13 @@ export function PortfolioNetWorthChart({ stocks, cash, tradeJournal }: Props) {
       ? "Daily totals from your account (U.S. market calendar dates), ending with today’s live portfolio value."
       : meta?.source === "journal"
         ? "Estimated from recorded trades using each trade’s price; positions added without trades aren’t reflected in the past."
-        : "No dated history yet—the line shows your current total. Use the mobile app while signed in, or record trades here, to build a timeline.";
+        : "No dated history yet—the line shows your current total. Use the mobile app while signed in, or record trades from stock details, to build a timeline.";
 
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <p className="text-[11px] font-medium tabular-nums text-subtle">
-          {loading ? "Loading history…" : `Now ${fmtCurrency(liveTotal)}`}
+          {loading ? "Loading history…" : `Now ${formatCurrency(liveTotal)}`}
         </p>
         <div
           className="flex flex-wrap gap-1 rounded-lg border border-border bg-background/80 p-1 shadow-sm dark:bg-white/5"
@@ -190,9 +187,7 @@ export function PortfolioNetWorthChart({ stocks, cash, tradeJournal }: Props) {
                   tick={{ fill: chart.tickFill, fontSize: 10 }}
                   tickFormatter={(v) => {
                     const n = Number(v);
-                    if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-                    if (Math.abs(n) >= 1_000) return `$${(n / 1_000).toFixed(0)}k`;
-                    return `$${Math.round(n)}`;
+                    return formatCompactCurrency(n);
                   }}
                   width={52}
                   tickLine={false}
@@ -211,7 +206,7 @@ export function PortfolioNetWorthChart({ stocks, cash, tradeJournal }: Props) {
                     const row = payload?.[0]?.payload as { t?: number } | undefined;
                     return row?.t != null ? tooltipHeading(row.t) : "";
                   }}
-                  formatter={(v: number) => [fmtCurrency(v), "Net worth"]}
+                  formatter={(v: number) => [formatCurrency(v), "Net worth"]}
                 />
                 <Line
                   type="monotone"

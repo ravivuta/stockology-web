@@ -7,6 +7,7 @@ import type { StockHolding } from "@/store/portfolioStore";
 import { useDashboardChartTheme } from "@/hooks/useDashboardChartTheme";
 import { paddedValueDomain } from "@/lib/chart-y-domain";
 import { evenlySpacedValueTicks } from "@/lib/chart-axis-ticks";
+import { formatCompactCurrency, formatCurrency } from "@/lib/numberFormat";
 
 const MAX_SLICES = 14;
 
@@ -43,10 +44,6 @@ const BAR_COLORS_LIGHT = [
   "#57b8cc",
   "#b59ac8",
 ] as const;
-
-function fmtCurrency(n: number) {
-  return n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-}
 
 type Props = {
   stocks: StockHolding[];
@@ -92,11 +89,7 @@ export function PortfolioAllocationChart({ stocks, cash }: Props) {
     );
   }
 
-  const tickFmt = (v: number) => {
-    if (Math.abs(v) >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
-    if (Math.abs(v) >= 1_000) return `$${(v / 1_000).toFixed(0)}k`;
-    return `$${Math.round(v)}`;
-  };
+  const tickFmt = (v: number) => formatCompactCurrency(v);
 
   const plotHeight = Math.min(420, Math.max(220, 56 + data.length * 36));
 
@@ -106,7 +99,7 @@ export function PortfolioAllocationChart({ stocks, cash }: Props) {
       <div className="relative z-[1] flex h-full flex-col pt-3">
         <div className="px-4 pb-2">
           <p className="text-[11px] font-medium tabular-nums text-subtle">
-            Total {fmtCurrency(total)}
+            Total {formatCurrency(total)}
           </p>
         </div>
         <div className="min-h-0 flex-1 px-2 pb-2">
@@ -145,7 +138,7 @@ export function PortfolioAllocationChart({ stocks, cash }: Props) {
                   boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
                 }}
                 labelStyle={{ color: chart.tooltipLabelColor, fontSize: 11 }}
-                formatter={(v: number) => [fmtCurrency(v), "Value"]}
+                formatter={(v: number) => [formatCurrency(v), "Value"]}
               />
               <Bar dataKey="value" radius={[0, 6, 6, 0]} isAnimationActive={chartAnimate} animationDuration={600}>
                 {data.map((_, i) => (

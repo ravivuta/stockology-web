@@ -187,7 +187,7 @@ function parseRawHolding(raw: unknown): { stock: StockHolding; lots: { open: Tra
 
   const aa = h.analystAvg ?? h.analyst_average;
   if (typeof aa === "string" && aa.trim()) stock.analystAvg = aa.trim();
-  else if (typeof aa === "number" && Number.isFinite(aa)) stock.analystAvg = aa.toFixed(1);
+  else if (typeof aa === "number" && Number.isFinite(aa)) stock.analystAvg = aa.toFixed(2);
 
   const b = optFiniteNumber(h.beta);
   if (b != null) stock.beta = b;

@@ -17,6 +17,7 @@ import { useSubscriptionGate } from "@/hooks/useSubscriptionGate";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { appCtaButton } from "@/lib/appCtaClasses";
+import { formatCurrency } from "@/lib/numberFormat";
 import { cn } from "@/lib/utils";
 
 const SECTIONS = [
@@ -163,7 +164,7 @@ export default function SettingsPage() {
           <div className="flex shrink-0 sm:justify-end">
             <div className="rounded-md border border-border/80 bg-background/80 px-2.5 py-1.5 text-right dark:border-white/[0.08] dark:bg-white/[0.04]">
               <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-subtle">Cash (saved)</p>
-              <p className="mt-px text-sm font-semibold tabular-nums text-foreground">${cashBalance.toFixed(2)}</p>
+              <p className="mt-px text-sm font-semibold tabular-nums text-foreground">{formatCurrency(cashBalance)}</p>
             </div>
           </div>
         </div>

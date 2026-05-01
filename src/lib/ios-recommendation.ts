@@ -3,6 +3,8 @@
  * `UnifiedDataStore.calculateScore` + `RecommendationEngine.compute`.
  */
 
+import { formatCurrency } from "@/lib/numberFormat";
+
 export type IosOpenLot = {
   purchaseDate?: string;
   quantity?: number;
@@ -236,7 +238,7 @@ export function getWashSaleInfo(stock: IosStockInput, now = new Date()): WashSal
       month: "short",
       day: "numeric",
       year: "numeric",
-    })} (Wash sale rule - loss of $${Math.abs(restrictingLoss).toFixed(2)})\nDays remaining: ${daysRemaining}`;
+    })} (Wash sale rule - loss of ${formatCurrency(Math.abs(restrictingLoss))})\nDays remaining: ${daysRemaining}`;
   } else if (!canBuy) {
     displayText = "🚫 Cannot buy (wash sale restriction active)";
   }
@@ -344,7 +346,7 @@ function generateReduceComment(stock: IosStockInput, reduceQty: number): string 
 }
 
 function generateSellComment(stock: IosStockInput, targetPrice: number): string {
-  let comment = `Price above target sell price $${targetPrice.toFixed(2)}`;
+  let comment = `Price above target sell price ${formatCurrency(targetPrice)}`;
   const oldest = getOldestOpenLotDate(stock);
   if (oldest && !isUnknownPurchaseDate(oldest)) {
     const isLongTerm = Date.now() - oldest.getTime() > 365 * DAY_MS;
@@ -454,7 +456,7 @@ export function computeRecommendationFactors(
       if (rec.movingAvg > 0) {
         factors.push({
           label: `Price below ${stock.shortSMA}-day SMA`,
-          detail: `$${currentPrice.toFixed(2)} vs $${rec.movingAvg.toFixed(2)}`,
+          detail: `${formatCurrency(currentPrice)} vs ${formatCurrency(rec.movingAvg)}`,
           passes: currentPrice <= rec.movingAvg,
         });
       }
@@ -464,7 +466,7 @@ export function computeRecommendationFactors(
       if (rec.nextBuyPrice > 0) {
         factors.push({
           label: "Price below next buy target",
-          detail: `$${currentPrice.toFixed(2)} vs $${rec.nextBuyPrice.toFixed(2)}`,
+          detail: `${formatCurrency(currentPrice)} vs ${formatCurrency(rec.nextBuyPrice)}`,
           passes: currentPrice <= rec.nextBuyPrice,
         });
       }
@@ -473,7 +475,7 @@ export function computeRecommendationFactors(
       if (stock.analystTarget != null && stock.analystTarget > 0) {
         factors.push({
           label: "Price at/above analyst target",
-          detail: `$${currentPrice.toFixed(2)} ≥ $${stock.analystTarget.toFixed(2)}`,
+          detail: `${formatCurrency(currentPrice)} ≥ ${formatCurrency(stock.analystTarget)}`,
           passes: currentPrice >= stock.analystTarget,
         });
       }
@@ -483,12 +485,12 @@ export function computeRecommendationFactors(
       const moneyToFree = Math.max(0, costBasis - stockLimit);
       factors.push({
         label: "Cost basis above limit",
-        detail: `$${Math.round(costBasis)} > $${Math.round(stockLimit)}`,
+        detail: `${formatCurrency(costBasis)} > ${formatCurrency(stockLimit)}`,
         passes: costBasis > stockLimit,
       });
       factors.push({
         label: "Unrealized gain sufficient to reduce",
-        detail: `Gain $${Math.round(unrealizedGain)} vs needed $${Math.round(moneyToFree / 2)}`,
+        detail: `Gain ${formatCurrency(unrealizedGain)} vs needed ${formatCurrency(moneyToFree / 2)}`,
         passes: unrealizedGain > moneyToFree / 2,
       });
       break;
@@ -501,12 +503,12 @@ export function computeRecommendationFactors(
     if (!isETF) {
       factors.push({
         label: "Score ≥ 50",
-        detail: `${score.toFixed(1)}/100`,
+        detail: `${score.toFixed(2)}/100`,
         passes: score >= 50,
       });
       factors.push({
         label: "Expected return > 25%",
-        detail: `${rec.expectedReturnPct.toFixed(1)}%`,
+        detail: `${rec.expectedReturnPct.toFixed(2)}%`,
         passes: rec.expectedReturnPct > 25,
       });
       const aiPass = aiScore == null || !(aiScore > 0) || aiScore >= 50;
@@ -523,7 +525,7 @@ export function computeRecommendationFactors(
     const maxHoldingLimit = 2 * stockLimit;
     factors.push({
       label: "Holding limit OK",
-      detail: `$${Math.round(costBasis)} of $${Math.round(maxHoldingLimit)} max`,
+      detail: `${formatCurrency(costBasis)} of ${formatCurrency(maxHoldingLimit)} max`,
       passes: costBasis < maxHoldingLimit,
     });
 
@@ -636,13 +638,13 @@ export function scoreBreakdownRows(stock: IosStockInput): {
 
   return {
     analystLine: aa ? `${aa}/5.0` : "—",
-    analystPoints: `${analystPoints.toFixed(1)}/${analystWeight}`,
-    upsideLine: upsidePct != null ? `${upsidePct.toFixed(1)}%` : "—",
-    upsidePoints: `${upsidePoints.toFixed(1)}/${upsideWeight}`,
-    capLine: mc != null && mc > 0 ? `$${(mc / 1_000_000_000).toFixed(1)}B` : "—",
-    capPoints: `${capScore.toFixed(1)}/20`,
+    analystPoints: `${analystPoints.toFixed(2)}/${analystWeight}`,
+    upsideLine: upsidePct != null ? `${upsidePct.toFixed(2)}%` : "—",
+    upsidePoints: `${upsidePoints.toFixed(2)}/${upsideWeight}`,
+    capLine: mc != null && mc > 0 ? `$${(mc / 1_000_000_000).toFixed(2)}B` : "—",
+    capPoints: `${capScore.toFixed(2)}/20`,
     pegLine: peg > 0 ? peg.toFixed(2) : "—",
-    pegPoints: `${pegPoints.toFixed(1)}/20`,
+    pegPoints: `${pegPoints.toFixed(2)}/20`,
   };
 }
 
@@ -851,7 +853,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
       const suggestedShares = Math.round(transactionLimit / currentPrice);
       return {
         action: "BUY",
-        comments: `Buy ${suggestedShares.toFixed(0)} stocks. Current Price is below ${actualSmaPeriod.toFixed(0)} day moving avg ${movingAvg.toFixed(2)}`,
+          comments: `Buy ${suggestedShares.toFixed(0)} stocks. Current price is below ${actualSmaPeriod.toFixed(0)} day moving avg ${formatCurrency(movingAvg)}`,
         nextBuyPrice,
         movingAvg,
         expectedReturnPct,
@@ -871,7 +873,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
     const addQty = Math.round(transactionLimit / currentPrice);
     return {
       action: "ADD",
-      comments: `Add ${addQty.toFixed(0)} stocks. Current price is below next target buy price ${nextBuyPrice.toFixed(2)}`,
+      comments: `Add ${addQty.toFixed(0)} stocks. Current price is below next target buy price ${formatCurrency(nextBuyPrice)}`,
       nextBuyPrice,
       movingAvg,
       expectedReturnPct,
@@ -900,24 +902,24 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
   if (numStock === 0) {
     const blockers: string[] = [];
     if (currentPrice > nextBuyPrice) {
-      blockers.push(`price is above ${actualSmaPeriod.toFixed(0)}-day moving average (${movingAvg.toFixed(2)})`);
+      blockers.push(`price is above ${actualSmaPeriod.toFixed(0)}-day moving average (${formatCurrency(movingAvg)})`);
     }
     if (stock.isETF !== true && !relaxScoreRequirement) {
       if (expectedReturnPct <= 25) {
-        blockers.push(`expected return ${expectedReturnPct.toFixed(1)}% is at/below 25% minimum`);
+        blockers.push(`expected return ${expectedReturnPct.toFixed(2)}% is at/below 25% minimum`);
       }
       if (metricScore <= 50) {
         blockers.push(`score ${metricScore.toFixed(0)}/100 is at/below 50 minimum`);
       }
     }
     if (currentPrice >= transactionLimit) {
-      blockers.push(`share price exceeds per-trade limit (${transactionLimit.toFixed(2)})`);
+      blockers.push(`share price exceeds per-trade limit (${formatCurrency(transactionLimit)})`);
     }
     return {
       action: "WAIT_BUY",
       comments:
         blockers.length === 0
-          ? `Waiting for entry conditions to align. Next buy trigger: ${nextBuyPrice.toFixed(2)}.`
+          ? `Waiting for entry conditions to align. Next buy trigger: ${formatCurrency(nextBuyPrice)}.`
           : `WAIT due to: ${blockers.join("; ")}.`,
       nextBuyPrice,
       movingAvg,
@@ -937,7 +939,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
 
   return {
     action: "WAIT_ADD",
-    comments: `Add more shares when price is below next target buy price: ${nextBuyPrice.toFixed(2)}`,
+    comments: `Add more shares when price is below next target buy price: ${formatCurrency(nextBuyPrice)}`,
     nextBuyPrice,
     movingAvg,
     expectedReturnPct,

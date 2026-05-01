@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { appCtaButton } from "@/lib/appCtaClasses";
+import { formatCurrency } from "@/lib/numberFormat";
 import { AppModal, ModalSection } from "@/components/ui/AppModal";
 import type { StockHolding } from "@/store/portfolioStore";
 
@@ -112,12 +113,12 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
             <span className="font-medium text-foreground">Accumulation:</span> up to about 2× stock limit to average down.
           </p>
           <p className="mt-2">
-            <span className="font-medium text-foreground">Current cost basis:</span> ${costBasis.toFixed(0)} ·{" "}
-            <span className="font-medium text-foreground">Max accumulation:</span> ${maxAccumulation.toFixed(0)}
+            <span className="font-medium text-foreground">Current cost basis:</span> {formatCurrency(costBasis)} ·{" "}
+            <span className="font-medium text-foreground">Max accumulation:</span> {formatCurrency(maxAccumulation)}
           </p>
           <p className="mt-2">
             <span className="font-medium text-foreground">Sell target:</span>{" "}
-            {sellTarget.price != null ? `$${sellTarget.price.toFixed(2)}` : "—"}{" "}
+            {sellTarget.price != null ? formatCurrency(sellTarget.price) : "—"}{" "}
             <span className="text-subtle">({sellTarget.source})</span>
           </p>
         </div>

@@ -20,6 +20,7 @@ import {
   fetchCloudNetWorthHistory,
   type NetWorthPoint,
 } from "@/lib/portfolio-net-worth-series";
+import { formatAbsPercent, formatCompactCurrency, formatCurrency, formatPercent } from "@/lib/numberFormat";
 
 const PALETTE = {
   cash: "var(--dashboard-chart-cash)",
@@ -28,18 +29,6 @@ const PALETTE = {
   holdingsValue: "var(--dashboard-chart-holdings)",
   loss: "var(--dashboard-chart-loss)",
 } as const;
-
-function fmtCurrency(n: number) {
-  return n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-}
-
-function fmtPct(n: number, digits = 1) {
-  return `${n >= 0 ? "+" : ""}${n.toFixed(digits)}%`;
-}
-
-function fmtAbsPct(n: number, digits = 1) {
-  return `${Math.abs(n).toFixed(digits)}%`;
-}
 
 export default function DashboardPage() {
   const reduceMotion = useReducedMotion();
@@ -217,7 +206,7 @@ export default function DashboardPage() {
             >
               <PortfolioDonut
                 segments={pieData.map((p) => ({ name: p.name, value: p.value, color: p.color }))}
-                totalValue={fmtCurrency(totalBalance)}
+                totalValue={formatCurrency(totalBalance)}
                 totalLabelClassName="text-[color:var(--dashboard-chart-center-text)]"
                 totalValueClassName="text-[color:var(--dashboard-chart-center-text)]"
               />
@@ -242,17 +231,17 @@ export default function DashboardPage() {
           </div>
 
           <dl className="grid w-full max-w-lg grid-cols-1 gap-0 lg:shrink-0">
-            <StatRow label="Cash" value={fmtCurrency(cash)} valueClassName="text-[color:var(--dashboard-chart-cash)]" />
+            <StatRow label="Cash" value={formatCurrency(cash)} valueClassName="text-[color:var(--dashboard-chart-cash)]" />
             {isProfitable ? (
               <>
                 <StatRow
                   label="Cost"
-                  value={fmtCurrency(holdingsCostBasis)}
+                  value={formatCurrency(holdingsCostBasis)}
                   valueClassName="text-[color:var(--dashboard-chart-cost-basis)]"
                 />
                 <StatRow
                   label="Gain"
-                  value={`${fmtCurrency(holdingsPnL)} (${fmtAbsPct(totalPnLPct)})`}
+                  value={`${formatCurrency(holdingsPnL)} (${formatAbsPercent(totalPnLPct)})`}
                   valueClassName="font-semibold text-[color:var(--dashboard-chart-gain)]"
                   last={!showTodayChange}
                 />
@@ -261,17 +250,17 @@ export default function DashboardPage() {
               <>
                 <StatRow
                   label="Cost basis"
-                  value={fmtCurrency(holdingsCostBasis)}
+                  value={formatCurrency(holdingsCostBasis)}
                   valueClassName="text-[color:var(--dashboard-chart-cost-basis)]"
                 />
                 <StatRow
                   label="Current value"
-                  value={fmtCurrency(holdingsValue)}
+                  value={formatCurrency(holdingsValue)}
                   valueClassName="text-[color:var(--dashboard-chart-holdings)]"
                 />
                 <StatRow
                   label="Loss"
-                  value={`${fmtCurrency(Math.abs(holdingsPnL))} (${fmtAbsPct(totalPnLPct)})`}
+                  value={`${formatCurrency(Math.abs(holdingsPnL))} (${formatAbsPercent(totalPnLPct)})`}
                   valueClassName="font-semibold text-[color:var(--dashboard-chart-loss)]"
                   last={!showTodayChange}
                 />
@@ -280,7 +269,7 @@ export default function DashboardPage() {
             {showTodayChange ? (
               <StatRow
                 label="Today"
-                value={`${fmtCurrency(Math.abs(todayChange.change))} (${fmtPct(todayChange.percent)})`}
+                value={`${formatCurrency(Math.abs(todayChange.change))} (${formatPercent(todayChange.percent, true)})`}
                 valueClassName={todayValueClassName}
                 last
               />
@@ -497,9 +486,7 @@ function EmptyCol({ message, sub }: { message: string; sub: string }) {
 }
 
 function fmtShort(n: number) {
-  if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (Math.abs(n) >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-  return fmtCurrency(n);
+  return formatCompactCurrency(n);
 }
 
 function GainerLoserBars({

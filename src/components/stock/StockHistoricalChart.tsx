@@ -15,6 +15,7 @@ import { paddedValueDomain } from "@/lib/chart-y-domain";
 import { evenlySpacedTimeTickValues, evenlySpacedValueTicks } from "@/lib/chart-axis-ticks";
 import { useDashboardChartTheme } from "@/hooks/useDashboardChartTheme";
 import { APP_CTA_FILL } from "@/lib/appCtaClasses";
+import { formatCurrency, formatPercent } from "@/lib/numberFormat";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -94,8 +95,7 @@ export function StockHistoricalChart({ symbol, smaPeriod, averageCost, points, l
           <span
             className={`font-bold tabular-nums ${compact ? "text-xs" : "text-sm"} ${pct >= 0 ? "text-primary" : "text-error"}`}
           >
-            {pct >= 0 ? "+" : ""}
-            {pct.toFixed(2)}%
+            {formatPercent(pct, true)}
             <span className={`ml-1 font-medium text-subtle ${compact ? "text-[10px]" : "text-xs"}`}>in range</span>
           </span>
         )}
@@ -136,7 +136,7 @@ export function StockHistoricalChart({ symbol, smaPeriod, averageCost, points, l
                 axisLine={{ stroke: chart.referenceStroke }}
                 tickLine={false}
                 width={compact ? 44 : 52}
-                tickFormatter={(v) => `$${Number(v).toFixed(0)}`}
+                tickFormatter={(v) => formatCurrency(Number(v))}
               />
               <Tooltip
                 cursor={{ stroke: chart.referenceStroke, strokeWidth: 1, strokeDasharray: "4 4", opacity: 0.55 }}
@@ -148,7 +148,7 @@ export function StockHistoricalChart({ symbol, smaPeriod, averageCost, points, l
                   fontSize: 11,
                 }}
                 labelStyle={{ color: chart.tooltipLabelColor, fontSize: 11 }}
-                formatter={(value: number) => [`$${value.toFixed(2)}`, "Close"]}
+                formatter={(value: number) => [formatCurrency(value), "Close"]}
                 labelFormatter={(_label, payload) => {
                   const row = payload?.[0]?.payload as { dateStr?: string } | undefined;
                   return row?.dateStr ?? "";

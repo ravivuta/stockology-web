@@ -6,6 +6,7 @@ import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { runRefreshPipeline } from "@/lib/refresh";
 import { analystTargetUpsidePct, formatMarketCapCompact, formatUpsidePct } from "@/lib/marketFormat";
+import { formatCurrency, formatDecimal, formatPercent } from "@/lib/numberFormat";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
@@ -257,15 +258,15 @@ export default function WatchlistPage() {
                         <span className="min-w-0 truncate">{s.symbol}</span>
                       </Link>
                     </td>
-                    <td className="px-2 py-3 text-right tabular-nums text-subtle sm:px-3">${(s.lastPrice ?? 0).toFixed(2)}</td>
+                    <td className="px-2 py-3 text-right tabular-nums text-subtle sm:px-3">{formatCurrency(s.lastPrice ?? 0)}</td>
                     <td className="px-2 py-3 text-right tabular-nums text-subtle sm:px-3">
-                      {s.dailyChangePercent != null ? `${s.dailyChangePercent >= 0 ? "+" : ""}${s.dailyChangePercent.toFixed(2)}%` : "—"}
+                      {s.dailyChangePercent != null ? formatPercent(s.dailyChangePercent, true) : "—"}
                     </td>
                     <td
                       className="min-w-0 px-2 py-3 text-right tabular-nums text-foreground sm:px-3"
                       title="Consensus / average rating when available from data refresh"
                     >
-                      <span className="block truncate">{rating || "—"}</span>
+                      <span className="block truncate">{rating && !Number.isNaN(Number.parseFloat(rating)) ? formatDecimal(Number.parseFloat(rating)) : "—"}</span>
                     </td>
                     <td
                       className={`min-w-0 px-2 py-3 text-right tabular-nums font-medium sm:px-3 ${
@@ -273,7 +274,7 @@ export default function WatchlistPage() {
                       }`}
                       title={
                         s.analystTarget != null && s.lastPrice
-                          ? `Target $${s.analystTarget.toFixed(2)} vs last $${s.lastPrice.toFixed(2)}`
+                          ? `Target ${formatCurrency(s.analystTarget)} vs last ${formatCurrency(s.lastPrice)}`
                           : undefined
                       }
                     >

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { appCtaButton } from "@/lib/appCtaClasses";
+import { formatCurrency } from "@/lib/numberFormat";
 import { usePortfolioStore } from "@/store/portfolioStore";
 
 export default function SimulationPage() {
@@ -86,8 +87,8 @@ export default function SimulationPage() {
         </label>
         {trackedStock ? (
           <p className="rounded-lg border border-border/70 bg-background/50 px-3 py-2 text-xs text-subtle">
-            Using saved strategy for {trackedStock.symbol}: SMA {trackedStock.shortSMA}, dynamic {trackedStock.dynamicFactor}%, stock limit $
-            {trackedStock.stockLimit.toFixed(0)}, transaction limit ${trackedStock.transactionLimit.toFixed(0)}.
+            Using saved strategy for {trackedStock.symbol}: SMA {trackedStock.shortSMA}, dynamic {trackedStock.dynamicFactor}%, stock limit{" "}
+            {formatCurrency(trackedStock.stockLimit)}, transaction limit {formatCurrency(trackedStock.transactionLimit)}.
           </p>
         ) : null}
         <button

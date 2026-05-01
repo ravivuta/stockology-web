@@ -43,10 +43,10 @@ function mapPriceRowToPatch(p: EdgePriceRow): Partial<StockHolding> {
   }
   const aa = p.analyst_average;
   if (aa != null) {
-    if (typeof aa === "number" && Number.isFinite(aa)) patch.analystAvg = aa.toFixed(1);
+    if (typeof aa === "number" && Number.isFinite(aa)) patch.analystAvg = aa.toFixed(2);
     else if (typeof aa === "string" && aa.trim()) {
       const n = parseFloat(aa);
-      patch.analystAvg = Number.isFinite(n) ? n.toFixed(1) : aa.trim();
+      patch.analystAvg = Number.isFinite(n) ? n.toFixed(2) : aa.trim();
     }
   }
   if (p.market_cap != null) {

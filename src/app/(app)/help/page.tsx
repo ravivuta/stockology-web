@@ -107,7 +107,7 @@ const SECTIONS: Section[] = [
   {
     category: "stock-detail",
     title: "Trade Recording",
-    body: "Record buy/sell transactions in the Holdings tab. Use the 'Record Trade' button to open a modal with quantity and price inputs. Trades update your position and recalculate recommendations.",
+    body: "Record buy/sell transactions from each stock's detail view. Enter quantity, price, and account fields there to update positions, tax lots, and recommendations.",
   },
   {
     category: "stock-detail",

@@ -8,8 +8,7 @@ import { runRefreshPipeline } from "@/lib/refresh";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
 import { PortfolioAllocationChart } from "@/components/portfolio/PortfolioAllocationChart";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
-import { SymbolTradeCombobox } from "@/components/portfolio/SymbolTradeCombobox";
-import { isValidTicker } from "@/lib/csvPortfolio";
+import { formatCurrency, formatNumberMax2, formatPercent, formatSignedCurrency } from "@/lib/numberFormat";
 import { recommendationActionDisplay } from "@/lib/recommendation";
 import { computeTodayChangeFromLiveQuotes } from "@/lib/portfolio-net-worth-series";
 
@@ -40,20 +39,11 @@ export default function PortfolioPage() {
   const stocks = usePortfolioStore((s) => s.stocks);
   const cash = usePortfolioStore((s) => s.cashBalance);
   const recalc = usePortfolioStore((s) => s.recalcMetrics);
-  const addStock = usePortfolioStore((s) => s.addStock);
-  const recordTrade = usePortfolioStore((s) => s.recordTrade);
 
   const [sort, setSort] = useState<SortKey>("symbol");
   const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION.symbol);
   const [query, setQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
-
-  const [tradeSymbol, setTradeSymbol] = useState("");
-  const [tradeSide, setTradeSide] = useState<"BUY" | "SELL">("BUY");
-  const [tradeQty, setTradeQty] = useState("1");
-  const [tradePrice, setTradePrice] = useState("");
-  const [tradeAccountName, setTradeAccountName] = useState("");
-  const [tradeAccountType, setTradeAccountType] = useState<"unknown" | "retirement" | "taxable">("unknown");
 
   /** Portfolio page lists positions only; watchlist-only symbols (0 qty) stay in store for trading elsewhere. */
   const holdings = useMemo(() => stocks.filter((s) => s.quantity > 0), [stocks]);
@@ -134,49 +124,6 @@ export default function PortfolioPage() {
     setRefreshing(false);
   }
 
-  function submitTrade(symbol: string) {
-    const sym = symbol.toUpperCase();
-    const q = parseFloat(tradeQty) || 0;
-    if (q <= 0) return;
-    const st = stocks.find((s) => s.symbol === sym);
-    const last = st?.lastPrice ?? 0;
-    const p = parseFloat(tradePrice) || last;
-    if (!Number.isFinite(p) || p <= 0) return;
-    const date = new Date().toISOString().slice(0, 10);
-    if (tradeSide === "BUY" && !st) {
-      addStock({ symbol: sym, quantity: 0, averageCost: 0, lastPrice: p });
-    }
-    recordTrade(sym, tradeSide, q, p, date, {
-      account: tradeAccountName.trim() || undefined,
-      isRetirementAccount:
-        tradeAccountType === "unknown" ? null : tradeAccountType === "retirement",
-    });
-    setTradePrice("");
-  }
-
-  const symU = tradeSymbol.trim().toUpperCase();
-  const holdingForTrade = stocks.find((s) => s.symbol === symU);
-  const tradeQtyNum = parseFloat(tradeQty) || 0;
-  const lastForTrade = holdingForTrade?.lastPrice ?? 0;
-  const tradePriceNum = parseFloat(tradePrice) || lastForTrade;
-  const tradePriceOk = Number.isFinite(tradePriceNum) && tradePriceNum > 0;
-  const canApplyTrade =
-    isValidTicker(symU) &&
-    tradeQtyNum > 0 &&
-    tradePriceOk &&
-    (tradeSide === "BUY" || (holdingForTrade != null && holdingForTrade.quantity > 0));
-  const applyTradeTitle = !canApplyTrade
-    ? !isValidTicker(symU)
-      ? "Enter a valid ticker (letters, numbers, optional . or -)."
-      : tradeQtyNum <= 0
-        ? "Quantity must be greater than zero."
-        : !tradePriceOk
-          ? "Enter a price, or add the symbol and refresh so a last price exists."
-          : tradeSide === "SELL"
-            ? "Sell only applies to symbols you hold with quantity greater than zero."
-            : undefined
-    : undefined;
-
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -199,16 +146,16 @@ export default function PortfolioPage() {
       <div className="hidden gap-3 sm:grid-cols-2 lg:grid-cols-4 md:grid">
         <div className="rounded-xl border border-border/80 bg-elevated px-4 py-3 shadow-sm dark:border-white/[0.08]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Cash balance</p>
-          <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">${cash.toFixed(2)}</p>
+          <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">{formatCurrency(cash)}</p>
         </div>
         <div className="rounded-xl border border-border/80 bg-elevated px-4 py-3 shadow-sm dark:border-white/[0.08]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Assets value</p>
-          <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">${assetsValue.toFixed(2)}</p>
+          <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">{formatCurrency(assetsValue)}</p>
           <p className="mt-0.5 text-[11px] text-subtle">Holdings at last price</p>
         </div>
         <div className="rounded-xl border border-border/80 bg-elevated px-4 py-3 shadow-sm dark:border-white/[0.08]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Net worth</p>
-          <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">${netWorth.toFixed(2)}</p>
+          <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">{formatCurrency(netWorth)}</p>
           <p className="mt-0.5 text-[11px] text-subtle">Cash + assets</p>
         </div>
         <div className="rounded-xl border border-border/80 bg-elevated px-4 py-3 shadow-sm dark:border-white/[0.08]">
@@ -223,9 +170,7 @@ export default function PortfolioPage() {
                     : "text-foreground"
               }`}
             >
-              {portfolioTodayChange.change >= 0 ? "+" : "−"}$
-              {Math.abs(portfolioTodayChange.change).toFixed(2)} ({portfolioTodayChange.percent >= 0 ? "+" : ""}
-              {portfolioTodayChange.percent.toFixed(2)}%)
+              {formatSignedCurrency(portfolioTodayChange.change)} ({formatPercent(portfolioTodayChange.percent, true)})
             </p>
           ) : (
             <p className="mt-1 text-lg font-semibold tabular-nums text-subtle">—</p>
@@ -246,82 +191,13 @@ export default function PortfolioPage() {
               className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
             />
           </label>
-          <label className="flex min-w-[10rem] flex-col gap-1 text-[11px] text-subtle">
-            Trade symbol
-            <SymbolTradeCombobox
-              id="portfolio-trade-symbol"
-              value={tradeSymbol}
-              onChange={setTradeSymbol}
-              portfolioStocks={stocks}
-            />
-          </label>
-          <label className="flex w-[5.5rem] flex-col gap-1 text-[11px] text-subtle">
-            Side
-            <select
-              value={tradeSide}
-              onChange={(e) => setTradeSide(e.target.value as "BUY" | "SELL")}
-              className="rounded-lg border border-border bg-background px-2.5 py-2 text-sm text-foreground"
-            >
-              <option value="BUY">Buy</option>
-              <option value="SELL">Sell</option>
-            </select>
-          </label>
-          <label className="flex w-[4.75rem] flex-col gap-1 text-[11px] text-subtle">
-            Qty
-            <input
-              value={tradeQty}
-              onChange={(e) => setTradeQty(e.target.value)}
-              className="rounded-lg border border-border bg-background px-2.5 py-2 text-sm text-foreground"
-            />
-          </label>
-          <label className="flex w-[7rem] flex-col gap-1 text-[11px] text-subtle">
-            Price
-            <input
-              value={tradePrice}
-              onChange={(e) => setTradePrice(e.target.value)}
-              placeholder="Last"
-              className="rounded-lg border border-border bg-background px-2.5 py-2 text-sm text-foreground"
-            />
-          </label>
-          <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-[11px] text-subtle sm:max-w-[12rem]">
-            Account name
-            <input
-              value={tradeAccountName}
-              onChange={(e) => setTradeAccountName(e.target.value)}
-              placeholder="Brokerage / IRA"
-              disabled={tradeSide === "SELL"}
-              className="rounded-lg border border-border bg-background px-2.5 py-2 text-sm text-foreground disabled:opacity-60"
-            />
-          </label>
-          <label className="flex w-[8.25rem] flex-col gap-1 text-[11px] text-subtle">
-            Account type
-            <select
-              value={tradeAccountType}
-              onChange={(e) => setTradeAccountType(e.target.value as "unknown" | "retirement" | "taxable")}
-              disabled={tradeSide === "SELL"}
-              className="rounded-lg border border-border bg-background px-2.5 py-2 text-sm text-foreground disabled:opacity-60"
-            >
-              <option value="unknown">Unknown</option>
-              <option value="retirement">Retirement</option>
-              <option value="taxable">Taxable</option>
-            </select>
-          </label>
-          <button
-            type="button"
-            disabled={!canApplyTrade}
-            title={applyTradeTitle}
-            onClick={() => canApplyTrade && submitTrade(symU)}
-            className={appCtaButton("ui-hover-spotlight px-3 py-2 text-sm disabled:opacity-50")}
-          >
-            Apply
-          </button>
           <CsvImportExportBar exportFilename="stocks-pm-portfolio.csv" compact />
           <Link href="/csv-help" className="ui-hover-pop rounded-lg border border-primary/30 px-2.5 py-1.5 text-xs text-foreground dark:border-primary/25">
             CSV help
           </Link>
         </div>
         <p className="mt-2 text-xs text-subtle">
-          Record buy/sell trades, import/export CSV, or filter the table here. Account fields are stored on new buy lots and shown in stock details.
+          Filter holdings here, or open a stock to record trades and review lot details. CSV import and export stay available on this page.
         </p>
       </div>
 
@@ -373,11 +249,11 @@ export default function PortfolioPage() {
                       </Link>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-foreground">{s.quantity}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-foreground">${s.averageCost.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-foreground">${costBasis.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-foreground">${(s.lastPrice ?? 0).toFixed(2)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-foreground">${value.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatNumberMax2(s.quantity)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatCurrency(s.averageCost)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatCurrency(costBasis)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatCurrency(s.lastPrice ?? 0)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatCurrency(value)}</td>
                   <td
                     className={`px-4 py-3 text-right tabular-nums font-medium ${
                       gainLoss > 0
@@ -387,15 +263,15 @@ export default function PortfolioPage() {
                           : "text-subtle"
                     }`}
                   >
-                    {`${gainLoss >= 0 ? "+" : "−"}$${Math.abs(gainLoss).toFixed(2)}`}
-                    {gainLossPct != null ? ` (${gainLossPct >= 0 ? "+" : ""}${gainLossPct.toFixed(2)}%)` : ""}
+                    {formatSignedCurrency(gainLoss)}
+                    {gainLossPct != null ? ` (${formatPercent(gainLossPct, true)})` : ""}
                   </td>
                   <td
                     className={`px-4 py-3 text-right tabular-nums font-medium ${
                       d == null ? "text-subtle" : d > 0 ? "text-emerald-700 dark:text-primary" : d < 0 ? "text-red-700 dark:text-red-400" : "text-subtle"
                     }`}
                   >
-                    {d != null && Number.isFinite(d) ? `${d >= 0 ? "+" : ""}${d.toFixed(2)}%` : "—"}
+                    {d != null && Number.isFinite(d) ? formatPercent(d, true) : "—"}
                   </td>
                   <td className="px-4 py-3 align-middle">
                     {s.recommendation ? (
@@ -417,7 +293,7 @@ export default function PortfolioPage() {
         {rows.length === 0 && (
           <p className="p-6 text-center text-subtle">
             {holdings.length === 0
-              ? "You don’t have any holdings yet. Buy a stock above to open a position."
+              ? "You don’t have any holdings yet. Import positions from CSV or open a stock to record a trade."
               : "No holdings match your search."}
           </p>
         )}

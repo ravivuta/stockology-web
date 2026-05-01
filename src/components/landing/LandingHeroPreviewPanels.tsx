@@ -2,6 +2,7 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import { AlertTriangle, ArrowRightLeft, Target, TrendingDown, TrendingUp } from "lucide-react";
+import { formatNumberMax2 } from "@/lib/numberFormat";
 
 const chartEase = [0.22, 1, 0.36, 1] as const;
 
@@ -411,7 +412,7 @@ export function LandingHeroPreviewHoldingsTargetsSection() {
             >
               <div className="flex min-w-0 items-center gap-2.5">
                 <span className="font-mono text-xs font-semibold tabular-nums text-zinc-100">{h.sym}</span>
-                <span className="text-[11px] tabular-nums text-zinc-500">{h.pct.toFixed(1)}%</span>
+                <span className="text-[11px] tabular-nums text-zinc-500">{formatNumberMax2(h.pct)}%</span>
               </div>
               <span
                 className={`shrink-0 text-[11px] font-semibold tabular-nums ${

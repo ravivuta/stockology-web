@@ -23,6 +23,7 @@ import {
 import { paddedValueDomain } from "@/lib/chart-y-domain";
 import { evenlySpacedTimeTickValues, evenlySpacedValueTicks } from "@/lib/chart-axis-ticks";
 import { APP_CTA_FILL } from "@/lib/appCtaClasses";
+import { formatCompactCurrency, formatCurrency, formatPercent } from "@/lib/numberFormat";
 import { cn } from "@/lib/utils";
 import {
   mergePortfolioWithSpyDaily,
@@ -36,10 +37,6 @@ const PALETTE = {
   portfolioLine: "var(--dashboard-chart-portfolio-line)",
   spyLine: "var(--dashboard-chart-benchmark-line)",
 } as const;
-
-function fmtCurrency(n: number) {
-  return n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-}
 
 function formatChartAxisDate(ms: number) {
   return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -330,7 +327,7 @@ export function DashboardReturnComparison() {
                     domain={pctYDomain}
                     ticks={pctYTicks.length > 0 ? pctYTicks : undefined}
                     tick={{ fill: chart.tickFill, fontSize: 10 }}
-                    tickFormatter={(v) => `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(0)}%`}
+                    tickFormatter={(v) => formatPercent(Number(v), true)}
                     width={40}
                     tickLine={false}
                     axisLine={false}
@@ -352,7 +349,7 @@ export function DashboardReturnComparison() {
                     formatter={(v: number, name: string) => {
                       const label =
                         name === "portfolioPct" || name === "Portfolio" ? "Portfolio" : name === "spyPct" || name === "S&P 500" ? "S&P 500" : name;
-                      return [`${Number(v).toFixed(2)}%`, label];
+                      return [formatPercent(Number(v)), label];
                     }}
                   />
                   <ReferenceLine y={0} stroke={chart.referenceStroke} strokeDasharray="4 6" />
@@ -400,7 +397,7 @@ export function DashboardReturnComparison() {
                     domain={valueYDomain}
                     ticks={valueYTicks.length > 0 ? valueYTicks : undefined}
                     tick={{ fill: chart.tickFill, fontSize: 10 }}
-                    tickFormatter={(v) => `$${(Number(v) / 1000).toFixed(0)}k`}
+                    tickFormatter={(v) => formatCompactCurrency(Number(v))}
                     width={44}
                     tickLine={false}
                     axisLine={false}
@@ -419,7 +416,7 @@ export function DashboardReturnComparison() {
                       const row = payload?.[0]?.payload as ComparisonChartRow | undefined;
                       return row ? formatChartTooltipHeading(row.dateMs) : "";
                     }}
-                    formatter={(v: number) => [fmtCurrency(Number(v)), "Value"]}
+                    formatter={(v: number) => [formatCurrency(Number(v)), "Value"]}
                   />
                   <Line
                     type="monotone"

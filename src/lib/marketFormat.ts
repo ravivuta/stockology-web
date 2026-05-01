@@ -1,11 +1,8 @@
+import { formatCompactCurrency, formatPercent } from "@/lib/numberFormat";
+
 /** Compact USD market cap for tables (e.g. $1.25B). */
 export function formatMarketCapCompact(value: number | undefined | null): string {
-  if (value == null || !Number.isFinite(value) || value <= 0) return "—";
-  if (value >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
-  if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
-  if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
-  if (value >= 1e3) return `$${(value / 1e3).toFixed(1)}K`;
-  return `$${Math.round(value).toLocaleString()}`;
+  return formatCompactCurrency(value);
 }
 
 /**
@@ -20,6 +17,5 @@ export function analystTargetUpsidePct(lastPrice: number | undefined | null, ana
 
 export function formatUpsidePct(pct: number | null): string {
   if (pct == null) return "—";
-  const sign = pct > 0 ? "+" : "";
-  return `${sign}${pct.toFixed(1)}%`;
+  return formatPercent(pct, true);
 }

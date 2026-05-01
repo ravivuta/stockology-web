@@ -10,6 +10,7 @@ import {
   isUnknownPurchaseDate,
   scoreBreakdownRows,
 } from "@/lib/ios-recommendation";
+import { formatCompactCurrency, formatCurrency, formatDecimal, formatNumberMax2, formatPercent, formatSignedCurrency } from "@/lib/numberFormat";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { useSupabaseStockHistory } from "@/hooks/useSupabaseStockHistory";
 import { lastSma } from "@/lib/stock-chart";
@@ -79,11 +80,7 @@ function formatAccountType(isRetirementAccount: boolean | null | undefined): str
 /** Human-readable score (avoid long float noise). */
 function formatScoreDisplay(score: number | undefined | null): string {
   if (score == null || !Number.isFinite(score)) return "—";
-  const a = Math.abs(score);
-  if (a >= 1000) return score.toFixed(0);
-  if (a >= 100) return score.toFixed(1);
-  if (a >= 10) return score.toFixed(1);
-  return score.toFixed(2);
+  return formatDecimal(score);
 }
 
 type Props = {
@@ -332,7 +329,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
           </div>
           <div className={cn("mt-1.5 flex flex-wrap items-baseline gap-2 sm:mt-2 sm:gap-3", dense && "mt-1")}>
             <span className={cn("font-semibold tabular-nums tracking-tight", dense ? "text-2xl" : "text-3xl")}>
-              ${last.toFixed(2)}
+              {formatCurrency(last)}
             </span>
             {stock.dailyChangePercent != null && (
               <span
@@ -342,8 +339,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                   stock.dailyChangePercent >= 0 ? "text-primary" : "text-error"
                 )}
               >
-                {stock.dailyChangePercent >= 0 ? "+" : ""}
-                {stock.dailyChangePercent.toFixed(2)}% today
+                {formatPercent(stock.dailyChangePercent, true)} today
               </span>
             )}
           </div>
@@ -391,14 +387,14 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               Position
             </p>
             <div className={cn("grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5", dense ? "gap-2" : "gap-3")}>
-              <StatTile compact={dense} label="Quantity" value={stock.quantity} />
-              <StatTile compact={dense} label="Avg cost" value={`$${stock.averageCost.toFixed(2)}`} />
-              <StatTile compact={dense} label="Last" value={`$${last.toFixed(2)}`} />
-              <StatTile compact={dense} label="Market value" value={`$${positionValue.toFixed(2)}`} />
+              <StatTile compact={dense} label="Quantity" value={formatNumberMax2(stock.quantity)} />
+              <StatTile compact={dense} label="Avg cost" value={formatCurrency(stock.averageCost)} />
+              <StatTile compact={dense} label="Last" value={formatCurrency(last)} />
+              <StatTile compact={dense} label="Market value" value={formatCurrency(positionValue)} />
               <StatTile
                 compact={dense}
                 label="Unrealized P/L"
-                value={`$${unrealized.toFixed(2)} (${unrealizedPct >= 0 ? "+" : ""}${unrealizedPct.toFixed(1)}%)`}
+                value={`${formatCurrency(unrealized)} (${formatPercent(unrealizedPct, true)})`}
                 valueClassName={unrealized >= 0 ? "text-primary" : "text-error"}
               />
             </div>
@@ -414,13 +410,13 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               Quote
             </p>
             <div className={cn("grid grid-cols-2 sm:grid-cols-4", dense ? "gap-2" : "gap-3")}>
-              <StatTile compact={dense} label="Last price" value={`$${last.toFixed(2)}`} />
+              <StatTile compact={dense} label="Last price" value={formatCurrency(last)} />
               <StatTile
                 compact={dense}
                 label="Day change"
                 value={
                   stock.dailyChangePercent != null
-                    ? `${stock.dailyChangePercent >= 0 ? "+" : ""}${stock.dailyChangePercent.toFixed(2)}%`
+                    ? formatPercent(stock.dailyChangePercent, true)
                     : "—"
                 }
                 valueClassName={
@@ -434,7 +430,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               <StatTile
                 compact={dense}
                 label="Analyst target"
-                value={stock.analystTarget != null ? `$${stock.analystTarget.toFixed(2)}` : "—"}
+                value={stock.analystTarget != null ? formatCurrency(stock.analystTarget) : "—"}
               />
               <StatTile
                 compact={dense}
@@ -528,12 +524,12 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                     <p className={cn("leading-relaxed text-foreground/90", dense ? "text-sm" : "text-base")}>{rec.comments}</p>
 
                     <div className={cn("grid sm:grid-cols-2 lg:grid-cols-3", dense ? "gap-2" : "gap-3")}>
-                      <RecMetric compact={dense} label="Next buy near" value={`$${rec.nextBuyPrice.toFixed(2)}`} />
-                      <RecMetric compact={dense} label={`MA (${stock.shortSMA})`} value={`$${rec.movingAvg.toFixed(2)}`} />
+                      <RecMetric compact={dense} label="Next buy near" value={formatCurrency(rec.nextBuyPrice)} />
+                      <RecMetric compact={dense} label={`MA (${stock.shortSMA})`} value={formatCurrency(rec.movingAvg)} />
                       <RecMetric
                         compact={dense}
                         label="Expected return"
-                        value={`${rec.expectedReturnPct >= 0 ? "+" : ""}${rec.expectedReturnPct.toFixed(1)}%`}
+                        value={formatPercent(rec.expectedReturnPct, true)}
                       />
                       {stock.score != null && (
                         <RecMetric
@@ -654,23 +650,23 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                   Fundamentals and moving average from your latest quotes. If you also use the mobile app, numbers stay in step after a refresh.
                 </p>
                 <ul className={cn("grid grid-cols-1 sm:grid-cols-2", dense ? "gap-x-4 gap-y-2" : "gap-x-8 gap-y-4")}>
-                  <SnapshotRow compact={dense} label="Beta" value={stock.beta != null ? stock.beta.toFixed(2) : "—"} />
+                  <SnapshotRow compact={dense} label="Beta" value={stock.beta != null ? formatDecimal(stock.beta) : "—"} />
                   <SnapshotRow
                     compact={dense}
                     label="Market cap"
-                    value={stock.marketCap != null ? `$${(stock.marketCap / 1_000_000_000).toFixed(1)}B` : "—"}
+                    value={stock.marketCap != null ? formatCompactCurrency(stock.marketCap) : "—"}
                   />
-                  <SnapshotRow compact={dense} label="PEG ratio" value={stock.peg != null ? stock.peg.toFixed(2) : "—"} />
+                  <SnapshotRow compact={dense} label="PEG ratio" value={stock.peg != null ? formatDecimal(stock.peg) : "—"} />
                   <SnapshotRow compact={dense} label="Analyst avg" value={stock.analystAvg?.trim() || "—"} />
                   <SnapshotRow
                     compact={dense}
                     label="Analyst target"
-                    value={stock.analystTarget != null ? `$${stock.analystTarget.toFixed(2)}` : "—"}
+                    value={stock.analystTarget != null ? formatCurrency(stock.analystTarget) : "—"}
                   />
                   <SnapshotRow
                     compact={dense}
                     label={`SMA(${stock.shortSMA})`}
-                    value={smaForSnapshot != null ? `$${smaForSnapshot.toFixed(2)}` : "—"}
+                    value={smaForSnapshot != null ? formatCurrency(smaForSnapshot) : "—"}
                     hint={
                       stock.movingAvg != null && Number.isFinite(stock.movingAvg)
                         ? "Saved moving average from your last refresh"
@@ -687,7 +683,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
         <SectionCard
           compact={dense}
           title="Record a trade"
-          description="Enter a buy or sell to update cash, shares, average cost, and lots—same as the quick trade on the Portfolio page."
+          description="Enter a buy or sell to update cash, shares, average cost, and lots for this symbol."
         >
           <div className={cn("flex flex-wrap items-end", dense ? "gap-2" : "gap-3")}>
             <label className={cn("flex flex-col font-medium text-foreground", dense ? "gap-1 text-xs" : "gap-1.5 text-sm")}>
@@ -723,13 +719,13 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               )}
             >
               Price (optional)
-              <input
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder={`Default ${last.toFixed(2)}`}
-                className={cn(
-                  "border border-border bg-background tabular-nums text-foreground dark:border-white/10",
-                  dense ? "rounded-lg px-2 py-1.5 text-xs" : "rounded-xl px-3 py-2.5 text-sm"
+                <input
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder={`Default ${formatDecimal(last)}`}
+                  className={cn(
+                    "border border-border bg-background tabular-nums text-foreground dark:border-white/10",
+                    dense ? "rounded-lg px-2 py-1.5 text-xs" : "rounded-xl px-3 py-2.5 text-sm"
                 )}
               />
             </label>
@@ -791,11 +787,11 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
           >
             <div className={cn("grid sm:grid-cols-2 xl:grid-cols-4", dense ? "gap-2" : "gap-3")}>
               <StatTile compact={dense} label="Open lots" value={String(lotSummary.openLots.length)} />
-              <StatTile compact={dense} label="Open basis" value={`$${lotSummary.openCostBasis.toFixed(2)}`} />
+              <StatTile compact={dense} label="Open basis" value={formatCurrency(lotSummary.openCostBasis)} />
               <StatTile
                 compact={dense}
                 label="Realized P/L"
-                value={`${lotSummary.realizedGainLoss >= 0 ? "+" : "−"}$${Math.abs(lotSummary.realizedGainLoss).toFixed(2)}`}
+                value={formatSignedCurrency(lotSummary.realizedGainLoss)}
                 valueClassName={lotSummary.realizedGainLoss >= 0 ? "text-primary" : "text-error"}
               />
               <StatTile
@@ -864,7 +860,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                           <div className="flex flex-wrap items-start justify-between gap-2">
                             <div>
                               <p className="font-medium tabular-nums text-foreground">
-                                {lot.quantity} shares @ ${lot.costBasis.toFixed(2)}
+                                {formatNumberMax2(lot.quantity)} shares @ {formatCurrency(lot.costBasis)}
                               </p>
                               <p className={cn("text-subtle", dense ? "mt-1 text-[11px]" : "mt-1 text-xs")}>
                                 Bought {formatDateLabel(lot.purchaseDate)}
@@ -885,13 +881,13 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                             </div>
                           </div>
                           <div className={cn("mt-2 grid grid-cols-2 sm:grid-cols-3", dense ? "gap-2" : "gap-3")}>
-                            <SnapshotRow compact={dense} label="Lot basis" value={`$${lotCostBasis.toFixed(2)}`} />
-                            <SnapshotRow compact={dense} label="Market value" value={`$${lotMarketValue.toFixed(2)}`} />
+                            <SnapshotRow compact={dense} label="Lot basis" value={formatCurrency(lotCostBasis)} />
+                            <SnapshotRow compact={dense} label="Market value" value={formatCurrency(lotMarketValue)} />
                             <SnapshotRow
                               compact={dense}
                               label="Unrealized P/L"
-                              value={`${lotUnrealized >= 0 ? "+" : "−"}$${Math.abs(lotUnrealized).toFixed(2)}`}
-                              hint={last > 0 ? `Last price $${last.toFixed(2)}` : undefined}
+                              value={formatSignedCurrency(lotUnrealized)}
+                              hint={last > 0 ? `Last price ${formatCurrency(last)}` : undefined}
                             />
                           </div>
                         </li>
@@ -917,7 +913,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                         <div className="flex flex-wrap items-start justify-between gap-2">
                           <div>
                             <p className="font-medium tabular-nums text-foreground">
-                              Sold {lot.quantity} shares @ ${lot.salePrice.toFixed(2)}
+                              Sold {formatNumberMax2(lot.quantity)} shares @ {formatCurrency(lot.salePrice)}
                             </p>
                             <p className={cn("text-subtle", dense ? "mt-1 text-[11px]" : "mt-1 text-xs")}>
                               Sale date {formatDateLabel(lot.saleDate)}
@@ -936,11 +932,11 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                           </span>
                         </div>
                         <div className={cn("mt-2 grid grid-cols-2", dense ? "gap-2" : "gap-3")}>
-                          <SnapshotRow compact={dense} label="Proceeds" value={`$${(lot.quantity * lot.salePrice).toFixed(2)}`} />
+                          <SnapshotRow compact={dense} label="Proceeds" value={formatCurrency(lot.quantity * lot.salePrice)} />
                           <SnapshotRow
                             compact={dense}
                             label="Realized P/L"
-                            value={`${lot.realizedGainLoss >= 0 ? "+" : "−"}$${Math.abs(lot.realizedGainLoss).toFixed(2)}`}
+                            value={formatSignedCurrency(lot.realizedGainLoss)}
                           />
                         </div>
                       </li>
