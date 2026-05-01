@@ -8,6 +8,7 @@ import { LayoutDashboard, PieChart, ListOrdered, Newspaper, Settings, HelpCircle
 import { createClient } from "@/lib/supabase/client";
 import { clearPortfolioClientState } from "@/lib/clear-portfolio-client-state";
 import { useShellRouteTransition } from "@/components/LandingViewTransition";
+import { AppLogo } from "@/components/AppLogo";
 
 /** Primary tabs — aligned with iOS `HomeView` Dashboard + Portfolio plus Watchlist & News on web. */
 const primaryNav: { href: string; label: string; icon: ComponentType<{ size?: number; className?: string }> }[] = [
@@ -153,9 +154,7 @@ export default function Sidebar({
               e.currentTarget.style.transform = "scale(1)";
             }}
           >
-            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-bold text-primary">
-              S
-            </div>
+            <AppLogo size={36} rounded="rounded-lg" />
             <span
               className="whitespace-nowrap text-lg font-semibold text-foreground transition-all duration-300"
               style={{

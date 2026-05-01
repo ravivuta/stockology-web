@@ -15,6 +15,11 @@ export const metadata: Metadata = {
   title: "Stocks PM — Portfolio allocation & recommendations",
   description:
     "Enter your holdings and cash, see allocation and performance, and get clear rules-based recommendations. Web companion to the Stocks PM iOS app—not financial advice.",
+  icons: {
+    icon: "/brand/stocks-pm-ios-logo.png",
+    apple: "/brand/stocks-pm-ios-logo.png",
+    shortcut: "/brand/stocks-pm-ios-logo.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
