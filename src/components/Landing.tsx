@@ -93,9 +93,9 @@ function LandingMarketingTopChrome({
             </span>
           </Link>
           <nav className="flex shrink-0 items-center gap-0.5 sm:gap-1" aria-label="Marketing">
-            <Link href="/#features" className={linkQuiet + " hidden sm:inline-flex"}>Features</Link>
-            <Link href="/#pricing" className={linkQuiet + " hidden sm:inline-flex"}>Pricing</Link>
-            <Link href="/about" className={linkQuiet + " hidden sm:inline-flex"}>About</Link>
+            <Link href="/#features" className={linkQuiet + " hidden md:inline-flex"}>Features</Link>
+            <Link href="/#pricing" className={linkQuiet + " hidden md:inline-flex"}>Pricing</Link>
+            <Link href="/about" className={linkQuiet}>About</Link>
             <Link href="/contact" className={linkQuiet + " hidden sm:inline-flex"}>Contact</Link>
             {hasSession ? (
               <TransitionLink href="/dashboard" prefetch={false} className={pillOutline}>
@@ -279,6 +279,44 @@ export function Landing({ hasSession }: { hasSession: boolean }) {
           </section>
         )}
 
+        {/* ── Company overview ── quick entry point before the long product story */}
+        <section id="about-summary" className="relative z-10 border-b border-white/[0.05] bg-[#0d1018]/90 py-14 sm:py-20">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <div className="grid gap-10 md:grid-cols-2 md:gap-16">
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-emerald-400">AppAiTech</p>
+                <h2 className="mb-4 text-2xl font-bold tracking-tight text-white sm:text-3xl">Built for everyday investors</h2>
+                <p className="mb-6 text-sm leading-relaxed text-zinc-400">
+                  Stocks PM combines rules-based portfolio optimisation, backtesting simulation, and real-time market data into one accessible web app — companion to the Stocks PM iOS app.
+                </p>
+                <p className="mb-8 text-xs text-zinc-600">
+                  ⚠️ Educational &amp; practice trading only. Not financial advice. No real money or actual trades involved.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <Link href="/about" className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-zinc-200 no-underline transition-colors hover:bg-white/10">About us</Link>
+                  <Link href="/contact" className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-zinc-200 no-underline transition-colors hover:bg-white/10">Contact</Link>
+                  <Link href="/privacy" className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-zinc-200 no-underline transition-colors hover:bg-white/10">Privacy policy</Link>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { icon: "📊", label: "Real-time dashboard" },
+                  { icon: "⚙️", label: "Optimisation engine" },
+                  { icon: "📈", label: "Backtesting & simulation" },
+                  { icon: "⭐", label: "Watchlist management" },
+                  { icon: "📍", label: "S&P 500 comparison" },
+                  { icon: "🎯", label: "Smart filtering" },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.025] px-4 py-3">
+                    <span className="text-lg">{item.icon}</span>
+                    <span className="text-xs font-medium text-zinc-300">{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Product story: wheel-driven chapters (touch: long-scroll fallback inside LandingProductDepth) */}
         <div className="relative">
           <div
@@ -455,21 +493,6 @@ export function Landing({ hasSession }: { hasSession: boolean }) {
             </div>
           </section>
 
-          {/* ── Footer links ── */}
-          <section className="border-t border-white/[0.05] py-10">
-            <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-6 gap-y-2 px-4 sm:px-6">
-              {[
-                { label: "About", href: "/about" },
-                { label: "Contact", href: "/contact" },
-                { label: "Privacy", href: "/privacy" },
-                { label: "Terms", href: "/terms" },
-              ].map((l) => (
-                <Link key={l.href} href={l.href} className="text-xs text-zinc-500 no-underline transition-colors hover:text-zinc-300">{l.label}</Link>
-              ))}
-              <span className="w-full text-center text-xs text-zinc-600 sm:w-auto sm:text-left">© 2026 Stocks PM by AppAiTech</span>
-            </div>
-          </section>
-
           {/* CTA band */}
           <section className="relative mx-auto max-w-6xl px-4 pb-24 sm:px-6 sm:pb-32">
             <div className="landing-cta-halo" aria-hidden />
@@ -546,6 +569,43 @@ export function Landing({ hasSession }: { hasSession: boolean }) {
         </div>
       </main>
       </div>
+
+      {/* ── Site footer — outside scroll-lock root so it's always reachable ── */}
+      <footer className="border-t border-white/[0.06] bg-[#0b0d13] py-12">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="grid gap-8 sm:grid-cols-3">
+            <div>
+              <div className="mb-3 flex items-center gap-2">
+                <span className="text-base font-semibold text-white">Stocks <span className="bg-gradient-to-r from-emerald-300 to-cyan-300 bg-clip-text text-transparent">PM</span></span>
+              </div>
+              <p className="text-xs leading-relaxed text-zinc-500">Smart portfolio optimisation & analysis. Companion to the Stocks PM iOS app.</p>
+              <p className="mt-3 text-xs text-zinc-600">© 2026 AppAiTech. All rights reserved.</p>
+            </div>
+            <div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-zinc-500">Company</p>
+              <ul className="space-y-2">
+                {[
+                  { label: "About us", href: "/about" },
+                  { label: "Contact", href: "/contact" },
+                ].map((l) => (
+                  <li key={l.href}><Link href={l.href} className="text-sm text-zinc-400 no-underline transition-colors hover:text-white">{l.label}</Link></li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-zinc-500">Legal</p>
+              <ul className="space-y-2">
+                {[
+                  { label: "Privacy policy", href: "/privacy" },
+                  { label: "Terms of service", href: "/terms" },
+                ].map((l) => (
+                  <li key={l.href}><Link href={l.href} className="text-sm text-zinc-400 no-underline transition-colors hover:text-white">{l.label}</Link></li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
