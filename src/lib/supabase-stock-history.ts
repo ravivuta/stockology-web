@@ -1,0 +1,58 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { PricePoint } from "@/lib/stock-chart";
+
+type RpcRow = {
+  date: string;
+  close: number | null;
+  open?: number | null;
+  high?: number | null;
+  low?: number | null;
+  volume?: number | null;
+};
+
+const MAX_DAYS = 2000;
+
+/**
+ * Loads daily closes from `historical_prices` via `get_historical_prices` RPC.
+ * Returns points sorted ascending by calendar date (oldest first) for charting.
+ *
+ * Note: The iOS app does **not** call this RPC — it uses `GET /rest/v1/historical_prices`
+ * (see `SupabaseHistoricalService.swift`). Adding or changing this RPC does not affect iOS
+ * as long as the `historical_prices` table and RLS stay the same.
+ */
+export async function fetchHistoricalPricePoints(
+  supabase: SupabaseClient,
+  symbol: string,
+  days = 400
+): Promise<{ points: PricePoint[]; error: string | null }> {
+  const sym = symbol.trim().toUpperCase();
+  if (!sym) return { points: [], error: "Missing symbol" };
+
+  const n = Math.min(Math.max(Math.floor(days), 1), MAX_DAYS);
+  // Single DB signature (text, int). Named args must not be split across two overloads.
+  const { data, error } = await supabase.rpc("get_historical_prices", {
+    p_symbol: sym,
+    p_days: n,
+  });
+
+  if (error) {
+    return { points: [], error: error.message };
+  }
+
+  const rows = (data ?? []) as RpcRow[];
+  const points: PricePoint[] = rows
+    .map((row) => {
+      const d =
+        typeof row.date === "string"
+          ? row.date.slice(0, 10)
+          : row.date != null
+            ? String(row.date).slice(0, 10)
+            : "";
+      const close = row.close != null ? Number(row.close) : NaN;
+      return { date: d, close };
+    })
+    .filter((p) => p.date.length >= 10 && Number.isFinite(p.close))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  return { points, error: null };
+}

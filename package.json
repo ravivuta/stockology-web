@@ -1,0 +1,48 @@
+{
+  "name": "stocks-pm-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "backtest:recommendations": "tsx scripts/backtest-recommendation-runs.ts",
+    "simulate:signal-year": "tsx scripts/simulate-signal-year.ts",
+    "simulate:signal-year:apply": "tsx scripts/simulate-signal-year.ts --apply",
+    "seed:demo-account": "node scripts/seed-demo-account.mjs",
+    "dev": "next dev --turbopack",
+    "dev:webpack": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^3.9.1",
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.48.1",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.15.0",
+    "lucide-react": "^0.468.0",
+    "next": "15.5.15",
+    "next-themes": "^0.4.4",
+    "ogl": "^1.0.11",
+    "papaparse": "^5.4.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-hook-form": "^7.54.2",
+    "recharts": "^2.15.0",
+    "tailwind-merge": "^2.6.0",
+    "zod": "^3.24.1",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "@eslint/eslintrc": "^3",
+    "@types/node": "^20",
+    "@types/papaparse": "^5.3.15",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "15.5.15",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5"
+  }
+}

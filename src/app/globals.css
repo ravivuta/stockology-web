@@ -1,0 +1,989 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Collapsed left rail width — match `src/lib/app-shell.ts` APP_RAIL_PX */
+  --app-rail: 4rem;
+  --app-pad-min: 1rem;
+  --app-pad-fluid: clamp(1rem, 2.5vw, 2rem);
+
+  /*
+   * Legacy palette names — remapped to a zinc + emerald system so existing
+   * `text-yale`, `bg-cerulean`, etc. resolve to a cohesive UI without renaming every class.
+   */
+  --palette-yale: #18181b;
+  --palette-alice: #fafafa;
+  --palette-cerulean: #15803d;
+  --palette-baby: #86efac;
+  --palette-battleship: #71717a;
+
+  /* Green-700: strong contrast with white on filled CTAs (WCAG AA for body copy). */
+  --theme-primary: #15803d;
+  --theme-primary-light: #22c55e;
+  --theme-primary-foreground: #ffffff;
+  --theme-accent: #22c55e;
+  --theme-neutral: var(--palette-battleship);
+  --theme-background: #fafafa;
+  --theme-foreground: #18181b;
+  --theme-text-secondary: #52525b;
+  --theme-surface: #f4f4f5;
+  --theme-surface-elevated: #ffffff;
+  --theme-muted: #e4e4e7;
+  --theme-border: #e4e4e7;
+  --theme-border-subtle: #f4f4f5;
+  --theme-ring-focus: color-mix(in srgb, var(--theme-primary) 45%, transparent);
+  --theme-error: #dc2626;
+  --theme-error-bg: color-mix(in srgb, var(--theme-error) 10%, var(--theme-background));
+  --theme-shadow-card:
+    0 1px 0 color-mix(in srgb, var(--theme-foreground) 6%, transparent),
+    0 8px 24px -8px color-mix(in srgb, var(--theme-foreground) 12%, transparent);
+  --theme-shadow-hover:
+    0 1px 0 color-mix(in srgb, var(--theme-foreground) 8%, transparent),
+    0 12px 32px -10px color-mix(in srgb, var(--theme-foreground) 18%, transparent);
+
+  --chart-portfolio-line: var(--palette-cerulean);
+  --chart-benchmark-line: #c2410c;
+
+  /* Landing hero CTA — reused across the app for primary actions (see `appCtaClasses.ts`). */
+  --landing-cta-from: #7ed39e;
+  --landing-cta-to: #5fbfad;
+  --landing-cta-text: #0a0a0a;
+  --landing-cta-shadow: 0 0 28px -10px rgba(126, 211, 158, 0.45);
+}
+
+.dark {
+  /* Neutrals aligned with marketing: `LandingAmbientBackground`, tour `#101219`, section `#0f1219` */
+  --palette-yale: #fafafa;
+  --palette-alice: #0a0c12;
+  --palette-cerulean: #4ade80;
+  --palette-baby: #22c55e;
+  --palette-battleship: #a1a1aa;
+
+  --theme-primary: #22c55e;
+  --theme-primary-light: #4ade80;
+  --theme-primary-foreground: #0a0a0a;
+  --theme-accent: #34d399;
+  --theme-neutral: var(--palette-battleship);
+  --theme-background: #0a0c12;
+  --theme-foreground: #fafafa;
+  --theme-text-secondary: #a1a1aa;
+  --theme-surface: #101219;
+  --theme-surface-elevated: #151a24;
+  --theme-muted: #1e212b;
+  --theme-border: #2a3140;
+  --theme-border-subtle: #171d28;
+  --theme-ring-focus: color-mix(in srgb, var(--theme-primary) 50%, transparent);
+  --theme-error-bg: color-mix(in srgb, var(--theme-error) 14%, var(--theme-surface));
+  --theme-shadow-card:
+    0 1px 0 color-mix(in srgb, white 6%, transparent),
+    0 12px 40px -12px rgba(0, 0, 0, 0.62),
+    0 0 0 1px color-mix(in srgb, white 4%, transparent);
+  --theme-shadow-hover:
+    0 1px 0 color-mix(in srgb, white 8%, transparent),
+    0 16px 48px -12px rgba(0, 0, 0, 0.72),
+    0 0 0 1px color-mix(in srgb, var(--theme-primary) 12%, transparent);
+
+  --chart-portfolio-line: var(--theme-primary-light);
+  --chart-benchmark-line: #fb923c;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+body {
+  background: var(--theme-background);
+  color: var(--theme-foreground);
+  letter-spacing: -0.07em;
+  transition:
+    background-color 220ms ease,
+    color 220ms ease;
+}
+
+/* Mono / code: keep default spacing — IBM Plex Sans -7% is for UI copy only */
+:where(.font-mono, code, kbd, samp, pre) {
+  letter-spacing: normal;
+}
+
+@keyframes nav-progress-sweep {
+  0% {
+    transform: scaleX(0);
+    opacity: 1;
+  }
+  70% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 0;
+  }
+}
+
+.nav-progress-sweep {
+  animation: nav-progress-sweep 0.22s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+}
+
+/* Route segment loading — Haptimize-style enter + spinner (CSS-only for instant paint). */
+@keyframes route-loading-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes route-loading-orbit-pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+}
+
+.route-loading {
+  animation: route-loading-enter 0.42s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.route-loading-spin-wrap {
+  position: relative;
+  display: flex;
+  width: 3.25rem;
+  height: 3.25rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.route-loading-spin-wrap::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in srgb, var(--theme-primary) 28%, transparent);
+  animation: route-loading-orbit-pulse 1.45s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-loading {
+    animation: none;
+  }
+
+  .route-loading-spin-wrap::before {
+    animation: none;
+    opacity: 0.45;
+    transform: none;
+  }
+}
+
+/* Instant, GPU-friendly spinner for `loading.tsx` (no JS required for motion). */
+@keyframes route-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.route-loading-spinner {
+  box-sizing: border-box;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 9999px;
+  border: 2.5px solid color-mix(in srgb, var(--theme-primary) 22%, transparent);
+  border-top-color: var(--theme-primary);
+  animation: route-loading-spin 0.65s linear infinite;
+  contain: strict;
+  will-change: transform;
+}
+
+.dark .route-loading-spinner {
+  border-color: color-mix(in srgb, var(--theme-primary) 28%, transparent);
+  border-top-color: var(--theme-primary-light);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-loading-spinner {
+    animation: none;
+    border-color: color-mix(in srgb, var(--theme-primary) 35%, transparent);
+    border-top-color: var(--theme-primary);
+    opacity: 0.9;
+  }
+
+  .dark .route-loading-spinner {
+    border-color: color-mix(in srgb, var(--theme-primary-light) 35%, transparent);
+    border-top-color: var(--theme-primary-light);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-progress-sweep {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+::selection {
+  background-color: color-mix(in srgb, var(--theme-primary) 35%, transparent);
+  color: var(--theme-foreground);
+}
+
+.dark ::selection {
+  background-color: color-mix(in srgb, var(--theme-primary) 40%, transparent);
+  color: var(--theme-foreground);
+}
+
+/* Authenticated layout: main content inset for fixed left sidebar (Haptimize-style) */
+.app-shell-main {
+  min-height: 100dvh;
+  margin-left: var(--app-rail);
+  padding: var(--app-pad-fluid);
+  padding-left: calc(var(--app-pad-fluid) + env(safe-area-inset-left, 0px));
+  padding-right: calc(var(--app-pad-fluid) + env(safe-area-inset-right, 0px));
+  padding-top: calc(var(--app-pad-min) + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(var(--app-pad-fluid) + env(safe-area-inset-bottom, 0px));
+}
+
+/* Avoid transition on every node (Recharts creates hundreds of SVG elements — was causing main-thread jank). */
+.recharts-layer,
+.recharts-surface,
+.recharts-wrapper,
+.recharts-wrapper * {
+  transition: none !important;
+}
+
+/* Haptimize-style: soften interactive color transitions (Recharts opted out above). */
+* {
+  transition-property: background-color, border-color, color, opacity;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
+
+:root {
+  --ui-interaction-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ui-spring-ease: cubic-bezier(0.34, 1.12, 0.64, 1);
+  --ui-press-short-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --ui-interaction-duration: 280ms;
+  --ui-press-duration: 90ms;
+  /* Aliases for lift / text utilities below */
+  --ui-hover-ease: var(--ui-interaction-ease);
+  --ui-hover-duration: var(--ui-interaction-duration);
+}
+
+@keyframes ui-btn-ripple {
+  0% {
+    transform: translate(-50%, -50%) scale(0.28);
+    opacity: 0.26;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.75);
+    opacity: 0;
+  }
+}
+
+/*
+ * In-app interactive hovers only (`.app-interactive-ui` on AppShell / auth / onboarding).
+ * Marketing `landing-marketing` is outside this scope — no global button lift there.
+ * Small controls: stronger scale + glow. Large frames: use `.ui-hover-lift` / `.dashboard-panel` (subtle rules below).
+ */
+.app-interactive-ui button:not(:disabled):not(.no-ui-hover),
+.app-interactive-ui a[href].ui-hover-pop,
+.app-interactive-ui a[href].ui-hover-spotlight,
+.app-interactive-ui a[href].ui-hover-surface,
+.app-interactive-ui button.ui-hover-surface:not(:disabled):not(.no-ui-hover) {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.app-interactive-ui button:not(:disabled):not(.no-ui-hover),
+.app-interactive-ui a[href].ui-hover-pop,
+.app-interactive-ui a[href].ui-hover-spotlight,
+.app-interactive-ui a[href].ui-hover-surface,
+.app-interactive-ui button.ui-hover-surface:not(:disabled):not(.no-ui-hover) {
+  transition:
+    transform var(--ui-interaction-duration) var(--ui-spring-ease),
+    box-shadow var(--ui-interaction-duration) var(--ui-interaction-ease),
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    opacity 150ms ease;
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  /* Full-width rows / cards: lift + tight ring only (scale + big glow looks huge on wide hit targets). */
+  .app-interactive-ui a[href].ui-hover-surface:hover,
+  .app-interactive-ui button:not(:disabled):not(.no-ui-hover).ui-hover-surface:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      0 4px 16px -6px color-mix(in srgb, var(--theme-foreground) 16%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--theme-primary) 20%, transparent);
+  }
+
+  .app-interactive-ui a[href].ui-hover-surface:active,
+  .app-interactive-ui button:not(:disabled):not(.no-ui-hover).ui-hover-surface:active {
+    transform: translateY(0);
+    transition:
+      transform var(--ui-press-duration) var(--ui-press-short-ease),
+      box-shadow var(--ui-press-duration) var(--ui-press-short-ease),
+      background-color 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease,
+      opacity 150ms ease;
+    box-shadow:
+      inset 0 2px 8px color-mix(in srgb, var(--theme-foreground) 10%, transparent),
+      0 1px 2px color-mix(in srgb, var(--theme-foreground) 6%, transparent);
+  }
+
+  .dark .app-interactive-ui a[href].ui-hover-surface:active,
+  .dark .app-interactive-ui button:not(:disabled):not(.no-ui-hover).ui-hover-surface:active {
+    box-shadow:
+      inset 0 2px 10px rgba(0, 0, 0, 0.35),
+      0 1px 0 color-mix(in srgb, white 5%, transparent);
+  }
+
+  .app-interactive-ui button:not(:disabled):not(.no-ui-hover):not(.ui-hover-text):not(.ui-hover-surface):hover,
+  .app-interactive-ui a[href].ui-hover-pop:hover,
+  .app-interactive-ui a[href].ui-hover-spotlight:hover {
+    transform: scale(1.035);
+    box-shadow:
+      0 6px 20px -8px color-mix(in srgb, var(--theme-foreground) 22%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--theme-primary) 20%, transparent),
+      0 0 16px -8px color-mix(in srgb, var(--theme-primary) 22%, transparent);
+  }
+
+  .app-interactive-ui button:not(:disabled):not(.no-ui-hover).ui-hover-text:hover {
+    transform: scale(1.035);
+  }
+
+  .app-interactive-ui button:not(:disabled):not(.no-ui-hover).ui-hover-spotlight:hover,
+  .app-interactive-ui a[href].ui-hover-spotlight:hover {
+    box-shadow:
+      0 11px 32px -10px color-mix(in srgb, var(--theme-primary) 40%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--theme-primary) 28%, transparent),
+      0 0 36px -5px color-mix(in srgb, var(--theme-primary) 32%, transparent);
+  }
+
+  .app-interactive-ui button:not(:disabled):not(.no-ui-hover):not(.ui-hover-text):not(.ui-hover-surface):active,
+  .app-interactive-ui a[href].ui-hover-pop:active,
+  .app-interactive-ui a[href].ui-hover-spotlight:active {
+    transform: scale(0.965);
+    transition:
+      transform var(--ui-press-duration) var(--ui-press-short-ease),
+      box-shadow var(--ui-press-duration) var(--ui-press-short-ease),
+      background-color 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease,
+      opacity 150ms ease;
+    box-shadow:
+      inset 0 3px 12px color-mix(in srgb, var(--theme-foreground) 14%, transparent),
+      0 1px 2px color-mix(in srgb, var(--theme-foreground) 8%, transparent);
+  }
+
+  .app-interactive-ui button:not(:disabled):not(.no-ui-hover).ui-hover-text:active {
+    transform: scale(0.975);
+    transition:
+      transform var(--ui-press-duration) var(--ui-press-short-ease),
+      background-color 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease,
+      opacity 150ms ease;
+  }
+
+  .dark .app-interactive-ui button:not(:disabled):not(.no-ui-hover):not(.ui-hover-text):not(.ui-hover-surface):active,
+  .dark .app-interactive-ui a[href].ui-hover-pop:active,
+  .dark .app-interactive-ui a[href].ui-hover-spotlight:active {
+    box-shadow:
+      inset 0 3px 14px rgba(0, 0, 0, 0.45),
+      0 1px 0 color-mix(in srgb, white 6%, transparent);
+  }
+
+  .app-interactive-ui button:not(:disabled):not(.no-ui-hover).ui-ripple-playing::before,
+  .app-interactive-ui a[href].ui-hover-pop.ui-ripple-playing::before,
+  .app-interactive-ui a[href].ui-hover-spotlight.ui-ripple-playing::before,
+  .app-interactive-ui a[href].ui-hover-surface.ui-ripple-playing::before,
+  .app-interactive-ui button.ui-hover-surface:not(:disabled):not(.no-ui-hover).ui-ripple-playing::before {
+    content: "";
+    position: absolute;
+    left: var(--ripple-x, 50%);
+    top: var(--ripple-y, 50%);
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 50%;
+    transform: translate(-50%, -50%) scale(0.28);
+    background: color-mix(in srgb, var(--theme-primary) 30%, transparent);
+    pointer-events: none;
+    animation: ui-btn-ripple 560ms var(--ui-interaction-ease) forwards;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-interactive-ui button:not(:disabled):not(.no-ui-hover),
+  .app-interactive-ui a[href].ui-hover-pop,
+  .app-interactive-ui a[href].ui-hover-spotlight,
+  .app-interactive-ui a[href].ui-hover-surface,
+  .app-interactive-ui button.ui-hover-surface:not(:disabled):not(.no-ui-hover) {
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease,
+      opacity 150ms ease;
+  }
+
+  .app-interactive-ui button:not(:disabled):not(.no-ui-hover):hover,
+  .app-interactive-ui button:not(:disabled):not(.no-ui-hover):active,
+  .app-interactive-ui a[href].ui-hover-pop:hover,
+  .app-interactive-ui a[href].ui-hover-pop:active,
+  .app-interactive-ui a[href].ui-hover-spotlight:hover,
+  .app-interactive-ui a[href].ui-hover-spotlight:active,
+  .app-interactive-ui a[href].ui-hover-surface:hover,
+  .app-interactive-ui a[href].ui-hover-surface:active,
+  .app-interactive-ui button.ui-hover-surface:not(:disabled):not(.no-ui-hover):hover,
+  .app-interactive-ui button.ui-hover-surface:not(:disabled):not(.no-ui-hover):active {
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+.ui-hover-lift {
+  transition:
+    transform var(--ui-hover-duration) var(--ui-hover-ease),
+    box-shadow var(--ui-hover-duration) var(--ui-hover-ease),
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+  box-shadow: var(--theme-shadow-card);
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  /* Marketing / non-app skeletons: slightly stronger lift */
+  .ui-hover-lift:hover {
+    transform: scale(1.015);
+    box-shadow: var(--theme-shadow-hover);
+  }
+
+  /* App: large panels / frames — minimal motion, mostly depth */
+  .app-interactive-ui .ui-hover-lift:hover {
+    transform: translateY(-1px) scale(1.004);
+    box-shadow:
+      0 1px 0 color-mix(in srgb, var(--theme-foreground) 7%, transparent),
+      0 10px 28px -12px color-mix(in srgb, var(--theme-foreground) 14%, transparent);
+  }
+
+  .dark .app-interactive-ui .ui-hover-lift:hover {
+    box-shadow:
+      0 1px 0 color-mix(in srgb, white 7%, transparent),
+      0 12px 36px -14px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* `.ui-hover-pop` / `.ui-hover-spotlight` — motion + shadow come from the shared button rules above. */
+.app-interactive-ui label.ui-hover-pop {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transition:
+    transform var(--ui-interaction-duration) var(--ui-spring-ease),
+    box-shadow var(--ui-interaction-duration) var(--ui-interaction-ease),
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .app-interactive-ui label.ui-hover-pop:hover {
+    transform: scale(1.035);
+    box-shadow:
+      0 6px 20px -8px color-mix(in srgb, var(--theme-foreground) 22%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--theme-primary) 20%, transparent),
+      0 0 16px -8px color-mix(in srgb, var(--theme-primary) 22%, transparent);
+  }
+
+  .app-interactive-ui label.ui-hover-pop:active {
+    transform: scale(0.965);
+    transition:
+      transform var(--ui-press-duration) var(--ui-press-short-ease),
+      box-shadow var(--ui-press-duration) var(--ui-press-short-ease),
+      background-color 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease;
+    box-shadow:
+      inset 0 3px 12px color-mix(in srgb, var(--theme-foreground) 14%, transparent),
+      0 1px 2px color-mix(in srgb, var(--theme-foreground) 8%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-interactive-ui label.ui-hover-pop {
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  }
+
+  .app-interactive-ui label.ui-hover-pop:hover,
+  .app-interactive-ui label.ui-hover-pop:active {
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+.ui-hover-pop {
+  transition:
+    transform var(--ui-interaction-duration) var(--ui-spring-ease),
+    box-shadow var(--ui-interaction-duration) var(--ui-interaction-ease),
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.ui-hover-spotlight {
+  transition:
+    transform var(--ui-interaction-duration) var(--ui-spring-ease),
+    box-shadow var(--ui-interaction-duration) var(--ui-interaction-ease),
+    background-color 150ms ease;
+}
+
+/* Full-width list rows / wide blocks inside app shell — pair with rules under `.app-interactive-ui` above. */
+.ui-hover-surface {
+  transition:
+    transform var(--ui-interaction-duration) var(--ui-spring-ease),
+    box-shadow var(--ui-interaction-duration) var(--ui-interaction-ease),
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+/* Dashboard: subtle refresh pulse (no layout thrash) */
+@keyframes dashboard-refresh-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.88;
+  }
+}
+
+.dashboard-refresh-pulse {
+  animation: dashboard-refresh-pulse 1.1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-refresh-pulse {
+    animation: none;
+    opacity: 0.92;
+  }
+}
+
+/* Shared dashboard panel — elevated surface vs page + sidebar */
+.dashboard-panel {
+  border-radius: 0.75rem;
+  border-width: 1px;
+  border-color: var(--theme-border);
+  background: var(--theme-surface-elevated);
+  box-shadow: var(--theme-shadow-card);
+  transition:
+    box-shadow 280ms ease,
+    border-color 200ms ease,
+    background-color 200ms ease;
+}
+
+.dark .dashboard-panel {
+  border-color: var(--theme-border);
+  background: var(--theme-surface-elevated);
+  box-shadow: var(--theme-shadow-card);
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  /* App only: large frames — tiny lift, softer shadow than full `--theme-shadow-hover` */
+  .app-interactive-ui .dashboard-panel {
+    transition:
+      transform var(--ui-hover-duration) var(--ui-hover-ease),
+      box-shadow 280ms ease,
+      border-color 200ms ease,
+      background-color 200ms ease;
+  }
+
+  .app-interactive-ui .dashboard-panel:hover {
+    transform: translateY(-0.5px) scale(1.001);
+    box-shadow:
+      0 1px 0 color-mix(in srgb, var(--theme-foreground) 6%, transparent),
+      0 9px 24px -10px color-mix(in srgb, var(--theme-foreground) 13%, transparent);
+    border-color: color-mix(in srgb, var(--theme-primary) 18%, var(--theme-border));
+  }
+
+  .dark .app-interactive-ui .dashboard-panel:hover {
+    box-shadow:
+      0 1px 0 color-mix(in srgb, white 6%, transparent),
+      0 11px 30px -12px rgba(0, 0, 0, 0.48);
+    border-color: color-mix(in srgb, var(--theme-primary) 24%, var(--theme-border));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-interactive-ui .dashboard-panel:hover {
+    transform: none;
+  }
+}
+
+/* Marketing / hero feature tiles — lift without replacing their own shadow-lg */
+.ui-hover-scale-card {
+  transition: transform var(--ui-hover-duration) var(--ui-hover-ease);
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .ui-hover-scale-card:hover {
+    transform: scale(1.02);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-hover-scale-card:hover {
+    transform: none;
+  }
+
+  .app-interactive-ui .ui-hover-lift:hover {
+    transform: none;
+  }
+}
+
+/* Cards / modals that match dashboard elevation */
+.ui-surface-elevated {
+  background: var(--theme-surface-elevated);
+  border-color: var(--theme-border);
+}
+
+/* Focus rings */
+:focus-visible {
+  outline: 2px solid var(--theme-primary);
+  outline-offset: 2px;
+}
+
+.dark :focus-visible {
+  outline-color: var(--theme-primary-light);
+}
+
+.ui-hover-text {
+  transition: transform var(--ui-interaction-duration) var(--ui-spring-ease), color 150ms ease;
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .ui-hover-text:hover {
+    transform: scale(1.02);
+  }
+
+  .app-interactive-ui .ui-hover-text:hover {
+    transform: scale(1.035);
+  }
+}
+
+/* Landing hero — SVG line draw + dot (prefers-reduced-motion respected via no class in component) */
+@keyframes landing-chart-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Route skeleton / loading shimmer */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/**
+ * Instant paint (no enter animation): left-to-right shimmer while RSC streams.
+ * Use on block placeholders; combine with rounded-* / h-* / w-* utilities.
+ */
+.ui-skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--theme-muted);
+}
+
+.ui-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--theme-primary) 28%, transparent),
+    transparent
+  );
+  animation: shimmer 1.35s ease-in-out infinite;
+}
+
+.dark .ui-skeleton::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--theme-primary-light) 22%, transparent),
+    transparent
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-skeleton::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* Auth route loading — reads on near-black layout */
+.auth-route-skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.auth-route-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, rgb(34, 197, 94) 22%, transparent),
+    transparent
+  );
+  animation: shimmer 1.35s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-route-skeleton::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+@keyframes landing-dot-pop {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+  65% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.landing-hero-chart-line {
+  animation: landing-chart-draw 1.35s cubic-bezier(0.33, 1, 0.68, 1) 0.12s forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-hero-chart-line {
+    animation: none;
+    stroke-dashoffset: 0 !important;
+  }
+}
+
+.landing-hero-chart-dot {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: landing-dot-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) 1.25s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-hero-chart-dot {
+    animation: none;
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* ─── Marketing landing: scoped grid + glow (Better Stack–style dark UI) ─── */
+.landing-marketing {
+  background-color: transparent;
+  color: #fafafa;
+}
+
+.landing-marketing .landing-grid-bg {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, black 20%, transparent 75%);
+}
+
+/* Below-hero marketing: cooler slab + coarse grid + grain (distinct from line-wave hero) */
+.landing-marketing .landing-marquee-atmosphere {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(102deg, transparent 0%, rgba(52, 211, 153, 0.045) 38%, transparent 62%),
+    radial-gradient(ellipse 100% 120% at 50% -30%, rgba(34, 211, 238, 0.07), transparent 52%),
+    radial-gradient(ellipse 70% 55% at 100% 100%, rgba(99, 102, 241, 0.05), transparent 50%);
+}
+
+.landing-marketing .landing-lower-slab {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    185deg,
+    rgba(8, 11, 18, 0.92) 0%,
+    rgba(12, 16, 26, 0.96) 22%,
+    rgba(14, 18, 30, 0.98) 50%,
+    rgba(11, 14, 22, 0.97) 78%,
+    rgba(8, 10, 16, 0.95) 100%
+  );
+}
+
+.landing-marketing .landing-lower-grid {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.1;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(ellipse 95% 75% at 50% 40%, black 0%, transparent 75%);
+}
+
+.landing-marketing .landing-lower-glow {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 85% 50% at 20% 12%, rgba(34, 211, 238, 0.06), transparent 55%),
+    radial-gradient(ellipse 70% 45% at 88% 35%, rgba(52, 211, 153, 0.055), transparent 52%),
+    radial-gradient(ellipse 60% 40% at 50% 92%, rgba(167, 139, 250, 0.045), transparent 50%);
+}
+
+.landing-marketing .landing-texture-grain {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.04;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='a'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23a)'/%3E%3C/svg%3E");
+}
+
+.landing-marketing .landing-cta-halo {
+  pointer-events: none;
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: min(100%, 920px);
+  height: min(70%, 520px);
+  transform: translate(-50%, -50%);
+  background: radial-gradient(ellipse at center, rgba(52, 211, 153, 0.07), transparent 68%);
+  filter: blur(2px);
+}
+
+/* Tutorial / journey band: soft dots + horizontal read stripe */
+.landing-marketing .landing-journey-dots {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.14;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.065) 1px, transparent 1.5px);
+  background-size: 20px 20px;
+  mask-image: linear-gradient(180deg, black 0%, black 78%, transparent 100%);
+}
+
+.landing-marketing .landing-journey-sheen {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    12deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.028) 42%,
+    transparent 58%
+  );
+}
+
+/* Finer technical grid — reads as “workspace” without competing with content */
+.landing-marketing .landing-mesh-fine {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.09;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(ellipse 100% 85% at 50% 45%, black 0%, transparent 72%);
+}
+
+.landing-marketing .landing-outcomes-veil {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 0%, rgba(52, 211, 153, 0.065), transparent 58%),
+    linear-gradient(180deg, rgba(9, 12, 18, 0.35) 0%, transparent 32%),
+    linear-gradient(180deg, transparent 55%, rgba(6, 8, 12, 0.45) 100%);
+}
+
+/* Soft vertical seam between stacked marketing bands (no hard 1px line) */
+.landing-marketing .landing-seam-down {
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 56px;
+  background: linear-gradient(
+    to bottom,
+    rgba(15, 18, 25, 0.55) 0%,
+    rgba(12, 15, 22, 0.18) 45%,
+    transparent 100%
+  );
+}
+
+.landing-marketing .landing-seam-up {
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 48px;
+  background: linear-gradient(to top, rgba(8, 10, 16, 0.5) 0%, transparent 100%);
+}
+
+.landing-hero-chart-line-dark {
+  animation: landing-chart-draw 1.35s cubic-bezier(0.33, 1, 0.68, 1) 0.12s forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-hero-chart-line-dark {
+    animation: none;
+    stroke-dashoffset: 0 !important;
+  }
+}
+
+/* Arbitrary `text-[9px]`–`text-[11px]` — Tailwind only sets font-size; give tiny UI copy a bit more line air. */
+@layer utilities {
+  .text-\[9px\] {
+    line-height: 1.55;
+    letter-spacing: -0.02em;
+  }
+  .text-\[10px\] {
+    line-height: 1.55;
+    letter-spacing: -0.02em;
+  }
+  .text-\[11px\] {
+    line-height: 1.55;
+    letter-spacing: -0.025em;
+  }
+}
