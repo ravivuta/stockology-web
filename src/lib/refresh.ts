@@ -20,9 +20,10 @@ function sanitizeSymbols(symbols: string[]): string[] {
 }
 
 export async function runRefreshPipeline(symbols: string[]): Promise<{ ok: boolean; message?: string }> {
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   try {
     const clean = sanitizeSymbols(symbols);
-    const res = await fetch("/api/python/refresh", {
+    const res = await fetch(`${basePath}/api/python/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ symbols: clean }),
