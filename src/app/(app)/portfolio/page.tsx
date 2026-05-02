@@ -7,7 +7,9 @@ import { usePortfolioStore } from "@/store/portfolioStore";
 import { runRefreshPipeline } from "@/lib/refresh";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
 import { PortfolioAllocationChart } from "@/components/portfolio/PortfolioAllocationChart";
+import { SymbolTradeCombobox } from "@/components/portfolio/SymbolTradeCombobox";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
+import { isValidTicker } from "@/lib/csvPortfolio";
 import { formatCurrency, formatNumberMax2, formatPercent, formatSignedCurrency } from "@/lib/numberFormat";
 import { recommendationActionDisplay } from "@/lib/recommendation";
 import { computeTodayChangeFromLiveQuotes } from "@/lib/portfolio-net-worth-series";
@@ -39,10 +41,16 @@ export default function PortfolioPage() {
   const stocks = usePortfolioStore((s) => s.stocks);
   const cash = usePortfolioStore((s) => s.cashBalance);
   const recalc = usePortfolioStore((s) => s.recalcMetrics);
+  const addStock = usePortfolioStore((s) => s.addStock);
+  const updateStock = usePortfolioStore((s) => s.updateStock);
 
   const [sort, setSort] = useState<SortKey>("symbol");
   const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION.symbol);
   const [query, setQuery] = useState("");
+  const [newSymbol, setNewSymbol] = useState("");
+  const [newQuantity, setNewQuantity] = useState("1");
+  const [newAverageCost, setNewAverageCost] = useState("");
+  const [newLastPrice, setNewLastPrice] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
   /** Portfolio page lists positions only; watchlist-only symbols (0 qty) stay in store for trading elsewhere. */
@@ -124,6 +132,38 @@ export default function PortfolioPage() {
     setRefreshing(false);
   }
 
+  function addHolding() {
+    const sym = newSymbol.trim().toUpperCase().replace(/[^A-Z0-9.-]/g, "");
+    const quantity = parseFloat(newQuantity);
+    const averageCost = parseFloat(newAverageCost);
+    const lastPrice = newLastPrice.trim() ? parseFloat(newLastPrice) : averageCost;
+    if (!isValidTicker(sym) || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(averageCost) || averageCost <= 0) return;
+
+    const existing = stocks.find((s) => s.symbol === sym);
+    const nextLastPrice = Number.isFinite(lastPrice) && lastPrice > 0 ? lastPrice : (existing?.lastPrice ?? averageCost);
+    if (existing) {
+      updateStock(sym, {
+        quantity,
+        averageCost,
+        lastPrice: nextLastPrice,
+        pendingOptimization: existing.pendingOptimization ?? true,
+      });
+    } else {
+      addStock({
+        symbol: sym,
+        quantity,
+        averageCost,
+        lastPrice: nextLastPrice,
+        pendingOptimization: true,
+      });
+    }
+
+    setNewSymbol("");
+    setNewQuantity("1");
+    setNewAverageCost("");
+    setNewLastPrice("");
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -192,9 +232,55 @@ export default function PortfolioPage() {
               className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
             />
           </label>
+          <label className="flex min-w-[11rem] flex-1 flex-col gap-1 text-[11px] text-subtle sm:max-w-sm">
+            Search stock
+            <SymbolTradeCombobox
+              id="portfolio-add-holding-symbol"
+              value={newSymbol}
+              onChange={setNewSymbol}
+              portfolioStocks={stocks}
+            />
+          </label>
+          <label className="flex w-[6.5rem] flex-col gap-1 text-[11px] text-subtle">
+            Qty
+            <input
+              value={newQuantity}
+              onChange={(e) => setNewQuantity(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addHolding()}
+              placeholder="1"
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+            />
+          </label>
+          <label className="flex w-[7.5rem] flex-col gap-1 text-[11px] text-subtle">
+            Avg cost
+            <input
+              value={newAverageCost}
+              onChange={(e) => setNewAverageCost(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addHolding()}
+              placeholder="100"
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+            />
+          </label>
+          <label className="flex w-[7.5rem] flex-col gap-1 text-[11px] text-subtle">
+            Last
+            <input
+              value={newLastPrice}
+              onChange={(e) => setNewLastPrice(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addHolding()}
+              placeholder="Optional"
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={addHolding}
+            className={appCtaButton("ui-hover-pop px-3 py-2 text-sm")}
+          >
+            Add
+          </button>
         </div>
         <p className="mt-2 text-xs text-subtle">
-          Filter holdings here, or open a stock to record trades and review lot details. CSV import and export are available in the top-right actions.
+          Search a stock first, then enter quantity and average cost to add or update the holding directly. CSV import and export are available in the top-right actions.
         </p>
       </div>
 
@@ -294,7 +380,7 @@ export default function PortfolioPage() {
         {rows.length === 0 && (
           <p className="p-6 text-center text-subtle">
             {holdings.length === 0
-              ? "You don’t have any holdings yet. Import positions from CSV or open a stock to record a trade."
+              ? "You don’t have any holdings yet. Add a holding above or import positions from CSV."
               : "No holdings match your search."}
           </p>
         )}
