@@ -155,7 +155,7 @@ export default function WatchlistPage() {
           >
             {refreshing ? "Refreshing…" : "Refresh quotes"}
           </button>
-          <CsvImportExportBar exportFilename="stocks-pm-watchlist.csv" />
+          <CsvImportExportBar exportFilename="stocks-pm-watchlist.csv" importMode="watchlist" />
           <Link href="/csv-help" className="ui-hover-text text-sm text-primary underline-offset-2 hover:underline">
             CSV help
           </Link>

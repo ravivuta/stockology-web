@@ -271,7 +271,7 @@ export default function PortfolioPage() {
           >
             {refreshing ? "Refreshing…" : "Refresh"}
           </button>
-          <CsvImportExportBar exportFilename="stocks-pm-portfolio.csv" compact />
+          <CsvImportExportBar exportFilename="stocks-pm-portfolio.csv" compact importMode="portfolio" />
           <Link href="/csv-help" className="ui-hover-pop rounded-lg border border-primary/30 px-3 py-2 text-sm text-foreground dark:border-primary/25">
             CSV help
           </Link>

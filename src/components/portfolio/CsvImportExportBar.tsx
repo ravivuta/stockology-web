@@ -9,23 +9,81 @@ import {
   type CsvExportStock,
   type CsvImportRow,
 } from "@/lib/csvPortfolio";
-import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { runRefreshPipeline } from "@/lib/refresh";
 
 type Props = {
   exportFilename: string;
   /** Defaults to all symbols in the store (same as iOS: full tracked list). */
   exportStocks?: CsvExportStock[];
   compact?: boolean;
+  importMode?: "portfolio" | "watchlist";
 };
 
-export function CsvImportExportBar({ exportFilename, exportStocks, compact = false }: Props) {
+function dedupeSymbolRows(rows: CsvImportRow[]): CsvImportRow[] {
+  const seen = new Set<string>();
+  const out: CsvImportRow[] = [];
+  for (const row of rows) {
+    const symbol = row.symbol.toUpperCase();
+    if (seen.has(symbol)) continue;
+    seen.add(symbol);
+    out.push({ symbol, qty: 0, price: 0, name: row.name });
+  }
+  return out;
+}
+
+export function CsvImportExportBar({
+  exportFilename,
+  exportStocks,
+  compact = false,
+  importMode = "portfolio",
+}: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const importHoldings = usePortfolioStore((s) => s.importHoldings);
+  const importCsvRows = usePortfolioStore((s) => s.importCsvRows);
+  const recalc = usePortfolioStore((s) => s.recalcMetrics);
   const storeStocks = usePortfolioStore((s) => s.stocks);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
   const toExport = exportStocks ?? storeStocks;
   const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
-  const [pendingImport, setPendingImport] = useState<{ rows: CsvImportRow[]; skipped: string[] } | null>(null);
+
+  async function applyImport(rows: CsvImportRow[], skipped: string[]) {
+    const normalizedRows = importMode === "watchlist" ? dedupeSymbolRows(rows) : rows;
+    const outcome = importCsvRows(normalizedRows, importMode);
+
+    if (outcome.importedSymbols.length > 0) {
+      await runRefreshPipeline(outcome.importedSymbols);
+      recalc();
+      usePortfolioStore.setState({ lastRefreshAt: new Date().toISOString() });
+    }
+
+    const invalidNote =
+      skipped.length > 0
+        ? ` Skipped invalid tickers: ${skipped.slice(0, 8).join(", ")}${skipped.length > 8 ? "…" : ""}.`
+        : "";
+
+    if (importMode === "watchlist") {
+      const alreadyTracked = outcome.importedCount - outcome.addedCount;
+      const trackedNote = alreadyTracked > 0 ? ` ${alreadyTracked} already tracked.` : "";
+      setFlash({
+        kind: "ok",
+        text: `Imported ${outcome.addedCount} new watchlist symbol(s).${trackedNote}${invalidNote}`,
+      });
+      return;
+    }
+
+    const prunedNote =
+      outcome.prunedWatchlistCount > 0
+        ? ` Removed ${outcome.prunedWatchlistCount} stale watchlist-only symbol(s).`
+        : "";
+    const typeLead =
+      outcome.importType === "holdings"
+        ? `Merged ${outcome.importedCount} symbol(s) with the existing portfolio.`
+        : `Imported ${outcome.importedCount} watchlist symbol(s) into the portfolio tracker.`;
+
+    setFlash({
+      kind: "ok",
+      text: `${typeLead}${prunedNote}${invalidNote}`,
+    });
+  }
 
   function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -40,17 +98,7 @@ export function CsvImportExportBar({ exportFilename, exportStocks, compact = fal
           setFlash({ kind: "err", text: res.error });
           return;
         }
-        if (storeStocks.length > 0) {
-          setPendingImport({ rows: res.rows, skipped: res.skipped });
-          return;
-        }
-        importHoldings(res.rows);
-        const importedSymbols = new Set(res.rows.map((row) => row.symbol)).size;
-        const skipNote =
-          res.skipped.length > 0
-            ? ` Skipped invalid tickers: ${res.skipped.slice(0, 8).join(", ")}${res.skipped.length > 8 ? "…" : ""}.`
-            : "";
-        setFlash({ kind: "ok", text: `Imported ${importedSymbols} symbol(s).${skipNote}` });
+        await applyImport(res.rows, res.skipped);
       })();
     };
     reader.readAsText(file, "utf-8");
@@ -100,32 +148,6 @@ export function CsvImportExportBar({ exportFilename, exportStocks, compact = fal
           {flash.text}
         </p>
       ) : null}
-
-      <ConfirmModal
-        open={pendingImport != null}
-        onClose={() => setPendingImport(null)}
-        onConfirm={() => {
-          if (!pendingImport) return;
-          const { rows, skipped } = pendingImport;
-          importHoldings(rows);
-          const importedSymbols = new Set(rows.map((row) => row.symbol)).size;
-          const skipNote =
-            skipped.length > 0
-              ? ` Skipped invalid tickers: ${skipped.slice(0, 8).join(", ")}${skipped.length > 8 ? "…" : ""}.`
-              : "";
-          setFlash({ kind: "ok", text: `Imported ${importedSymbols} symbol(s).${skipNote}` });
-        }}
-        title="Replace portfolio from CSV?"
-        description={
-          <>
-            You already track {storeStocks.length} symbol{storeStocks.length === 1 ? "" : "s"}. Importing applies the file as the new snapshot (quantities, costs, and strategy
-            columns). This cannot be undone automatically.
-          </>
-        }
-        confirmLabel="Import and replace"
-        cancelLabel="Cancel"
-        variant="danger"
-      />
     </div>
   );
 }

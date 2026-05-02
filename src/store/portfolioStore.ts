@@ -126,7 +126,13 @@ type State = {
   resetAll: () => void;
   setOptimizing: (v: boolean) => void;
   setOnboardingComplete: (v: boolean) => void;
-  importHoldings: (rows: CsvImportRow[]) => void;
+  importCsvRows: (rows: CsvImportRow[], mode: "portfolio" | "watchlist") => {
+    importType: "holdings" | "watchlist";
+    importedSymbols: string[];
+    importedCount: number;
+    addedCount: number;
+    prunedWatchlistCount: number;
+  };
   /** Replace local portfolio from a cloud snapshot (e.g. mobile sync). Recomputes recommendations. */
   replaceFromCloudSync: (payload: {
     cashBalance: number;
@@ -144,6 +150,69 @@ const UNKNOWN_PURCHASE_DATE_BASE_MS = Date.UTC(1970, 0, 1, 0, 0, 0, 0);
 
 function unknownPurchaseDateForOffset(offset: number): string {
   return new Date(UNKNOWN_PURCHASE_DATE_BASE_MS + (offset * 1000)).toISOString();
+}
+
+function preserveImportedMetadata(existing: StockHolding | undefined) {
+  if (!existing) return {};
+  return {
+    dailyChangePercent: existing.dailyChangePercent,
+    score: existing.score,
+    isShortlisted: existing.isShortlisted,
+    isVisibleInRisk: existing.isVisibleInRisk,
+    isInWatchlistSize: existing.isInWatchlistSize,
+    aiSentimentScore: existing.aiSentimentScore,
+    beta: existing.beta,
+    marketCap: existing.marketCap,
+    peg: existing.peg,
+    analystTarget: existing.analystTarget,
+    analystAvg: existing.analystAvg,
+    isETF: existing.isETF,
+    movingAvg: existing.movingAvg,
+    suppressTradeActions: existing.suppressTradeActions,
+    enableRSIReversalGate: existing.enableRSIReversalGate,
+    rsiPeriod: existing.rsiPeriod,
+    rsiOversoldThreshold: existing.rsiOversoldThreshold,
+    rsiOverboughtThreshold: existing.rsiOverboughtThreshold,
+    rsiHysteresisPoints: existing.rsiHysteresisPoints,
+    rsiMinRisingDays: existing.rsiMinRisingDays,
+  } satisfies Partial<StockHolding>;
+}
+
+function buildImportedOpenLots(rows: CsvImportRow[]): {
+  totalQty: number;
+  averageCost: number;
+  template: CsvImportRow;
+  openLots: TradeLot[];
+} {
+  let totalQty = 0;
+  let totalBasis = 0;
+  let unknownDateOffset = 0;
+  const openLots: TradeLot[] = [];
+
+  for (const row of rows) {
+    const qty = Math.max(0, row.qty);
+    const price = Math.max(0, row.price);
+    if (qty <= 0) continue;
+
+    totalQty += qty;
+    totalBasis += qty * price;
+    openLots.push({
+      id: uid(),
+      quantity: qty,
+      costBasis: price,
+      purchaseDate: row.purchaseDate || unknownPurchaseDateForOffset(unknownDateOffset++),
+      account: row.account?.trim() || "",
+      isRetirementAccount: row.isRetirementAccount ?? null,
+      status: "open",
+    });
+  }
+
+  return {
+    totalQty,
+    averageCost: totalQty > 0 ? totalBasis / totalQty : 0,
+    template: rows[rows.length - 1],
+    openLots: openLots.sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate)),
+  };
 }
 
 type RecalcContext = {
@@ -543,69 +612,115 @@ export const usePortfolioStore = create<State>()(
       },
       setOptimizing: (v) => set({ optimizing: v }),
       setOnboardingComplete: (v) => set({ onboardingComplete: v }),
-      importHoldings: (rows) => {
-        set((st) => {
-          const grouped = new Map<string, CsvImportRow[]>();
-          for (const row of rows) {
-            const symbol = row.symbol.toUpperCase();
-            const existing = grouped.get(symbol);
-            if (existing) existing.push({ ...row, symbol });
-            else grouped.set(symbol, [{ ...row, symbol }]);
+      importCsvRows: (rows, mode) => {
+        const grouped = new Map<string, CsvImportRow[]>();
+        for (const row of rows) {
+          const symbol = row.symbol.toUpperCase();
+          const existing = grouped.get(symbol);
+          if (existing) existing.push({ ...row, symbol });
+          else grouped.set(symbol, [{ ...row, symbol }]);
+        }
+
+        const importedSymbols = [...grouped.keys()].sort((a, b) => a.localeCompare(b));
+        const importedSymbolSet = new Set(importedSymbols);
+        const holdingsSymbols = new Set<string>();
+        for (const [symbol, symbolRows] of grouped.entries()) {
+          if (symbolRows.some((row) => Math.max(0, row.qty) > 0)) {
+            holdingsSymbols.add(symbol);
           }
+        }
 
-          const lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }> = {};
-          const importedStocks: StockHolding[] = [];
+        const importType = mode === "watchlist" || holdingsSymbols.size === 0 ? "watchlist" : "holdings";
+        let addedCount = 0;
+        let prunedWatchlistCount = 0;
 
-          for (const [symbol, symbolRows] of grouped.entries()) {
-            let totalQty = 0;
-            let totalBasis = 0;
-            let unknownDateOffset = 0;
-
-            const openLots: TradeLot[] = [];
-            for (const row of symbolRows) {
-              const qty = Math.max(0, row.qty);
-              const price = Math.max(0, row.price);
-              if (qty > 0) {
-                totalQty += qty;
-                totalBasis += qty * price;
-                openLots.push({
-                  id: uid(),
-                  quantity: qty,
-                  costBasis: price,
-                  purchaseDate: row.purchaseDate || unknownPurchaseDateForOffset(unknownDateOffset++),
-                  account: row.account?.trim() || "",
-                  isRetirementAccount: row.isRetirementAccount ?? null,
-                  status: "open",
+        set((st) => {
+          const keepExisting =
+            mode === "watchlist"
+              ? st.stocks
+              : st.stocks.filter((stock) => {
+                  const shouldKeep = stock.quantity > 0 || importedSymbolSet.has(stock.symbol);
+                  if (!shouldKeep && stock.quantity <= 0) prunedWatchlistCount += 1;
+                  return shouldKeep;
                 });
-              }
-            }
 
-            if (openLots.length > 0) {
-              lotsBySymbol[symbol] = {
-                open: openLots.sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate)),
-                sold: [],
+          const stockMap = new Map(keepExisting.map((stock) => [stock.symbol, stock] as const));
+          const lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }> = {};
+          for (const stock of keepExisting) {
+            const lots = st.lotsBySymbol[stock.symbol];
+            if (lots) {
+              lotsBySymbol[stock.symbol] = {
+                open: lots.open.map((lot) => ({ ...lot })),
+                sold: lots.sold.map((lot) => ({ ...lot })),
               };
             }
+          }
 
-            const template = symbolRows[symbolRows.length - 1];
-            const averageCost = totalQty > 0 ? totalBasis / totalQty : 0;
-            const lastPrice = totalQty === 0 && (template?.price ?? 0) === 0 ? 0 : (template?.price ?? 0) > 0 ? template.price : undefined;
+          for (const [symbol, symbolRows] of grouped.entries()) {
+            const existing = stockMap.get(symbol);
+            const imported = buildImportedOpenLots(symbolRows);
+            const hasImportedHoldings = imported.totalQty > 0;
 
-            importedStocks.push(
+            if (mode === "watchlist") {
+              if (existing) continue;
+              addedCount += 1;
+              stockMap.set(
+                symbol,
+                defaultStock({
+                  symbol,
+                  quantity: 0,
+                  averageCost: 0,
+                  name: imported.template.name,
+                  pendingOptimization: true,
+                })
+              );
+              continue;
+            }
+
+            if (hasImportedHoldings) {
+              lotsBySymbol[symbol] = { open: imported.openLots, sold: [] };
+              stockMap.set(
+                symbol,
+                defaultStock({
+                  symbol,
+                  quantity: imported.totalQty,
+                  averageCost: imported.averageCost,
+                  lastPrice:
+                    existing?.lastPrice && existing.lastPrice > 0
+                      ? existing.lastPrice
+                      : imported.template.price > 0
+                        ? imported.template.price
+                        : undefined,
+                  shortSMA: imported.template.shortSMA,
+                  dynamicFactor: imported.template.dynamicFactor,
+                  stockLimit: imported.template.stockLimit,
+                  transactionLimit: imported.template.transactionLimit,
+                  targetPrice: imported.template.targetPrice,
+                  name: imported.template.name ?? existing?.name,
+                  pendingOptimization: true,
+                  ...preserveImportedMetadata(existing),
+                })
+              );
+              if (!existing) addedCount += 1;
+              continue;
+            }
+
+            if (existing?.quantity > 0) continue;
+
+            delete lotsBySymbol[symbol];
+            stockMap.set(
+              symbol,
               defaultStock({
                 symbol,
-                quantity: totalQty,
-                averageCost,
-                lastPrice,
-                shortSMA: template?.shortSMA,
-                dynamicFactor: template?.dynamicFactor,
-                stockLimit: template?.stockLimit,
-                transactionLimit: template?.transactionLimit,
-                targetPrice: template?.targetPrice,
-                name: template?.name,
+                quantity: 0,
+                averageCost: 0,
+                lastPrice: existing?.lastPrice,
+                name: imported.template.name ?? existing?.name,
                 pendingOptimization: true,
+                ...preserveImportedMetadata(existing),
               })
             );
+            if (!existing) addedCount += 1;
           }
 
           const ctx: RecalcContext = {
@@ -616,12 +731,21 @@ export const usePortfolioStore = create<State>()(
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
             lotsBySymbol,
           };
-          const stocks = importedStocks.map((s) => recalcHolding(s, ctx));
+          const stocks = [...stockMap.values()]
+            .sort((a, b) => a.symbol.localeCompare(b.symbol))
+            .map((s) => recalcHolding(s, ctx));
           const tradeJournal = buildTradeJournalFromLots(lotsBySymbol);
           const portfolioSize = stocks.reduce((a, x) => a + x.quantity * (x.lastPrice ?? 0), 0) + st.cashBalance;
 
           return { stocks, lotsBySymbol, tradeJournal, portfolioSize };
         });
+        return {
+          importType,
+          importedSymbols,
+          importedCount: importedSymbols.length,
+          addedCount,
+          prunedWatchlistCount,
+        };
       },
       replaceFromCloudSync: (payload) =>
         set((st) => {

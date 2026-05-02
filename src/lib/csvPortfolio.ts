@@ -16,6 +16,36 @@ export type CsvImportRow = {
   name?: string;
 };
 
+function parseSymbolOnlyText(text: string): { ok: true; rows: CsvImportRow[]; skipped: string[] } | null {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return null;
+
+  const parsedLines = lines.map((line) => line.split(",").map((cell) => cell.replace(/^"+|"+$/g, "").trim()));
+  const hasExtraNonEmptyCells = parsedLines.some((cells) => cells.slice(1).some((cell) => cell.length > 0));
+  if (hasExtraNonEmptyCells) return null;
+
+  const skipped: string[] = [];
+  const rows: CsvImportRow[] = [];
+  const firstValue = parsedLines[0]?.[0]?.toLowerCase() ?? "";
+  const body = firstValue === "symbol" || firstValue === "ticker" ? parsedLines.slice(1) : parsedLines;
+
+  for (const cells of body) {
+    const firstCell = cells[0]?.toUpperCase() ?? "";
+    if (!firstCell) continue;
+    if (!isValidTicker(firstCell)) {
+      skipped.push(firstCell);
+      continue;
+    }
+    rows.push({ symbol: firstCell, qty: 0, price: 0 });
+  }
+
+  if (rows.length === 0) return null;
+  return { ok: true, rows, skipped };
+}
+
 function normKey(s: string) {
   return s.trim().toLowerCase().replace(/[\s_]/g, "");
 }
@@ -108,6 +138,9 @@ function parseRetirementAccountFlag(raw: string): boolean | undefined {
 export async function parsePortfolioCsv(
   text: string
 ): Promise<{ ok: true; rows: CsvImportRow[]; skipped: string[] } | { ok: false; error: string }> {
+  const symbolOnly = parseSymbolOnlyText(text);
+  if (symbolOnly) return symbolOnly;
+
   const { default: Papa } = await import("papaparse");
   const parsed = Papa.parse<Record<string, unknown>>(text, {
     header: true,
@@ -116,6 +149,8 @@ export async function parsePortfolioCsv(
   });
 
   if (parsed.errors.length > 0) {
+    const fallback = parseSymbolOnlyText(text);
+    if (fallback) return fallback;
     const msg = parsed.errors[0]?.message ?? "CSV parse error";
     return { ok: false, error: msg };
   }
@@ -220,8 +255,19 @@ export async function parsePortfolioCsv(
       if (txn && isSellTransaction(txn)) continue;
       if (txn && !isBuyTransaction(txn)) continue;
 
-      const qty = kQty ? parseNumber(getCell(row, kQty)) ?? 0 : 0;
-      const price = kPrice ? parseNumber(getCell(row, kPrice)) ?? 0 : 0;
+      const rawQty = kQty ? getCell(row, kQty) : "";
+      const rawPrice = kPrice ? getCell(row, kPrice) : "";
+      const hasQty = rawQty.length > 0;
+      const hasPrice = rawPrice.length > 0;
+      if (hasQty !== hasPrice) {
+        return {
+          ok: false,
+          error: `Row for ${sym} is missing ${hasQty ? "price" : "quantity"}. Leave both blank for watchlist-only, or provide both for holdings.`,
+        };
+      }
+
+      const qty = hasQty ? parseNumber(rawQty) ?? 0 : 0;
+      const price = hasPrice ? parseNumber(rawPrice) ?? 0 : 0;
       out.push({
         symbol: sym,
         qty: Math.max(0, qty),
@@ -264,8 +310,19 @@ export async function parsePortfolioCsv(
       skipped.push(sym);
       continue;
     }
-    const qty = kQty ? parseNumber(getCell(row, kQty)) ?? 0 : 0;
-    const price = kPrice ? parseNumber(getCell(row, kPrice)) ?? 0 : 0;
+    const rawQty = kQty ? getCell(row, kQty) : "";
+    const rawPrice = kPrice ? getCell(row, kPrice) : "";
+    const hasQty = rawQty.length > 0;
+    const hasPrice = rawPrice.length > 0;
+    if (hasQty !== hasPrice) {
+      return {
+        ok: false,
+        error: `Row for ${sym} is missing ${hasQty ? "price" : "quantity"}. Leave both blank for watchlist-only, or provide both for holdings.`,
+      };
+    }
+
+    const qty = hasQty ? parseNumber(rawQty) ?? 0 : 0;
+    const price = hasPrice ? parseNumber(rawPrice) ?? 0 : 0;
     out.push({
       symbol: sym,
       qty: Math.max(0, qty),
