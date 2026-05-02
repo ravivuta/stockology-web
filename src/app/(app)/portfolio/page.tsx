@@ -123,11 +123,14 @@ export default function PortfolioPage() {
     return r;
   }, [holdings, query, showActionable, sort, sortDirection]);
 
-  const { assetsValue, netWorth, portfolioTodayChange } = useMemo(() => {
+  const { assetsValue, totalGainLoss, totalGainLossPct, netWorth, portfolioTodayChange } = useMemo(() => {
     const assets = stocks.reduce((a, s) => a + s.quantity * (s.lastPrice ?? 0), 0);
+    const holdingsCostBasis = stocks.reduce((a, s) => a + s.quantity * s.averageCost, 0);
+    const totalGainLoss = assets - holdingsCostBasis;
+    const totalGainLossPct = holdingsCostBasis > 0 ? (totalGainLoss / holdingsCostBasis) * 100 : null;
     const net = assets + cash;
     const portfolioTodayChange = computeTodayChangeFromLiveQuotes(stocks, cash);
-    return { assetsValue: assets, netWorth: net, portfolioTodayChange };
+    return { assetsValue: assets, holdingsCostBasis, totalGainLoss, totalGainLossPct, netWorth: net, portfolioTodayChange };
   }, [stocks, cash]);
 
   async function refresh() {
@@ -205,10 +208,23 @@ export default function PortfolioPage() {
           <p className="mt-0.5 text-[11px] text-subtle">Cash + assets</p>
         </div>
         <div className="rounded-xl border border-border/80 bg-elevated px-4 py-3 shadow-sm dark:border-white/[0.08]">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Today (portfolio)</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Total gain</p>
+          <p
+            className={`mt-1 text-lg font-semibold tabular-nums ${
+              totalGainLoss > 0
+                ? "text-emerald-600 dark:text-primary"
+                : totalGainLoss < 0
+                  ? "text-red-600 dark:text-red-400"
+                  : "text-foreground"
+            }`}
+          >
+            {formatSignedCurrency(totalGainLoss)}
+            {totalGainLossPct != null ? ` (${formatPercent(totalGainLossPct, true)})` : ""}
+          </p>
+          <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Today&apos;s chg</p>
           {portfolioTodayChange.hasBaseline ? (
             <p
-              className={`mt-1 text-lg font-semibold tabular-nums ${
+              className={`mt-1 text-sm font-medium tabular-nums ${
                 portfolioTodayChange.change > 0
                   ? "text-emerald-600 dark:text-primary"
                   : portfolioTodayChange.change < 0
@@ -219,9 +235,8 @@ export default function PortfolioPage() {
               {formatSignedCurrency(portfolioTodayChange.change)} ({formatPercent(portfolioTodayChange.percent, true)})
             </p>
           ) : (
-            <p className="mt-1 text-lg font-semibold tabular-nums text-subtle">—</p>
+            <p className="mt-1 text-sm font-medium tabular-nums text-subtle">—</p>
           )}
-          <p className="mt-0.5 text-[11px] text-subtle">Estimated from live quote changes across holdings</p>
         </div>
       </div>
 
@@ -250,15 +265,6 @@ export default function PortfolioPage() {
           </button>
           <div className="hidden h-10 w-px self-end bg-border/80 dark:bg-white/[0.08] md:block" aria-hidden />
           <div className="flex min-w-[18rem] flex-1 flex-wrap items-end gap-2">
-            <label className="flex min-w-[11rem] flex-[1.5] flex-col gap-1 text-[11px] text-subtle">
-              Add New Stock/Holding
-              <SymbolTradeCombobox
-                id="portfolio-add-holding-symbol"
-                value={newSymbol}
-                onChange={setNewSymbol}
-                portfolioStocks={stocks}
-              />
-            </label>
             <label className="flex w-[6.5rem] flex-col gap-1 text-[11px] text-subtle">
               Qty
               <input
@@ -267,6 +273,15 @@ export default function PortfolioPage() {
                 onKeyDown={(e) => e.key === "Enter" && addHolding()}
                 placeholder="1"
                 className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+              />
+            </label>
+            <label className="flex min-w-[11rem] flex-[1.5] flex-col gap-1 text-[11px] text-subtle">
+              Add New Stock/Holding
+              <SymbolTradeCombobox
+                id="portfolio-add-holding-symbol"
+                value={newSymbol}
+                onChange={setNewSymbol}
+                portfolioStocks={stocks}
               />
             </label>
             <label className="flex w-[7.5rem] flex-col gap-1 text-[11px] text-subtle">
