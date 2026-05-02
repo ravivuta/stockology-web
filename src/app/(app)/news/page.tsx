@@ -32,12 +32,12 @@ function NewsArticleCard({ item }: { item: NewsFeedItem }) {
   const sentimentLabel = sentimentShortLabel(item.sentiment);
 
   const inner = (
-    <article className="flex h-full flex-col gap-4 rounded-2xl border border-border/80 bg-elevated p-5 shadow-sm transition-[border-color,box-shadow,background-color] duration-200 dark:border-white/[0.08] dark:bg-white/[0.03] sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:p-6">
+    <article className="flex h-full flex-col gap-3 rounded-2xl border border-border/80 bg-elevated p-5 shadow-sm transition-[border-color,box-shadow,background-color] duration-200 dark:border-white/[0.08] dark:bg-white/[0.03] sm:flex-row sm:items-start sm:justify-between sm:gap-5 sm:p-6">
       <div className="min-w-0 flex-1">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
           <span
             className={cn(
-              "inline-flex h-7 min-w-[2.25rem] items-center justify-center rounded-lg px-2 text-xs font-bold tracking-wide ring-1",
+              "inline-flex h-6 min-w-[2rem] items-center justify-center rounded-lg px-2 text-[10px] font-bold tracking-wide ring-1",
               isMacro
                 ? "bg-amber-500/15 text-amber-800 ring-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200"
                 : "bg-primary/12 text-foreground ring-primary/20 dark:bg-primary/15 dark:text-primary"
@@ -48,7 +48,7 @@ function NewsArticleCard({ item }: { item: NewsFeedItem }) {
           </span>
           {sentimentLabel ? (
             <span
-              className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/60 px-2.5 py-0.5 text-[11px] font-medium text-subtle dark:border-white/[0.08]"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/60 px-2 py-0.5 text-[10px] font-medium text-subtle dark:border-white/[0.08]"
               title={item.sentiment ?? undefined}
             >
               <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", sentimentDotClass(item.sentiment))} />
@@ -56,12 +56,12 @@ function NewsArticleCard({ item }: { item: NewsFeedItem }) {
             </span>
           ) : null}
         </div>
-        <h2 className="text-lg font-semibold leading-snug tracking-tight text-foreground sm:text-xl">{item.title}</h2>
+        <h2 className="text-sm font-semibold leading-snug tracking-tight text-foreground sm:text-base">{item.title}</h2>
         {item.companyName && !isMacro ? (
-          <p className="mt-2 text-sm text-subtle">{item.companyName}</p>
+          <p className="mt-1.5 text-xs text-subtle">{item.companyName}</p>
         ) : null}
       </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-subtle sm:max-w-[14rem] sm:justify-end sm:text-right">
+      <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-subtle sm:max-w-[14rem] sm:justify-end sm:text-right">
         <span className="font-medium text-foreground/70">{item.source}</span>
         {rel ? (
           <>
