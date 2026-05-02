@@ -62,13 +62,13 @@ type SavedCsvMappingPreset = {
   updatedAt: string;
 };
 
-function describeRetirementSetting(value: "no" | "yes"): string {
-  return value === "yes" ? "Retirement" : "Non-retirement";
+function describeAccountType(value: "no" | "yes"): string {
+  return value === "yes" ? "Retirement" : "Taxable";
 }
 
 function describePreset(preset: SavedCsvMappingPreset): string {
   const accountName = preset.defaultAccountName.trim() || "No default account name";
-  return `${accountName} • ${describeRetirementSetting(preset.defaultRetirementAccount)}`;
+  return `${accountName} • ${describeAccountType(preset.defaultRetirementAccount)}`;
 }
 
 function chunk<T>(arr: T[], size: number): T[][] {
@@ -470,7 +470,7 @@ export function CsvImportExportBar({
               <div className="flex flex-col gap-3">
                 <div>
                   <p className="text-sm font-medium text-foreground">Saved Mappings</p>
-                  <p className="mt-1 text-xs text-subtle">Apply a previously saved mapping profile, including account name and retirement type defaults, before reviewing the column matches.</p>
+                  <p className="mt-1 text-xs text-subtle">Apply a previously saved mapping profile, including profile name and account type defaults, before reviewing the column matches.</p>
                 </div>
                 {savedPresets.length > 0 ? (
                   <div className="space-y-2">
@@ -553,8 +553,8 @@ export function CsvImportExportBar({
             </div>
             <div className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
               <div>
-                <p className="text-sm font-medium text-foreground">Default Retirement</p>
-                <p className="mt-1 text-xs text-subtle">Applied to holding lots when no retirement column is mapped.</p>
+                <p className="text-sm font-medium text-foreground">Account Type</p>
+                <p className="mt-1 text-xs text-subtle">Saved with the profile and applied to holding lots when no account type column is mapped.</p>
               </div>
               <select
                 value={pendingMappingImport?.defaultRetirementAccount ?? "no"}
@@ -564,8 +564,8 @@ export function CsvImportExportBar({
                 }}
                 className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
               >
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
+                <option value="no">Taxable</option>
+                <option value="yes">Retirement</option>
               </select>
             </div>
             <div className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
