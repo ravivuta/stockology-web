@@ -224,14 +224,14 @@ export default function WatchlistPage() {
           </colgroup>
           <thead className="bg-muted/60 text-xs font-semibold uppercase tracking-wide text-subtle dark:bg-white/[0.05]">
             <tr>
-              <SortableHeaderCell label="Symbol" column="symbol" activeColumn={sort} direction={sortDirection} onSort={toggleSort} className="px-2 py-3 pl-4 sm:px-3 sm:pl-5" />
-              <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
-              <SortableHeaderCell label="Chg" column="change" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
-              <SortableHeaderCell label="Analyst Rating" column="analyst" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
-              <SortableHeaderCell label="Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
-              <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
-              <SortableHeaderCell label="Recommendation" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} className="min-w-0 px-2 py-3 sm:px-3" />
-              <th scope="col" className="px-2 py-3 pr-4 text-right sm:px-3 sm:pr-5">
+              <SortableHeaderCell label="Symbol" column="symbol" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
+              <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
+              <SortableHeaderCell label="Today %" column="change" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
+              <SortableHeaderCell label="Analyst Rating" column="analyst" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
+              <SortableHeaderCell label="Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
+              <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
+              <SortableHeaderCell label="Recommendation" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="min-w-0 px-2 py-3 sm:px-3" />
+              <th scope="col" className="px-2 py-3 text-center sm:px-3">
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
@@ -252,17 +252,17 @@ export default function WatchlistPage() {
                     key={s.symbol}
                     className="transition-colors duration-150 hover:bg-muted/50 dark:hover:bg-white/[0.04]"
                   >
-                    <td className="min-w-0 px-2 py-3 pl-4 align-middle font-medium text-foreground sm:px-3 sm:pl-5">
+                    <td className="min-w-0 px-2 py-3 align-middle font-medium text-foreground sm:px-3">
                       <Link
                         href={`/stock/${encodeURIComponent(s.symbol)}`}
-                        className="ui-hover-text inline-flex max-w-full min-w-0 text-left text-primary hover:underline"
+                        className="ui-hover-text inline-flex max-w-full min-w-0 justify-center text-center text-primary hover:underline"
                       >
                         <span className="min-w-0 truncate">{s.symbol}</span>
                       </Link>
                     </td>
-                    <td className="px-2 py-3 text-right tabular-nums text-subtle sm:px-3">{formatCurrency(s.lastPrice ?? 0)}</td>
+                    <td className="px-2 py-3 text-center tabular-nums text-subtle sm:px-3">{formatCurrency(s.lastPrice ?? 0)}</td>
                     <td
-                      className={`px-2 py-3 text-right tabular-nums font-medium sm:px-3 ${
+                      className={`px-2 py-3 text-center tabular-nums font-medium sm:px-3 ${
                         s.dailyChangePercent == null
                           ? "text-subtle"
                           : s.dailyChangePercent > 0
@@ -275,13 +275,13 @@ export default function WatchlistPage() {
                       {s.dailyChangePercent != null ? formatPercent(s.dailyChangePercent, true) : "—"}
                     </td>
                     <td
-                      className="min-w-0 px-2 py-3 text-right tabular-nums text-foreground sm:px-3"
+                      className="min-w-0 px-2 py-3 text-center tabular-nums text-foreground sm:px-3"
                       title="Consensus / average rating when available from data refresh"
                     >
                       <span className="block truncate">{rating && !Number.isNaN(Number.parseFloat(rating)) ? formatDecimal(Number.parseFloat(rating)) : "—"}</span>
                     </td>
                     <td
-                      className={`min-w-0 px-2 py-3 text-right tabular-nums font-medium sm:px-3 ${
+                      className={`min-w-0 px-2 py-3 text-center tabular-nums font-medium sm:px-3 ${
                         upside == null ? "text-subtle" : upside > 0 ? "text-emerald-700 dark:text-emerald-400" : upside < 0 ? "text-red-700 dark:text-red-400" : "text-subtle"
                       }`}
                       title={
@@ -292,15 +292,15 @@ export default function WatchlistPage() {
                     >
                       <span className="block truncate">{formatUpsidePct(upside)}</span>
                     </td>
-                    <td className="min-w-0 px-2 py-3 text-right tabular-nums text-subtle sm:px-3">
+                    <td className="min-w-0 px-2 py-3 text-center tabular-nums text-subtle sm:px-3">
                       <span className="block truncate">{s.score != null ? formatDecimal(s.score) : "—"}</span>
                     </td>
-                    <td className="min-w-0 px-2 py-3 text-left text-xs text-subtle sm:px-3">
+                    <td className="min-w-0 px-2 py-3 text-center text-xs text-subtle sm:px-3">
                       <span className="block truncate" title={s.recommendation?.action ?? undefined}>
                         {s.recommendation?.action ?? "—"}
                       </span>
                     </td>
-                    <td className="px-2 py-3 pr-4 text-right sm:px-3 sm:pr-5">
+                    <td className="px-2 py-3 text-center sm:px-3">
                       <button
                         type="button"
                         onClick={() => setRemoveTarget(s.symbol)}

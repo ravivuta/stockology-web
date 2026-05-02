@@ -10,7 +10,7 @@ type Props<T extends string> = {
   activeColumn: T;
   direction: SortDirection;
   onSort: (column: T) => void;
-  align?: "left" | "right";
+  align?: "left" | "center" | "right";
   className?: string;
 };
 
@@ -32,7 +32,7 @@ export function SortableHeaderCell<T extends string>({
       aria-sort={ariaSort}
       className={cn(
         "px-4 pb-2 pt-3 text-xs font-semibold tracking-wide",
-        align === "right" ? "text-right tabular-nums" : "text-left",
+        align === "right" ? "text-right tabular-nums" : align === "center" ? "text-center" : "text-left",
         className
       )}
     >
@@ -41,7 +41,7 @@ export function SortableHeaderCell<T extends string>({
         onClick={() => onSort(column)}
         className={cn(
           "inline-flex items-center gap-1 transition-colors hover:text-foreground",
-          align === "right" ? "ml-auto justify-end" : "justify-start"
+          align === "right" ? "ml-auto justify-end" : align === "center" ? "mx-auto justify-center" : "justify-start"
         )}
       >
         <span>{label}</span>

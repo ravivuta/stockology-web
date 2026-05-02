@@ -332,15 +332,15 @@ export default function PortfolioPage() {
           </colgroup>
           <thead className="bg-muted/60 text-subtle dark:bg-white/[0.05]">
             <tr>
-              <SortableHeaderCell label="Symbol" column="symbol" activeColumn={sort} direction={sortDirection} onSort={toggleSort} />
-              <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
-              <SortableHeaderCell label="Chg" column="today" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
-              <SortableHeaderCell label="Qty" column="quantity" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
-              <SortableHeaderCell label="Avg" column="averageCost" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
-              <SortableHeaderCell label="Costbasis" column="costBasis" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
-              <SortableHeaderCell label="Current Value" column="value" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
-              <SortableHeaderCell label="P/L" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
-              <SortableHeaderCell label="Recommendation" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} />
+              <SortableHeaderCell label="Symbol" column="symbol" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
+              <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
+              <SortableHeaderCell label="Chg" column="today" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
+              <SortableHeaderCell label="Qty" column="quantity" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
+              <SortableHeaderCell label="Avg" column="averageCost" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
+              <SortableHeaderCell label="Costbasis" column="costBasis" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
+              <SortableHeaderCell label="Current Value" column="value" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
+              <SortableHeaderCell label="P/L" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
+              <SortableHeaderCell label="Recommendation" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
             </tr>
           </thead>
           <tbody>
@@ -355,30 +355,30 @@ export default function PortfolioPage() {
                   key={s.symbol}
                   className="transition-colors duration-150 hover:bg-muted/50 dark:hover:bg-white/[0.04]"
                 >
-                  <td className="px-4 py-3 align-middle">
+                  <td className="px-4 py-3 align-middle text-center">
                     <div className="min-w-0">
                       <Link
                         href={`/stock/${encodeURIComponent(s.symbol)}`}
-                        className="ui-hover-text inline-flex max-w-full items-center gap-1 truncate font-medium text-foreground hover:underline"
+                        className="ui-hover-text inline-flex max-w-full items-center justify-center gap-1 truncate font-medium text-foreground hover:underline"
                       >
                         {s.symbol}
                       </Link>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatCurrency(s.lastPrice ?? 0)}</td>
+                  <td className="px-4 py-3 text-center tabular-nums text-foreground">{formatCurrency(s.lastPrice ?? 0)}</td>
                   <td
-                    className={`px-4 py-3 text-right tabular-nums font-medium ${
+                    className={`px-4 py-3 text-center tabular-nums font-medium ${
                       d == null ? "text-subtle" : d > 0 ? "text-emerald-700 dark:text-primary" : d < 0 ? "text-red-700 dark:text-red-400" : "text-subtle"
                     }`}
                   >
                     {d != null && Number.isFinite(d) ? formatPercent(d, true) : "—"}
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatNumberMax2(s.quantity)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatCurrency(s.averageCost)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatWholeCurrency(costBasis)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatWholeCurrency(value)}</td>
+                  <td className="px-4 py-3 text-center tabular-nums text-foreground">{formatNumberMax2(s.quantity)}</td>
+                  <td className="px-4 py-3 text-center tabular-nums text-foreground">{formatCurrency(s.averageCost)}</td>
+                  <td className="px-4 py-3 text-center tabular-nums text-foreground">{formatWholeCurrency(costBasis)}</td>
+                  <td className="px-4 py-3 text-center tabular-nums text-foreground">{formatWholeCurrency(value)}</td>
                   <td
-                    className={`px-4 py-3 text-right tabular-nums font-medium ${
+                    className={`px-4 py-3 text-center tabular-nums font-medium ${
                       gainLoss > 0
                         ? "text-emerald-700 dark:text-primary"
                         : gainLoss < 0
@@ -389,10 +389,10 @@ export default function PortfolioPage() {
                     {formatSignedCurrency(gainLoss)}
                     {gainLossPct != null ? ` (${formatPercent(gainLossPct, true)})` : ""}
                   </td>
-                  <td className="px-4 py-3 align-middle">
+                  <td className="px-4 py-3 align-middle text-center">
                     {s.recommendation ? (
                       <span
-                        className={`inline-flex max-w-full truncate rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${recBadgeClass(s.recommendation.action)}`}
+                        className={`inline-flex max-w-full items-center justify-center truncate rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${recBadgeClass(s.recommendation.action)}`}
                         title={s.recommendation.comments || s.recommendation.action}
                       >
                         {recommendationActionDisplay(s.recommendation.action)}
