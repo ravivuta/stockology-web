@@ -103,7 +103,7 @@ export function PortfolioDonut({
 
   return (
     <div
-      className={`relative aspect-square w-[140px] shrink-0 sm:w-[152px] ${className}`}
+      className={`relative aspect-square w-[154px] shrink-0 sm:w-[167px] ${className}`}
       role="img"
       aria-label={ariaLabel}
     >
