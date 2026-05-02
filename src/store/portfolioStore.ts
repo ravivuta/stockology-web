@@ -705,7 +705,7 @@ export const usePortfolioStore = create<State>()(
               continue;
             }
 
-            if (existing?.quantity > 0) continue;
+            if ((existing?.quantity ?? 0) > 0) continue;
 
             delete lotsBySymbol[symbol];
             stockMap.set(

@@ -3,13 +3,23 @@
 import { useRef, useState } from "react";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import {
+  CSV_IMPORT_FIELDS,
   parsePortfolioCsv,
+  shouldShowCsvMapping,
+  suggestCsvColumnMapping,
+  normalizeCsvHeader,
+  extractCsvHeaders,
   exportPortfolioCsv,
   downloadCsv,
+  type CsvColumnMapping,
+  type CsvColumnStandard,
   type CsvExportStock,
   type CsvImportRow,
 } from "@/lib/csvPortfolio";
 import { runRefreshPipeline } from "@/lib/refresh";
+import { AppModal, ModalSection } from "@/components/ui/AppModal";
+
+const CSV_MAPPING_MEMORY_KEY = "stocks-pm-csv-mapping-memory:v1";
 
 type Props = {
   exportFilename: string;
@@ -18,6 +28,39 @@ type Props = {
   compact?: boolean;
   importMode?: "portfolio" | "watchlist";
 };
+
+type PendingMappingImport = {
+  text: string;
+  headers: string[];
+  mapping: CsvColumnMapping;
+  defaultRetirementAccount: "no" | "yes";
+};
+
+function loadSavedMappingMemory(): Partial<Record<string, CsvColumnStandard>> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(CSV_MAPPING_MEMORY_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as Partial<Record<string, CsvColumnStandard>>;
+  } catch {
+    return {};
+  }
+}
+
+function saveMappingMemory(mapping: CsvColumnMapping) {
+  if (typeof window === "undefined") return;
+  try {
+    const previous = loadSavedMappingMemory();
+    const next = { ...previous };
+    for (const [standard, source] of Object.entries(mapping) as Array<[CsvColumnStandard, string]>) {
+      if (!source || source.toLowerCase() === "none") continue;
+      next[normalizeCsvHeader(source)] = standard;
+    }
+    window.localStorage.setItem(CSV_MAPPING_MEMORY_KEY, JSON.stringify(next));
+  } catch {
+    // ignore storage failures
+  }
+}
 
 function dedupeSymbolRows(rows: CsvImportRow[]): CsvImportRow[] {
   const seen = new Set<string>();
@@ -44,10 +87,22 @@ export function CsvImportExportBar({
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
   const toExport = exportStocks ?? storeStocks;
   const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [pendingMappingImport, setPendingMappingImport] = useState<PendingMappingImport | null>(null);
 
-  async function applyImport(rows: CsvImportRow[], skipped: string[]) {
+  async function applyImport(rows: CsvImportRow[], skipped: string[], defaultRetirementAccount?: boolean) {
+    const normalizedWithDefaults =
+      defaultRetirementAccount == null
+        ? rows
+        : rows.map((row) =>
+            row.qty > 0 && row.isRetirementAccount == null
+              ? { ...row, isRetirementAccount: defaultRetirementAccount }
+              : row
+          );
     const normalizedRows = importMode === "watchlist" ? dedupeSymbolRows(rows) : rows;
-    const outcome = importCsvRows(normalizedRows, importMode);
+    const outcome = importCsvRows(
+      importMode === "watchlist" ? normalizedRows : normalizedWithDefaults,
+      importMode
+    );
 
     if (outcome.importedSymbols.length > 0) {
       await runRefreshPipeline(outcome.importedSymbols);
@@ -93,6 +148,17 @@ export function CsvImportExportBar({
     reader.onload = () => {
       void (async () => {
         const text = String(reader.result ?? "");
+        if (importMode === "portfolio" && shouldShowCsvMapping(text)) {
+          const headers = extractCsvHeaders(text);
+          setPendingMappingImport({
+            text,
+            headers,
+            mapping: suggestCsvColumnMapping(headers, loadSavedMappingMemory()),
+            defaultRetirementAccount: "no",
+          });
+          return;
+        }
+
         const res = await parsePortfolioCsv(text);
         if (!res.ok) {
           setFlash({ kind: "err", text: res.error });
@@ -148,6 +214,118 @@ export function CsvImportExportBar({
           {flash.text}
         </p>
       ) : null}
+
+      <AppModal
+        open={pendingMappingImport != null}
+        onClose={() => setPendingMappingImport(null)}
+        size="lg"
+        titleId="csv-mapping-title"
+        describedById="csv-mapping-description"
+      >
+        <ModalSection className="border-b border-border px-5 pb-4 pt-5 dark:border-foreground/10">
+          <h2 id="csv-mapping-title" className="text-lg font-semibold tracking-tight text-foreground">
+            Map CSV columns
+          </h2>
+          <p id="csv-mapping-description" className="mt-2 text-sm leading-relaxed text-subtle">
+            Match your file’s columns to the iOS import fields before importing. `Symbol` is required. For holdings, `Quantity` and `Price` must both be mapped. If both are left
+            blank, the row imports as watchlist-only.
+          </p>
+        </ModalSection>
+        <ModalSection className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div className="space-y-3">
+            {CSV_IMPORT_FIELDS.map((field) => (
+              <div key={field.key} className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {field.label}
+                    {field.required ? " *" : ""}
+                  </p>
+                  <p className="mt-1 text-xs text-subtle">{field.description}</p>
+                </div>
+                <select
+                  value={pendingMappingImport?.mapping[field.key] ?? "none"}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setPendingMappingImport((current) =>
+                      current
+                        ? {
+                            ...current,
+                            mapping: {
+                              ...current.mapping,
+                              [field.key]: value,
+                            },
+                          }
+                        : current
+                    );
+                  }}
+                  className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
+                >
+                  <option value="none">None</option>
+                  {(pendingMappingImport?.headers ?? []).map((header) => (
+                    <option key={`${field.key}:${header}`} value={header}>
+                      {header}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+            <div className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
+              <div>
+                <p className="text-sm font-medium text-foreground">Default Retirement</p>
+                <p className="mt-1 text-xs text-subtle">Applied to holding lots when no retirement column is mapped.</p>
+              </div>
+              <select
+                value={pendingMappingImport?.defaultRetirementAccount ?? "no"}
+                onChange={(e) => {
+                  const value = e.target.value as "no" | "yes";
+                  setPendingMappingImport((current) => (current ? { ...current, defaultRetirementAccount: value } : current));
+                }}
+                className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
+              >
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
+            </div>
+          </div>
+        </ModalSection>
+        <ModalSection className="flex flex-wrap justify-end gap-2 border-t border-border px-4 py-4 dark:border-foreground/10">
+          <button
+            type="button"
+            onClick={() => setPendingMappingImport(null)}
+            className="ui-hover-pop rounded-lg border border-border px-4 py-2 text-sm text-foreground"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!pendingMappingImport) return;
+              void (async () => {
+                saveMappingMemory(pendingMappingImport.mapping);
+                const res = await parsePortfolioCsv(pendingMappingImport.text, {
+                  columnMapping: pendingMappingImport.mapping,
+                });
+                if (!res.ok) {
+                  setFlash({ kind: "err", text: res.error });
+                  return;
+                }
+                await applyImport(
+                  res.rows,
+                  res.skipped,
+                  pendingMappingImport.mapping.retirementAccount &&
+                    pendingMappingImport.mapping.retirementAccount.toLowerCase() !== "none"
+                    ? undefined
+                    : pendingMappingImport.defaultRetirementAccount === "yes"
+                );
+                setPendingMappingImport(null);
+              })();
+            }}
+            className="ui-hover-spotlight rounded-lg border border-primary/40 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+          >
+            Import CSV
+          </button>
+        </ModalSection>
+      </AppModal>
     </div>
   );
 }
