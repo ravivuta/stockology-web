@@ -506,16 +506,16 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Why this signal</p>
+                          <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Factors considered</p>
                           <p className={cn("text-subtle", dense ? "mt-0.5 text-[11px]" : "mt-1 text-xs")}>
-                            Rules checked for the current recommendation, with pass/fail flags.
+                            Rules checked for the current recommendation, shown as flagged factors.
                           </p>
                         </div>
                         <span className={cn("font-medium text-subtle", dense ? "text-[10px]" : "text-xs")}>
                           {recommendationFactors.filter((factor) => factor.passes).length}/{recommendationFactors.length} passed
                         </span>
                       </div>
-                      <div className={cn("grid sm:grid-cols-2", dense ? "mt-3 gap-2" : "mt-4 gap-2.5")}>
+                      <div className={cn(dense ? "mt-3 space-y-1.5" : "mt-4 space-y-2")}>
                         {recommendationFactors.map((factor) => (
                           <FactorFlagRow
                             key={`${factor.label}-${factor.detail}`}
@@ -912,26 +912,48 @@ function FactorFlagRow({
   return (
     <div
       className={cn(
-        "rounded-xl border",
+        "relative overflow-hidden rounded-xl border",
         passes
-          ? "border-emerald-500/25 bg-emerald-500/10"
-          : "border-amber-500/25 bg-amber-500/10",
+          ? "border-emerald-500/20 bg-emerald-500/8"
+          : "border-amber-500/20 bg-amber-500/8",
         compact ? "px-2.5 py-2" : "px-3.5 py-3"
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <p className={cn("min-w-0 flex-1 font-semibold text-foreground", compact ? "text-xs" : "text-sm")}>{label}</p>
+      <div
+        aria-hidden="true"
+        className={cn(
+          "absolute inset-y-0 left-0 w-1.5",
+          passes ? "bg-emerald-500/85" : "bg-amber-500/85"
+        )}
+      />
+      <div className={cn("flex items-start gap-3", compact ? "pl-2" : "pl-2.5")}>
         <span
           className={cn(
-            "shrink-0 rounded-full px-2 py-1 font-semibold uppercase tracking-[0.12em]",
-            passes ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-            compact ? "text-[9px]" : "text-[10px]"
+            "mt-0.5 shrink-0 rounded-full border",
+            passes
+              ? "border-emerald-500/35 bg-emerald-500/18 text-emerald-700 dark:text-emerald-300"
+              : "border-amber-500/35 bg-amber-500/18 text-amber-700 dark:text-amber-300",
+            compact ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]"
           )}
         >
-          {passes ? "Pass" : "Blocked"}
+          {passes ? "Met" : "Flag"}
         </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+            <p className={cn("min-w-0 flex-1 font-semibold text-foreground", compact ? "text-xs" : "text-sm")}>{label}</p>
+            <span
+              className={cn(
+                "shrink-0 font-semibold uppercase tracking-[0.12em]",
+                passes ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300",
+                compact ? "text-[9px]" : "text-[10px]"
+              )}
+            >
+              {passes ? "Supports signal" : "Needs caution"}
+            </span>
+          </div>
+          <p className={cn("leading-snug text-subtle", compact ? "mt-1 text-[10px]" : "mt-1.5 text-xs")}>{detail}</p>
+        </div>
       </div>
-      <p className={cn("leading-snug text-subtle", compact ? "mt-1.5 text-[10px]" : "mt-2 text-xs")}>{detail}</p>
     </div>
   );
 }

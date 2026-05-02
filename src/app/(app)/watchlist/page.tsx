@@ -183,7 +183,7 @@ export default function WatchlistPage() {
           <div className="hidden h-10 w-px self-end bg-border/80 dark:bg-white/[0.08] md:block" aria-hidden />
           <div className="ml-auto flex flex-wrap items-end gap-2">
             <label className="flex min-w-[9rem] flex-col gap-1 text-[11px] text-subtle">
-              Add symbol
+              Add Stock
               <SymbolTradeCombobox
                 id="watchlist-add-symbol"
                 value={newSymbol}
