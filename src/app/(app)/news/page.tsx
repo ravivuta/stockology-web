@@ -32,7 +32,7 @@ function NewsArticleCard({ item }: { item: NewsFeedItem }) {
   const sentimentLabel = sentimentShortLabel(item.sentiment);
 
   const inner = (
-    <article className="flex h-full flex-col gap-3 rounded-2xl border border-border/80 bg-elevated p-5 shadow-sm transition-[border-color,box-shadow,background-color] duration-200 dark:border-white/[0.08] dark:bg-white/[0.03] sm:flex-row sm:items-start sm:justify-between sm:gap-5 sm:p-6">
+    <article className="flex h-full flex-col gap-2 rounded-2xl border border-border/80 bg-elevated p-3.5 shadow-sm transition-[border-color,box-shadow,background-color] duration-200 dark:border-white/[0.08] dark:bg-white/[0.03] sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:p-4">
       <div className="min-w-0 flex-1">
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <span
