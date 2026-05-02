@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Newspaper, RefreshCw, Search, Sparkles } from "lucide-react";
 import { usePortfolioStore } from "@/store/portfolioStore";
-import { StockDetailExpandPanel } from "@/components/stock/StockDetailExpandPanel";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { runRefreshPipeline } from "@/lib/refresh";
 import { APP_CTA_FILL, appCtaButton } from "@/lib/appCtaClasses";
@@ -33,34 +32,36 @@ function NewsArticleCard({ item }: { item: NewsFeedItem }) {
   const sentimentLabel = sentimentShortLabel(item.sentiment);
 
   const inner = (
-    <article className="flex h-full flex-col rounded-2xl border border-border/80 bg-elevated p-4 shadow-sm transition-[border-color,box-shadow,background-color] duration-200 dark:border-white/[0.08] dark:bg-white/[0.03]">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span
-          className={cn(
-            "inline-flex h-7 min-w-[2.25rem] items-center justify-center rounded-lg px-2 text-xs font-bold tracking-wide ring-1",
-            isMacro
-              ? "bg-amber-500/15 text-amber-800 ring-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200"
-              : "bg-primary/12 text-foreground ring-primary/20 dark:bg-primary/15 dark:text-primary"
-          )}
-          title={isMacro ? "Global markets" : item.symbol}
-        >
-          {isMacro ? "Macro" : item.symbol}
-        </span>
-        {sentimentLabel ? (
+    <article className="flex h-full flex-col gap-4 rounded-2xl border border-border/80 bg-elevated p-5 shadow-sm transition-[border-color,box-shadow,background-color] duration-200 dark:border-white/[0.08] dark:bg-white/[0.03] sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:p-6">
+      <div className="min-w-0 flex-1">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
           <span
-            className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/60 px-2.5 py-0.5 text-[11px] font-medium text-subtle dark:border-white/[0.08]"
-            title={item.sentiment ?? undefined}
+            className={cn(
+              "inline-flex h-7 min-w-[2.25rem] items-center justify-center rounded-lg px-2 text-xs font-bold tracking-wide ring-1",
+              isMacro
+                ? "bg-amber-500/15 text-amber-800 ring-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200"
+                : "bg-primary/12 text-foreground ring-primary/20 dark:bg-primary/15 dark:text-primary"
+            )}
+            title={isMacro ? "Global markets" : item.symbol}
           >
-            <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", sentimentDotClass(item.sentiment))} />
-            {sentimentLabel}
+            {isMacro ? "Macro" : item.symbol}
           </span>
+          {sentimentLabel ? (
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/60 px-2.5 py-0.5 text-[11px] font-medium text-subtle dark:border-white/[0.08]"
+              title={item.sentiment ?? undefined}
+            >
+              <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", sentimentDotClass(item.sentiment))} />
+              {sentimentLabel}
+            </span>
+          ) : null}
+        </div>
+        <h2 className="text-lg font-semibold leading-snug tracking-tight text-foreground sm:text-xl">{item.title}</h2>
+        {item.companyName && !isMacro ? (
+          <p className="mt-2 text-sm text-subtle">{item.companyName}</p>
         ) : null}
       </div>
-      <h2 className="text-base font-semibold leading-snug tracking-tight text-foreground line-clamp-3">{item.title}</h2>
-      {item.companyName && !isMacro ? (
-        <p className="mt-2 text-sm text-subtle line-clamp-1">{item.companyName}</p>
-      ) : null}
-      <div className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-4 text-xs text-subtle">
+      <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-subtle sm:max-w-[14rem] sm:justify-end sm:text-right">
         <span className="font-medium text-foreground/70">{item.source}</span>
         {rel ? (
           <>
@@ -107,8 +108,6 @@ export default function NewsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
-
   const load = useCallback(async () => {
     if (!hasSupabaseConfig()) {
       setItems([]);
@@ -272,7 +271,7 @@ export default function NewsPage() {
                   {searchText.trim() ? " (filtered)" : ""}
                 </p>
               </div>
-              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <ul className="grid grid-cols-1 gap-4">
                 {filtered.map((item) => (
                   <li key={item.id} className="list-none">
                     <NewsArticleCard item={item} />
@@ -332,33 +331,6 @@ export default function NewsPage() {
                 </div>
               </div>
             </>
-          )}
-
-          {stocks.length > 0 && !noConfig && (
-            <div className="rounded-2xl border border-border/80 bg-elevated p-4 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.03]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-subtle">Symbol detail</p>
-              <p className="mt-1 text-xs leading-relaxed text-subtle">Open your portfolio tickers without leaving News.</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {stocks.map((s) => (
-                  <button
-                    key={s.symbol}
-                    type="button"
-                    onClick={() => setDetailSymbol((x) => (x === s.symbol ? null : s.symbol))}
-                    className={cn(
-                      "rounded-lg px-3 py-1.5 text-xs font-bold tracking-wide transition-colors",
-                      detailSymbol === s.symbol ? cn(APP_CTA_FILL, "shadow-sm") : "border border-border/80 bg-background/80 text-foreground hover:bg-muted/50 dark:border-white/10 dark:bg-white/[0.04]"
-                    )}
-                  >
-                    {s.symbol}
-                  </button>
-                ))}
-              </div>
-              {detailSymbol ? (
-                <div className="mt-4 border-t border-border/60 pt-4 dark:border-white/[0.06]">
-                  <StockDetailExpandPanel symbol={detailSymbol} embedded onClose={() => setDetailSymbol(null)} />
-                </div>
-              ) : null}
-            </div>
           )}
         </aside>
       </div>

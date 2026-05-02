@@ -50,7 +50,6 @@ export default function PortfolioPage() {
   const [newSymbol, setNewSymbol] = useState("");
   const [newQuantity, setNewQuantity] = useState("1");
   const [newAverageCost, setNewAverageCost] = useState("");
-  const [newLastPrice, setNewLastPrice] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
   /** Portfolio page lists positions only; watchlist-only symbols (0 qty) stay in store for trading elsewhere. */
@@ -136,11 +135,10 @@ export default function PortfolioPage() {
     const sym = newSymbol.trim().toUpperCase().replace(/[^A-Z0-9.-]/g, "");
     const quantity = parseFloat(newQuantity);
     const averageCost = parseFloat(newAverageCost);
-    const lastPrice = newLastPrice.trim() ? parseFloat(newLastPrice) : averageCost;
     if (!isValidTicker(sym) || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(averageCost) || averageCost <= 0) return;
 
     const existing = stocks.find((s) => s.symbol === sym);
-    const nextLastPrice = Number.isFinite(lastPrice) && lastPrice > 0 ? lastPrice : (existing?.lastPrice ?? averageCost);
+    const nextLastPrice = existing?.lastPrice && existing.lastPrice > 0 ? existing.lastPrice : averageCost;
     if (existing) {
       updateStock(sym, {
         quantity,
@@ -161,7 +159,6 @@ export default function PortfolioPage() {
     setNewSymbol("");
     setNewQuantity("1");
     setNewAverageCost("");
-    setNewLastPrice("");
   }
 
   return (
@@ -232,52 +229,45 @@ export default function PortfolioPage() {
               className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
             />
           </label>
-          <label className="flex min-w-[11rem] flex-1 flex-col gap-1 text-[11px] text-subtle sm:max-w-sm">
-            Search stock
-            <SymbolTradeCombobox
-              id="portfolio-add-holding-symbol"
-              value={newSymbol}
-              onChange={setNewSymbol}
-              portfolioStocks={stocks}
-            />
-          </label>
-          <label className="flex w-[6.5rem] flex-col gap-1 text-[11px] text-subtle">
-            Qty
-            <input
-              value={newQuantity}
-              onChange={(e) => setNewQuantity(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addHolding()}
-              placeholder="1"
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-            />
-          </label>
-          <label className="flex w-[7.5rem] flex-col gap-1 text-[11px] text-subtle">
-            Avg cost
-            <input
-              value={newAverageCost}
-              onChange={(e) => setNewAverageCost(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addHolding()}
-              placeholder="100"
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-            />
-          </label>
-          <label className="flex w-[7.5rem] flex-col gap-1 text-[11px] text-subtle">
-            Last
-            <input
-              value={newLastPrice}
-              onChange={(e) => setNewLastPrice(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addHolding()}
-              placeholder="Optional"
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-            />
-          </label>
-          <button
-            type="button"
-            onClick={addHolding}
-            className={appCtaButton("ui-hover-pop px-3 py-2 text-sm")}
-          >
-            Add
-          </button>
+          <div className="hidden h-10 w-px self-end bg-border/80 dark:bg-white/[0.08] md:block" aria-hidden />
+          <div className="flex min-w-[18rem] flex-1 flex-wrap items-end gap-2">
+            <label className="flex min-w-[11rem] flex-[1.5] flex-col gap-1 text-[11px] text-subtle">
+              Search stock
+              <SymbolTradeCombobox
+                id="portfolio-add-holding-symbol"
+                value={newSymbol}
+                onChange={setNewSymbol}
+                portfolioStocks={stocks}
+              />
+            </label>
+            <label className="flex w-[6.5rem] flex-col gap-1 text-[11px] text-subtle">
+              Qty
+              <input
+                value={newQuantity}
+                onChange={(e) => setNewQuantity(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addHolding()}
+                placeholder="1"
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+              />
+            </label>
+            <label className="flex w-[7.5rem] flex-col gap-1 text-[11px] text-subtle">
+              Avg cost
+              <input
+                value={newAverageCost}
+                onChange={(e) => setNewAverageCost(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addHolding()}
+                placeholder="100"
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={addHolding}
+              className={appCtaButton("ui-hover-pop px-3 py-2 text-sm")}
+            >
+              Add
+            </button>
+          </div>
         </div>
         <p className="mt-2 text-xs text-subtle">
           Search a stock first, then enter quantity and average cost to add or update the holding directly. CSV import and export are available in the top-right actions.
