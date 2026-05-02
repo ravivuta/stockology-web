@@ -372,10 +372,10 @@ export default function PortfolioPage() {
                 <col style={{ width: "9%" }} />
                 <col style={{ width: "10%" }} />
                 <col style={{ width: "10%" }} />
-                <col style={{ width: "11%" }} />
+                <col style={{ width: "13%" }} />
                 <col style={{ width: "7%" }} />
-                <col style={{ width: "7%" }} />
-                <col style={{ width: "10%" }} />
+                <col style={{ width: "6%" }} />
+                <col style={{ width: "9%" }} />
               </colgroup>
               <thead className="bg-muted/60 text-subtle dark:bg-white/[0.05]">
                 <tr>
