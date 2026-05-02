@@ -10,7 +10,7 @@ import { PortfolioAllocationChart } from "@/components/portfolio/PortfolioAlloca
 import { SymbolTradeCombobox } from "@/components/portfolio/SymbolTradeCombobox";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
 import { isValidTicker } from "@/lib/csvPortfolio";
-import { formatCurrency, formatNumberMax2, formatPercent, formatSignedCurrency } from "@/lib/numberFormat";
+import { formatCurrency, formatNumberMax2, formatPercent, formatSignedCurrency, formatWholeCurrency } from "@/lib/numberFormat";
 import { recommendationActionDisplay } from "@/lib/recommendation";
 import { computeTodayChangeFromLiveQuotes } from "@/lib/portfolio-net-worth-series";
 
@@ -52,6 +52,7 @@ export default function PortfolioPage() {
   const [newQuantity, setNewQuantity] = useState("1");
   const [newAverageCost, setNewAverageCost] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
 
   /** Portfolio page lists positions only; watchlist-only symbols (0 qty) stay in store for trading elsewhere. */
   const holdings = useMemo(() => stocks.filter((s) => s.quantity > 0), [stocks]);
@@ -241,7 +242,18 @@ export default function PortfolioPage() {
       </div>
 
       <div className="ui-hover-lift rounded-2xl border border-border bg-elevated p-3">
-        <div className="flex flex-wrap items-end gap-2">
+        <div className="md:hidden">
+          <button
+            type="button"
+            aria-expanded={mobileControlsOpen}
+            aria-controls="portfolio-mobile-controls"
+            onClick={() => setMobileControlsOpen((open) => !open)}
+            className="w-full rounded-xl border border-border bg-background px-4 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
+          >
+            {mobileControlsOpen ? "Hide filters & add stock" : "Show filters & add stock"}
+          </button>
+        </div>
+        <div id="portfolio-mobile-controls" className={`${mobileControlsOpen ? "mt-3 flex" : "hidden"} flex-wrap items-end gap-2 md:mt-0 md:flex`}>
           <label className="flex min-w-[11rem] flex-1 flex-col gap-1 text-[11px] text-subtle sm:max-w-xs">
             Filter
             <input
@@ -306,7 +318,7 @@ export default function PortfolioPage() {
       </div>
 
       <div className="ui-hover-lift overflow-x-auto rounded-2xl border border-border bg-elevated">
-        <table className="w-full table-fixed text-sm">
+        <table className="min-w-[980px] w-full text-sm">
           <colgroup>
             <col style={{ width: "14%" }} />
             <col style={{ width: "8%" }} />
@@ -325,8 +337,8 @@ export default function PortfolioPage() {
               <SortableHeaderCell label="Chg" column="today" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
               <SortableHeaderCell label="Qty" column="quantity" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
               <SortableHeaderCell label="Avg" column="averageCost" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
-              <SortableHeaderCell label="Basis" column="costBasis" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
-              <SortableHeaderCell label="Value" column="value" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
+              <SortableHeaderCell label="Costbasis" column="costBasis" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
+              <SortableHeaderCell label="Current Value" column="value" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
               <SortableHeaderCell label="P/L" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
               <SortableHeaderCell label="Recommendation" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} />
             </tr>
@@ -334,7 +346,6 @@ export default function PortfolioPage() {
           <tbody>
             {rows.flatMap((s) => {
               const value = s.quantity * (s.lastPrice ?? 0);
-              const valueWeightPct = assetsValue > 0 ? (value / assetsValue) * 100 : null;
               const costBasis = s.quantity * s.averageCost;
               const gainLoss = value - costBasis;
               const gainLossPct = costBasis > 0 ? (gainLoss / costBasis) * 100 : null;
@@ -364,11 +375,8 @@ export default function PortfolioPage() {
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatNumberMax2(s.quantity)}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatCurrency(s.averageCost)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatCurrency(costBasis)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-foreground">
-                    {formatCurrency(value)}
-                    {valueWeightPct != null ? ` (${formatPercent(valueWeightPct)})` : ""}
-                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatWholeCurrency(costBasis)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatWholeCurrency(value)}</td>
                   <td
                     className={`px-4 py-3 text-right tabular-nums font-medium ${
                       gainLoss > 0

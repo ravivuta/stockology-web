@@ -441,7 +441,7 @@ function GainerLoserCards({
       </div>
       <div className="flex min-h-[140px] flex-col">
         <div className="mb-3 flex flex-wrap items-baseline gap-2">
-          <h3 className="flex items-center gap-1.5 text-sm font-semibold text-subtle">
+          <h3 className="flex items-center gap-1.5 text-sm font-semibold text-[color:var(--dashboard-chart-loss)]">
             <TrendingDown className="h-4 w-4 opacity-90" aria-hidden />
             Losers
           </h3>
@@ -459,13 +459,13 @@ function GainerLoserCards({
                 onClick={() => onToggleSymbol(s.symbol)}
                 className={`ui-hover-lift min-w-[7.5rem] rounded-xl border p-3 text-left text-sm shadow-sm transition-colors dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 ${
                   selectedSymbol === s.symbol
-                    ? "border-border bg-muted/90 dark:bg-white/10"
-                    : "border-border bg-muted/40 hover:border-border hover:bg-muted/70"
+                    ? "border-[color:var(--dashboard-chart-loss)]/40 bg-[color:var(--dashboard-chart-loss)]/10 dark:bg-[color:var(--dashboard-chart-loss)]/15"
+                    : "border-border bg-muted/40 hover:border-[color:var(--dashboard-chart-loss)]/35 hover:bg-[color:var(--dashboard-chart-loss)]/5"
                 }`}
               >
                 <div className="font-semibold text-foreground">{s.symbol}</div>
                 <div className="text-[11px] text-subtle">Cost {fmtShort(cost)}</div>
-                <div className="text-[11px] font-semibold text-subtle">−{fmtShort(loss)}</div>
+                <div className="text-[11px] font-semibold text-[color:var(--dashboard-chart-loss)]">−{fmtShort(loss)}</div>
               </button>
             );
           })}
@@ -559,7 +559,7 @@ function GainerLoserBars({
       </div>
       <div>
         <div className="mb-3 flex flex-wrap items-baseline gap-2">
-          <h3 className="text-sm font-semibold text-subtle">Losers</h3>
+          <h3 className="text-sm font-semibold text-[color:var(--dashboard-chart-loss)]">Losers</h3>
           <span className="text-xs text-subtle">Cost basis {fmtShort(totalLoserCb)}</span>
         </div>
         {sortedL.length === 0 ? (
@@ -580,10 +580,12 @@ function GainerLoserBars({
                   type="button"
                   onClick={() => onToggleSymbol(l.symbol)}
                   className={`ui-hover-pop flex w-10 flex-col items-center gap-1 rounded-md ${
-                    selectedSymbol === l.symbol ? "ring-2 ring-foreground/25 ring-offset-2 ring-offset-background dark:ring-white/30" : ""
+                    selectedSymbol === l.symbol
+                      ? "ring-2 ring-[color:var(--dashboard-chart-loss)] ring-offset-2 ring-offset-background"
+                      : ""
                   }`}
                 >
-                  <span className="text-[9px] font-bold tabular-nums text-subtle">{fmtShort(loss)}</span>
+                  <span className="text-[9px] font-bold tabular-nums text-[color:var(--dashboard-chart-loss)]">{fmtShort(loss)}</span>
                   <div className="flex w-9 flex-col justify-end overflow-hidden rounded-md shadow-sm" style={{ height: barH }}>
                     <div className="w-full bg-battleship/70 dark:bg-battleship/55" style={{ height: lossH }} />
                     <div className="w-full bg-muted" style={{ height: curH }} />

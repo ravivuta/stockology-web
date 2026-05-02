@@ -7,6 +7,10 @@ const MAX_2 = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
 });
 
+const WHOLE = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 0,
+});
+
 export function formatDecimal(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
   return EXACT_2.format(value);
@@ -20,6 +24,11 @@ export function formatNumberMax2(value: number | null | undefined): string {
 export function formatCurrency(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
   return `$${formatDecimal(value)}`;
+}
+
+export function formatWholeCurrency(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return `$${WHOLE.format(value)}`;
 }
 
 export function formatSignedCurrency(value: number | null | undefined): string {

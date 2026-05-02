@@ -226,7 +226,7 @@ export default function WatchlistPage() {
             <tr>
               <SortableHeaderCell label="Symbol" column="symbol" activeColumn={sort} direction={sortDirection} onSort={toggleSort} className="px-2 py-3 pl-4 sm:px-3 sm:pl-5" />
               <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
-              <SortableHeaderCell label="Today %" column="change" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
+              <SortableHeaderCell label="Chg" column="change" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
               <SortableHeaderCell label="Analyst Rating" column="analyst" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
               <SortableHeaderCell label="Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
               <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
@@ -261,7 +261,17 @@ export default function WatchlistPage() {
                       </Link>
                     </td>
                     <td className="px-2 py-3 text-right tabular-nums text-subtle sm:px-3">{formatCurrency(s.lastPrice ?? 0)}</td>
-                    <td className="px-2 py-3 text-right tabular-nums text-subtle sm:px-3">
+                    <td
+                      className={`px-2 py-3 text-right tabular-nums font-medium sm:px-3 ${
+                        s.dailyChangePercent == null
+                          ? "text-subtle"
+                          : s.dailyChangePercent > 0
+                            ? "text-emerald-700 dark:text-emerald-400"
+                            : s.dailyChangePercent < 0
+                              ? "text-red-700 dark:text-red-400"
+                              : "text-subtle"
+                      }`}
+                    >
                       {s.dailyChangePercent != null ? formatPercent(s.dailyChangePercent, true) : "—"}
                     </td>
                     <td
