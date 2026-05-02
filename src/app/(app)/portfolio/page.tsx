@@ -267,33 +267,19 @@ export default function PortfolioPage() {
         </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[17rem_minmax(0,1fr)] lg:items-start lg:gap-6 xl:grid-cols-[17rem_minmax(0,1fr)_20rem]">
-        <div className="space-y-8">
-          <div className="grid gap-3 md:grid-cols-2 lg:hidden">
-            <PortfolioSummaryTiles
-              cash={cash}
-              assetsValue={assetsValue}
-              netWorth={netWorth}
-              totalGainLoss={totalGainLoss}
-              totalGainLossPct={totalGainLossPct}
-              portfolioTodayChange={portfolioTodayChange}
-            />
-          </div>
+      <div className="hidden gap-3 md:grid md:grid-cols-2 lg:grid-cols-4">
+        <PortfolioSummaryTiles
+          cash={cash}
+          assetsValue={assetsValue}
+          netWorth={netWorth}
+          totalGainLoss={totalGainLoss}
+          totalGainLossPct={totalGainLossPct}
+          portfolioTodayChange={portfolioTodayChange}
+        />
+      </div>
 
-          <aside className="hidden lg:sticky lg:top-6 lg:flex lg:flex-col lg:gap-3">
-            <PortfolioSummaryTiles
-              cash={cash}
-              assetsValue={assetsValue}
-              netWorth={netWorth}
-              totalGainLoss={totalGainLoss}
-              totalGainLossPct={totalGainLossPct}
-              portfolioTodayChange={portfolioTodayChange}
-            />
-          </aside>
-        </div>
-
-        <div className="min-w-0 space-y-8">
-          <div className="ui-hover-lift rounded-2xl border border-border bg-elevated p-3">
+      <div className="space-y-8">
+        <div className="ui-hover-lift rounded-2xl border border-border bg-elevated p-3">
             <div className="md:hidden">
               <button
                 type="button"
@@ -363,9 +349,9 @@ export default function PortfolioPage() {
                 </button>
               </div>
             </div>
-          </div>
+        </div>
 
-          <div className="ui-hover-lift overflow-x-auto rounded-2xl border border-border bg-elevated">
+        <div className="ui-hover-lift overflow-x-auto rounded-2xl border border-border bg-elevated">
             <table className="min-w-[980px] w-full text-sm">
               <colgroup>
                 <col style={{ width: "14%" }} />
@@ -461,32 +447,17 @@ export default function PortfolioPage() {
                   : "No holdings match your search."}
               </p>
             )}
-          </div>
-
-          <section className="ui-hover-lift rounded-2xl border border-border bg-elevated p-4 sm:p-5 md:block xl:hidden">
-            <h2 className="text-lg font-semibold text-foreground">Portfolio allocation</h2>
-            <p className="mt-1 text-sm text-subtle">
-              Market value by position and cash (largest slices first). Smaller positions may be grouped as Other.
-            </p>
-            <div className="mt-4">
-              <PortfolioAllocationChart stocks={stocks} cash={cash} />
-            </div>
-          </section>
         </div>
 
-        <aside className="hidden xl:block">
-          <div className="sticky top-6">
-            <section className="ui-hover-lift rounded-2xl border border-border bg-elevated p-4">
-              <h2 className="text-lg font-semibold text-foreground">Portfolio allocation</h2>
-              <p className="mt-1 text-sm text-subtle">
-                Market value by position and cash (largest slices first). Smaller positions may be grouped as Other.
-              </p>
-              <div className="mt-4">
-                <PortfolioAllocationChart stocks={stocks} cash={cash} />
-              </div>
-            </section>
+        <section className="ui-hover-lift hidden rounded-2xl border border-border bg-elevated p-4 sm:p-5 md:block">
+          <h2 className="text-lg font-semibold text-foreground">Portfolio allocation</h2>
+          <p className="mt-1 text-sm text-subtle">
+            Market value by position and cash (largest slices first). Smaller positions may be grouped as Other.
+          </p>
+          <div className="mt-4">
+            <PortfolioAllocationChart stocks={stocks} cash={cash} />
           </div>
-        </aside>
+        </section>
       </div>
     </div>
   );
