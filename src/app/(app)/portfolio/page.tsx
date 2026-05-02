@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { appCtaButton } from "@/lib/appCtaClasses";
+import { appCtaButton, glassFilterToggle } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { runRefreshPipeline } from "@/lib/refresh";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
@@ -267,11 +267,7 @@ export default function PortfolioPage() {
           <button
             type="button"
             onClick={() => setShowActionable((v) => !v)}
-            className={`rounded-full border px-3 py-2 text-xs font-semibold transition-colors ${
-              showActionable
-                ? "border-transparent bg-emerald-300 text-black"
-                : "border-border bg-background text-subtle hover:text-foreground"
-            }`}
+            className={glassFilterToggle(showActionable, "emerald")}
           >
             Show actionable stocks
           </button>
