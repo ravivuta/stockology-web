@@ -303,9 +303,6 @@ export default function PortfolioPage() {
             </button>
           </div>
         </div>
-        <p className="mt-2 text-xs text-subtle">
-          Search a stock first, then enter quantity and average cost to add or update the holding directly. CSV import and export are available in the top-right actions.
-        </p>
       </div>
 
       <div className="ui-hover-lift overflow-x-auto rounded-2xl border border-border bg-elevated">

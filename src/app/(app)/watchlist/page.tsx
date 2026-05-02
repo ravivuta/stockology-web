@@ -208,9 +208,6 @@ export default function WatchlistPage() {
             </button>
           </div>
         </div>
-        <p className="mt-2 text-xs text-subtle">
-          Add watch-only symbols here or filter the tracked list. Holdings stay on this list automatically.
-        </p>
       </div>
 
       <div className="w-full overflow-x-auto rounded-2xl border border-border bg-elevated">
