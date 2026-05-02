@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { computeRiskReturnScore } from "@/lib/ios-recommendation";
 import { buildRecommendation } from "@/lib/recommendation";
-import type { CsvImportRow } from "@/lib/csvPortfolio";
+import type { CsvImportRow, CsvImportTrade } from "@/lib/csvPortfolio";
 import { buildTradeJournalFromLots } from "@/lib/trade-journal-from-lots";
 
 export type LotStatus = "open" | "partiallySold" | "fullySold" | "washSaleRestricted";
@@ -126,12 +126,13 @@ type State = {
   resetAll: () => void;
   setOptimizing: (v: boolean) => void;
   setOnboardingComplete: (v: boolean) => void;
-  importCsvRows: (rows: CsvImportRow[], mode: "portfolio" | "watchlist") => {
+  importCsvRows: (rows: CsvImportRow[], mode: "portfolio" | "watchlist", trades?: CsvImportTrade[]) => {
     importType: "holdings" | "watchlist";
     importedSymbols: string[];
     importedCount: number;
     addedCount: number;
     prunedWatchlistCount: number;
+    importedTradeCount: number;
   };
   /** Replace local portfolio from a cloud snapshot (e.g. mobile sync). Recomputes recommendations. */
   replaceFromCloudSync: (payload: {
@@ -146,10 +147,8 @@ function uid() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-const UNKNOWN_PURCHASE_DATE_BASE_MS = Date.UTC(1970, 0, 1, 0, 0, 0, 0);
-
-function unknownPurchaseDateForOffset(offset: number): string {
-  return new Date(UNKNOWN_PURCHASE_DATE_BASE_MS + (offset * 1000)).toISOString();
+function defaultImportPurchaseDate(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function preserveImportedMetadata(existing: StockHolding | undefined) {
@@ -186,7 +185,6 @@ function buildImportedOpenLots(rows: CsvImportRow[]): {
 } {
   let totalQty = 0;
   let totalBasis = 0;
-  let unknownDateOffset = 0;
   const openLots: TradeLot[] = [];
 
   for (const row of rows) {
@@ -200,7 +198,7 @@ function buildImportedOpenLots(rows: CsvImportRow[]): {
       id: uid(),
       quantity: qty,
       costBasis: price,
-      purchaseDate: row.purchaseDate || unknownPurchaseDateForOffset(unknownDateOffset++),
+      purchaseDate: row.purchaseDate || defaultImportPurchaseDate(),
       account: row.account?.trim() || "",
       isRetirementAccount: row.isRetirementAccount ?? null,
       status: "open",
@@ -612,7 +610,7 @@ export const usePortfolioStore = create<State>()(
       },
       setOptimizing: (v) => set({ optimizing: v }),
       setOnboardingComplete: (v) => set({ onboardingComplete: v }),
-      importCsvRows: (rows, mode) => {
+      importCsvRows: (rows, mode, trades = []) => {
         const grouped = new Map<string, CsvImportRow[]>();
         for (const row of rows) {
           const symbol = row.symbol.toUpperCase();
@@ -621,7 +619,7 @@ export const usePortfolioStore = create<State>()(
           else grouped.set(symbol, [{ ...row, symbol }]);
         }
 
-        const importedSymbols = [...grouped.keys()].sort((a, b) => a.localeCompare(b));
+        const importedSymbols = [...new Set([...grouped.keys(), ...trades.map((trade) => trade.symbol.toUpperCase())])].sort((a, b) => a.localeCompare(b));
         const importedSymbolSet = new Set(importedSymbols);
         const holdingsSymbols = new Set<string>();
         for (const [symbol, symbolRows] of grouped.entries()) {
@@ -633,6 +631,7 @@ export const usePortfolioStore = create<State>()(
         const importType = mode === "watchlist" || holdingsSymbols.size === 0 ? "watchlist" : "holdings";
         let addedCount = 0;
         let prunedWatchlistCount = 0;
+        let importedTradeCount = 0;
 
         set((st) => {
           const keepExisting =
@@ -723,6 +722,27 @@ export const usePortfolioStore = create<State>()(
             if (!existing) addedCount += 1;
           }
 
+          if (mode === "portfolio") {
+            for (const trade of trades) {
+              const symbol = trade.symbol.toUpperCase();
+              const qty = Math.max(0, trade.qty);
+              const price = Math.max(0, trade.price);
+              if (qty <= 0) continue;
+              importedTradeCount += 1;
+
+              const bundle = lotsBySymbol[symbol] ?? { open: [], sold: [] };
+              const stock = stockMap.get(symbol);
+              const averageCost = stock?.averageCost ?? 0;
+              bundle.sold.unshift({
+                saleDate: trade.tradeDate || defaultImportPurchaseDate(),
+                quantity: qty,
+                salePrice: price,
+                realizedGainLoss: (price - averageCost) * qty,
+              });
+              lotsBySymbol[symbol] = bundle;
+            }
+          }
+
           const ctx: RecalcContext = {
             etfProfitTarget: st.etfProfitTarget,
             stockProfitTarget: st.stockProfitTarget,
@@ -745,6 +765,7 @@ export const usePortfolioStore = create<State>()(
           importedCount: importedSymbols.length,
           addedCount,
           prunedWatchlistCount,
+          importedTradeCount,
         };
       },
       replaceFromCloudSync: (payload) =>

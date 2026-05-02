@@ -1,7 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { usePortfolioStore } from "@/store/portfolioStore";
+import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
+import { upsertPortfolioSnapshotForCloudUser } from "@/lib/portfolio-cloud-sync";
+import { fetchTickerHydrationFromTables, type TickerHydrationPriceRow } from "@/lib/ticker-direct-hydration";
+import { usePortfolioStore, type StockHolding } from "@/store/portfolioStore";
 import {
   CSV_IMPORT_FIELDS,
   parsePortfolioCsv,
@@ -14,10 +18,13 @@ import {
   type CsvColumnMapping,
   type CsvColumnStandard,
   type CsvExportStock,
+  type CsvImportTrade,
   type CsvImportRow,
 } from "@/lib/csvPortfolio";
-import { runRefreshPipeline } from "@/lib/refresh";
 import { AppModal, ModalSection } from "@/components/ui/AppModal";
+import { parseStockPeg } from "@/lib/stock-metric-parse";
+
+const MAX_TRACKED_STOCKS = 200;
 
 const CSV_MAPPING_MEMORY_KEY = "stocks-pm-csv-mapping-memory:v1";
 const CSV_MAPPING_PRESETS_KEY = "stocks-pm-csv-mapping-presets:v1";
@@ -54,6 +61,43 @@ type SavedCsvMappingPreset = {
   defaultRetirementAccount: "no" | "yes";
   updatedAt: string;
 };
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+function mapHydrationRowToPatch(row: TickerHydrationPriceRow): Partial<StockHolding> {
+  const patch: Partial<StockHolding> = {};
+  if (row.last_price != null && Number.isFinite(Number(row.last_price))) patch.lastPrice = Number(row.last_price);
+  if (row.daily_pct_change != null && Number.isFinite(Number(row.daily_pct_change))) patch.dailyChangePercent = Number(row.daily_pct_change);
+  if (typeof row.company_name === "string" && row.company_name.trim()) patch.name = row.company_name.trim();
+  if (row.analyst_target != null) {
+    const target = Number(row.analyst_target);
+    if (Number.isFinite(target) && target > 0) patch.analystTarget = target;
+  }
+  if (row.analyst_average != null) {
+    if (typeof row.analyst_average === "number" && Number.isFinite(row.analyst_average)) patch.analystAvg = row.analyst_average.toFixed(2);
+    if (typeof row.analyst_average === "string" && row.analyst_average.trim()) {
+      const parsed = Number.parseFloat(row.analyst_average);
+      patch.analystAvg = Number.isFinite(parsed) ? parsed.toFixed(2) : row.analyst_average.trim();
+    }
+  }
+  if (row.market_cap != null) {
+    const marketCap = Number(row.market_cap);
+    if (Number.isFinite(marketCap) && marketCap > 0) patch.marketCap = marketCap;
+  }
+  const peg = parseStockPeg(row.peg_ratio);
+  if (peg !== undefined) patch.peg = peg;
+  if (row.beta != null) {
+    const beta = Number(row.beta);
+    if (Number.isFinite(beta)) patch.beta = beta;
+  }
+  if (row.is_etf === true) patch.isETF = true;
+  if (row.is_etf === false) patch.isETF = false;
+  return patch;
+}
 
 function loadSavedMappingMemory(): Partial<Record<string, CsvColumnStandard>> {
   if (typeof window === "undefined") return {};
@@ -153,6 +197,7 @@ export function CsvImportExportBar({
   const fileRef = useRef<HTMLInputElement>(null);
   const importCsvRows = usePortfolioStore((s) => s.importCsvRows);
   const recalc = usePortfolioStore((s) => s.recalcMetrics);
+  const updateStock = usePortfolioStore((s) => s.updateStock);
   const storeStocks = usePortfolioStore((s) => s.stocks);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
   const toExport = exportStocks ?? storeStocks;
@@ -173,11 +218,59 @@ export function CsvImportExportBar({
     setProgress({ active: false, label: "", value: 0 });
   }
 
+  async function hydrateImportedSymbols(symbols: string[]) {
+    if (!hasSupabaseConfig()) return;
+    const supabase = createClient();
+    for (const batch of chunk(symbols, 35)) {
+      const { prices, sentiment } = await fetchTickerHydrationFromTables(supabase, batch);
+      for (const sym of Object.keys(prices)) {
+        const priceRow = prices[sym];
+        if (!priceRow) continue;
+        const patch = mapHydrationRowToPatch(priceRow);
+        const sent = sentiment[sym];
+        if (sent?.sentiment_score != null && Number.isFinite(Number(sent.sentiment_score))) {
+          patch.aiSentimentScore = Number(sent.sentiment_score);
+        }
+        if (Object.keys(patch).length > 0) {
+          updateStock(sym, patch);
+        }
+      }
+    }
+  }
+
+  async function saveImportSnapshot() {
+    if (!hasSupabaseConfig()) return;
+    const supabase = createClient();
+    const { data } = await supabase.auth.getUser();
+    const authUserId = data.user?.id;
+    if (!authUserId) return;
+    const dataUserId = await resolveStocksPmDataUserId(supabase, authUserId);
+    const state = usePortfolioStore.getState();
+    await upsertPortfolioSnapshotForCloudUser(supabase, dataUserId, {
+      cashBalance: state.cashBalance,
+      stocks: state.stocks,
+      lotsBySymbol: state.lotsBySymbol,
+    });
+  }
+
   async function applyImport(
     rows: CsvImportRow[],
     skipped: string[],
-    defaults?: { defaultRetirementAccount?: boolean; defaultAccountName?: string }
+    defaults?: { defaultRetirementAccount?: boolean; defaultAccountName?: string },
+    importedTrades: CsvImportTrade[] = []
   ) {
+    const importedSymbols = [...new Set(rows.map((row) => row.symbol.toUpperCase()))];
+    const currentSymbols = new Set(storeStocks.map((stock) => stock.symbol.toUpperCase()));
+    const newSymbols = importedSymbols.filter((symbol) => !currentSymbols.has(symbol));
+    if (currentSymbols.size + newSymbols.length > MAX_TRACKED_STOCKS) {
+      const overflow = currentSymbols.size + newSymbols.length - MAX_TRACKED_STOCKS;
+      setFlash({
+        kind: "err",
+        text: `Cannot import: ${newSymbols.length} new stocks in this file would exceed the maximum tracked-stock limit of ${MAX_TRACKED_STOCKS} (currently have ${currentSymbols.size}). Remove at least ${overflow} stock(s) before importing.`,
+      });
+      return;
+    }
+
     updateImportProgress("Applying import", 58);
     const normalizedWithDefaults =
       defaults?.defaultRetirementAccount == null && !defaults?.defaultAccountName?.trim()
@@ -195,14 +288,17 @@ export function CsvImportExportBar({
     const normalizedRows = importMode === "watchlist" ? dedupeSymbolRows(rows) : rows;
     const outcome = importCsvRows(
       importMode === "watchlist" ? normalizedRows : normalizedWithDefaults,
-      importMode
+      importMode,
+      importedTrades
     );
 
     if (outcome.importedSymbols.length > 0) {
-      updateImportProgress("Refreshing imported symbols", 82);
-      await runRefreshPipeline(outcome.importedSymbols);
+      updateImportProgress("Loading market data", 76);
+      await hydrateImportedSymbols(outcome.importedSymbols);
       recalc();
       usePortfolioStore.setState({ lastRefreshAt: new Date().toISOString() });
+      updateImportProgress("Saving snapshot", 92);
+      await saveImportSnapshot();
     }
 
     const invalidNote =
@@ -226,7 +322,7 @@ export function CsvImportExportBar({
         : "";
     const typeLead =
       outcome.importType === "holdings"
-        ? `Merged ${outcome.importedCount} symbol(s) with the existing portfolio.`
+        ? `Merged ${outcome.importedCount} symbol(s) with the existing portfolio.${outcome.importedTradeCount > 0 ? ` Imported ${outcome.importedTradeCount} trade(s).` : ""}`
         : `Imported ${outcome.importedCount} watchlist symbol(s) into the portfolio tracker.`;
 
     setFlash({
@@ -245,20 +341,20 @@ export function CsvImportExportBar({
         try {
           beginImportProgress("Reading CSV file", 16);
           const text = String(reader.result ?? "");
-        if (importMode === "portfolio" && shouldShowCsvMapping(text)) {
-          const headers = extractCsvHeaders(text);
-          setSavedPresets(loadSavedMappingPresets());
-          setPendingMappingImport({
-            text,
-            headers,
-            mapping: suggestCsvColumnMapping(headers, loadSavedMappingMemory()),
-            defaultAccountName: "",
-            defaultRetirementAccount: "no",
-            savePreset: false,
-            presetName: "",
-          });
-          finishImportProgress();
-          return;
+          if (importMode === "portfolio" && shouldShowCsvMapping(text)) {
+            const headers = extractCsvHeaders(text);
+            setSavedPresets(loadSavedMappingPresets());
+            setPendingMappingImport({
+              text,
+              headers,
+              mapping: suggestCsvColumnMapping(headers, loadSavedMappingMemory()),
+              defaultAccountName: "",
+              defaultRetirementAccount: "no",
+              savePreset: false,
+              presetName: "",
+            });
+            finishImportProgress();
+            return;
           }
 
           updateImportProgress("Parsing CSV", 36);
@@ -268,8 +364,13 @@ export function CsvImportExportBar({
             finishImportProgress();
             return;
           }
-          await applyImport(res.rows, res.skipped);
+          await applyImport(res.rows, res.skipped, undefined, res.trades);
           updateImportProgress("Finishing import", 100);
+        } catch (error) {
+          setFlash({
+            kind: "err",
+            text: error instanceof Error ? error.message : "CSV import failed.",
+          });
         } finally {
           window.setTimeout(() => finishImportProgress(), 350);
         }
@@ -561,10 +662,16 @@ export function CsvImportExportBar({
                       pendingMappingImport.mapping.retirementAccount.toLowerCase() !== "none"
                         ? undefined
                         : pendingMappingImport.defaultRetirementAccount === "yes",
-                  }
-                );
+                  },
+                  res.trades
+                  );
                   updateImportProgress("Finishing import", 100);
                   setPendingMappingImport(null);
+                } catch (error) {
+                  setFlash({
+                    kind: "err",
+                    text: error instanceof Error ? error.message : "CSV import failed.",
+                  });
                 } finally {
                   window.setTimeout(() => finishImportProgress(), 350);
                 }
