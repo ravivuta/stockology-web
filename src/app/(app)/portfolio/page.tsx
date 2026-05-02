@@ -37,6 +37,14 @@ function recBadgeClass(action: string): string {
   return "bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary";
 }
 
+function recSymbolTextClass(action: string | undefined): string {
+  const u = action?.toUpperCase() ?? "";
+  if (u === "SELL") return "text-error dark:text-red-300";
+  if (u === "REDUCE") return "text-amber-700 dark:text-amber-200";
+  if (u === "BUY" || u === "ADD") return "text-primary dark:text-primary";
+  return "text-foreground dark:text-white";
+}
+
 export default function PortfolioPage() {
   const stocks = usePortfolioStore((s) => s.stocks);
   const cash = usePortfolioStore((s) => s.cashBalance);
@@ -355,7 +363,7 @@ export default function PortfolioPage() {
                     <div className="min-w-0">
                       <Link
                         href={`/stock/${encodeURIComponent(s.symbol)}`}
-                        className="ui-hover-text inline-flex max-w-full items-center justify-center gap-1 truncate font-medium text-foreground hover:underline"
+                        className={`ui-hover-text inline-flex max-w-full items-center justify-center gap-1 truncate font-medium hover:underline ${recSymbolTextClass(s.recommendation?.action)}`}
                       >
                         {s.symbol}
                       </Link>

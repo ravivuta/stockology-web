@@ -47,6 +47,14 @@ export default function WatchlistPage() {
     return normalized === "BUY" || normalized === "ADD" || normalized === "SELL" || normalized === "REDUCE";
   }
 
+  function recSymbolTextClass(action: string | undefined): string {
+    const normalized = action?.toUpperCase() ?? "";
+    if (normalized === "SELL") return "text-error dark:text-red-300";
+    if (normalized === "REDUCE") return "text-amber-700 dark:text-amber-200";
+    if (normalized === "BUY" || normalized === "ADD") return "text-primary dark:text-primary";
+    return "text-foreground dark:text-white";
+  }
+
   function toggleSort(next: SortKey) {
     if (sort === next) {
       setSortDirection((dir) => (dir === "asc" ? "desc" : "asc"));
@@ -247,7 +255,7 @@ export default function WatchlistPage() {
                     <td className="min-w-0 px-2 py-3 align-middle font-medium text-foreground sm:px-3">
                       <Link
                         href={`/stock/${encodeURIComponent(s.symbol)}`}
-                        className="ui-hover-text inline-flex max-w-full min-w-0 justify-center text-center text-primary hover:underline"
+                        className={`ui-hover-text inline-flex max-w-full min-w-0 justify-center text-center hover:underline ${recSymbolTextClass(s.recommendation?.action)}`}
                       >
                         <span className="min-w-0 truncate">{s.symbol}</span>
                       </Link>
