@@ -227,7 +227,7 @@ export default function WatchlistPage() {
             <tr>
               <SortableHeaderCell label="Symbol" column="symbol" activeColumn={sort} direction={sortDirection} onSort={toggleSort} className="px-2 py-3 pl-4 sm:px-3 sm:pl-5" />
               <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
-              <SortableHeaderCell label="Chg" column="change" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
+              <SortableHeaderCell label="Today %" column="change" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
               <SortableHeaderCell label="Analyst" column="analyst" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
               <SortableHeaderCell label="Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
               <SortableHeaderCell label="Cap" column="marketCap" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />

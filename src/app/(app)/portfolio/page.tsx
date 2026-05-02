@@ -296,7 +296,7 @@ export default function PortfolioPage() {
               <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
               <SortableHeaderCell label="Value" column="value" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
               <SortableHeaderCell label="P/L" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
-              <SortableHeaderCell label="Today" column="today" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
+              <SortableHeaderCell label="Today %" column="today" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
               <SortableHeaderCell label="Signal" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} />
             </tr>
           </thead>
