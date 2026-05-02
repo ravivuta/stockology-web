@@ -47,6 +47,7 @@ export default function PortfolioPage() {
   const [sort, setSort] = useState<SortKey>("symbol");
   const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION.symbol);
   const [query, setQuery] = useState("");
+  const [showActionable, setShowActionable] = useState(false);
   const [newSymbol, setNewSymbol] = useState("");
   const [newQuantity, setNewQuantity] = useState("1");
   const [newAverageCost, setNewAverageCost] = useState("");
@@ -54,6 +55,12 @@ export default function PortfolioPage() {
 
   /** Portfolio page lists positions only; watchlist-only symbols (0 qty) stay in store for trading elsewhere. */
   const holdings = useMemo(() => stocks.filter((s) => s.quantity > 0), [stocks]);
+
+  function isActionable(action: string | undefined): boolean {
+    if (!action) return false;
+    const normalized = action.toUpperCase();
+    return normalized === "BUY" || normalized === "ADD" || normalized === "SELL" || normalized === "REDUCE";
+  }
 
   function toggleSort(next: SortKey) {
     if (sort === next) {
@@ -67,6 +74,7 @@ export default function PortfolioPage() {
   const rows = useMemo(() => {
     let r = [...holdings];
     const q = query.trim().toUpperCase();
+    if (showActionable) r = r.filter((s) => isActionable(s.recommendation?.action));
     if (q) r = r.filter((s) => s.symbol.includes(q));
     r.sort((a, b) => {
       const valueA = a.quantity * (a.lastPrice ?? 0);
@@ -113,7 +121,7 @@ export default function PortfolioPage() {
       return sortDirection === "asc" ? cmp : -cmp;
     });
     return r;
-  }, [holdings, query, sort, sortDirection]);
+  }, [holdings, query, showActionable, sort, sortDirection]);
 
   const { assetsValue, netWorth, portfolioTodayChange } = useMemo(() => {
     const assets = stocks.reduce((a, s) => a + s.quantity * (s.lastPrice ?? 0), 0);
@@ -229,10 +237,21 @@ export default function PortfolioPage() {
               className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
             />
           </label>
+          <button
+            type="button"
+            onClick={() => setShowActionable((v) => !v)}
+            className={`rounded-full border px-3 py-2 text-xs font-semibold transition-colors ${
+              showActionable
+                ? "border-transparent bg-emerald-300 text-black"
+                : "border-border bg-background text-subtle hover:text-foreground"
+            }`}
+          >
+            Show actionable stocks
+          </button>
           <div className="hidden h-10 w-px self-end bg-border/80 dark:bg-white/[0.08] md:block" aria-hidden />
           <div className="flex min-w-[18rem] flex-1 flex-wrap items-end gap-2">
             <label className="flex min-w-[11rem] flex-[1.5] flex-col gap-1 text-[11px] text-subtle">
-              Search stock
+              Add New Stock/Holding
               <SymbolTradeCombobox
                 id="portfolio-add-holding-symbol"
                 value={newSymbol}
