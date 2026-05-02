@@ -436,7 +436,7 @@ export default function PortfolioPage() {
                               : "text-subtle"
                         }`}
                       >
-                        {formatSignedCurrency(gainLoss)}
+                        {formatWholeCurrency(Math.abs(gainLoss))}
                         {gainLossPct != null ? ` (${formatPercent(gainLossPct, true)})` : ""}
                       </td>
                       <td className={`px-4 py-3 text-center tabular-nums font-medium ${upside == null ? "text-subtle" : upside > 0 ? "text-emerald-700 dark:text-primary" : upside < 0 ? "text-red-700 dark:text-red-400" : "text-subtle"}`}>
