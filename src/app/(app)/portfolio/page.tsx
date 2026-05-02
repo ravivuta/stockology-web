@@ -14,7 +14,7 @@ import { formatCurrency, formatNumberMax2, formatPercent, formatSignedCurrency, 
 import { recommendationActionDisplay } from "@/lib/recommendation";
 import { computeTodayChangeFromLiveQuotes } from "@/lib/portfolio-net-worth-series";
 
-type SortKey = "symbol" | "quantity" | "averageCost" | "costBasis" | "lastPrice" | "value" | "gainLoss" | "today" | "signal";
+type SortKey = "symbol" | "quantity" | "averageCost" | "costBasis" | "lastPrice" | "value" | "gainLoss" | "gainLossPct" | "today" | "signal";
 
 const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
   symbol: "asc",
@@ -24,6 +24,7 @@ const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
   lastPrice: "desc",
   value: "desc",
   gainLoss: "desc",
+  gainLossPct: "desc",
   today: "desc",
   signal: "asc",
 };
@@ -158,6 +159,8 @@ export default function PortfolioPage() {
       const costBasisB = b.quantity * b.averageCost;
       const gainLossA = valueA - costBasisA;
       const gainLossB = valueB - costBasisB;
+      const gainLossPctA = costBasisA > 0 ? (gainLossA / costBasisA) * 100 : Number.NEGATIVE_INFINITY;
+      const gainLossPctB = costBasisB > 0 ? (gainLossB / costBasisB) * 100 : Number.NEGATIVE_INFINITY;
       const todayA = a.dailyChangePercent ?? Number.NEGATIVE_INFINITY;
       const todayB = b.dailyChangePercent ?? Number.NEGATIVE_INFINITY;
 
@@ -183,6 +186,9 @@ export default function PortfolioPage() {
           break;
         case "gainLoss":
           cmp = gainLossA - gainLossB;
+          break;
+        case "gainLossPct":
+          cmp = gainLossPctA - gainLossPctB;
           break;
         case "today":
           cmp = todayA - todayB;
@@ -352,7 +358,7 @@ export default function PortfolioPage() {
         </div>
 
         <div className="ui-hover-lift overflow-x-auto rounded-2xl border border-border bg-elevated">
-            <table className="min-w-[980px] w-full text-sm">
+            <table className="min-w-[1060px] w-full text-sm">
               <colgroup>
                 <col style={{ width: "14%" }} />
                 <col style={{ width: "8%" }} />
@@ -360,9 +366,10 @@ export default function PortfolioPage() {
                 <col style={{ width: "7%" }} />
                 <col style={{ width: "10%" }} />
                 <col style={{ width: "10%" }} />
-                <col style={{ width: "17%" }} />
                 <col style={{ width: "12%" }} />
-                <col style={{ width: "12%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "9%" }} />
+                <col style={{ width: "10%" }} />
               </colgroup>
               <thead className="bg-muted/60 text-subtle dark:bg-white/[0.05]">
                 <tr>
@@ -373,7 +380,8 @@ export default function PortfolioPage() {
                   <SortableHeaderCell label="Avg" column="averageCost" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
                   <SortableHeaderCell label="Costbasis" column="costBasis" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
                   <SortableHeaderCell label="Current Value" column="value" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
-                  <SortableHeaderCell label="P/L" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
+                  <SortableHeaderCell label="P/L $" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
+                  <SortableHeaderCell label="P/L %" column="gainLossPct" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
                   <SortableHeaderCell label="Recommendation" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
                 </tr>
               </thead>
@@ -421,7 +429,17 @@ export default function PortfolioPage() {
                         }`}
                       >
                         {formatSignedCurrency(gainLoss)}
-                        {gainLossPct != null ? ` (${formatPercent(gainLossPct, true)})` : ""}
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-center tabular-nums font-medium ${
+                          gainLoss > 0
+                            ? "text-emerald-700 dark:text-primary"
+                            : gainLoss < 0
+                              ? "text-red-700 dark:text-red-400"
+                              : "text-subtle"
+                        }`}
+                      >
+                        {gainLossPct != null ? formatPercent(gainLossPct, true) : "—"}
                       </td>
                       <td className="px-4 py-3 align-middle text-center">
                         {s.recommendation ? (
