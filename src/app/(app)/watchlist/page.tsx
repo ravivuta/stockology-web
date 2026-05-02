@@ -8,6 +8,7 @@ import { runRefreshPipeline } from "@/lib/refresh";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
 import { formatCurrency, formatDecimal, formatPercent } from "@/lib/numberFormat";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
+import { SymbolTradeCombobox } from "@/components/portfolio/SymbolTradeCombobox";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
 
@@ -61,7 +62,7 @@ export default function WatchlistPage() {
     const q = query.trim().toUpperCase();
     const filtered = stocks
       .filter((s) => {
-        if (showShortlisted && !s.isShortlisted) return false;
+        if (showShortlisted && (!s.isShortlisted || s.quantity > 0)) return false;
         if (showActionable && !isActionable(s.recommendation?.action)) return false;
         if (!q) return true;
         return (
@@ -191,12 +192,11 @@ export default function WatchlistPage() {
           <div className="ml-auto flex flex-wrap items-end gap-2">
             <label className="flex min-w-[9rem] flex-col gap-1 text-[11px] text-subtle">
               Add symbol
-              <input
+              <SymbolTradeCombobox
+                id="watchlist-add-symbol"
                 value={newSymbol}
-                onChange={(e) => setNewSymbol(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addWatchlistSymbol()}
-                placeholder="AAPL"
-                className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                onChange={setNewSymbol}
+                portfolioStocks={stocks}
               />
             </label>
             <button
