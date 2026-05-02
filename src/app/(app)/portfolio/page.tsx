@@ -397,6 +397,7 @@ export default function PortfolioPage() {
                   const value = s.quantity * (s.lastPrice ?? 0);
                   const costBasis = s.quantity * s.averageCost;
                   const gainLoss = value - costBasis;
+                  const gainLossPct = costBasis > 0 ? (gainLoss / costBasis) * 100 : null;
                   const upside = analystTargetUpsidePct(s.lastPrice, s.analystTarget);
                   const d = s.dailyChangePercent;
                   return (
@@ -436,6 +437,7 @@ export default function PortfolioPage() {
                         }`}
                       >
                         {formatSignedCurrency(gainLoss)}
+                        {gainLossPct != null ? ` (${formatPercent(gainLossPct, true)})` : ""}
                       </td>
                       <td className={`px-4 py-3 text-center tabular-nums font-medium ${upside == null ? "text-subtle" : upside > 0 ? "text-emerald-700 dark:text-primary" : upside < 0 ? "text-red-700 dark:text-red-400" : "text-subtle"}`}>
                         {formatUpsidePct(upside)}
