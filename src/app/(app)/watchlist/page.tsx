@@ -155,24 +155,6 @@ export default function WatchlistPage() {
 
       <div className="ui-hover-lift rounded-2xl border border-border bg-elevated p-3">
         <div className="flex flex-wrap items-end gap-2">
-          <label className="flex min-w-[9rem] flex-col gap-1 text-[11px] text-subtle">
-            Add symbol
-            <input
-              value={newSymbol}
-              onChange={(e) => setNewSymbol(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addWatchlistSymbol()}
-              placeholder="AAPL"
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-            />
-          </label>
-          <button
-            type="button"
-            onClick={addWatchlistSymbol}
-            className={appCtaButton("ui-hover-pop px-3 py-2 text-sm")}
-          >
-            Add
-          </button>
-          <div className="hidden h-10 w-px self-end bg-border/80 dark:bg-white/[0.08] md:block" aria-hidden />
           <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-[11px] text-subtle sm:max-w-xs">
             Filter
             <input
@@ -205,6 +187,26 @@ export default function WatchlistPage() {
           >
             Show actionable
           </button>
+          <div className="hidden h-10 w-px self-end bg-border/80 dark:bg-white/[0.08] md:block" aria-hidden />
+          <div className="ml-auto flex flex-wrap items-end gap-2">
+            <label className="flex min-w-[9rem] flex-col gap-1 text-[11px] text-subtle">
+              Add symbol
+              <input
+                value={newSymbol}
+                onChange={(e) => setNewSymbol(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addWatchlistSymbol()}
+                placeholder="AAPL"
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={addWatchlistSymbol}
+              className={appCtaButton("ui-hover-pop px-3 py-2 text-sm")}
+            >
+              Add
+            </button>
+          </div>
         </div>
         <p className="mt-2 text-xs text-subtle">
           Add watch-only symbols here or filter the tracked list. Holdings stay on this list automatically.
@@ -231,7 +233,7 @@ export default function WatchlistPage() {
               <SortableHeaderCell label="Analyst Rating" column="analyst" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
               <SortableHeaderCell label="Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
               <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
-              <SortableHeaderCell label="Signal" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} className="min-w-0 px-2 py-3 sm:px-3" />
+              <SortableHeaderCell label="Recommendation" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} className="min-w-0 px-2 py-3 sm:px-3" />
               <th scope="col" className="px-2 py-3 pr-4 text-right sm:px-3 sm:pr-5">
                 <span className="sr-only">Actions</span>
               </th>

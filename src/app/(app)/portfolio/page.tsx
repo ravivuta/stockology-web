@@ -264,18 +264,8 @@ export default function PortfolioPage() {
             Show actionable stocks
           </button>
           <div className="hidden h-10 w-px self-end bg-border/80 dark:bg-white/[0.08] md:block" aria-hidden />
-          <div className="flex min-w-[18rem] flex-1 flex-wrap items-end gap-2">
-            <label className="flex w-[6.5rem] flex-col gap-1 text-[11px] text-subtle">
-              Qty
-              <input
-                value={newQuantity}
-                onChange={(e) => setNewQuantity(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addHolding()}
-                placeholder="1"
-                className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-              />
-            </label>
-            <label className="flex min-w-[11rem] flex-[1.5] flex-col gap-1 text-[11px] text-subtle">
+          <div className="grid min-w-[18rem] flex-1 items-end gap-2 sm:grid-cols-[minmax(11rem,1.5fr)_7.5rem_6.5rem_auto]">
+            <label className="flex min-w-0 flex-col gap-1 text-[11px] text-subtle">
               Add New Stock/Holding
               <SymbolTradeCombobox
                 id="portfolio-add-holding-symbol"
@@ -284,13 +274,23 @@ export default function PortfolioPage() {
                 portfolioStocks={stocks}
               />
             </label>
-            <label className="flex w-[7.5rem] flex-col gap-1 text-[11px] text-subtle">
+            <label className="flex min-w-0 flex-col gap-1 text-[11px] text-subtle">
               Avg cost
               <input
                 value={newAverageCost}
                 onChange={(e) => setNewAverageCost(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && addHolding()}
                 placeholder="100"
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+              />
+            </label>
+            <label className="flex min-w-0 flex-col gap-1 text-[11px] text-subtle">
+              Qty
+              <input
+                value={newQuantity}
+                onChange={(e) => setNewQuantity(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addHolding()}
+                placeholder="1"
                 className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
               />
             </label>
@@ -331,7 +331,7 @@ export default function PortfolioPage() {
               <SortableHeaderCell label="Basis" column="costBasis" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
               <SortableHeaderCell label="Value" column="value" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
               <SortableHeaderCell label="P/L" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
-              <SortableHeaderCell label="Signal" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} />
+              <SortableHeaderCell label="Recommendation" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} />
             </tr>
           </thead>
           <tbody>

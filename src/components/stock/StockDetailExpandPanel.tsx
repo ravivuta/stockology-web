@@ -373,6 +373,22 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
           dense ? "space-y-3 px-3 py-3" : "max-h-[min(72vh,920px)] space-y-5 overflow-y-auto px-5 py-5"
         )}
       >
+        <SectionCard
+          compact={dense}
+          title="Price chart"
+          description="Choose a range (1w–5y). The dashed line is your average cost when you hold a position."
+        >
+          <StockHistoricalChart
+            symbol={stock.symbol}
+            smaPeriod={stock.shortSMA}
+            averageCost={hasPosition && stock.averageCost > 0 ? stock.averageCost : null}
+            points={points}
+            loading={histLoading}
+            error={histError}
+            compact={dense}
+          />
+        </SectionCard>
+
         {/* At-a-glance: position or watch-only */}
         {hasPosition ? (
           <div>
@@ -440,7 +456,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
           </div>
         )}
 
-        <div className={cn("grid items-start", dense ? "gap-3" : "gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(19rem,0.95fr)]")}>
+        <div className={cn("grid items-start", dense ? "gap-3" : "gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(21rem,1fr)] 2xl:grid-cols-[minmax(0,1.55fr)_minmax(23rem,1fr)]")}>
           <div className={dense ? "space-y-3" : "space-y-5"}>
             <SectionCard
               compact={dense}
@@ -499,7 +515,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                           {recommendationFactors.filter((factor) => factor.passes).length}/{recommendationFactors.length} passed
                         </span>
                       </div>
-                      <div className={dense ? "mt-3 space-y-2" : "mt-4 space-y-2.5"}>
+                      <div className={cn("grid sm:grid-cols-2", dense ? "mt-3 gap-2" : "mt-4 gap-2.5")}>
                         {recommendationFactors.map((factor) => (
                           <FactorFlagRow
                             key={`${factor.label}-${factor.detail}`}
@@ -546,22 +562,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                   No recommendation yet — refresh quotes from Portfolio or Dashboard.
                 </p>
               )}
-            </SectionCard>
-
-            <SectionCard
-              compact={dense}
-              title="Price chart"
-              description="Choose a range (1w–5y). The dashed line is your average cost when you hold a position."
-            >
-              <StockHistoricalChart
-                symbol={stock.symbol}
-                smaPeriod={stock.shortSMA}
-                averageCost={hasPosition && stock.averageCost > 0 ? stock.averageCost : null}
-                points={points}
-                loading={histLoading}
-                error={histError}
-                compact={dense}
-              />
             </SectionCard>
           </div>
 
@@ -912,26 +912,26 @@ function FactorFlagRow({
   return (
     <div
       className={cn(
-        "flex items-start justify-between gap-3 rounded-lg border",
+        "rounded-xl border",
         passes
           ? "border-emerald-500/25 bg-emerald-500/10"
           : "border-amber-500/25 bg-amber-500/10",
-        compact ? "px-2.5 py-2" : "px-3 py-2.5"
+        compact ? "px-2.5 py-2" : "px-3.5 py-3"
       )}
     >
-      <div className="min-w-0 flex-1">
-        <p className={cn("font-semibold text-foreground", compact ? "text-xs" : "text-sm")}>{label}</p>
-        <p className={cn("leading-snug text-subtle", compact ? "mt-0.5 text-[10px]" : "mt-1 text-xs")}>{detail}</p>
+      <div className="flex items-start justify-between gap-3">
+        <p className={cn("min-w-0 flex-1 font-semibold text-foreground", compact ? "text-xs" : "text-sm")}>{label}</p>
+        <span
+          className={cn(
+            "shrink-0 rounded-full px-2 py-1 font-semibold uppercase tracking-[0.12em]",
+            passes ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+            compact ? "text-[9px]" : "text-[10px]"
+          )}
+        >
+          {passes ? "Pass" : "Blocked"}
+        </span>
       </div>
-      <span
-        className={cn(
-          "shrink-0 rounded-full px-2 py-1 font-semibold uppercase tracking-[0.12em]",
-          passes ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-          compact ? "text-[9px]" : "text-[10px]"
-        )}
-      >
-        {passes ? "Pass" : "Blocked"}
-      </span>
+      <p className={cn("leading-snug text-subtle", compact ? "mt-1.5 text-[10px]" : "mt-2 text-xs")}>{detail}</p>
     </div>
   );
 }
