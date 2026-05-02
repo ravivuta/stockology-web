@@ -5,16 +5,17 @@ import Link from "next/link";
 import { appCtaButton, glassFilterToggle } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { runRefreshPipeline } from "@/lib/refresh";
+import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
 import { PortfolioAllocationChart } from "@/components/portfolio/PortfolioAllocationChart";
 import { SymbolTradeCombobox } from "@/components/portfolio/SymbolTradeCombobox";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
 import { isValidTicker } from "@/lib/csvPortfolio";
-import { formatCurrency, formatNumberMax2, formatPercent, formatSignedCurrency, formatWholeCurrency } from "@/lib/numberFormat";
+import { formatCurrency, formatDecimal, formatNumberMax2, formatPercent, formatSignedCurrency, formatWholeCurrency } from "@/lib/numberFormat";
 import { recommendationActionDisplay } from "@/lib/recommendation";
 import { computeTodayChangeFromLiveQuotes } from "@/lib/portfolio-net-worth-series";
 
-type SortKey = "symbol" | "quantity" | "averageCost" | "costBasis" | "lastPrice" | "value" | "gainLoss" | "gainLossPct" | "today" | "signal";
+type SortKey = "symbol" | "quantity" | "averageCost" | "costBasis" | "lastPrice" | "value" | "gainLoss" | "upside" | "score" | "today" | "signal";
 
 const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
   symbol: "asc",
@@ -24,7 +25,8 @@ const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
   lastPrice: "desc",
   value: "desc",
   gainLoss: "desc",
-  gainLossPct: "desc",
+  upside: "desc",
+  score: "desc",
   today: "desc",
   signal: "asc",
 };
@@ -159,8 +161,8 @@ export default function PortfolioPage() {
       const costBasisB = b.quantity * b.averageCost;
       const gainLossA = valueA - costBasisA;
       const gainLossB = valueB - costBasisB;
-      const gainLossPctA = costBasisA > 0 ? (gainLossA / costBasisA) * 100 : Number.NEGATIVE_INFINITY;
-      const gainLossPctB = costBasisB > 0 ? (gainLossB / costBasisB) * 100 : Number.NEGATIVE_INFINITY;
+      const upsideA = analystTargetUpsidePct(a.lastPrice, a.analystTarget);
+      const upsideB = analystTargetUpsidePct(b.lastPrice, b.analystTarget);
       const todayA = a.dailyChangePercent ?? Number.NEGATIVE_INFINITY;
       const todayB = b.dailyChangePercent ?? Number.NEGATIVE_INFINITY;
 
@@ -187,8 +189,11 @@ export default function PortfolioPage() {
         case "gainLoss":
           cmp = gainLossA - gainLossB;
           break;
-        case "gainLossPct":
-          cmp = gainLossPctA - gainLossPctB;
+        case "upside":
+          cmp = (upsideA ?? Number.NEGATIVE_INFINITY) - (upsideB ?? Number.NEGATIVE_INFINITY);
+          break;
+        case "score":
+          cmp = (a.score ?? Number.NEGATIVE_INFINITY) - (b.score ?? Number.NEGATIVE_INFINITY);
           break;
         case "today":
           cmp = todayA - todayB;
@@ -358,17 +363,18 @@ export default function PortfolioPage() {
         </div>
 
         <div className="ui-hover-lift overflow-x-auto rounded-2xl border border-border bg-elevated">
-            <table className="min-w-[1060px] w-full text-sm">
+            <table className="min-w-[1180px] w-full text-sm">
               <colgroup>
-                <col style={{ width: "14%" }} />
+                <col style={{ width: "13%" }} />
                 <col style={{ width: "8%" }} />
                 <col style={{ width: "8%" }} />
                 <col style={{ width: "7%" }} />
-                <col style={{ width: "10%" }} />
-                <col style={{ width: "10%" }} />
-                <col style={{ width: "12%" }} />
-                <col style={{ width: "10%" }} />
                 <col style={{ width: "9%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "11%" }} />
+                <col style={{ width: "7%" }} />
+                <col style={{ width: "7%" }} />
                 <col style={{ width: "10%" }} />
               </colgroup>
               <thead className="bg-muted/60 text-subtle dark:bg-white/[0.05]">
@@ -380,8 +386,9 @@ export default function PortfolioPage() {
                   <SortableHeaderCell label="Avg" column="averageCost" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
                   <SortableHeaderCell label="Costbasis" column="costBasis" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
                   <SortableHeaderCell label="Current Value" column="value" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
-                  <SortableHeaderCell label="P/L $" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
-                  <SortableHeaderCell label="P/L %" column="gainLossPct" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
+                  <SortableHeaderCell label="P/L" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
+                  <SortableHeaderCell label="Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
+                  <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
                   <SortableHeaderCell label="Recommendation" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
                 </tr>
               </thead>
@@ -390,7 +397,7 @@ export default function PortfolioPage() {
                   const value = s.quantity * (s.lastPrice ?? 0);
                   const costBasis = s.quantity * s.averageCost;
                   const gainLoss = value - costBasis;
-                  const gainLossPct = costBasis > 0 ? (gainLoss / costBasis) * 100 : null;
+                  const upside = analystTargetUpsidePct(s.lastPrice, s.analystTarget);
                   const d = s.dailyChangePercent;
                   return (
                     <tr
@@ -430,17 +437,10 @@ export default function PortfolioPage() {
                       >
                         {formatSignedCurrency(gainLoss)}
                       </td>
-                      <td
-                        className={`px-4 py-3 text-center tabular-nums font-medium ${
-                          gainLoss > 0
-                            ? "text-emerald-700 dark:text-primary"
-                            : gainLoss < 0
-                              ? "text-red-700 dark:text-red-400"
-                              : "text-subtle"
-                        }`}
-                      >
-                        {gainLossPct != null ? formatPercent(gainLossPct, true) : "—"}
+                      <td className={`px-4 py-3 text-center tabular-nums font-medium ${upside == null ? "text-subtle" : upside > 0 ? "text-emerald-700 dark:text-primary" : upside < 0 ? "text-red-700 dark:text-red-400" : "text-subtle"}`}>
+                        {formatUpsidePct(upside)}
                       </td>
+                      <td className="px-4 py-3 text-center tabular-nums text-foreground">{s.score != null ? formatDecimal(s.score) : "—"}</td>
                       <td className="px-4 py-3 align-middle text-center">
                         {s.recommendation ? (
                           <span
