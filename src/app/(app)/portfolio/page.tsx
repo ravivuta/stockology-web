@@ -278,25 +278,25 @@ export default function PortfolioPage() {
         <table className="w-full table-fixed text-sm">
           <colgroup>
             <col style={{ width: "14%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "8%" }} />
             <col style={{ width: "7%" }} />
-            <col style={{ width: "8%" }} />
             <col style={{ width: "10%" }} />
-            <col style={{ width: "8%" }} />
             <col style={{ width: "10%" }} />
             <col style={{ width: "17%" }} />
-            <col style={{ width: "8%" }} />
+            <col style={{ width: "12%" }} />
             <col style={{ width: "12%" }} />
           </colgroup>
           <thead className="bg-muted/60 text-subtle dark:bg-white/[0.05]">
             <tr>
               <SortableHeaderCell label="Symbol" column="symbol" activeColumn={sort} direction={sortDirection} onSort={toggleSort} />
+              <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
+              <SortableHeaderCell label="Chg" column="today" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
               <SortableHeaderCell label="Qty" column="quantity" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
               <SortableHeaderCell label="Avg" column="averageCost" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
               <SortableHeaderCell label="Basis" column="costBasis" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
-              <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
               <SortableHeaderCell label="Value" column="value" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
               <SortableHeaderCell label="P/L" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
-              <SortableHeaderCell label="Today %" column="today" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" />
               <SortableHeaderCell label="Signal" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} />
             </tr>
           </thead>
@@ -323,10 +323,17 @@ export default function PortfolioPage() {
                       </Link>
                     </div>
                   </td>
+                  <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatCurrency(s.lastPrice ?? 0)}</td>
+                  <td
+                    className={`px-4 py-3 text-right tabular-nums font-medium ${
+                      d == null ? "text-subtle" : d > 0 ? "text-emerald-700 dark:text-primary" : d < 0 ? "text-red-700 dark:text-red-400" : "text-subtle"
+                    }`}
+                  >
+                    {d != null && Number.isFinite(d) ? formatPercent(d, true) : "—"}
+                  </td>
                   <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatNumberMax2(s.quantity)}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatCurrency(s.averageCost)}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatCurrency(costBasis)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-foreground">{formatCurrency(s.lastPrice ?? 0)}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-foreground">
                     {formatCurrency(value)}
                     {valueWeightPct != null ? ` (${formatPercent(valueWeightPct)})` : ""}
@@ -342,13 +349,6 @@ export default function PortfolioPage() {
                   >
                     {formatSignedCurrency(gainLoss)}
                     {gainLossPct != null ? ` (${formatPercent(gainLossPct, true)})` : ""}
-                  </td>
-                  <td
-                    className={`px-4 py-3 text-right tabular-nums font-medium ${
-                      d == null ? "text-subtle" : d > 0 ? "text-emerald-700 dark:text-primary" : d < 0 ? "text-red-700 dark:text-red-400" : "text-subtle"
-                    }`}
-                  >
-                    {d != null && Number.isFinite(d) ? formatPercent(d, true) : "—"}
                   </td>
                   <td className="px-4 py-3 align-middle">
                     {s.recommendation ? (

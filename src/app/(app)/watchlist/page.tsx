@@ -5,13 +5,13 @@ import Link from "next/link";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { runRefreshPipeline } from "@/lib/refresh";
-import { analystTargetUpsidePct, formatMarketCapCompact, formatUpsidePct } from "@/lib/marketFormat";
+import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
 import { formatCurrency, formatDecimal, formatPercent } from "@/lib/numberFormat";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
 
-type SortKey = "symbol" | "lastPrice" | "change" | "analyst" | "upside" | "marketCap" | "signal";
+type SortKey = "symbol" | "lastPrice" | "change" | "analyst" | "upside" | "score" | "signal";
 
 const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
   symbol: "asc",
@@ -19,7 +19,7 @@ const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
   change: "desc",
   analyst: "desc",
   upside: "desc",
-  marketCap: "desc",
+  score: "desc",
   signal: "asc",
 };
 
@@ -93,8 +93,8 @@ export default function WatchlistPage() {
         case "upside":
           cmp = (upsideA ?? Number.NEGATIVE_INFINITY) - (upsideB ?? Number.NEGATIVE_INFINITY);
           break;
-        case "marketCap":
-          cmp = (a.marketCap ?? Number.NEGATIVE_INFINITY) - (b.marketCap ?? Number.NEGATIVE_INFINITY);
+        case "score":
+          cmp = (a.score ?? Number.NEGATIVE_INFINITY) - (b.score ?? Number.NEGATIVE_INFINITY);
           break;
         case "signal":
           cmp = (a.recommendation?.action ?? "").localeCompare(b.recommendation?.action ?? "");
@@ -192,7 +192,7 @@ export default function WatchlistPage() {
                 : "border-border bg-background text-subtle hover:text-foreground"
             }`}
           >
-            Shortlisted
+            Show shortlisted
           </button>
           <button
             type="button"
@@ -203,7 +203,7 @@ export default function WatchlistPage() {
                 : "border-border bg-background text-subtle hover:text-foreground"
             }`}
           >
-            Actionable
+            Show actionable
           </button>
         </div>
         <p className="mt-2 text-xs text-subtle">
@@ -228,9 +228,9 @@ export default function WatchlistPage() {
               <SortableHeaderCell label="Symbol" column="symbol" activeColumn={sort} direction={sortDirection} onSort={toggleSort} className="px-2 py-3 pl-4 sm:px-3 sm:pl-5" />
               <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
               <SortableHeaderCell label="Today %" column="change" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
-              <SortableHeaderCell label="Analyst" column="analyst" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
+              <SortableHeaderCell label="Analyst Rating" column="analyst" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
               <SortableHeaderCell label="Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
-              <SortableHeaderCell label="Cap" column="marketCap" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
+              <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="right" className="px-2 py-3 sm:px-3" />
               <SortableHeaderCell label="Signal" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} className="min-w-0 px-2 py-3 sm:px-3" />
               <th scope="col" className="px-2 py-3 pr-4 text-right sm:px-3 sm:pr-5">
                 <span className="sr-only">Actions</span>
@@ -284,7 +284,7 @@ export default function WatchlistPage() {
                       <span className="block truncate">{formatUpsidePct(upside)}</span>
                     </td>
                     <td className="min-w-0 px-2 py-3 text-right tabular-nums text-subtle sm:px-3">
-                      <span className="block truncate">{formatMarketCapCompact(s.marketCap)}</span>
+                      <span className="block truncate">{s.score != null ? formatDecimal(s.score) : "—"}</span>
                     </td>
                     <td className="min-w-0 px-2 py-3 text-left text-xs text-subtle sm:px-3">
                       <span className="block truncate" title={s.recommendation?.action ?? undefined}>
