@@ -62,6 +62,15 @@ type SavedCsvMappingPreset = {
   updatedAt: string;
 };
 
+function describeRetirementSetting(value: "no" | "yes"): string {
+  return value === "yes" ? "Retirement" : "Non-retirement";
+}
+
+function describePreset(preset: SavedCsvMappingPreset): string {
+  const accountName = preset.defaultAccountName.trim() || "No default account name";
+  return `${accountName} • ${describeRetirementSetting(preset.defaultRetirementAccount)}`;
+}
+
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
@@ -457,102 +466,74 @@ export function CsvImportExportBar({
         </ModalSection>
         <ModalSection className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <div className="space-y-3">
-            {CSV_IMPORT_FIELDS.map((field) => (
-              <div key={field.key} className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
+            <div className="rounded-2xl border border-border/80 bg-background/60 p-3">
+              <div className="flex flex-col gap-3">
                 <div>
-                  <p className="text-sm font-medium text-foreground">
-                    {field.label}
-                    {field.required ? " *" : ""}
-                  </p>
-                  <p className="mt-1 text-xs text-subtle">{field.description}</p>
+                  <p className="text-sm font-medium text-foreground">Saved Mappings</p>
+                  <p className="mt-1 text-xs text-subtle">Apply a previously saved mapping profile, including account name and retirement type defaults, before reviewing the column matches.</p>
                 </div>
-                <select
-                  value={pendingMappingImport?.mapping[field.key] ?? "none"}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setPendingMappingImport((current) =>
-                      current
-                        ? {
-                            ...current,
-                            mapping: {
-                              ...current.mapping,
-                              [field.key]: value,
-                            },
-                          }
-                        : current
-                    );
-                  }}
-                  className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
-                >
-                  <option value="none">None</option>
-                  {(pendingMappingImport?.headers ?? []).map((header) => (
-                    <option key={`${field.key}:${header}`} value={header}>
-                      {header}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))}
-            <div className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
-              <div>
-                <p className="text-sm font-medium text-foreground">Saved Preset</p>
-                <p className="mt-1 text-xs text-subtle">Reuse a saved mapping/profile setup from a prior import.</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <select
-                  defaultValue=""
-                  onChange={(e) => {
-                    const presetId = e.target.value;
-                    if (!presetId) return;
-                    const preset = savedPresets.find((item) => item.id === presetId);
-                    if (!preset) return;
-                    setPendingMappingImport((current) =>
-                      current
-                        ? {
-                            ...current,
-                            mapping: preset.mapping,
-                            defaultAccountName: preset.defaultAccountName,
-                            defaultRetirementAccount: preset.defaultRetirementAccount,
-                            presetName: preset.name,
-                          }
-                        : current
-                    );
-                    e.currentTarget.value = "";
-                  }}
-                  className="min-w-[13rem] rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
-                >
-                  <option value="">Load saved preset…</option>
-                  {savedPresets.map((preset) => (
-                    <option key={preset.id} value={preset.id}>
-                      {preset.name}
-                    </option>
-                  ))}
-                </select>
                 {savedPresets.length > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const presetName = pendingMappingImport?.presetName.trim();
-                      if (!presetName) return;
-                      const preset = savedPresets.find((item) => item.name.trim().toLowerCase() === presetName.toLowerCase());
-                      if (!preset) return;
-                      const next = removeSavedMappingPreset(preset.id);
-                      setSavedPresets(next);
-                      setPendingMappingImport((current) =>
-                        current
-                          ? {
-                              ...current,
-                              savePreset: false,
-                              presetName: "",
-                            }
-                          : current
+                  <div className="space-y-2">
+                    {savedPresets.map((preset) => {
+                      const isActive = pendingMappingImport?.presetName.trim().toLowerCase() === preset.name.trim().toLowerCase();
+                      return (
+                        <div
+                          key={preset.id}
+                          className={`flex flex-col gap-2 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between ${
+                            isActive ? "border-primary/60 bg-primary/10" : "border-border/80 bg-elevated/60"
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-foreground">{preset.name}</p>
+                            <p className="mt-1 text-xs text-subtle">{describePreset(preset)}</p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPendingMappingImport((current) =>
+                                  current
+                                    ? {
+                                        ...current,
+                                        mapping: preset.mapping,
+                                        defaultAccountName: preset.defaultAccountName,
+                                        defaultRetirementAccount: preset.defaultRetirementAccount,
+                                        presetName: preset.name,
+                                      }
+                                    : current
+                                );
+                              }}
+                              className="ui-hover-spotlight rounded-lg border border-primary/40 bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground"
+                            >
+                              Apply
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = removeSavedMappingPreset(preset.id);
+                                setSavedPresets(next);
+                                setPendingMappingImport((current) =>
+                                  current && current.presetName.trim().toLowerCase() === preset.name.trim().toLowerCase()
+                                    ? {
+                                        ...current,
+                                        savePreset: false,
+                                        presetName: "",
+                                      }
+                                    : current
+                                );
+                              }}
+                              className="ui-hover-pop rounded-lg border border-border px-3 py-2 text-sm text-foreground"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
                       );
-                    }}
-                    className="ui-hover-pop rounded-lg border border-border px-3 py-2 text-sm text-foreground"
-                  >
-                    Delete preset
-                  </button>
-                ) : null}
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-subtle">No saved mappings yet.</p>
+                )}
               </div>
             </div>
             <div className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
@@ -616,6 +597,46 @@ export function CsvImportExportBar({
                 />
               </div>
             </div>
+            <div className="rounded-xl border border-border/80 bg-background/60 p-3">
+              <p className="text-sm font-medium text-foreground">Column Mapping</p>
+              <p className="mt-1 text-xs text-subtle">Map your CSV column headers to the standard iOS import fields. `Symbol` is required.</p>
+            </div>
+            {CSV_IMPORT_FIELDS.map((field) => (
+              <div key={field.key} className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {field.label}
+                    {field.required ? " *" : ""}
+                  </p>
+                  <p className="mt-1 text-xs text-subtle">{field.description}</p>
+                </div>
+                <select
+                  value={pendingMappingImport?.mapping[field.key] ?? "none"}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setPendingMappingImport((current) =>
+                      current
+                        ? {
+                            ...current,
+                            mapping: {
+                              ...current.mapping,
+                              [field.key]: value,
+                            },
+                          }
+                        : current
+                    );
+                  }}
+                  className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
+                >
+                  <option value="none">None</option>
+                  {(pendingMappingImport?.headers ?? []).map((header) => (
+                    <option key={`${field.key}:${header}`} value={header}>
+                      {header}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
           </div>
         </ModalSection>
         <ModalSection className="flex flex-wrap justify-end gap-2 border-t border-border px-4 py-4 dark:border-foreground/10">
@@ -652,18 +673,18 @@ export function CsvImportExportBar({
                     setFlash({ kind: "err", text: res.error });
                     return;
                   }
-                await applyImport(
-                  res.rows,
-                  res.skipped,
-                  {
-                    defaultAccountName: pendingMappingImport.defaultAccountName,
-                    defaultRetirementAccount:
-                      pendingMappingImport.mapping.retirementAccount &&
-                      pendingMappingImport.mapping.retirementAccount.toLowerCase() !== "none"
-                        ? undefined
-                        : pendingMappingImport.defaultRetirementAccount === "yes",
-                  },
-                  res.trades
+                  await applyImport(
+                    res.rows,
+                    res.skipped,
+                    {
+                      defaultAccountName: pendingMappingImport.defaultAccountName,
+                      defaultRetirementAccount:
+                        pendingMappingImport.mapping.retirementAccount &&
+                        pendingMappingImport.mapping.retirementAccount.toLowerCase() !== "none"
+                          ? undefined
+                          : pendingMappingImport.defaultRetirementAccount === "yes",
+                    },
+                    res.trades
                   );
                   updateImportProgress("Finishing import", 100);
                   setPendingMappingImport(null);
