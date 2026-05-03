@@ -261,6 +261,16 @@ export default function SettingsPage() {
                       No Stripe customer record was found for this account yet. Start the trial first.
                     </p>
                   ) : null}
+                  {billingState === "portal_unavailable" ? (
+                    <p className="rounded-md border border-amber-500/25 bg-amber-500/10 px-2.5 py-2 text-[11px] text-amber-700 dark:text-amber-200">
+                      No Stripe-managed subscription was found for this account. If your access comes from the iOS app, manage billing in Apple subscriptions; otherwise start the Stripe trial first.
+                    </p>
+                  ) : null}
+                  {billingState === "portal_error" ? (
+                    <p className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 dark:text-red-200">
+                      Billing portal could not be opened. Check the Stripe portal configuration and try again.
+                    </p>
+                  ) : null}
                   {billingState === "error" ? (
                     <p className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 dark:text-red-200">
                       Billing could not be started. Check the Stripe environment variables and try again.

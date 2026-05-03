@@ -7,31 +7,49 @@ import { getStripe } from "@/lib/stripe/server";
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  if (!user) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    if (!user) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+
+    const dataUserId = await syncStocksPmAuthUser(supabase, user.id);
+    const stripe = getStripe();
+    const email = user.email ?? "";
+    const customers = email
+      ? await stripe.customers.list({ email, limit: 10 })
+      : { data: [] as Stripe.Customer[] };
+    const customer = customers.data.find((item) => item.metadata?.user_id === dataUserId) ?? customers.data[0];
+
+    if (!customer) {
+      return NextResponse.redirect(new URL("/settings?billing=missing_customer", request.url));
+    }
+
+    const subscriptions = await stripe.subscriptions.list({
+      customer: customer.id,
+      status: "all",
+      limit: 10,
+    });
+    const hasStripeSubscription = subscriptions.data.some((subscription) =>
+      ["trialing", "active", "past_due", "paused", "canceled", "unpaid"].includes(subscription.status)
+    );
+
+    if (!hasStripeSubscription) {
+      return NextResponse.redirect(new URL("/settings?billing=portal_unavailable", request.url));
+    }
+
+    const portal = await stripe.billingPortal.sessions.create({
+      customer: customer.id,
+      return_url: `${request.nextUrl.origin}/settings`,
+    });
+
+    return NextResponse.redirect(portal.url);
+  } catch (error) {
+    console.error("[billing/portal] failed", error);
+    return NextResponse.redirect(new URL("/settings?billing=portal_error", request.url));
   }
-
-  const dataUserId = await syncStocksPmAuthUser(supabase, user.id);
-  const stripe = getStripe();
-  const email = user.email ?? "";
-  const customers = email
-    ? await stripe.customers.list({ email, limit: 10 })
-    : { data: [] as Stripe.Customer[] };
-  const customer = customers.data.find((item) => item.metadata?.user_id === dataUserId) ?? customers.data[0];
-
-  if (!customer) {
-    return NextResponse.redirect(new URL("/settings?billing=missing_customer", request.url));
-  }
-
-  const portal = await stripe.billingPortal.sessions.create({
-    customer: customer.id,
-    return_url: `${request.nextUrl.origin}/settings`,
-  });
-
-  return NextResponse.redirect(portal.url);
 }
