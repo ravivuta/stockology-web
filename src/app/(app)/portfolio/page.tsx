@@ -9,6 +9,7 @@ import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
 import { PortfolioAllocationChart } from "@/components/portfolio/PortfolioAllocationChart";
 import { SymbolTradeCombobox } from "@/components/portfolio/SymbolTradeCombobox";
+import { StockDetailModal } from "@/components/stock/StockDetailModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
 import { isValidTicker } from "@/lib/csvPortfolio";
 import { formatCurrency, formatDecimal, formatNumberMax2, formatPercent, formatSignedCurrency, formatWholeCurrency } from "@/lib/numberFormat";
@@ -130,6 +131,7 @@ export default function PortfolioPage() {
   const [newAverageCost, setNewAverageCost] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
+  const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
 
   /** Portfolio page lists positions only; watchlist-only symbols (0 qty) stay in store for trading elsewhere. */
   const holdings = useMemo(() => stocks.filter((s) => s.quantity > 0), [stocks]);
@@ -407,12 +409,13 @@ export default function PortfolioPage() {
                     >
                       <td className="px-4 py-3 align-middle text-center">
                         <div className="min-w-0">
-                          <Link
-                            href={`/stock/${encodeURIComponent(s.symbol)}`}
+                          <button
+                            type="button"
+                            onClick={() => setDetailSymbol(s.symbol)}
                             className={`ui-hover-text inline-flex max-w-full items-center justify-center gap-1 truncate font-medium hover:underline ${recSymbolTextClass(s.recommendation?.action)}`}
                           >
                             {s.symbol}
-                          </Link>
+                          </button>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-center tabular-nums text-foreground">{formatCurrency(s.lastPrice ?? 0)}</td>
@@ -479,6 +482,8 @@ export default function PortfolioPage() {
           </div>
         </section>
       </div>
+
+      <StockDetailModal symbol={detailSymbol} onClose={() => setDetailSymbol(null)} />
     </div>
   );
 }

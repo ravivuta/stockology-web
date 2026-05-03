@@ -5,7 +5,7 @@ import type { PricePoint } from "@/lib/stock-chart";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { fetchHistoricalPricePoints } from "@/lib/supabase-stock-history";
 
-const DEFAULT_DAYS = 400;
+const DEFAULT_DAYS = 2000;
 
 /** Daily OHLC history from the account backend when configured; otherwise callers fall back to public data. */
 export function useSupabaseStockHistory(symbol: string | null, days: number = DEFAULT_DAYS) {

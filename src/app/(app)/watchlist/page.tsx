@@ -9,6 +9,7 @@ import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
 import { formatCurrency, formatDecimal, formatPercent } from "@/lib/numberFormat";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
 import { SymbolTradeCombobox } from "@/components/portfolio/SymbolTradeCombobox";
+import { StockDetailModal } from "@/components/stock/StockDetailModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
 
@@ -40,6 +41,7 @@ export default function WatchlistPage() {
   const [sort, setSort] = useState<SortKey>("symbol");
   const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION.symbol);
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
+  const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
 
   function isActionable(action: string | undefined): boolean {
     if (!action) return false;
@@ -253,12 +255,13 @@ export default function WatchlistPage() {
                     className="transition-colors duration-150 hover:bg-muted/50 dark:hover:bg-white/[0.04]"
                   >
                     <td className="min-w-0 px-2 py-3 align-middle font-medium text-foreground sm:px-3">
-                      <Link
-                        href={`/stock/${encodeURIComponent(s.symbol)}`}
+                      <button
+                        type="button"
+                        onClick={() => setDetailSymbol(s.symbol)}
                         className={`ui-hover-text inline-flex max-w-full min-w-0 justify-center text-center hover:underline ${recSymbolTextClass(s.recommendation?.action)}`}
                       >
                         <span className="min-w-0 truncate">{s.symbol}</span>
-                      </Link>
+                      </button>
                     </td>
                     <td className="px-2 py-3 text-center tabular-nums text-subtle sm:px-3">{formatCurrency(s.lastPrice ?? 0)}</td>
                     <td
@@ -336,6 +339,8 @@ export default function WatchlistPage() {
         cancelLabel="Keep"
         variant="danger"
       />
+
+      <StockDetailModal symbol={detailSymbol} onClose={() => setDetailSymbol(null)} />
     </div>
   );
 }

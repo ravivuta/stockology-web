@@ -15,7 +15,7 @@ export default function StockDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-6xl">
       <StockDetailExpandPanel symbol={symbol} showBackLink />
     </div>
   );

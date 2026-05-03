@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Settings, X } from "lucide-react";
+import { CheckCircle2, Settings, X, XCircle } from "lucide-react";
 import {
   computeRecommendationFactors,
   getOldestOpenLotDate,
@@ -10,6 +10,8 @@ import {
   isUnknownPurchaseDate,
   scoreBreakdownRows,
 } from "@/lib/ios-recommendation";
+import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
+import { buildRecommendation } from "@/lib/recommendation";
 import { formatCompactCurrency, formatCurrency, formatDecimal, formatNumberMax2, formatPercent, formatSignedCurrency } from "@/lib/numberFormat";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { useSupabaseStockHistory } from "@/hooks/useSupabaseStockHistory";
@@ -83,6 +85,23 @@ function formatScoreDisplay(score: number | undefined | null): string {
   return formatDecimal(score);
 }
 
+function isInsufficientHistoryComment(comment: string | undefined): boolean {
+  return (comment ?? "").toLowerCase().startsWith("insufficient historical data");
+}
+
+function recommendationTone(action: string | undefined): string {
+  const normalized = action?.toUpperCase() ?? "";
+  if (normalized === "SELL") return "border-red-500/30 bg-red-500/14 text-red-700 dark:text-red-200";
+  if (normalized === "REDUCE") return "border-amber-500/30 bg-amber-500/14 text-amber-800 dark:text-amber-200";
+  if (normalized.startsWith("WAIT")) return "border-border/80 bg-background/75 text-subtle dark:border-white/[0.08] dark:bg-white/[0.05]";
+  return "border-primary/30 bg-primary/14 text-primary";
+}
+
+function valueTone(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value) || value === 0) return "text-foreground";
+  return value > 0 ? "text-primary" : "text-error";
+}
+
 type Props = {
   symbol: string;
   embedded?: boolean;
@@ -106,11 +125,15 @@ function StatTile({
   return (
     <div
       className={cn(
-        "rounded-lg border border-border/80 bg-background/70 dark:border-white/[0.08] dark:bg-white/[0.04]",
-        compact ? "px-2.5 py-2" : "rounded-xl px-4 py-3.5",
+        "relative overflow-hidden border border-border/80 bg-[linear-gradient(160deg,rgba(255,255,255,0.92),rgba(255,255,255,0.72))] shadow-[0_18px_50px_-28px_rgba(15,23,42,0.45)] dark:border-white/[0.08] dark:bg-[linear-gradient(160deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))]",
+        compact ? "rounded-xl px-2.5 py-2" : "rounded-2xl px-4 py-3.5",
         className
       )}
     >
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(56,189,248,0.55),transparent)] opacity-70"
+      />
       <p
         className={cn(
           "font-semibold uppercase tracking-[0.12em] text-subtle",
@@ -146,10 +169,14 @@ function SectionCard({
   return (
     <section
       className={cn(
-        "border border-border/80 bg-elevated shadow-sm dark:border-white/[0.08]",
-        compact ? "rounded-xl p-3" : "rounded-2xl p-5"
+        "relative overflow-hidden border border-border/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,255,255,0.76))] shadow-[0_26px_80px_-42px_rgba(15,23,42,0.42)] dark:border-white/[0.08] dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03))]",
+        compact ? "rounded-xl p-3" : "rounded-[1.6rem] p-5"
       )}
     >
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(56,189,248,0.45),transparent)] opacity-80"
+      />
       <div className={cn("border-b border-border/60 dark:border-white/[0.06]", compact ? "pb-2" : "pb-3")}>
         <h3 className={cn("font-semibold text-foreground", compact ? "text-sm" : "text-base")}>{title}</h3>
         {description ? (
@@ -163,12 +190,42 @@ function SectionCard({
   );
 }
 
+function HeroStat({
+  label,
+  value,
+  detail,
+  valueClassName,
+  compact,
+}: {
+  label: string;
+  value: React.ReactNode;
+  detail?: React.ReactNode;
+  valueClassName?: string;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-2xl border border-white/45 bg-white/70 backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.05]",
+        compact ? "px-3 py-2" : "px-4 py-3.5"
+      )}
+    >
+      <p className={cn("font-semibold uppercase tracking-[0.14em] text-subtle", compact ? "text-[9px]" : "text-[11px]")}>{label}</p>
+      <p className={cn("mt-1 font-semibold tabular-nums tracking-tight text-foreground", compact ? "text-sm" : "text-xl", valueClassName)}>
+        {value}
+      </p>
+      {detail ? <p className={cn("mt-1 text-subtle", compact ? "text-[10px]" : "text-xs")}>{detail}</p> : null}
+    </div>
+  );
+}
+
 export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink }: Props) {
   const stocks = usePortfolioStore((s) => s.stocks);
   const recordTrade = usePortfolioStore((s) => s.recordTrade);
   const updateStock = usePortfolioStore((s) => s.updateStock);
   const etfProfitTarget = usePortfolioStore((s) => s.etfProfitTarget);
   const stockProfitTarget = usePortfolioStore((s) => s.stockProfitTarget);
+  const useAISentimentForRecommendations = usePortfolioStore((s) => s.useAISentimentForRecommendations);
   const useRSIGatingForRecommendations = usePortfolioStore((s) => s.useRSIGatingForRecommendations);
   const sellOnlyLongTermQualified = usePortfolioStore((s) => s.sellOnlyLongTermQualified);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
@@ -246,7 +303,41 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       realizedGainLoss: soldLots.reduce((sum, lot) => sum + lot.realizedGainLoss, 0),
     };
   }, [lots, stock]);
-  const rec = stock?.recommendation;
+  const storedRec = stock?.recommendation;
+  const rec = useMemo(() => {
+    if (!stock) return undefined;
+    if (closes.length <= 0 && !(stock.movingAvg != null && Number.isFinite(stock.movingAvg) && stock.movingAvg > 0)) {
+      if (storedRec && histLoading && isInsufficientHistoryComment(storedRec.comments)) {
+        return {
+          ...storedRec,
+          comments: "Loading historical data for recommendation…",
+        };
+      }
+      return storedRec;
+    }
+    return buildRecommendation(stock, {
+      closes,
+      etfProfitTarget,
+      stockProfitTarget,
+      useAISentiment: useAISentimentForRecommendations,
+      useRSIGating: useRSIGatingForRecommendations,
+      sellOnlyLongTermQualified,
+      openLots: lotSummary.openLots,
+      soldLots: lotSummary.soldLots,
+    });
+  }, [
+    closes,
+    etfProfitTarget,
+    histLoading,
+    lotSummary.openLots,
+    lotSummary.soldLots,
+    sellOnlyLongTermQualified,
+    stock,
+    stockProfitTarget,
+    storedRec,
+    useAISentimentForRecommendations,
+    useRSIGatingForRecommendations,
+  ]);
   const recommendationFactors = useMemo(() => {
     if (!stock || !rec) return [];
     return computeRecommendationFactors(stock, rec, {
@@ -277,6 +368,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const positionValue = stock.quantity * last;
   const unrealized = positionValue - costBasis;
   const unrealizedPct = costBasis > 0 ? (unrealized / costBasis) * 100 : 0;
+  const upside = analystTargetUpsidePct(stock.lastPrice, stock.analystTarget);
 
   function applyTrade() {
     const q = parseFloat(qty) || 0;
@@ -294,61 +386,120 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   return (
     <div
       className={cn(
-        "border-border bg-muted/20 text-foreground",
-        embedded ? "border-t" : "rounded-2xl border ui-hover-lift"
+        "relative overflow-hidden text-foreground",
+        embedded
+          ? "border-t border-border/70 bg-transparent"
+          : "rounded-[1.9rem] border border-border/80 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.14),transparent_26%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.12),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.95),rgba(248,250,252,0.88))] shadow-[0_30px_100px_-55px_rgba(15,23,42,0.55)] dark:border-white/[0.08] dark:bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_24%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.1),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.94),rgba(2,6,23,0.94))]"
       )}
     >
+      {!embedded ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-12 top-0 h-28 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.75),transparent_68%)] blur-3xl dark:bg-[radial-gradient(circle,rgba(56,189,248,0.18),transparent_68%)]"
+        />
+      ) : null}
       {/* Header */}
       <div
         className={cn(
-          "flex flex-col border-b border-border/80 sm:flex-row sm:items-start sm:justify-between dark:border-white/[0.08]",
-          dense ? "gap-2 px-3 py-2.5 sm:gap-3" : "gap-4 px-5 py-4"
+          "relative border-b border-border/70 dark:border-white/[0.08]",
+          dense ? "px-3 py-3" : "px-5 py-5 sm:px-6 sm:py-6"
         )}
       >
-        <div className="min-w-0 flex-1">
-          {showBackLink && (
-            <Link
-              href="/portfolio"
-              className={cn("mb-2 inline-block font-medium text-primary hover:underline", dense ? "text-xs" : "text-sm")}
-            >
-              ← Portfolio
-            </Link>
-          )}
-          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 sm:gap-x-3 sm:gap-y-1">
-            <h2 className={cn("font-bold tracking-tight", dense ? "text-xl" : "text-2xl")}>{stock.symbol}</h2>
-            {stock.name ? (
-              <span
-                className={cn("max-w-full truncate text-foreground/75", dense ? "max-w-[min(100%,14rem)] text-xs" : "text-base")}
-                title={stock.name}
+        <div className={cn("grid items-start gap-4", dense ? "grid-cols-1" : "lg:grid-cols-[minmax(0,1.2fr)_minmax(19rem,0.95fr)] lg:gap-6")}>
+          <div className="min-w-0">
+            {showBackLink && (
+              <Link
+                href="/portfolio"
+                className={cn("mb-3 inline-block font-medium text-primary hover:underline", dense ? "text-xs" : "text-sm")}
               >
-                {stock.name}
-              </span>
-            ) : null}
-          </div>
-          <div className={cn("mt-1.5 flex flex-wrap items-baseline gap-2 sm:mt-2 sm:gap-3", dense && "mt-1")}>
-            <span className={cn("font-semibold tabular-nums tracking-tight", dense ? "text-2xl" : "text-3xl")}>
-              {formatCurrency(last)}
-            </span>
-            {stock.dailyChangePercent != null && (
+                ← Portfolio
+              </Link>
+            )}
+            <div className="flex flex-wrap items-center gap-2">
               <span
                 className={cn(
-                  "font-semibold tabular-nums",
-                  dense ? "text-sm" : "text-base",
-                  stock.dailyChangePercent >= 0 ? "text-primary" : "text-error"
+                  "inline-flex rounded-full border px-2.5 py-1 font-semibold uppercase tracking-[0.18em] text-subtle",
+                  dense ? "text-[9px]" : "text-[10px]",
+                  hasPosition ? "border-primary/20 bg-primary/10" : "border-border/70 bg-background/60 dark:border-white/[0.08] dark:bg-white/[0.04]"
                 )}
               >
-                {formatPercent(stock.dailyChangePercent, true)} today
+                {hasPosition ? "Holding" : "Watchlist"}
               </span>
-            )}
+              {rec ? (
+                <span
+                  className={cn(
+                    "inline-flex rounded-full border px-2.5 py-1 font-bold tracking-[0.14em]",
+                    dense ? "text-[9px]" : "text-[10px]",
+                    recommendationTone(rec.action)
+                  )}
+                >
+                  {rec.action.replace("_", " ")}
+                </span>
+              ) : null}
+            </div>
+            <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h2 className={cn("font-bold tracking-tight", dense ? "text-2xl" : "text-[2.4rem] leading-none")}>{stock.symbol}</h2>
+              {stock.name ? (
+                <span
+                  className={cn("max-w-full truncate text-foreground/70", dense ? "max-w-[min(100%,16rem)] text-xs" : "text-lg")}
+                  title={stock.name}
+                >
+                  {stock.name}
+                </span>
+              ) : null}
+            </div>
+            <div className={cn("mt-3 flex flex-wrap items-end gap-x-3 gap-y-2", dense ? "mt-2" : "sm:gap-x-4")}>
+              <span className={cn("font-semibold tabular-nums tracking-tight text-foreground", dense ? "text-3xl" : "text-5xl leading-none")}>
+                {formatCurrency(last)}
+              </span>
+              <div className="space-y-1">
+                {stock.dailyChangePercent != null ? (
+                  <p className={cn("font-semibold tabular-nums", dense ? "text-sm" : "text-lg", valueTone(stock.dailyChangePercent))}>
+                    {formatPercent(stock.dailyChangePercent, true)} today
+                  </p>
+                ) : null}
+                <p className={cn("text-subtle", dense ? "text-[11px]" : "text-sm")}>
+                  {histLoading ? "Refreshing history and recommendation context" : "Live quote with synced rule-based recommendation"}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className={cn("grid gap-3", dense ? "grid-cols-2" : "sm:grid-cols-2")}>
+            <HeroStat
+              compact={dense}
+              label={hasPosition ? "Position value" : "Analyst target"}
+              value={hasPosition ? formatCurrency(positionValue) : stock.analystTarget != null ? formatCurrency(stock.analystTarget) : "—"}
+              detail={hasPosition ? `${formatNumberMax2(stock.quantity)} shares held` : "Consensus target from latest refresh"}
+            />
+            <HeroStat
+              compact={dense}
+              label={hasPosition ? "Unrealized P/L" : "Upside"}
+              value={hasPosition ? `${formatCurrency(unrealized)} (${formatPercent(unrealizedPct, true)})` : formatUpsidePct(upside)}
+              valueClassName={hasPosition ? valueTone(unrealized) : valueTone(upside)}
+              detail={hasPosition ? `Basis ${formatCurrency(costBasis)}` : stock.analystTarget != null ? `Target ${formatCurrency(stock.analystTarget)}` : "No target available"}
+            />
+            <HeroStat
+              compact={dense}
+              label="Signal"
+              value={rec ? rec.action.replace("_", " ") : "No signal"}
+              valueClassName={rec ? recommendationTone(rec.action).split(" ").find((item) => item.startsWith("text-")) : undefined}
+              detail={stock.score != null ? `Score ${formatScoreDisplay(stock.score)}` : "Rules-based recommendation"}
+            />
+            <HeroStat
+              compact={dense}
+              label="Strategy"
+              value={`SMA ${stock.shortSMA}`}
+              detail={`Dynamic factor ${formatDecimal(stock.dynamicFactor)}%`}
+            />
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+        <div className={cn("mt-4 flex shrink-0 items-center gap-1.5 sm:gap-2", dense ? "justify-end" : "justify-between")}>
           <button
             type="button"
             onClick={() => setStrategyOpen(true)}
             className={cn(
-              "ui-hover-pop inline-flex items-center gap-1.5 rounded-lg border border-border bg-background font-semibold text-foreground shadow-sm dark:border-white/10 dark:bg-white/5 sm:gap-2 sm:rounded-xl",
-              dense ? "px-2.5 py-1.5 text-xs" : "px-4 py-2.5 text-sm"
+              "ui-hover-pop inline-flex items-center gap-1.5 border border-white/45 bg-white/75 font-semibold text-foreground shadow-sm backdrop-blur-lg dark:border-white/10 dark:bg-white/[0.06] sm:gap-2",
+              dense ? "rounded-lg px-2.5 py-1.5 text-xs" : "rounded-xl px-4 py-2.5 text-sm"
             )}
             aria-label="Strategy parameters"
           >
@@ -359,7 +510,10 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
             <button
               type="button"
               onClick={onClose}
-              className={cn("rounded-lg text-subtle hover:bg-border/40 hover:text-foreground sm:rounded-xl", dense ? "p-1.5" : "p-2.5")}
+              className={cn(
+                "rounded-xl border border-transparent bg-transparent text-subtle hover:border-border/80 hover:bg-white/55 hover:text-foreground dark:hover:border-white/[0.08] dark:hover:bg-white/[0.06]",
+                dense ? "p-1.5" : "p-2.5"
+              )}
               aria-label="Close stock details"
             >
               <X className={dense ? "h-4 w-4" : "h-5 w-5"} />
@@ -370,94 +524,257 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
 
       <div
         className={cn(
-          dense ? "space-y-3 px-3 py-3" : "max-h-[min(72vh,920px)] space-y-5 overflow-y-auto px-5 py-5"
+          dense ? "space-y-3 px-3 py-3" : "max-h-[min(78vh,980px)] space-y-5 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6"
         )}
       >
-        <SectionCard
-          compact={dense}
-          title="Price chart"
-          description="Choose a range (1w–5y). The dashed line is your average cost when you hold a position."
-        >
-          <StockHistoricalChart
-            symbol={stock.symbol}
-            smaPeriod={stock.shortSMA}
-            averageCost={hasPosition && stock.averageCost > 0 ? stock.averageCost : null}
-            points={points}
-            loading={histLoading}
-            error={histError}
-            compact={dense}
-          />
-        </SectionCard>
-
-        {/* At-a-glance: position or watch-only */}
-        {hasPosition ? (
-          <div>
-            <p
-              className={cn(
-                "font-semibold uppercase tracking-[0.14em] text-subtle",
-                dense ? "mb-2 text-[10px]" : "mb-3 text-xs"
-              )}
-            >
-              Position
-            </p>
-            <div className={cn("grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5", dense ? "gap-2" : "gap-3")}>
-              <StatTile compact={dense} label="Quantity" value={formatNumberMax2(stock.quantity)} />
-              <StatTile compact={dense} label="Avg cost" value={formatCurrency(stock.averageCost)} />
-              <StatTile compact={dense} label="Last" value={formatCurrency(last)} />
-              <StatTile compact={dense} label="Market value" value={formatCurrency(positionValue)} />
-              <StatTile
-                compact={dense}
-                label="Unrealized P/L"
-                value={`${formatCurrency(unrealized)} (${formatPercent(unrealizedPct, true)})`}
-                valueClassName={unrealized >= 0 ? "text-primary" : "text-error"}
-              />
-            </div>
-          </div>
-        ) : (
-          <div>
-            <p
-              className={cn(
-                "font-semibold uppercase tracking-[0.14em] text-subtle",
-                dense ? "mb-2 text-[10px]" : "mb-3 text-xs"
-              )}
-            >
-              Quote
-            </p>
-            <div className={cn("grid grid-cols-2 sm:grid-cols-4", dense ? "gap-2" : "gap-3")}>
-              <StatTile compact={dense} label="Last price" value={formatCurrency(last)} />
-              <StatTile
-                compact={dense}
-                label="Day change"
-                value={
-                  stock.dailyChangePercent != null
-                    ? formatPercent(stock.dailyChangePercent, true)
-                    : "—"
-                }
-                valueClassName={
-                  stock.dailyChangePercent == null
-                    ? undefined
-                    : stock.dailyChangePercent >= 0
-                      ? "text-primary"
-                      : "text-error"
-                }
-              />
-              <StatTile
-                compact={dense}
-                label="Analyst target"
-                value={stock.analystTarget != null ? formatCurrency(stock.analystTarget) : "—"}
-              />
-              <StatTile
-                compact={dense}
-                label="Consensus"
-                value={stock.analystAvg?.trim() || "—"}
-                valueClassName={dense ? "text-sm font-medium" : "text-base font-medium"}
-              />
-            </div>
-          </div>
-        )}
-
-        <div className={cn("grid items-start", dense ? "gap-3" : "gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(21rem,1fr)] 2xl:grid-cols-[minmax(0,1.55fr)_minmax(23rem,1fr)]")}>
+        <div className={cn("grid items-start", dense ? "gap-3" : "gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(22rem,0.95fr)] 2xl:grid-cols-[minmax(0,1.72fr)_minmax(24rem,0.9fr)]")}>
           <div className={dense ? "space-y-3" : "space-y-5"}>
+            <SectionCard
+              compact={dense}
+              title="Price chart"
+              description="Choose a range (1w–5y). The dashed line is your average cost when you hold a position."
+            >
+              <StockHistoricalChart
+                symbol={stock.symbol}
+                smaPeriod={stock.shortSMA}
+                averageCost={hasPosition && stock.averageCost > 0 ? stock.averageCost : null}
+                points={points}
+                loading={histLoading}
+                error={histError}
+                compact={dense}
+              />
+            </SectionCard>
+
+            <SectionCard
+              compact={dense}
+              title={hasPosition ? "Position overview" : "Quote overview"}
+              description={
+                hasPosition
+                  ? "Current exposure, cost basis, and mark-to-market performance for this holding."
+                  : "Live quote and consensus data for this watchlist symbol."
+              }
+            >
+              <div className={cn(hasPosition ? "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" : "grid grid-cols-2 sm:grid-cols-4", dense ? "gap-2" : "gap-3")}>
+                {hasPosition ? (
+                  <>
+                    <StatTile compact={dense} label="Quantity" value={formatNumberMax2(stock.quantity)} />
+                    <StatTile compact={dense} label="Avg cost" value={formatCurrency(stock.averageCost)} />
+                    <StatTile compact={dense} label="Last" value={formatCurrency(last)} />
+                    <StatTile compact={dense} label="Market value" value={formatCurrency(positionValue)} />
+                    <StatTile
+                      compact={dense}
+                      label="Unrealized P/L"
+                      value={`${formatCurrency(unrealized)} (${formatPercent(unrealizedPct, true)})`}
+                      valueClassName={unrealized >= 0 ? "text-primary" : "text-error"}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <StatTile compact={dense} label="Last price" value={formatCurrency(last)} />
+                    <StatTile
+                      compact={dense}
+                      label="Day change"
+                      value={stock.dailyChangePercent != null ? formatPercent(stock.dailyChangePercent, true) : "—"}
+                      valueClassName={
+                        stock.dailyChangePercent == null
+                          ? undefined
+                          : stock.dailyChangePercent >= 0
+                            ? "text-primary"
+                            : "text-error"
+                      }
+                    />
+                    <StatTile
+                      compact={dense}
+                      label="Analyst target"
+                      value={stock.analystTarget != null ? formatCurrency(stock.analystTarget) : "—"}
+                    />
+                    <StatTile
+                      compact={dense}
+                      label="Consensus"
+                      value={stock.analystAvg?.trim() || "—"}
+                      valueClassName={dense ? "text-sm font-medium" : "text-base font-medium"}
+                    />
+                  </>
+                )}
+              </div>
+            </SectionCard>
+
+            {(hasPosition || lotSummary.openLots.length > 0 || lotSummary.soldLots.length > 0) && (
+              <SectionCard
+                compact={dense}
+                title="Tax lots"
+                description="Lot-level holding data for this symbol, including wash-sale status and long-term eligibility using the same rules as the iOS app."
+              >
+                <div className={cn("grid sm:grid-cols-2 xl:grid-cols-4", dense ? "gap-2" : "gap-3")}>
+                  <StatTile compact={dense} label="Open lots" value={String(lotSummary.openLots.length)} />
+                  <StatTile compact={dense} label="Open basis" value={formatCurrency(lotSummary.openCostBasis)} />
+                  <StatTile
+                    compact={dense}
+                    label="Realized P/L"
+                    value={formatSignedCurrency(lotSummary.realizedGainLoss)}
+                    valueClassName={lotSummary.realizedGainLoss >= 0 ? "text-primary" : "text-error"}
+                  />
+                  <StatTile
+                    compact={dense}
+                    label="Wash sale"
+                    value={
+                      lotSummary.washSale == null
+                        ? "—"
+                        : lotSummary.washSale.canBuy
+                          ? "Clear"
+                          : `${lotSummary.washSale.daysRemaining}d left`
+                    }
+                    valueClassName={lotSummary.washSale?.canBuy === false ? "text-error" : undefined}
+                  />
+                </div>
+
+                <div className={dense ? "mt-3 space-y-3" : "mt-4 space-y-4"}>
+                  <div className="rounded-xl border border-border/70 bg-background/40 p-3 dark:border-white/[0.07] dark:bg-white/[0.03]">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>Tax rule status</p>
+                        <p className={cn("text-subtle", dense ? "mt-1 text-[11px]" : "mt-1 text-xs")}>
+                          {lotSummary.washSale?.displayText ?? "No lot-level rule data available yet."}
+                        </p>
+                      </div>
+                      {sellOnlyLongTermQualified && hasPosition ? (
+                        <span
+                          className={cn(
+                            "inline-flex rounded-md px-2 py-1 font-semibold",
+                            dense ? "text-[10px]" : "text-xs",
+                            lotSummary.oldestOpenLotQualified
+                              ? "bg-emerald-500/15 text-emerald-800 dark:bg-emerald-400/20 dark:text-emerald-200"
+                              : "bg-amber-500/15 text-amber-800 dark:bg-amber-400/20 dark:text-amber-200"
+                          )}
+                        >
+                          {lotSummary.oldestOpenLotQualified ? "Sell gate satisfied" : "Sell gate blocked"}
+                        </span>
+                      ) : null}
+                    </div>
+                    {sellOnlyLongTermQualified && hasPosition ? (
+                      <p className={cn("text-subtle", dense ? "mt-2 text-[11px]" : "mt-2 text-xs")}>
+                        {lotSummary.oldestOpenLotDate == null || isUnknownPurchaseDate(lotSummary.oldestOpenLotDate)
+                          ? "Long-term sales are enabled in settings, but no dated open lot is available."
+                          : lotSummary.oldestOpenLotQualified
+                            ? `Oldest open lot qualifies for long-term treatment since ${formatDateLabel(lotSummary.oldestOpenLotDate.toISOString())}.`
+                            : `Oldest open lot has not reached the 365-day threshold yet (${formatDateLabel(lotSummary.oldestOpenLotDate.toISOString())}).`}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  {lotSummary.openLots.length > 0 ? (
+                    <div>
+                      <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>Open lots</p>
+                      <ul className={cn("mt-2 space-y-2", dense ? "text-xs" : "text-sm")}>
+                        {lotSummary.openLots.map((lot) => {
+                          const holdingStatus = lotHoldingStatus(lot.purchaseDate);
+                          const lotMarketValue = lot.quantity * last;
+                          const lotCostBasis = lot.quantity * lot.costBasis;
+                          const lotUnrealized = lotMarketValue - lotCostBasis;
+
+                          return (
+                            <li
+                              key={lot.id}
+                              className="rounded-xl border border-border/60 bg-background/40 p-3 dark:border-white/[0.06]"
+                            >
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div>
+                                  <p className="font-medium tabular-nums text-foreground">
+                                    {formatNumberMax2(lot.quantity)} shares @ {formatCurrency(lot.costBasis)}
+                                  </p>
+                                  <p className={cn("text-subtle", dense ? "mt-1 text-[11px]" : "mt-1 text-xs")}>
+                                    Bought {formatDateLabel(lot.purchaseDate)}
+                                  </p>
+                                  {(lot.account || lot.isRetirementAccount != null) && (
+                                    <p className={cn("text-subtle", dense ? "mt-1 text-[11px]" : "mt-1 text-xs")}>
+                                      {lot.account?.trim() ? lot.account : "No account name"} · {formatAccountType(lot.isRetirementAccount)}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  <span className={cn("inline-flex rounded-md px-2 py-1 font-semibold", dense ? "text-[10px]" : "text-xs", holdingStatus.className)}>
+                                    {holdingStatus.label}
+                                  </span>
+                                  <span className={cn("inline-flex rounded-md px-2 py-1 font-semibold", dense ? "text-[10px]" : "text-xs", lotStatusTone(lot.status))}>
+                                    {formatLotStatus(lot.status)}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className={cn("mt-2 grid grid-cols-2 sm:grid-cols-3", dense ? "gap-2" : "gap-3")}>
+                                <SnapshotRow compact={dense} label="Lot basis" value={formatCurrency(lotCostBasis)} />
+                                <SnapshotRow compact={dense} label="Market value" value={formatCurrency(lotMarketValue)} />
+                                <SnapshotRow
+                                  compact={dense}
+                                  label="Unrealized P/L"
+                                  value={formatSignedCurrency(lotUnrealized)}
+                                  hint={last > 0 ? `Last price ${formatCurrency(last)}` : undefined}
+                                />
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  ) : (
+                    <p className={cn("text-subtle", dense ? "text-xs" : "text-sm")}>
+                      No open lot records are available for this symbol yet.
+                    </p>
+                  )}
+
+                  {lotSummary.soldLots.length > 0 ? (
+                    <div>
+                      <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>Closed lots</p>
+                      <ul className={cn("mt-2 space-y-2", dense ? "text-xs" : "text-sm")}>
+                        {lotSummary.soldLots.map((lot, index) => (
+                          <li
+                            key={`${lot.saleDate}-${lot.quantity}-${lot.salePrice}-${index}`}
+                            className="rounded-xl border border-border/60 bg-background/40 p-3 dark:border-white/[0.06]"
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div>
+                                <p className="font-medium tabular-nums text-foreground">
+                                  Sold {formatNumberMax2(lot.quantity)} shares @ {formatCurrency(lot.salePrice)}
+                                </p>
+                                <p className={cn("text-subtle", dense ? "mt-1 text-[11px]" : "mt-1 text-xs")}>
+                                  Sale date {formatDateLabel(lot.saleDate)}
+                                </p>
+                              </div>
+                              <span
+                                className={cn(
+                                  "inline-flex rounded-md px-2 py-1 font-semibold",
+                                  dense ? "text-[10px]" : "text-xs",
+                                  lot.realizedGainLoss >= 0
+                                    ? "bg-emerald-500/15 text-emerald-800 dark:bg-emerald-400/20 dark:text-emerald-200"
+                                    : "bg-red-500/15 text-red-700 dark:bg-red-400/20 dark:text-red-200"
+                                )}
+                              >
+                                {lot.realizedGainLoss >= 0 ? "Realized gain" : "Realized loss"}
+                              </span>
+                            </div>
+                            <div className={cn("mt-2 grid grid-cols-2", dense ? "gap-2" : "gap-3")}>
+                              <SnapshotRow compact={dense} label="Proceeds" value={formatCurrency(lot.quantity * lot.salePrice)} />
+                              <SnapshotRow
+                                compact={dense}
+                                label="Realized P/L"
+                                value={formatSignedCurrency(lot.realizedGainLoss)}
+                              />
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+                {lotSummary.openLots.length === 0 && lotSummary.soldLots.length === 0 ? (
+                  <p className={cn("mt-3 text-subtle", dense ? "text-xs" : "text-sm")}>
+                    Record trades here or sync from the iOS app to populate tax lots for this symbol.
+                  </p>
+                ) : null}
+              </SectionCard>
+            )}
+          </div>
+
+          <div className={cn(dense ? "space-y-3" : "space-y-5 xl:sticky xl:top-3")}>
             <SectionCard
               compact={dense}
               title="Recommendation"
@@ -689,180 +1006,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
             </SectionCard>
           </div>
         </div>
-
-        {(hasPosition || lotSummary.openLots.length > 0 || lotSummary.soldLots.length > 0) && (
-          <SectionCard
-            compact={dense}
-            title="Tax lots"
-            description="Lot-level holding data for this symbol, including wash-sale status and long-term eligibility using the same rules as the iOS app."
-          >
-            <div className={cn("grid sm:grid-cols-2 xl:grid-cols-4", dense ? "gap-2" : "gap-3")}>
-              <StatTile compact={dense} label="Open lots" value={String(lotSummary.openLots.length)} />
-              <StatTile compact={dense} label="Open basis" value={formatCurrency(lotSummary.openCostBasis)} />
-              <StatTile
-                compact={dense}
-                label="Realized P/L"
-                value={formatSignedCurrency(lotSummary.realizedGainLoss)}
-                valueClassName={lotSummary.realizedGainLoss >= 0 ? "text-primary" : "text-error"}
-              />
-              <StatTile
-                compact={dense}
-                label="Wash sale"
-                value={
-                  lotSummary.washSale == null
-                    ? "—"
-                    : lotSummary.washSale.canBuy
-                      ? "Clear"
-                      : `${lotSummary.washSale.daysRemaining}d left`
-                }
-                valueClassName={lotSummary.washSale?.canBuy === false ? "text-error" : undefined}
-              />
-            </div>
-
-            <div className={dense ? "mt-3 space-y-3" : "mt-4 space-y-4"}>
-              <div className="rounded-xl border border-border/70 bg-background/40 p-3 dark:border-white/[0.07] dark:bg-white/[0.03]">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>Tax rule status</p>
-                    <p className={cn("text-subtle", dense ? "mt-1 text-[11px]" : "mt-1 text-xs")}>
-                      {lotSummary.washSale?.displayText ?? "No lot-level rule data available yet."}
-                    </p>
-                  </div>
-                  {sellOnlyLongTermQualified && hasPosition ? (
-                    <span
-                      className={cn(
-                        "inline-flex rounded-md px-2 py-1 font-semibold",
-                        dense ? "text-[10px]" : "text-xs",
-                        lotSummary.oldestOpenLotQualified
-                          ? "bg-emerald-500/15 text-emerald-800 dark:bg-emerald-400/20 dark:text-emerald-200"
-                          : "bg-amber-500/15 text-amber-800 dark:bg-amber-400/20 dark:text-amber-200"
-                      )}
-                    >
-                      {lotSummary.oldestOpenLotQualified ? "Sell gate satisfied" : "Sell gate blocked"}
-                    </span>
-                  ) : null}
-                </div>
-                {sellOnlyLongTermQualified && hasPosition ? (
-                  <p className={cn("text-subtle", dense ? "mt-2 text-[11px]" : "mt-2 text-xs")}>
-                    {lotSummary.oldestOpenLotDate == null || isUnknownPurchaseDate(lotSummary.oldestOpenLotDate)
-                      ? "Long-term sales are enabled in settings, but no dated open lot is available."
-                      : lotSummary.oldestOpenLotQualified
-                        ? `Oldest open lot qualifies for long-term treatment since ${formatDateLabel(lotSummary.oldestOpenLotDate.toISOString())}.`
-                        : `Oldest open lot has not reached the 365-day threshold yet (${formatDateLabel(lotSummary.oldestOpenLotDate.toISOString())}).`}
-                  </p>
-                ) : null}
-              </div>
-
-              {lotSummary.openLots.length > 0 ? (
-                <div>
-                  <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>Open lots</p>
-                  <ul className={cn("mt-2 space-y-2", dense ? "text-xs" : "text-sm")}>
-                    {lotSummary.openLots.map((lot) => {
-                      const holdingStatus = lotHoldingStatus(lot.purchaseDate);
-                      const lotMarketValue = lot.quantity * last;
-                      const lotCostBasis = lot.quantity * lot.costBasis;
-                      const lotUnrealized = lotMarketValue - lotCostBasis;
-
-                      return (
-                        <li
-                          key={lot.id}
-                          className="rounded-xl border border-border/60 bg-background/40 p-3 dark:border-white/[0.06]"
-                        >
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div>
-                              <p className="font-medium tabular-nums text-foreground">
-                                {formatNumberMax2(lot.quantity)} shares @ {formatCurrency(lot.costBasis)}
-                              </p>
-                              <p className={cn("text-subtle", dense ? "mt-1 text-[11px]" : "mt-1 text-xs")}>
-                                Bought {formatDateLabel(lot.purchaseDate)}
-                              </p>
-                              {(lot.account || lot.isRetirementAccount != null) && (
-                                <p className={cn("text-subtle", dense ? "mt-1 text-[11px]" : "mt-1 text-xs")}>
-                                  {lot.account?.trim() ? lot.account : "No account name"} · {formatAccountType(lot.isRetirementAccount)}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              <span className={cn("inline-flex rounded-md px-2 py-1 font-semibold", dense ? "text-[10px]" : "text-xs", holdingStatus.className)}>
-                                {holdingStatus.label}
-                              </span>
-                              <span className={cn("inline-flex rounded-md px-2 py-1 font-semibold", dense ? "text-[10px]" : "text-xs", lotStatusTone(lot.status))}>
-                                {formatLotStatus(lot.status)}
-                              </span>
-                            </div>
-                          </div>
-                          <div className={cn("mt-2 grid grid-cols-2 sm:grid-cols-3", dense ? "gap-2" : "gap-3")}>
-                            <SnapshotRow compact={dense} label="Lot basis" value={formatCurrency(lotCostBasis)} />
-                            <SnapshotRow compact={dense} label="Market value" value={formatCurrency(lotMarketValue)} />
-                            <SnapshotRow
-                              compact={dense}
-                              label="Unrealized P/L"
-                              value={formatSignedCurrency(lotUnrealized)}
-                              hint={last > 0 ? `Last price ${formatCurrency(last)}` : undefined}
-                            />
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ) : (
-                <p className={cn("text-subtle", dense ? "text-xs" : "text-sm")}>
-                  No open lot records are available for this symbol yet.
-                </p>
-              )}
-
-              {lotSummary.soldLots.length > 0 ? (
-                <div>
-                  <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>Closed lots</p>
-                  <ul className={cn("mt-2 space-y-2", dense ? "text-xs" : "text-sm")}>
-                    {lotSummary.soldLots.map((lot, index) => (
-                      <li
-                        key={`${lot.saleDate}-${lot.quantity}-${lot.salePrice}-${index}`}
-                        className="rounded-xl border border-border/60 bg-background/40 p-3 dark:border-white/[0.06]"
-                      >
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <div>
-                            <p className="font-medium tabular-nums text-foreground">
-                              Sold {formatNumberMax2(lot.quantity)} shares @ {formatCurrency(lot.salePrice)}
-                            </p>
-                            <p className={cn("text-subtle", dense ? "mt-1 text-[11px]" : "mt-1 text-xs")}>
-                              Sale date {formatDateLabel(lot.saleDate)}
-                            </p>
-                          </div>
-                          <span
-                            className={cn(
-                              "inline-flex rounded-md px-2 py-1 font-semibold",
-                              dense ? "text-[10px]" : "text-xs",
-                              lot.realizedGainLoss >= 0
-                                ? "bg-emerald-500/15 text-emerald-800 dark:bg-emerald-400/20 dark:text-emerald-200"
-                                : "bg-red-500/15 text-red-700 dark:bg-red-400/20 dark:text-red-200"
-                            )}
-                          >
-                            {lot.realizedGainLoss >= 0 ? "Realized gain" : "Realized loss"}
-                          </span>
-                        </div>
-                        <div className={cn("mt-2 grid grid-cols-2", dense ? "gap-2" : "gap-3")}>
-                          <SnapshotRow compact={dense} label="Proceeds" value={formatCurrency(lot.quantity * lot.salePrice)} />
-                          <SnapshotRow
-                            compact={dense}
-                            label="Realized P/L"
-                            value={formatSignedCurrency(lot.realizedGainLoss)}
-                          />
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </div>
-            {lotSummary.openLots.length === 0 && lotSummary.soldLots.length === 0 ? (
-              <p className={cn("mt-3 text-subtle", dense ? "text-xs" : "text-sm")}>
-                Record trades here or sync from the iOS app to populate tax lots for this symbol.
-              </p>
-            ) : null}
-          </SectionCard>
-        )}
       </div>
 
       <StockStrategyModal
@@ -910,50 +1053,22 @@ function FactorFlagRow({
   compact?: boolean;
 }) {
   return (
-    <div
-      className={cn(
-        "relative overflow-hidden rounded-xl border",
-        passes
-          ? "border-emerald-500/20 bg-emerald-500/8"
-          : "border-amber-500/20 bg-amber-500/8",
-        compact ? "px-2.5 py-2" : "px-3.5 py-3"
+    <div className={cn("flex items-start gap-2.5 border-b border-border/50 last:border-b-0 dark:border-white/[0.06]", compact ? "py-1.5" : "py-2")}>
+      {passes ? (
+        <CheckCircle2 className={cn("mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
+      ) : (
+        <XCircle className={cn("mt-0.5 shrink-0 text-red-600 dark:text-red-400", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
       )}
-    >
-      <div
-        aria-hidden="true"
+      <p className={cn("min-w-0 flex-1 text-foreground/88", compact ? "text-xs" : "text-sm")}>{label}</p>
+      <p
         className={cn(
-          "absolute inset-y-0 left-0 w-1.5",
-          passes ? "bg-emerald-500/85" : "bg-amber-500/85"
+          "shrink-0 text-right leading-snug",
+          passes ? "text-subtle" : "text-red-600 dark:text-red-300",
+          compact ? "max-w-[45%] text-[10px]" : "max-w-[48%] text-xs"
         )}
-      />
-      <div className={cn("flex items-start gap-3", compact ? "pl-2" : "pl-2.5")}>
-        <span
-          className={cn(
-            "mt-0.5 shrink-0 rounded-full border",
-            passes
-              ? "border-emerald-500/35 bg-emerald-500/18 text-emerald-700 dark:text-emerald-300"
-              : "border-amber-500/35 bg-amber-500/18 text-amber-700 dark:text-amber-300",
-            compact ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]"
-          )}
-        >
-          {passes ? "Met" : "Flag"}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-            <p className={cn("min-w-0 flex-1 font-semibold text-foreground", compact ? "text-xs" : "text-sm")}>{label}</p>
-            <span
-              className={cn(
-                "shrink-0 font-semibold uppercase tracking-[0.12em]",
-                passes ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300",
-                compact ? "text-[9px]" : "text-[10px]"
-              )}
-            >
-              {passes ? "Supports signal" : "Needs caution"}
-            </span>
-          </div>
-          <p className={cn("leading-snug text-subtle", compact ? "mt-1 text-[10px]" : "mt-1.5 text-xs")}>{detail}</p>
-        </div>
-      </div>
+      >
+        {detail}
+      </p>
     </div>
   );
 }
