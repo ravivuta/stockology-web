@@ -190,7 +190,7 @@ function SectionCard({
   );
 }
 
-function HeroStat({
+function HeaderSnapshotItem({
   label,
   value,
   detail,
@@ -364,11 +364,9 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const last = stock.lastPrice ?? 0;
   const tradePrice = price ? parseFloat(price) : last;
   const hasPosition = stock.quantity > 0;
-  const costBasis = stock.quantity * stock.averageCost;
   const positionValue = stock.quantity * last;
-  const unrealized = positionValue - costBasis;
-  const unrealizedPct = costBasis > 0 ? (unrealized / costBasis) * 100 : 0;
-  const upside = analystTargetUpsidePct(stock.lastPrice, stock.analystTarget);
+  const unrealized = positionValue - stock.quantity * stock.averageCost;
+  const unrealizedPct = stock.quantity * stock.averageCost > 0 ? (unrealized / (stock.quantity * stock.averageCost)) * 100 : 0;
 
   function applyTrade() {
     const q = parseFloat(qty) || 0;
@@ -458,39 +456,65 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                     {formatPercent(stock.dailyChangePercent, true)} today
                   </p>
                 ) : null}
+                {hasPosition ? (
+                  <div className={cn("space-y-0.5", dense ? "text-[11px]" : "text-sm")}>
+                    <p className="tabular-nums text-foreground/88">
+                      Position value {formatCurrency(positionValue)}
+                    </p>
+                    <p className={cn("tabular-nums", valueTone(unrealized))}>
+                      P/L {formatCurrency(unrealized)} ({formatPercent(unrealizedPct, true)})
+                    </p>
+                  </div>
+                ) : null}
                 <p className={cn("text-subtle", dense ? "text-[11px]" : "text-sm")}>
                   {histLoading ? "Refreshing history and recommendation context" : "Live quote with synced rule-based recommendation"}
                 </p>
               </div>
             </div>
           </div>
-          <div className={cn("grid gap-3", dense ? "grid-cols-2" : "sm:grid-cols-2")}>
-            <HeroStat
-              compact={dense}
-              label={hasPosition ? "Position value" : "Analyst target"}
-              value={hasPosition ? formatCurrency(positionValue) : stock.analystTarget != null ? formatCurrency(stock.analystTarget) : "—"}
-              detail={hasPosition ? `${formatNumberMax2(stock.quantity)} shares held` : "Consensus target from latest refresh"}
-            />
-            <HeroStat
-              compact={dense}
-              label={hasPosition ? "Unrealized P/L" : "Upside"}
-              value={hasPosition ? `${formatCurrency(unrealized)} (${formatPercent(unrealizedPct, true)})` : formatUpsidePct(upside)}
-              valueClassName={hasPosition ? valueTone(unrealized) : valueTone(upside)}
-              detail={hasPosition ? `Basis ${formatCurrency(costBasis)}` : stock.analystTarget != null ? `Target ${formatCurrency(stock.analystTarget)}` : "No target available"}
-            />
-            <HeroStat
-              compact={dense}
-              label="Signal"
-              value={rec ? rec.action.replace("_", " ") : "No signal"}
-              valueClassName={rec ? recommendationTone(rec.action).split(" ").find((item) => item.startsWith("text-")) : undefined}
-              detail={stock.score != null ? `Score ${formatScoreDisplay(stock.score)}` : "Rules-based recommendation"}
-            />
-            <HeroStat
-              compact={dense}
-              label="Strategy"
-              value={`SMA ${stock.shortSMA}`}
-              detail={`Dynamic factor ${formatDecimal(stock.dynamicFactor)}%`}
-            />
+          <div className="rounded-[1.4rem] border border-white/45 bg-white/70 p-3 backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.05]">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>Snapshot</p>
+                <p className={cn("text-subtle", dense ? "mt-0.5 text-[10px]" : "mt-1 text-xs")}>
+                  Latest quote context and core fundamentals.
+                </p>
+              </div>
+              {rec ? (
+                <span
+                  className={cn(
+                    "inline-flex rounded-full border px-2.5 py-1 font-bold tracking-[0.14em]",
+                    dense ? "text-[9px]" : "text-[10px]",
+                    recommendationTone(rec.action)
+                  )}
+                >
+                  {rec.action.replace("_", " ")}
+                </span>
+              ) : null}
+            </div>
+            <div className={cn("grid gap-3", dense ? "grid-cols-2" : "sm:grid-cols-2")}>
+              <HeaderSnapshotItem compact={dense} label="Beta" value={stock.beta != null ? formatDecimal(stock.beta) : "—"} />
+              <HeaderSnapshotItem
+                compact={dense}
+                label="Market cap"
+                value={stock.marketCap != null ? formatCompactCurrency(stock.marketCap) : "—"}
+              />
+              <HeaderSnapshotItem compact={dense} label="PEG ratio" value={stock.peg != null ? formatDecimal(stock.peg) : "—"} />
+              <HeaderSnapshotItem compact={dense} label="Analyst avg" value={stock.analystAvg?.trim() || "—"} />
+              <HeaderSnapshotItem
+                compact={dense}
+                label="Analyst target"
+                value={stock.analystTarget != null ? formatCurrency(stock.analystTarget) : "—"}
+                detail={formatUpsidePct(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget))}
+                valueClassName={valueTone(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget))}
+              />
+              <HeaderSnapshotItem
+                compact={dense}
+                label={`SMA(${stock.shortSMA})`}
+                value={smaForSnapshot != null ? formatCurrency(smaForSnapshot) : "—"}
+                detail={stock.isETF ? "ETF" : "Stock"}
+              />
+            </div>
           </div>
         </div>
         <div className={cn("mt-4 flex shrink-0 items-center gap-1.5 sm:gap-2", dense ? "justify-end" : "justify-between")}>
@@ -883,39 +907,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
           </div>
 
           <div className={dense ? "space-y-3" : "space-y-5"}>
-            <SectionCard
-              compact={dense}
-              title="Snapshot"
-              description="Fundamentals and moving average from your latest quotes. If you also use the mobile app, numbers stay in step after a refresh."
-            >
-              <ul className={cn("grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1", dense ? "gap-x-4 gap-y-2" : "gap-x-8 gap-y-4")}>
-                <SnapshotRow compact={dense} label="Beta" value={stock.beta != null ? formatDecimal(stock.beta) : "—"} />
-                <SnapshotRow
-                  compact={dense}
-                  label="Market cap"
-                  value={stock.marketCap != null ? formatCompactCurrency(stock.marketCap) : "—"}
-                />
-                <SnapshotRow compact={dense} label="PEG ratio" value={stock.peg != null ? formatDecimal(stock.peg) : "—"} />
-                <SnapshotRow compact={dense} label="Analyst avg" value={stock.analystAvg?.trim() || "—"} />
-                <SnapshotRow
-                  compact={dense}
-                  label="Analyst target"
-                  value={stock.analystTarget != null ? formatCurrency(stock.analystTarget) : "—"}
-                />
-                <SnapshotRow
-                  compact={dense}
-                  label={`SMA(${stock.shortSMA})`}
-                  value={smaForSnapshot != null ? formatCurrency(smaForSnapshot) : "—"}
-                  hint={
-                    stock.movingAvg != null && Number.isFinite(stock.movingAvg)
-                      ? "Saved moving average from your last refresh"
-                      : "Estimated from recent daily closes in the chart range"
-                  }
-                />
-                <SnapshotRow compact={dense} label="ETF" value={stock.isETF ? "Yes" : "No"} />
-              </ul>
-            </SectionCard>
-
             <SectionCard
               compact={dense}
               title="Record a trade"
