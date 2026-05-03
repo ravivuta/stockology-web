@@ -163,6 +163,12 @@ export default function SettingsPage() {
             <p className="max-w-xl text-[11px] leading-snug text-subtle sm:text-xs sm:leading-snug">
               Account, subscription, and portfolio preferences—aligned with the Stocks PM iOS profile experience.
             </p>
+            {!loading && !allowed ? (
+              <div className="mt-2 rounded-lg border border-red-500/30 bg-red-500/12 px-3 py-2 text-[11px] leading-snug text-red-700 dark:text-red-200 sm:text-xs">
+                <span className="font-semibold uppercase tracking-wide">Limited Access</span>{" "}
+                Your account does not have an active trial or subscription, so navigation is locked to Settings until billing is activated.
+              </div>
+            ) : null}
           </div>
           <div className="flex shrink-0 sm:justify-end">
             <div className="rounded-md border border-border/80 bg-background/80 px-2.5 py-1.5 text-right dark:border-white/[0.08] dark:bg-white/[0.04]">
@@ -230,15 +236,15 @@ export default function SettingsPage() {
                       "inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
                       allowed
                         ? "bg-primary/12 text-primary ring-1 ring-primary/25 dark:bg-primary/15"
-                        : "bg-muted text-subtle ring-1 ring-border dark:ring-white/[0.08]"
+                        : "bg-red-500/12 text-red-700 ring-1 ring-red-500/30 dark:bg-red-500/16 dark:text-red-200"
                     )}
                   >
-                    {allowed ? "Access active" : "Limited access"}
+                    {allowed ? "Access active" : "Limited Access"}
                   </div>
                   <p className="text-[11px] leading-snug text-subtle sm:text-xs sm:leading-snug">
                     {allowed
                       ? "Your trial or subscription is active from Stripe or a synced iOS subscription."
-                      : "Access is limited until you start the trial subscription or an existing mobile subscription is synced."}
+                      : "You were redirected here because the rest of the app is locked until you start the trial subscription or an existing mobile subscription is synced."}
                   </p>
                   {billingState === "success" ? (
                     <p className="rounded-md border border-primary/25 bg-primary/10 px-2.5 py-2 text-[11px] text-primary">
