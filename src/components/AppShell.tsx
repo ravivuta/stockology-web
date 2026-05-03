@@ -10,14 +10,17 @@ import Sidebar from "@/components/nav/Sidebar";
 import { STOCKS_PM_ONBOARDING_USER_META_KEY } from "@/lib/onboarding-meta";
 import { PageLoading } from "@/components/ui/PageLoading";
 import { useHydrateTickerFundamentals } from "@/hooks/useHydrateTickerFundamentals";
+import { isPaidSubscriptionTier } from "@/lib/subscription-state";
 
 function planFromSubscription(row: SubRow, allowed: boolean): { label: string; variant: "free" | "trial" | "pro" | "max" } {
-  const now = Date.now();
   if (!allowed) return { label: "Free", variant: "free" };
-  const paid = row?.subscription_expires_at ? new Date(row.subscription_expires_at).getTime() : 0;
-  const trial = row?.trial_expires_at ? new Date(row.trial_expires_at).getTime() : 0;
-  if (paid && paid > now) return { label: "Pro", variant: "pro" };
-  if (trial && trial > now) return { label: "Trial", variant: "trial" };
+  if (isPaidSubscriptionTier(row?.subscription_tier)) {
+    const tier = row?.subscription_tier?.trim().toLowerCase();
+    if (tier === "monthly") return { label: "Monthly", variant: "pro" };
+    if (tier === "yearly") return { label: "Yearly", variant: "pro" };
+    return { label: "Pro", variant: "pro" };
+  }
+  if (row?.trial_expires_at) return { label: "Trial", variant: "trial" };
   return { label: "Free", variant: "free" };
 }
 
@@ -60,35 +63,41 @@ export function AppShell({
   }, [metaDone, user.id, hasCloudPortfolio, router]);
 
   useEffect(() => {
+    if (!loading && !allowed && pathname !== "/settings") {
+      router.replace("/settings");
+      return;
+    }
     if (pathname === "/onboarding" && onboardingDone) {
       router.replace("/dashboard");
     }
-  }, [pathname, onboardingDone, router]);
+  }, [allowed, loading, pathname, onboardingDone, router]);
 
   useEffect(() => {
+    if (!allowed) return;
     if (!onboardingDone && pathname !== "/onboarding") router.replace("/onboarding");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onboardingDone, pathname]);
-
-  useEffect(() => {
-    if (!loading && !allowed && pathname !== "/settings" && pathname !== "/onboarding") {
-      router.replace("/settings");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, allowed, pathname]);
-
-  if (!onboardingDone && pathname !== "/onboarding") {
-    return (
-      <div className="app-interactive-ui min-h-dvh bg-background">
-        <PageLoading message="Preparing your workspace…" compact />
-      </div>
-    );
-  }
+  }, [allowed, onboardingDone, pathname]);
 
   if (!loading && !allowed && pathname !== "/settings") {
     return (
       <div className="app-interactive-ui min-h-dvh bg-background">
         <PageLoading message="Checking subscription…" compact />
+      </div>
+    );
+  }
+
+  if (!allowed && pathname === "/onboarding") {
+    return (
+      <div className="app-interactive-ui min-h-dvh bg-background">
+        <PageLoading message="Redirecting to billing…" compact />
+      </div>
+    );
+  }
+
+  if (allowed && !onboardingDone && pathname !== "/onboarding") {
+    return (
+      <div className="app-interactive-ui min-h-dvh bg-background">
+        <PageLoading message="Preparing your workspace…" compact />
       </div>
     );
   }

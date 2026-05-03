@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/AppShell";
 import { PortfolioCloudBridge } from "@/components/PortfolioCloudBridge";
 import { snapshotIndicatesExistingAccount } from "@/lib/cloud-portfolio";
-import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
+import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   let user = null;
@@ -17,12 +17,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
   if (!user) redirect("/login");
 
-  const dataUserId = await resolveStocksPmDataUserId(supabase, user.id);
+  const dataUserId = await syncStocksPmAuthUser(supabase, user.id);
 
   const [subRes, snapRes] = await Promise.all([
     supabase
       .from("user_subscriptions")
-      .select("trial_expires_at, subscription_expires_at")
+      .select("trial_expires_at, subscription_expires_at, subscription_tier, is_active")
       .eq("user_id", dataUserId)
       .maybeSingle(),
     // Holdings are AES-256-CBC encrypted at rest; must read via RPC which decrypts server-side.

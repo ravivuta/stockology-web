@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   Briefcase,
   CreditCard,
@@ -11,7 +12,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
+import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { useSubscriptionGate } from "@/hooks/useSubscriptionGate";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -69,6 +70,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 }
 
 export default function SettingsPage() {
+  const searchParams = useSearchParams();
   const [userId, setUserId] = useState<string | undefined>();
   const { row, loading, allowed } = useSubscriptionGate(userId);
   const cashBalance = usePortfolioStore((s) => s.cashBalance);
@@ -90,6 +92,7 @@ export default function SettingsPage() {
   const [cashInput, setCashInput] = useState(String(cashBalance));
   const [activeSection, setActiveSection] = useState<string>(SECTIONS[0].id);
   const [resetOpen, setResetOpen] = useState(false);
+  const billingState = searchParams.get("billing");
 
   useEffect(() => {
     let cancelled = false;
@@ -98,7 +101,7 @@ export default function SettingsPage() {
       const { data } = await supabase.auth.getUser();
       const uid = data.user?.id;
       if (!uid || cancelled) return;
-      const resolved = await resolveStocksPmDataUserId(supabase, uid);
+      const resolved = await syncStocksPmAuthUser(supabase, uid);
       if (!cancelled) setUserId(resolved);
     })();
     return () => {
@@ -234,11 +237,43 @@ export default function SettingsPage() {
                   </div>
                   <p className="text-[11px] leading-snug text-subtle sm:text-xs sm:leading-snug">
                     {allowed
-                      ? "Trial or subscription is active. Billing and restore will connect here as production features ship."
-                      : "Access is limited here—renew or start a trial when billing is connected."}
+                      ? "Your trial or subscription is active from Stripe or a synced iOS subscription."
+                      : "Access is limited until you start the trial subscription or an existing mobile subscription is synced."}
                   </p>
+                  {billingState === "success" ? (
+                    <p className="rounded-md border border-primary/25 bg-primary/10 px-2.5 py-2 text-[11px] text-primary">
+                      Checkout completed. If access does not update within a few seconds, refresh this page.
+                    </p>
+                  ) : null}
+                  {billingState === "cancelled" ? (
+                    <p className="rounded-md border border-border/70 bg-background/50 px-2.5 py-2 text-[11px] text-subtle">
+                      Checkout was cancelled before the trial subscription started.
+                    </p>
+                  ) : null}
+                  {billingState === "missing_customer" ? (
+                    <p className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 dark:text-red-200">
+                      No Stripe customer record was found for this account yet. Start the trial first.
+                    </p>
+                  ) : null}
+                  {billingState === "error" ? (
+                    <p className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 dark:text-red-200">
+                      Billing could not be started. Check the Stripe environment variables and try again.
+                    </p>
+                  ) : null}
                   {row ? (
                     <ul className="space-y-1 rounded-md border border-border/70 bg-background/50 px-2.5 py-2 text-[10px] text-subtle dark:border-white/[0.08] dark:bg-yale/25 sm:text-[11px]">
+                      {row.subscription_tier ? (
+                        <li className="flex justify-between gap-4">
+                          <span className="text-subtle">Tier</span>
+                          <span className="font-medium capitalize tabular-nums text-foreground">{row.subscription_tier}</span>
+                        </li>
+                      ) : null}
+                      {row.is_active != null ? (
+                        <li className="flex justify-between gap-4">
+                          <span className="text-subtle">Active flag</span>
+                          <span className="font-medium tabular-nums text-foreground">{row.is_active ? "Yes" : "No"}</span>
+                        </li>
+                      ) : null}
                       {row.trial_expires_at ? (
                         <li className="flex justify-between gap-4">
                           <span className="text-subtle">Trial until</span>
@@ -253,8 +288,22 @@ export default function SettingsPage() {
                       ) : null}
                     </ul>
                   ) : null}
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <Link
+                      href="/billing/start?next=/dashboard"
+                      className={appCtaButton("ui-hover-spotlight px-3 py-2 text-sm")}
+                    >
+                      {allowed ? "Restart checkout" : "Start 30-day free trial"}
+                    </Link>
+                    <Link
+                      href="/billing/portal"
+                      className="ui-hover-pop rounded-lg border border-border px-3 py-2 text-sm text-foreground"
+                    >
+                      Manage billing
+                    </Link>
+                  </div>
                   <p className="text-[10px] leading-snug text-subtle">
-                    Restore purchases will refresh this row once store billing is wired up.
+                    Trial signup uses Stripe Checkout, collects billing up front, and automatically converts to a paid subscription after 30 days unless cancelled in the portal.
                   </p>
                 </div>
               )}

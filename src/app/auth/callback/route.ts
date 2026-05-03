@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { safeRelativeRedirectPath } from "@/lib/safe-redirect";
+import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
 
 function oauthErrorForQuery(message: string): string {
   const s = message.replace(/[\r\n\u0000]/g, " ").trim().slice(0, 200);
@@ -41,6 +42,13 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     return NextResponse.redirect(`${origin}${basePath}/login?error=${encodeURIComponent(oauthErrorForQuery(error.message))}`);
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) {
+    await syncStocksPmAuthUser(supabase, user.id);
   }
 
   return redirectResponse;
