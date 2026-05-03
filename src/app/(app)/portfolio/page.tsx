@@ -49,6 +49,23 @@ function recSymbolTextClass(action: string | undefined): string {
   return "text-foreground dark:text-white";
 }
 
+function scoreTextClass(score: number | null | undefined): string {
+  if (score == null || !Number.isFinite(score)) return "text-subtle";
+  if (score >= 90) return "text-emerald-600 dark:text-emerald-400";
+  if (score >= 80) return "text-emerald-600/90 dark:text-emerald-300";
+  if (score >= 70) return "text-primary dark:text-primary";
+  if (score >= 60) return "text-amber-600 dark:text-amber-300";
+  if (score >= 50) return "text-red-600/85 dark:text-red-300";
+  return "text-red-600 dark:text-red-400";
+}
+
+function upsideTextClass(upside: number | null | undefined): string {
+  if (upside == null || !Number.isFinite(upside)) return "text-subtle";
+  if (upside > 0) return "text-emerald-600 dark:text-emerald-400";
+  if (upside < 0) return "text-red-600 dark:text-red-400";
+  return "text-subtle";
+}
+
 function PortfolioSummaryTiles({
   cash,
   assetsValue,
@@ -442,10 +459,10 @@ export default function PortfolioPage() {
                         {formatWholeCurrency(Math.abs(gainLoss))}
                         {gainLossPct != null ? ` (${formatPercent(gainLossPct, true)})` : ""}
                       </td>
-                      <td className={`px-4 py-3 text-center tabular-nums font-medium ${upside == null ? "text-subtle" : upside > 0 ? "text-emerald-700 dark:text-primary" : upside < 0 ? "text-red-700 dark:text-red-400" : "text-subtle"}`}>
+                      <td className={`px-4 py-3 text-center tabular-nums font-medium ${upsideTextClass(upside)}`}>
                         {formatUpsidePct(upside)}
                       </td>
-                      <td className="px-4 py-3 text-center tabular-nums text-foreground">{s.score != null ? formatDecimal(s.score) : "—"}</td>
+                      <td className={`px-4 py-3 text-center tabular-nums font-medium ${scoreTextClass(s.score)}`}>{s.score != null ? formatDecimal(s.score) : "—"}</td>
                       <td className="px-4 py-3 align-middle text-center">
                         {s.recommendation ? (
                           <span

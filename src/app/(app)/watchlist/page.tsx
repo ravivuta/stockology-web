@@ -25,6 +25,34 @@ const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
   signal: "asc",
 };
 
+function scoreTextClass(score: number | null | undefined): string {
+  if (score == null || !Number.isFinite(score)) return "text-subtle";
+  if (score >= 90) return "text-emerald-600 dark:text-emerald-400";
+  if (score >= 80) return "text-emerald-600/90 dark:text-emerald-300";
+  if (score >= 70) return "text-primary dark:text-primary";
+  if (score >= 60) return "text-amber-600 dark:text-amber-300";
+  if (score >= 50) return "text-red-600/85 dark:text-red-300";
+  return "text-red-600 dark:text-red-400";
+}
+
+function upsideTextClass(upside: number | null | undefined): string {
+  if (upside == null || !Number.isFinite(upside)) return "text-subtle";
+  if (upside > 0) return "text-emerald-600 dark:text-emerald-400";
+  if (upside < 0) return "text-red-600 dark:text-red-400";
+  return "text-subtle";
+}
+
+function analystRatingTextClass(value: string | null | undefined): string {
+  const rating = typeof value === "string" ? Number.parseFloat(value) : Number.NaN;
+  if (!Number.isFinite(rating)) return "text-subtle";
+  if (rating >= 4.5) return "text-emerald-600 dark:text-emerald-400";
+  if (rating >= 4.0) return "text-emerald-600/90 dark:text-emerald-300";
+  if (rating >= 3.5) return "text-primary dark:text-primary";
+  if (rating >= 3.0) return "text-amber-600 dark:text-amber-300";
+  if (rating >= 2.5) return "text-red-600/85 dark:text-red-300";
+  return "text-red-600 dark:text-red-400";
+}
+
 /**
  * Watchlist includes every tracked symbol: zero-qty names and all holdings (they stay on the watchlist automatically).
  */
@@ -278,15 +306,13 @@ export default function WatchlistPage() {
                       {s.dailyChangePercent != null ? formatPercent(s.dailyChangePercent, true) : "—"}
                     </td>
                     <td
-                      className="min-w-0 px-2 py-3 text-center tabular-nums text-foreground sm:px-3"
+                      className={`min-w-0 px-2 py-3 text-center tabular-nums font-medium sm:px-3 ${analystRatingTextClass(rating)}`}
                       title="Consensus / average rating when available from data refresh"
                     >
                       <span className="block truncate">{rating && !Number.isNaN(Number.parseFloat(rating)) ? formatDecimal(Number.parseFloat(rating)) : "—"}</span>
                     </td>
                     <td
-                      className={`min-w-0 px-2 py-3 text-center tabular-nums font-medium sm:px-3 ${
-                        upside == null ? "text-subtle" : upside > 0 ? "text-emerald-700 dark:text-emerald-400" : upside < 0 ? "text-red-700 dark:text-red-400" : "text-subtle"
-                      }`}
+                      className={`min-w-0 px-2 py-3 text-center tabular-nums font-medium sm:px-3 ${upsideTextClass(upside)}`}
                       title={
                         s.analystTarget != null && s.lastPrice
                           ? `Target ${formatCurrency(s.analystTarget)} vs last ${formatCurrency(s.lastPrice)}`
@@ -295,7 +321,7 @@ export default function WatchlistPage() {
                     >
                       <span className="block truncate">{formatUpsidePct(upside)}</span>
                     </td>
-                    <td className="min-w-0 px-2 py-3 text-center tabular-nums text-subtle sm:px-3">
+                    <td className={`min-w-0 px-2 py-3 text-center tabular-nums font-medium sm:px-3 ${scoreTextClass(s.score)}`}>
                       <span className="block truncate">{s.score != null ? formatDecimal(s.score) : "—"}</span>
                     </td>
                     <td className="min-w-0 px-2 py-3 text-center text-xs text-subtle sm:px-3">

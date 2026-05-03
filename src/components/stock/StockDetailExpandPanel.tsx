@@ -102,6 +102,17 @@ function valueTone(value: number | null | undefined): string {
   return value > 0 ? "text-primary" : "text-error";
 }
 
+function analystRatingTone(value: string | null | undefined): string {
+  const rating = typeof value === "string" ? Number.parseFloat(value) : Number.NaN;
+  if (!Number.isFinite(rating)) return "text-foreground";
+  if (rating >= 4.5) return "text-emerald-600 dark:text-emerald-400";
+  if (rating >= 4.0) return "text-emerald-600/90 dark:text-emerald-300";
+  if (rating >= 3.5) return "text-primary dark:text-primary";
+  if (rating >= 3.0) return "text-amber-600 dark:text-amber-300";
+  if (rating >= 2.5) return "text-red-600/85 dark:text-red-300";
+  return "text-red-600 dark:text-red-400";
+}
+
 type Props = {
   symbol: string;
   embedded?: boolean;
@@ -207,14 +218,14 @@ function HeaderSnapshotItem({
     <div
       className={cn(
         "rounded-2xl border border-white/45 bg-white/70 backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.05]",
-        compact ? "px-3 py-2" : "px-4 py-3.5"
+        compact ? "px-2.5 py-2" : "px-4 py-3.5"
       )}
     >
       <p className={cn("font-semibold uppercase tracking-[0.14em] text-subtle", compact ? "text-[9px]" : "text-[11px]")}>{label}</p>
-      <p className={cn("mt-1 font-semibold tabular-nums tracking-tight text-foreground", compact ? "text-sm" : "text-xl", valueClassName)}>
+      <p className={cn("mt-1 font-semibold tabular-nums tracking-tight text-foreground", compact ? "text-[13px]" : "text-xl", valueClassName)}>
         {value}
       </p>
-      {detail ? <p className={cn("mt-1 text-subtle", compact ? "text-[10px]" : "text-xs")}>{detail}</p> : null}
+      {detail ? <p className={cn("mt-0.5 text-subtle", compact ? "text-[9px]" : "text-xs")}>{detail}</p> : null}
     </div>
   );
 }
@@ -384,7 +395,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   return (
     <div
       className={cn(
-        "relative overflow-hidden text-foreground",
+        "relative flex max-h-full min-h-0 flex-col overflow-hidden text-foreground",
         embedded
           ? "border-t border-border/70 bg-transparent"
           : "rounded-[1.9rem] border border-border/80 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.14),transparent_26%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.12),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.95),rgba(248,250,252,0.88))] shadow-[0_30px_100px_-55px_rgba(15,23,42,0.55)] dark:border-white/[0.08] dark:bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_24%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.1),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.94),rgba(2,6,23,0.94))]"
@@ -472,11 +483,11 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               </div>
             </div>
           </div>
-          <div className="rounded-[1.4rem] border border-white/45 bg-white/70 p-3 backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.05]">
-            <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="rounded-[1.25rem] border border-white/45 bg-white/70 p-2.5 backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.05]">
+            <div className="mb-2 flex items-center justify-between gap-3">
               <div>
                 <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>Snapshot</p>
-                <p className={cn("text-subtle", dense ? "mt-0.5 text-[10px]" : "mt-1 text-xs")}>
+                <p className={cn("text-subtle", dense ? "mt-0.5 text-[10px]" : "mt-0.5 text-[11px]")}>
                   Latest quote context and core fundamentals.
                 </p>
               </div>
@@ -492,24 +503,24 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                 </span>
               ) : null}
             </div>
-            <div className={cn("grid gap-3", dense ? "grid-cols-2" : "sm:grid-cols-2")}>
-              <HeaderSnapshotItem compact={dense} label="Beta" value={stock.beta != null ? formatDecimal(stock.beta) : "—"} />
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+              <HeaderSnapshotItem compact label="Beta" value={stock.beta != null ? formatDecimal(stock.beta) : "—"} />
               <HeaderSnapshotItem
-                compact={dense}
+                compact
                 label="Market cap"
                 value={stock.marketCap != null ? formatCompactCurrency(stock.marketCap) : "—"}
               />
-              <HeaderSnapshotItem compact={dense} label="PEG ratio" value={stock.peg != null ? formatDecimal(stock.peg) : "—"} />
-              <HeaderSnapshotItem compact={dense} label="Analyst avg" value={stock.analystAvg?.trim() || "—"} />
+              <HeaderSnapshotItem compact label="PEG ratio" value={stock.peg != null ? formatDecimal(stock.peg) : "—"} />
+              <HeaderSnapshotItem compact label="Analyst avg" value={stock.analystAvg?.trim() || "—"} valueClassName={analystRatingTone(stock.analystAvg)} />
               <HeaderSnapshotItem
-                compact={dense}
+                compact
                 label="Analyst target"
                 value={stock.analystTarget != null ? formatCurrency(stock.analystTarget) : "—"}
                 detail={formatUpsidePct(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget))}
                 valueClassName={valueTone(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget))}
               />
               <HeaderSnapshotItem
-                compact={dense}
+                compact
                 label={`SMA(${stock.shortSMA})`}
                 value={smaForSnapshot != null ? formatCurrency(smaForSnapshot) : "—"}
                 detail={stock.isETF ? "ETF" : "Stock"}
@@ -547,8 +558,9 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       </div>
 
       <div
+        style={{ scrollbarGutter: "stable" }}
         className={cn(
-          dense ? "space-y-3 px-3 py-3" : "max-h-[min(78vh,980px)] space-y-5 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6"
+          dense ? "min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3 pr-2" : "min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 pr-3 sm:px-6 sm:py-6"
         )}
       >
         <div className={cn("grid items-start", dense ? "gap-3" : "gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(22rem,0.95fr)] 2xl:grid-cols-[minmax(0,1.72fr)_minmax(24rem,0.9fr)]")}>
@@ -616,7 +628,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                       compact={dense}
                       label="Consensus"
                       value={stock.analystAvg?.trim() || "—"}
-                      valueClassName={dense ? "text-sm font-medium" : "text-base font-medium"}
+                      valueClassName={cn(dense ? "text-sm font-medium" : "text-base font-medium", analystRatingTone(stock.analystAvg))}
                     />
                   </>
                 )}
