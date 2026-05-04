@@ -94,6 +94,7 @@ export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState<string>(SECTIONS[0].id);
   const [resetOpen, setResetOpen] = useState(false);
   const billingState = searchParams.get("billing");
+  const billingDetail = searchParams.get("billing_detail");
 
   useEffect(() => {
     let cancelled = false;
@@ -316,6 +317,11 @@ export default function SettingsPage() {
                   {billingState === "error" ? (
                     <p className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 dark:text-red-200">
                       Billing could not be started. Check the Stripe environment variables and try again.
+                    </p>
+                  ) : null}
+                  {billingDetail ? (
+                    <p className="rounded-md border border-border/70 bg-background/50 px-2.5 py-2 font-mono text-[10px] leading-snug text-subtle dark:border-white/[0.08] dark:bg-yale/25 sm:text-[11px]">
+                      {billingDetail}
                     </p>
                   ) : null}
                   {row ? (
