@@ -2,8 +2,11 @@ import type Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type BillingSubState = {
+  subscription_tier: string;
+  trial_started_at: string | null;
   trial_expires_at: string | null;
   subscription_expires_at: string | null;
+  is_active: boolean;
 };
 
 function unixToIso(value: number | null): string | null {
@@ -26,8 +29,27 @@ function currentPeriodEndFromItems(subscription: Stripe.Subscription): number | 
   return null;
 }
 
+function subscriptionTierFromStripeSubscription(subscription: Stripe.Subscription): string {
+  if (subscription.status === "trialing") {
+    return "trial";
+  }
+
+  const interval = subscription.items.data[0]?.price?.recurring?.interval;
+  if (interval === "month") return "monthly";
+  if (interval === "year") return "yearly";
+  if (interval === "week") return "weekly";
+  if (interval === "day") return "daily";
+
+  if (subscription.status === "active" || subscription.status === "past_due") {
+    return "pro";
+  }
+
+  return "free";
+}
+
 export function trialAndSubscriptionFromStripeSubscription(subscription: Stripe.Subscription): BillingSubState {
   const status = subscription.status;
+  const trialStartedAt = status === "trialing" ? unixToIso(subscription.trial_start) : null;
   const trialExpiresAt = status === "trialing" ? unixToIso(subscription.trial_end) : null;
   const currentPeriodEndUnix = currentPeriodEndFromItems(subscription);
   const subscriptionExpiresAt =
@@ -36,8 +58,11 @@ export function trialAndSubscriptionFromStripeSubscription(subscription: Stripe.
       : null;
 
   return {
+    subscription_tier: subscriptionTierFromStripeSubscription(subscription),
+    trial_started_at: trialStartedAt,
     trial_expires_at: trialExpiresAt,
     subscription_expires_at: subscriptionExpiresAt,
+    is_active: status === "trialing" || status === "active" || status === "past_due",
   };
 }
 
@@ -55,7 +80,10 @@ export async function upsertUserSubscriptionState(userId: string, values: Billin
 
 export async function clearUserSubscriptionState(userId: string) {
   await upsertUserSubscriptionState(userId, {
+    subscription_tier: "free",
+    trial_started_at: null,
     trial_expires_at: null,
     subscription_expires_at: null,
+    is_active: false,
   });
 }

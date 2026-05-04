@@ -6,6 +6,19 @@ import { getStripe } from "@/lib/stripe/server";
 
 export const runtime = "nodejs";
 
+function portalErrorState(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("stripe_secret_key")) {
+    return "portal_env_missing";
+  }
+  if (normalized.includes("billing portal") || normalized.includes("no configuration provided")) {
+    return "portal_not_configured";
+  }
+  return "portal_error";
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -50,6 +63,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(portal.url);
   } catch (error) {
     console.error("[billing/portal] failed", error);
-    return NextResponse.redirect(new URL("/settings?billing=portal_error", request.url));
+    return NextResponse.redirect(new URL(`/settings?billing=${portalErrorState(error)}`, request.url));
   }
 }

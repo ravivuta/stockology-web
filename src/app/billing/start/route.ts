@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
       },
     ],
     allow_promotion_codes: true,
-    success_url: `${origin}/settings?billing=success&return_to=${encodeURIComponent(returnTo)}`,
+    success_url: `${origin}/billing/success?session_id={CHECKOUT_SESSION_ID}&next=${encodeURIComponent(returnTo)}`,
     cancel_url: `${origin}/settings?billing=cancelled`,
     metadata: {
       user_id: dataUserId,

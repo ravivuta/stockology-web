@@ -266,9 +266,19 @@ export default function SettingsPage() {
                       No Stripe-managed subscription was found for this account. If your access comes from the iOS app, manage billing in Apple subscriptions; otherwise start the Stripe trial first.
                     </p>
                   ) : null}
+                  {billingState === "portal_not_configured" ? (
+                    <p className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 dark:text-red-200">
+                      Stripe Billing Portal is not configured yet. Enable the customer portal and create a default configuration in Stripe Dashboard, then try again.
+                    </p>
+                  ) : null}
+                  {billingState === "portal_env_missing" ? (
+                    <p className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 dark:text-red-200">
+                      Stripe secret key is missing on the server, so the billing portal cannot be opened.
+                    </p>
+                  ) : null}
                   {billingState === "portal_error" ? (
                     <p className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 dark:text-red-200">
-                      Billing portal could not be opened. Check the Stripe portal configuration and try again.
+                      Billing portal could not be opened due to a Stripe server error. Check the deployment logs and try again.
                     </p>
                   ) : null}
                   {billingState === "error" ? (
