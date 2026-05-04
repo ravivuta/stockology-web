@@ -6,6 +6,11 @@ import { syncLatestStripeSubscriptionForUser } from "@/lib/stripe/subscription-s
 
 export const runtime = "nodejs";
 
+function sanitizedBillingDetail(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.replace(/[\r\n\u0000]/g, " ").trim().slice(0, 220);
+}
+
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const {
@@ -32,6 +37,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(returnTo, request.url));
   } catch (error) {
     console.error("[billing/refresh] failed", error);
-    return NextResponse.redirect(new URL("/settings?billing=portal_error", request.url));
+    const url = new URL("/settings?billing=refresh_error", request.url);
+    const detail = sanitizedBillingDetail(error);
+    if (detail) {
+      url.searchParams.set("billing_detail", detail);
+    }
+    return NextResponse.redirect(url);
   }
 }

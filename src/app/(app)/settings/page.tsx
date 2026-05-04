@@ -300,6 +300,11 @@ export default function SettingsPage() {
                       Billing portal could not be opened due to a Stripe server error. Check the deployment logs and try again.
                     </p>
                   ) : null}
+                  {billingState === "refresh_error" ? (
+                    <p className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 dark:text-red-200">
+                      Billing status could not be refreshed from Stripe. Check the detail below and deployment logs.
+                    </p>
+                  ) : null}
                   {billingState === "billing_env_missing" ? (
                     <p className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 dark:text-red-200">
                       Stripe secret key is missing on the server, so checkout cannot be started.
