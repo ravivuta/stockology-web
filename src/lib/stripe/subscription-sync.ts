@@ -26,6 +26,10 @@ function preferredSubscription(subscriptions: Stripe.Subscription[]) {
   return ranked[0] ?? null;
 }
 
+function customerIdFromSubscription(subscription: Stripe.Subscription): string | null {
+  return typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id ?? null;
+}
+
 export async function syncLatestStripeSubscriptionForUser({
   userId,
   email,
@@ -34,6 +38,22 @@ export async function syncLatestStripeSubscriptionForUser({
   email: string;
 }): Promise<StripeSyncResult> {
   const stripe = getStripe();
+  try {
+    const searchedSubscriptions = await stripe.subscriptions.search({
+      query: `metadata['user_id']:'${userId.replace(/'/g, "\\'")}'`,
+      limit: 20,
+    });
+    const directMatch = preferredSubscription(searchedSubscriptions.data);
+    if (directMatch) {
+      const customerId = customerIdFromSubscription(directMatch);
+      const state = trialAndSubscriptionFromStripeSubscription(directMatch);
+      await upsertUserSubscriptionState(userId, state);
+      return { ok: true, customerId: customerId ?? "", subscriptionId: directMatch.id, state };
+    }
+  } catch {
+    // Fallback below for Stripe accounts/environments where search is unavailable.
+  }
+
   const customers = email
     ? await stripe.customers.list({ email, limit: 10 })
     : { data: [] as Stripe.Customer[] };
