@@ -4,6 +4,7 @@ import { safeRelativeRedirectPath } from "@/lib/safe-redirect";
 import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
 import { subscriptionAllowsAccess } from "@/lib/subscription-state";
 import { getStripe, getStripePriceId } from "@/lib/stripe/server";
+import { syncLatestStripeSubscriptionForUser } from "@/lib/stripe/subscription-sync";
 
 export const runtime = "nodejs";
 
@@ -91,6 +92,18 @@ export async function GET(request: NextRequest) {
     }
 
     const origin = request.nextUrl.origin;
+    try {
+      const stripeState = await syncLatestStripeSubscriptionForUser({
+        userId: dataUserId,
+        email: user.email ?? "",
+      });
+      if (stripeState.ok && subscriptionAllowsAccess(stripeState.state)) {
+        return NextResponse.redirect(new URL(returnTo, request.url));
+      }
+    } catch (error) {
+      console.warn("[billing/start] stripe sync pre-check failed, continuing to checkout", error);
+    }
+
     const customerId = await findOrCreateCustomer({
       userId: dataUserId,
       email: user.email ?? "",

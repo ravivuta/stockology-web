@@ -1,9 +1,10 @@
 import type Stripe from "stripe";
 import { clearUserSubscriptionState, trialAndSubscriptionFromStripeSubscription, upsertUserSubscriptionState } from "@/lib/billing";
 import { getStripe } from "@/lib/stripe/server";
+import type { BillingSubState } from "@/lib/billing";
 
 export type StripeSyncResult =
-  | { ok: true; customerId: string; subscriptionId: string | null }
+  | { ok: true; customerId: string; subscriptionId: string | null; state: BillingSubState }
   | { ok: false; reason: "missing_customer" | "missing_subscription" };
 
 function preferredSubscription(subscriptions: Stripe.Subscription[]) {
@@ -55,6 +56,7 @@ export async function syncLatestStripeSubscriptionForUser({
     return { ok: false, reason: "missing_subscription" };
   }
 
-  await upsertUserSubscriptionState(userId, trialAndSubscriptionFromStripeSubscription(subscription));
-  return { ok: true, customerId: customer.id, subscriptionId: subscription.id };
+  const state = trialAndSubscriptionFromStripeSubscription(subscription);
+  await upsertUserSubscriptionState(userId, state);
+  return { ok: true, customerId: customer.id, subscriptionId: subscription.id, state };
 }

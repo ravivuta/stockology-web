@@ -353,12 +353,22 @@ export default function SettingsPage() {
                     </ul>
                   ) : null}
                   <div className="flex flex-wrap gap-2 pt-1">
-                    <Link
-                      href="/billing/start?next=/dashboard"
-                      className={appCtaButton("ui-hover-spotlight px-3 py-2 text-sm")}
-                    >
-                      {allowed ? "Restart checkout" : "Start 30-day free trial"}
-                    </Link>
+                    {!allowed ? (
+                      <Link
+                        href="/billing/start?next=/dashboard"
+                        className={appCtaButton("ui-hover-spotlight px-3 py-2 text-sm")}
+                      >
+                        Start 30-day free trial
+                      </Link>
+                    ) : null}
+                    {allowed ? (
+                      <Link
+                        href="/billing/refresh?next=/settings"
+                        className="ui-hover-pop rounded-lg border border-border px-3 py-2 text-sm text-foreground"
+                      >
+                        Refresh billing status
+                      </Link>
+                    ) : null}
                     <Link
                       href="/billing/portal"
                       className="ui-hover-pop rounded-lg border border-border px-3 py-2 text-sm text-foreground"
