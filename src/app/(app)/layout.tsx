@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { PortfolioCloudBridge } from "@/components/PortfolioCloudBridge";
 import { snapshotIndicatesExistingAccount } from "@/lib/cloud-portfolio";
 import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
+import { getSubscriptionRowForUser } from "@/lib/subscription-admin";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   let user = null;
@@ -19,17 +20,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const dataUserId = await syncStocksPmAuthUser(supabase, user.id);
 
-  const [subRes, snapRes] = await Promise.all([
-    supabase
-      .from("user_subscriptions")
-      .select("trial_expires_at, subscription_expires_at, subscription_tier, is_active")
-      .eq("user_id", dataUserId)
-      .maybeSingle(),
+  const [subRow, snapRes] = await Promise.all([
+    getSubscriptionRowForUser(dataUserId),
     // Holdings are AES-256-CBC encrypted at rest; must read via RPC which decrypts server-side.
     supabase.rpc("get_latest_portfolio_snapshot", { p_user_id: dataUserId }),
   ]);
-
-  const subRow = subRes.data;
   const latestSnapshot = snapRes.data as { holdings: unknown; cash_balance: unknown; total_portfolio_value: unknown } | null;
   const snapErr = snapRes.error;
 

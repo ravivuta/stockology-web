@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { subscriptionAllowsAccess, type SubscriptionRow } from "@/lib/subscription-state";
 
 export type SubRow = SubscriptionRow;
@@ -29,13 +28,12 @@ export function useSubscriptionGate(userId: string | undefined, serverRow?: SubR
         setLoading(true);
       }
       try {
-        const supabase = createClient();
-        const { data } = await supabase
-          .from("user_subscriptions")
-          .select("trial_expires_at, subscription_expires_at, subscription_tier, is_active")
-          .eq("user_id", userId)
-          .maybeSingle();
-        if (!cancelled) setRow(data ?? null);
+        const response = await fetch("/api/subscription/status", { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(`Subscription status request failed: ${response.status}`);
+        }
+        const payload = (await response.json()) as { row?: SubscriptionRow | null };
+        if (!cancelled) setRow(payload.row ?? null);
       } catch {
         if (!cancelled) setRow(null);
       } finally {
