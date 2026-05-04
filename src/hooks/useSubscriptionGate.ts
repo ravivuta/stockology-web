@@ -11,7 +11,7 @@ export type SubRow = SubscriptionRow;
 export function useSubscriptionGate(userId: string | undefined, serverRow?: SubRow) {
   const fromServer = serverRow !== undefined;
   const [row, setRow] = useState<SubRow | undefined>(() => (fromServer ? serverRow : undefined));
-  const [loading, setLoading] = useState(!fromServer && !!userId);
+  const [loading, setLoading] = useState(!!userId && !fromServer);
 
   useEffect(() => {
     if (!userId) {
@@ -19,13 +19,11 @@ export function useSubscriptionGate(userId: string | undefined, serverRow?: SubR
       setLoading(false);
       return;
     }
-    if (fromServer) {
-      setRow(serverRow);
-      setLoading(false);
-      return;
-    }
     let cancelled = false;
     (async () => {
+      if (!fromServer && !cancelled) {
+        setLoading(true);
+      }
       try {
         const supabase = createClient();
         const { data } = await supabase
@@ -37,13 +35,22 @@ export function useSubscriptionGate(userId: string | undefined, serverRow?: SubR
       } catch {
         if (!cancelled) setRow(null);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
   }, [userId, fromServer, serverRow]);
+
+  useEffect(() => {
+    if (fromServer) {
+      setRow(serverRow);
+      setLoading(false);
+    }
+  }, [fromServer, serverRow]);
 
   const allowed = (() => {
     if (row === undefined) return true;
