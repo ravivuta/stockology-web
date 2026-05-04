@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Briefcase,
   CreditCard,
@@ -70,6 +70,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 }
 
 export default function SettingsPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [userId, setUserId] = useState<string | undefined>();
   const { row, loading, allowed } = useSubscriptionGate(userId);
@@ -112,6 +113,12 @@ export default function SettingsPage() {
   useEffect(() => {
     setCashInput(String(cashBalance));
   }, [cashBalance]);
+
+  useEffect(() => {
+    if (billingState === "success" && !loading && !allowed) {
+      router.replace("/billing/refresh?next=/dashboard");
+    }
+  }, [allowed, billingState, loading, router]);
 
   const scrollToId = useCallback((id: string) => {
     setActiveSection(id);
@@ -259,6 +266,11 @@ export default function SettingsPage() {
                   {billingState === "missing_customer" ? (
                     <p className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 dark:text-red-200">
                       No Stripe customer record was found for this account yet. Start the trial first.
+                    </p>
+                  ) : null}
+                  {billingState === "missing_subscription" ? (
+                    <p className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 dark:text-red-200">
+                      Stripe billing was reached, but no subscription record could be found for this account yet. Try refresh billing status once more.
                     </p>
                   ) : null}
                   {billingState === "portal_unavailable" ? (

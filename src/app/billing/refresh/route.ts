@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { safeRelativeRedirectPath } from "@/lib/safe-redirect";
-import { getStripe } from "@/lib/stripe/server";
 import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
 import { syncLatestStripeSubscriptionForUser } from "@/lib/stripe/subscription-sync";
 
@@ -18,30 +17,21 @@ export async function GET(request: NextRequest) {
   }
 
   const returnTo = safeRelativeRedirectPath(request.nextUrl.searchParams.get("next"), "/dashboard");
-  const sessionId = request.nextUrl.searchParams.get("session_id");
-  if (!sessionId) {
-    return NextResponse.redirect(new URL(`/settings?billing=success&return_to=${encodeURIComponent(returnTo)}`, request.url));
-  }
 
   try {
     const dataUserId = await syncStocksPmAuthUser(supabase, user.id);
-    const stripe = getStripe();
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const result = await syncLatestStripeSubscriptionForUser({
+      userId: dataUserId,
+      email: user.email ?? "",
+    });
 
-    if (session.client_reference_id && session.client_reference_id !== dataUserId) {
-      return NextResponse.redirect(new URL("/settings?billing=error", request.url));
-    }
-
-    if (typeof session.subscription === "string") {
-      await syncLatestStripeSubscriptionForUser({
-        userId: dataUserId,
-        email: user.email ?? "",
-      });
+    if (!result.ok) {
+      return NextResponse.redirect(new URL(`/settings?billing=${result.reason}`, request.url));
     }
 
     return NextResponse.redirect(new URL(returnTo, request.url));
   } catch (error) {
-    console.error("[billing/success] failed", error);
-    return NextResponse.redirect(new URL("/settings?billing=error", request.url));
+    console.error("[billing/refresh] failed", error);
+    return NextResponse.redirect(new URL("/settings?billing=portal_error", request.url));
   }
 }
