@@ -293,6 +293,26 @@ export default function SettingsPage() {
                       Billing portal could not be opened due to a Stripe server error. Check the deployment logs and try again.
                     </p>
                   ) : null}
+                  {billingState === "billing_env_missing" ? (
+                    <p className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 dark:text-red-200">
+                      Stripe secret key is missing on the server, so checkout cannot be started.
+                    </p>
+                  ) : null}
+                  {billingState === "billing_price_missing" ? (
+                    <p className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 dark:text-red-200">
+                      `STRIPE_PRICE_ID` is missing on the server, so checkout cannot be started.
+                    </p>
+                  ) : null}
+                  {billingState === "billing_price_invalid" ? (
+                    <p className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 dark:text-red-200">
+                      The configured Stripe price id is invalid for this environment. Check that the price exists and matches the same Stripe mode as the secret key.
+                    </p>
+                  ) : null}
+                  {billingState === "billing_checkout_error" ? (
+                    <p className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 dark:text-red-200">
+                      Stripe Checkout could not be created. Check the Stripe product, recurring price, and customer configuration.
+                    </p>
+                  ) : null}
                   {billingState === "error" ? (
                     <p className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 dark:text-red-200">
                       Billing could not be started. Check the Stripe environment variables and try again.
