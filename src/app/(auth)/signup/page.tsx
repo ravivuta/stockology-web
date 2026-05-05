@@ -51,7 +51,7 @@ function SignupInner() {
       const origin = window.location.origin;
       const { data, error: err } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: googleOAuthSignInOptions(origin, "/billing/start?next=/dashboard"),
+        options: googleOAuthSignInOptions(origin, "/dashboard"),
       });
       if (err) throw err;
       if (data?.url) {
@@ -100,7 +100,7 @@ function SignupInner() {
         <div className="mt-6 flex items-start gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3.5 py-3">
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400/75" strokeWidth={1.75} aria-hidden />
           <p className="text-xs leading-relaxed text-zinc-500">
-            Start with a 30-day free trial. Billing is collected through Stripe and automatically continues unless you cancel before the trial ends.
+            Start with a 3-month free trial. No credit card is required during signup. Subscribe later from Settings whenever you are ready.
           </p>
         </div>
 

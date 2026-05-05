@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { safeRelativeRedirectPath } from "@/lib/safe-redirect";
+import { ensureUserHasWebTrial } from "@/lib/billing";
 import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
 
 function oauthErrorForQuery(message: string): string {
@@ -48,7 +49,8 @@ export async function GET(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   if (user) {
-    await syncStocksPmAuthUser(supabase, user.id);
+    const dataUserId = await syncStocksPmAuthUser(supabase, user.id);
+    await ensureUserHasWebTrial(dataUserId);
   }
 
   return redirectResponse;

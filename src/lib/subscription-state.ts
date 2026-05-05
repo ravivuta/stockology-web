@@ -3,6 +3,7 @@ export type SubscriptionRow = {
   subscription_expires_at: string | null;
   subscription_tier?: string | null;
   is_active?: boolean | null;
+  billing_exempt?: boolean | null;
 } | null;
 
 function expiresAtMs(value: string | null | undefined) {
@@ -16,6 +17,7 @@ export function isPaidSubscriptionTier(value: string | null | undefined) {
 
 export function subscriptionAllowsAccess(row: SubscriptionRow) {
   if (!row) return false;
+  if (row.billing_exempt === true) return true;
   if (row.is_active === false) return false;
 
   const now = Date.now();

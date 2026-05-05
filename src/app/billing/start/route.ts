@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { safeRelativeRedirectPath } from "@/lib/safe-redirect";
 import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
-import { subscriptionAllowsAccess } from "@/lib/subscription-state";
+import { isPaidSubscriptionTier, subscriptionAllowsAccess } from "@/lib/subscription-state";
 import { getStripe, getStripePriceId } from "@/lib/stripe/server";
 import { syncLatestStripeSubscriptionForUser } from "@/lib/stripe/subscription-sync";
 
@@ -80,11 +80,17 @@ export async function GET(request: NextRequest) {
       dataUserId = await syncStocksPmAuthUser(supabase, user.id);
       const { data: subRow } = await supabase
         .from("user_subscriptions")
-        .select("trial_expires_at, subscription_expires_at, subscription_tier, is_active")
+        .select("trial_expires_at, subscription_expires_at, subscription_tier, is_active, billing_exempt")
         .eq("user_id", dataUserId)
         .maybeSingle();
 
-      if (subscriptionAllowsAccess(subRow ?? null)) {
+      if (subRow?.billing_exempt === true) {
+        return NextResponse.redirect(new URL(returnTo, request.url));
+      }
+
+      const hasActivePaidAccess =
+        subscriptionAllowsAccess(subRow ?? null) && isPaidSubscriptionTier(subRow?.subscription_tier);
+      if (hasActivePaidAccess) {
         return NextResponse.redirect(new URL(returnTo, request.url));
       }
     } catch (error) {
@@ -132,7 +138,6 @@ export async function GET(request: NextRequest) {
         auth_user_id: user.id,
       },
       subscription_data: {
-        trial_period_days: 30,
         metadata: {
           user_id: dataUserId,
           auth_user_id: user.id,

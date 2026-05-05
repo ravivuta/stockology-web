@@ -34,6 +34,9 @@ export async function GET(request: NextRequest) {
 
     const dataUserId = await syncStocksPmAuthUser(supabase, user.id);
     const currentRow = await getSubscriptionRowForUser(dataUserId);
+    if (currentRow?.billing_exempt === true) {
+      return NextResponse.redirect(new URL("/settings?billing=admin_access", request.url));
+    }
     const hasAppAccess = subscriptionAllowsAccess(currentRow);
     const stripe = getStripe();
     const email = user.email ?? "";

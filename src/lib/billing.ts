@@ -87,3 +87,29 @@ export async function clearUserSubscriptionState(userId: string) {
     is_active: false,
   });
 }
+
+export async function ensureUserHasWebTrial(userId: string, trialMonths = 3) {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("user_subscriptions")
+    .select("user_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (data?.user_id) return false;
+
+  const trialStartedAt = new Date();
+  const trialExpiresAt = new Date(trialStartedAt);
+  trialExpiresAt.setMonth(trialExpiresAt.getMonth() + trialMonths);
+
+  await upsertUserSubscriptionState(userId, {
+    subscription_tier: "trial",
+    trial_started_at: trialStartedAt.toISOString(),
+    trial_expires_at: trialExpiresAt.toISOString(),
+    subscription_expires_at: null,
+    is_active: true,
+  });
+
+  return true;
+}

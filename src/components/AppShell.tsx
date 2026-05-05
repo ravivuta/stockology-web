@@ -14,6 +14,7 @@ import { isPaidSubscriptionTier } from "@/lib/subscription-state";
 
 function planFromSubscription(row: SubRow, allowed: boolean): { label: string; variant: "free" | "trial" | "pro" | "max" } {
   if (!allowed) return { label: "Free", variant: "free" };
+  if (row?.billing_exempt) return { label: "Admin", variant: "max" };
   if (isPaidSubscriptionTier(row?.subscription_tier)) {
     const tier = row?.subscription_tier?.trim().toLowerCase();
     if (tier === "monthly") return { label: "Monthly", variant: "pro" };

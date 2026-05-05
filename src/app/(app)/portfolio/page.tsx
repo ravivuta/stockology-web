@@ -527,7 +527,7 @@ export default function PortfolioPage() {
                   <SortableHeaderCell label="Costbasis" column="costBasis" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
                   <SortableHeaderCell label="Current Value" column="value" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
                   <SortableHeaderCell label="P/L" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
-                  <SortableHeaderCell label="Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
+                  <SortableHeaderCell label="Potential Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
                   <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
                   <th scope="col" aria-sort={sort === "signal" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className="px-4 pb-2 pt-3 text-center text-xs font-semibold tracking-wide">
                     <div className="flex flex-col items-center gap-2">

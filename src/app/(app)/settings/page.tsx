@@ -19,6 +19,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { recommendedWatchlistSize } from "@/lib/ios-recommendation";
 import { formatCurrency } from "@/lib/numberFormat";
+import { isPaidSubscriptionTier } from "@/lib/subscription-state";
 import { cn } from "@/lib/utils";
 
 const SECTIONS = [
@@ -101,6 +102,8 @@ export default function SettingsPage() {
   const billingState = searchParams.get("billing");
   const billingDetail = searchParams.get("billing_detail");
   const idealWatchlistSize = recommendedWatchlistSize(portfolioSize);
+  const hasPaidPlan = isPaidSubscriptionTier(row?.subscription_tier);
+  const hasBillingExempt = row?.billing_exempt === true;
 
   useEffect(() => {
     let cancelled = false;
@@ -246,10 +249,19 @@ export default function SettingsPage() {
                     {allowed ? "Access active" : "Limited Access"}
                   </div>
                   <p className="text-[11px] leading-snug text-subtle sm:text-xs sm:leading-snug">
-                    {allowed
-                      ? "Your trial or subscription is active from Stripe or a synced iOS subscription."
-                      : "You were redirected here because the rest of the app is locked until you start the trial subscription or an existing mobile subscription is synced."}
+                    {hasBillingExempt
+                      ? "This account is marked billing-exempt. Access stays active and Stripe billing is bypassed."
+                      : allowed
+                      ? hasPaidPlan
+                        ? "Your paid subscription is active from Stripe or a synced iOS subscription."
+                        : "Your app-managed free trial is active. Subscribe from Stripe anytime without losing access."
+                      : "You were redirected here because the rest of the app is locked until you start a subscription or an existing mobile subscription is synced."}
                   </p>
+                  {billingState === "admin_access" ? (
+                    <p className="rounded-md border border-primary/25 bg-primary/10 px-2.5 py-2 text-[11px] text-primary">
+                      This account is billing-exempt, so Stripe billing management is not used.
+                    </p>
+                  ) : null}
                   {billingState === "success" ? (
                     <p className="rounded-md border border-primary/25 bg-primary/10 px-2.5 py-2 text-[11px] text-primary">
                       Checkout completed. If access does not update within a few seconds, refresh this page.
@@ -257,12 +269,12 @@ export default function SettingsPage() {
                   ) : null}
                   {billingState === "cancelled" ? (
                     <p className="rounded-md border border-border/70 bg-background/50 px-2.5 py-2 text-[11px] text-subtle">
-                      Checkout was cancelled before the trial subscription started.
+                      Checkout was cancelled before the paid subscription started.
                     </p>
                   ) : null}
                   {billingState === "missing_customer" ? (
                     <p className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 dark:text-red-200">
-                      No Stripe customer record was found for this account yet. Start the trial first.
+                      No Stripe customer record was found for this account yet. Start the paid subscription first.
                     </p>
                   ) : null}
                   {billingState === "missing_subscription" ? (
@@ -272,7 +284,7 @@ export default function SettingsPage() {
                   ) : null}
                   {billingState === "portal_unavailable" ? (
                     <p className="rounded-md border border-amber-500/25 bg-amber-500/10 px-2.5 py-2 text-[11px] text-amber-700 dark:text-amber-200">
-                      No Stripe-managed subscription was found for this account. If your access comes from the iOS app, manage billing in Apple subscriptions; otherwise start the Stripe trial first.
+                      No Stripe-managed subscription was found for this account. If your access comes from the iOS app, manage billing in Apple subscriptions; otherwise start the Stripe subscription first.
                     </p>
                   ) : null}
                   {billingState === "portal_not_configured" ? (
@@ -339,6 +351,12 @@ export default function SettingsPage() {
                           <span className="font-medium tabular-nums text-foreground">{row.is_active ? "Yes" : "No"}</span>
                         </li>
                       ) : null}
+                      {row.billing_exempt != null ? (
+                        <li className="flex justify-between gap-4">
+                          <span className="text-subtle">Billing exempt</span>
+                          <span className="font-medium tabular-nums text-foreground">{row.billing_exempt ? "Yes" : "No"}</span>
+                        </li>
+                      ) : null}
                       {row.trial_expires_at ? (
                         <li className="flex justify-between gap-4">
                           <span className="text-subtle">Trial until</span>
@@ -354,15 +372,15 @@ export default function SettingsPage() {
                     </ul>
                   ) : null}
                   <div className="flex flex-wrap gap-2 pt-1">
-                    {!allowed ? (
+                    {!hasPaidPlan && !hasBillingExempt ? (
                       <Link
-                        href="/billing/start?next=/dashboard"
+                        href="/billing/start?next=/settings"
                         className={appCtaButton("ui-hover-spotlight px-3 py-2 text-sm")}
                       >
-                        Start 30-day free trial
+                        Subscribe now
                       </Link>
                     ) : null}
-                    {allowed ? (
+                    {hasPaidPlan && !hasBillingExempt ? (
                       <Link
                         href="/billing/refresh?next=/settings"
                         className="ui-hover-pop rounded-lg border border-border px-3 py-2 text-sm text-foreground"
@@ -370,15 +388,19 @@ export default function SettingsPage() {
                         Refresh billing status
                       </Link>
                     ) : null}
-                    <Link
-                      href="/billing/portal"
-                      className="ui-hover-pop rounded-lg border border-border px-3 py-2 text-sm text-foreground"
-                    >
-                      Manage billing
-                    </Link>
+                    {hasPaidPlan && !hasBillingExempt ? (
+                      <Link
+                        href="/billing/portal"
+                        className="ui-hover-pop rounded-lg border border-border px-3 py-2 text-sm text-foreground"
+                      >
+                        Manage billing
+                      </Link>
+                    ) : null}
                   </div>
                   <p className="text-[10px] leading-snug text-subtle">
-                    Trial signup uses Stripe Checkout, collects billing up front, and automatically converts to a paid subscription after 30 days unless cancelled in the portal.
+                    {hasBillingExempt
+                      ? "Billing-exempt accounts keep app access without expiry and are never routed through Stripe."
+                      : "Website signup now grants a 3-month app-managed trial with no credit card required. Stripe Checkout is only used when you choose to start a paid subscription."}
                   </p>
                 </div>
               )}

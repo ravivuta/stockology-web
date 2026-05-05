@@ -28,6 +28,9 @@ export async function GET(request: NextRequest) {
   try {
     const dataUserId = await syncStocksPmAuthUser(supabase, user.id);
     const currentRow = await getSubscriptionRowForUser(dataUserId);
+    if (currentRow?.billing_exempt === true) {
+      return NextResponse.redirect(new URL(returnTo, request.url));
+    }
     if (subscriptionAllowsAccess(currentRow)) {
       return NextResponse.redirect(new URL(returnTo, request.url));
     }

@@ -286,7 +286,7 @@ export default function WatchlistPage() {
                   </button>
                 </div>
               </th>
-              <SortableHeaderCell label="Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
+              <SortableHeaderCell label="Potential Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
               <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
               <th scope="col" aria-sort={sort === "signal" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className="min-w-0 px-2 py-3 text-center sm:px-3">
                 <div className="flex flex-col items-center gap-2">

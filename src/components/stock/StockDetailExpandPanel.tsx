@@ -797,7 +797,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                       />
                       <SnapshotRow
                         compact={dense}
-                        label="Upside to target"
+                        label="Potential Upside to target"
                         value={scoreRows.upsideLine}
                         hint={scoreRows.upsidePoints}
                         valueClassName={valueTone(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget))}
