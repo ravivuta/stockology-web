@@ -219,13 +219,10 @@ export default function SettingsPage() {
               id="appearance"
               icon={Palette}
               title="Appearance"
-              description="Light or dark mode for this browser. Your choice is remembered on this device."
+              description="Choose light, dark, or auto mode for this browser. Your choice is remembered on this device."
             >
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-2">
                 <ThemeToggle />
-                <p className="max-w-sm text-[10px] leading-snug text-subtle sm:text-right sm:text-[11px]">
-                  Applies to this browser only; pick light or dark explicitly.
-                </p>
               </div>
             </SettingsCard>
 
