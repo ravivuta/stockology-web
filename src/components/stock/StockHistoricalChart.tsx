@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 type Props = {
   symbol: string;
   smaPeriod: number;
+  smaOptions?: number[];
+  smaStorageKey?: string;
   averageCost?: number | null;
   points: PricePoint[] | null;
   loading: boolean;
@@ -46,9 +48,17 @@ function axisTickMs(ms: number) {
   return `${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
+function smaStroke(period: number): string {
+  if (period <= 50) return "#f59e0b";
+  if (period >= 200) return "#60a5fa";
+  return "#94a3b8";
+}
+
 export function StockHistoricalChart({
   symbol,
   smaPeriod,
+  smaOptions,
+  smaStorageKey,
   averageCost,
   points,
   loading,
@@ -63,7 +73,14 @@ export function StockHistoricalChart({
     if (!allowedRanges || allowedRanges.length === 0) return CHART_RANGES;
     return allowedRanges;
   }, [allowedRanges]);
+  const resolvedSmaOptions = useMemo(() => {
+    const next = smaOptions?.filter((value) => Number.isFinite(value) && value > 1) ?? [];
+    return next.length > 0 ? next : [smaPeriod];
+  }, [smaOptions, smaPeriod]);
   const [range, setRange] = useState<ChartRange>(rangeOptions.includes(initialRange) ? initialRange : rangeOptions[0] ?? "3mo");
+  const [selectedSmaPeriod, setSelectedSmaPeriod] = useState<number>(
+    resolvedSmaOptions.includes(smaPeriod) ? smaPeriod : (resolvedSmaOptions[0] ?? smaPeriod)
+  );
 
   useEffect(() => {
     if (!rangeOptions.includes(range)) {
@@ -71,18 +88,73 @@ export function StockHistoricalChart({
     }
   }, [initialRange, range, rangeOptions]);
 
+  useEffect(() => {
+    if (!resolvedSmaOptions.includes(selectedSmaPeriod)) {
+      setSelectedSmaPeriod(resolvedSmaOptions.includes(smaPeriod) ? smaPeriod : (resolvedSmaOptions[0] ?? smaPeriod));
+    }
+  }, [resolvedSmaOptions, selectedSmaPeriod, smaPeriod]);
+
+  useEffect(() => {
+    if (!smaStorageKey || typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(smaStorageKey);
+      if (!raw) return;
+      const parsed = Number.parseInt(raw, 10);
+      if (resolvedSmaOptions.includes(parsed)) {
+        setSelectedSmaPeriod(parsed);
+      }
+    } catch {
+      /* storage blocked */
+    }
+  }, [resolvedSmaOptions, smaStorageKey]);
+
+  useEffect(() => {
+    if (!smaStorageKey || typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(smaStorageKey, String(selectedSmaPeriod));
+    } catch {
+      /* storage blocked */
+    }
+  }, [selectedSmaPeriod, smaStorageKey]);
+
   const sliced = useMemo(() => (points ? sliceForRange(points, range) : []), [points, range]);
   const chartData = useMemo(() => {
-    const rows: { t: number; price: number; dateStr: string }[] = [];
-    for (const p of sliced) {
-      const t = parseYmdToUtcNoon(p.date);
-      if (!Number.isFinite(t) || !Number.isFinite(p.close)) continue;
-      rows.push({ t, price: p.close, dateStr: p.date.slice(0, 10) });
-    }
-    return rows;
-  }, [sliced]);
+    if (!points || points.length === 0) return [];
 
-  const smaValue = useMemo(() => (points ? lastSma(points, Math.min(smaPeriod, points.length)) : null), [points, smaPeriod]);
+    const slicedDates = new Set(sliced.map((point) => point.date.slice(0, 10)));
+    if (slicedDates.size === 0) return [];
+
+    const rows: { t: number; price: number; sma: number | null; dateStr: string }[] = [];
+    let rollingSum = 0;
+
+    for (let index = 0; index < points.length; index += 1) {
+      const point = points[index]!;
+      rollingSum += point.close;
+      if (index >= selectedSmaPeriod) {
+        rollingSum -= points[index - selectedSmaPeriod]!.close;
+      }
+
+      const dateStr = point.date.slice(0, 10);
+      if (!slicedDates.has(dateStr)) continue;
+
+      const t = parseYmdToUtcNoon(point.date);
+      if (!Number.isFinite(t) || !Number.isFinite(point.close)) continue;
+
+      rows.push({
+        t,
+        price: point.close,
+        sma: index + 1 >= selectedSmaPeriod ? rollingSum / selectedSmaPeriod : null,
+        dateStr,
+      });
+    }
+
+    return rows;
+  }, [points, selectedSmaPeriod, sliced]);
+
+  const smaValue = useMemo(
+    () => (points ? lastSma(points, Math.min(selectedSmaPeriod, points.length)) : null),
+    [points, selectedSmaPeriod]
+  );
   const pct = useMemo(() => rangePercentChange(sliced), [sliced]);
 
   const xTickMs = useMemo(() => {
@@ -94,10 +166,12 @@ export function StockHistoricalChart({
 
   const priceDomain = useMemo(() => {
     const vals = chartData.map((d) => d.price);
-    if (smaValue != null && smaValue > 0) vals.push(smaValue);
+    for (const row of chartData) {
+      if (row.sma != null && row.sma > 0) vals.push(row.sma);
+    }
     if (averageCost != null && averageCost > 0) vals.push(averageCost);
     return paddedValueDomain(vals, 0.06);
-  }, [chartData, smaValue, averageCost]);
+  }, [chartData, averageCost]);
   const yTickPrices = useMemo(
     () => evenlySpacedValueTicks(priceDomain[0], priceDomain[1], compact ? 4 : 5),
     [priceDomain, compact]
@@ -107,23 +181,45 @@ export function StockHistoricalChart({
     <div className={compact ? "space-y-2" : "space-y-3"} aria-label={`Price chart for ${symbol}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         {!hideRangeSelector ? (
-          <div
-            className={`flex flex-wrap gap-0.5 rounded-lg border border-border/80 bg-background/90 dark:border-white/10 ${compact ? "p-0.5" : "gap-1 rounded-xl p-1"}`}
-          >
-            {rangeOptions.map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setRange(r)}
-                className={cn(
-                  "rounded-md font-semibold",
-                  compact ? "px-2 py-1 text-[10px]" : "rounded-lg px-3 py-1.5 text-xs",
-                  range === r ? cn(APP_CTA_FILL, "shadow-sm") : "text-subtle hover:text-foreground"
-                )}
+          <div className="flex flex-wrap items-center gap-2">
+            <div
+              className={`flex flex-wrap gap-0.5 rounded-lg border border-border/80 bg-background/90 dark:border-white/10 ${compact ? "p-0.5" : "gap-1 rounded-xl p-1"}`}
+            >
+              {rangeOptions.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRange(r)}
+                  className={cn(
+                    "rounded-md font-semibold",
+                    compact ? "px-2 py-1 text-[10px]" : "rounded-lg px-3 py-1.5 text-xs",
+                    range === r ? cn(APP_CTA_FILL, "shadow-sm") : "text-subtle hover:text-foreground"
+                  )}
+                >
+                  {chartRangeLabel(r)}
+                </button>
+              ))}
+            </div>
+            {resolvedSmaOptions.length > 1 ? (
+              <div
+                className={`flex flex-wrap gap-0.5 rounded-lg border border-border/80 bg-background/90 dark:border-white/10 ${compact ? "p-0.5" : "gap-1 rounded-xl p-1"}`}
               >
-                {chartRangeLabel(r)}
-              </button>
-            ))}
+                {resolvedSmaOptions.map((period) => (
+                  <button
+                    key={period}
+                    type="button"
+                    onClick={() => setSelectedSmaPeriod(period)}
+                    className={cn(
+                      "rounded-md font-semibold",
+                      compact ? "px-2 py-1 text-[10px]" : "rounded-lg px-3 py-1.5 text-xs",
+                      selectedSmaPeriod === period ? cn(APP_CTA_FILL, "shadow-sm") : "text-subtle hover:text-foreground"
+                    )}
+                  >
+                    SMA {period}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : (
           <div
@@ -194,11 +290,19 @@ export function StockHistoricalChart({
                   return row?.dateStr ?? "";
                 }}
               />
-              {smaValue != null && smaValue > 0 && (
-                <ReferenceLine y={smaValue} stroke={chart.referenceStroke} strokeDasharray="5 5" />
-              )}
               {averageCost != null && averageCost > 0 && (
                 <ReferenceLine y={averageCost} stroke="var(--theme-primary)" strokeDasharray="3 3" />
+              )}
+              {smaValue != null && smaValue > 0 && (
+                <Line
+                  type="monotone"
+                  dataKey="sma"
+                  stroke={smaStroke(selectedSmaPeriod)}
+                  strokeWidth={1.8}
+                  dot={false}
+                  connectNulls
+                  isAnimationActive={chart.ready}
+                />
               )}
               <Line
                 type="monotone"
@@ -221,8 +325,8 @@ export function StockHistoricalChart({
         </span>
         {smaValue != null && smaValue > 0 && (
           <span className="flex items-center gap-2">
-            <span className="h-1 w-5 shrink-0 rounded-full opacity-80" style={{ background: chart.referenceStroke }} />{" "}
-            SMA ({smaPeriod})
+            <span className="h-1 w-5 shrink-0 rounded-full opacity-90" style={{ background: smaStroke(selectedSmaPeriod) }} />{" "}
+            SMA ({selectedSmaPeriod})
           </span>
         )}
         {averageCost != null && averageCost > 0 && (

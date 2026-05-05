@@ -243,6 +243,8 @@ export default function NewsPage() {
           <StockHistoricalChart
             symbol="SPY"
             smaPeriod={200}
+            smaOptions={[50, 200]}
+            smaStorageKey="stocks-pm:news:spy-sma-period"
             points={spyPoints}
             loading={spyLoading}
             error={spyError}
