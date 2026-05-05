@@ -16,6 +16,7 @@ import { isValidTicker } from "@/lib/csvPortfolio";
 import { formatCurrency, formatDecimal, formatNumberMax2, formatPercent, formatSignedCurrency, formatWholeCurrency } from "@/lib/numberFormat";
 import { recommendationActionDisplay } from "@/lib/recommendation";
 import { computeTodayChangeFromLiveQuotes } from "@/lib/portfolio-net-worth-series";
+import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 
 type SortKey = "symbol" | "quantity" | "averageCost" | "costBasis" | "lastPrice" | "value" | "gainLoss" | "upside" | "score" | "today" | "signal";
 
@@ -319,10 +320,11 @@ export default function PortfolioPage() {
   async function refresh() {
     if (stocks.length === 0) return;
     setRefreshing(true);
-    await runRefreshPipeline(stocks.map((s) => s.symbol));
-    recalc();
-    usePortfolioStore.setState({ lastRefreshAt: new Date().toISOString() });
-    setRefreshing(false);
+    try {
+      await runRefreshPipeline(stocks.map((s) => s.symbol), { includeSnapshot: true });
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   function saveCash() {
@@ -330,6 +332,7 @@ export default function PortfolioPage() {
     setCash(n);
     recalc();
     setIsCashEditing(false);
+    void flushCurrentPortfolioSnapshotNow(true);
   }
 
   function startCashEdit() {
@@ -366,6 +369,8 @@ export default function PortfolioPage() {
         pendingOptimization: true,
       });
     }
+
+    void flushCurrentPortfolioSnapshotNow(true);
 
     setNewSymbol("");
     setNewQuantity("1");

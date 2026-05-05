@@ -14,6 +14,7 @@ import { buildRecommendation } from "@/lib/recommendation";
 import { formatCompactCurrency, formatCurrency, formatDecimal, formatNumberMax2, formatPercent } from "@/lib/numberFormat";
 import { safeHttpUrlForHref } from "@/lib/safe-external-url";
 import { createClient } from "@/lib/supabase/client";
+import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { useSupabaseStockHistory } from "@/hooks/useSupabaseStockHistory";
 import { lastSma } from "@/lib/stock-chart";
@@ -234,6 +235,8 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const stocks = usePortfolioStore((s) => s.stocks);
   const recordTrade = usePortfolioStore((s) => s.recordTrade);
   const updateStock = usePortfolioStore((s) => s.updateStock);
+  const optimizeStock = usePortfolioStore((s) => s.optimizeStock);
+  const optimizing = usePortfolioStore((s) => s.optimizing);
   const etfProfitTarget = usePortfolioStore((s) => s.etfProfitTarget);
   const stockProfitTarget = usePortfolioStore((s) => s.stockProfitTarget);
   const useAISentimentForRecommendations = usePortfolioStore((s) => s.useAISentimentForRecommendations);
@@ -254,6 +257,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const [tradeAccountType, setTradeAccountType] = useState<"unknown" | "retirement" | "taxable">("unknown");
   const [aiNewsItems, setAiNewsItems] = useState<StockSentimentNewsItem[]>([]);
   const [aiNewsLoading, setAiNewsLoading] = useState(false);
+  const [optimizationMessage, setOptimizationMessage] = useState<string | null>(null);
 
   const smaFromHistory = useMemo(() => {
     if (!points || !stock) return null;
@@ -405,8 +409,19 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       isRetirementAccount:
         tradeAccountType === "unknown" ? null : tradeAccountType === "retirement",
     });
+    void flushCurrentPortfolioSnapshotNow(true);
     setPrice("");
     setTradeModalOpen(false);
+  }
+
+  async function handleOptimize() {
+    setOptimizationMessage(null);
+    const result = await optimizeStock(symbol);
+    if (!result.ok) {
+      setOptimizationMessage(result.error ?? `Unable to optimize ${symbol}.`);
+      return;
+    }
+    setOptimizationMessage("Parameters optimized from historical data.");
   }
   return (
     <div
@@ -733,8 +748,23 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               compact={dense}
               title={
                 <span className="flex items-center justify-between gap-3">
-                  <span>Recommendation</span>
+                <span>Recommendation</span>
                 <span className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleOptimize}
+                    disabled={optimizing || !stock.pendingOptimization}
+                    className={cn(
+                      "ui-hover-pop inline-flex items-center gap-1.5 border font-semibold shadow-sm backdrop-blur-lg sm:gap-2 disabled:cursor-not-allowed disabled:opacity-60",
+                      stock.pendingOptimization
+                        ? "border-primary/25 bg-primary/10 text-primary"
+                        : "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+                      dense ? "rounded-lg px-2 py-1 text-[10px]" : "rounded-lg px-2.5 py-1.5 text-xs"
+                    )}
+                    aria-label="Optimize parameters"
+                  >
+                    {optimizing ? "Optimizing…" : stock.pendingOptimization ? "Optimize" : "Optimized"}
+                  </button>
                   <button
                     type="button"
                     onClick={() => setStrategyOpen(true)}
@@ -753,6 +783,9 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
             >
               {rec ? (
                 <div className={dense ? "space-y-3" : "space-y-3"}>
+                  {optimizationMessage ? (
+                    <p className={cn("text-subtle", dense ? "text-[11px]" : "text-xs")}>{optimizationMessage}</p>
+                  ) : null}
                   <p
                     className={cn(
                       "inline-flex rounded-lg border font-bold tracking-tight",
@@ -962,7 +995,10 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
         stock={stock}
         etfProfitTarget={etfProfitTarget}
         stockProfitTarget={stockProfitTarget}
-        onSave={(patch) => updateStock(symbol, patch)}
+        onSave={(patch) => {
+          updateStock(symbol, patch);
+          void flushCurrentPortfolioSnapshotNow(true);
+        }}
       />
     </div>
   );
@@ -980,7 +1016,7 @@ function FactorFlagRow({
   compact?: boolean;
 }) {
   return (
-    <div className={cn("flex items-start gap-2.5 border-b border-border/50 last:border-b-0 dark:border-white/[0.06]", compact ? "py-1.5" : "py-2")}>
+    <div className={cn("flex items-start gap-2", compact ? "py-1" : "py-1.5")}>
       {passes ? (
         <CheckCircle2 className={cn("mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
       ) : (
@@ -1016,8 +1052,7 @@ function SnapshotRow({
   return (
     <li
       className={cn(
-        "border-b border-border/40 last:border-0 dark:border-white/[0.05]",
-        compact ? "pb-2 last:pb-0" : "pb-3 last:pb-0"
+        compact ? "pb-1.5 last:pb-0" : "pb-2 last:pb-0"
       )}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { setRecommendationHistory } from "@/lib/recommendation-history-cache";
 import type { PricePoint } from "@/lib/stock-chart";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { fetchHistoricalPricePoints } from "@/lib/supabase-stock-history";
@@ -41,6 +42,7 @@ export function useSupabaseStockHistory(symbol: string | null, days: number = DE
           setError(err);
           return;
         }
+        setRecommendationHistory(symbol, pts.map((point) => point.close));
         setPoints(pts);
       } catch (e) {
         if (!cancelled) {

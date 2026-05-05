@@ -162,7 +162,7 @@ function parseRawHolding(raw: unknown): { stock: StockHolding; lots: { open: Tra
     pendingOptimization: !hasStrategy,
     lastPrice,
     dailyChangePercent: 0,
-    isShortlisted: h.isShortlisted !== false,
+    isShortlisted: h.isShortlisted === true,
     isVisibleInRisk: true,
     isInWatchlistSize: true,
     suppressTradeActions: h.noAutoBuy === true,

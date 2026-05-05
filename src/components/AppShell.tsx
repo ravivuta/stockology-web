@@ -41,8 +41,6 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  useHydrateTickerFundamentals();
-
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const localOnboardingDone = usePortfolioStore((s) => s.onboardingComplete);
   const { row, allowed, loading } = useSubscriptionGate(dataUserId, serverSubscription);
@@ -51,6 +49,7 @@ export function AppShell({
 
   const serverOnboardingDone = user.user_metadata?.[STOCKS_PM_ONBOARDING_USER_META_KEY] === true;
   const onboardingDone = serverOnboardingDone || localOnboardingDone || hasCloudPortfolio;
+  useHydrateTickerFundamentals({ enabled: allowed && onboardingDone });
 
   const metaDone = serverOnboardingDone;
   useEffect(() => {
@@ -77,6 +76,11 @@ export function AppShell({
     if (!onboardingDone && pathname !== "/onboarding") router.replace("/onboarding");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allowed, onboardingDone, pathname]);
+
+  useEffect(() => {
+    if (!allowed || !onboardingDone) return;
+    usePortfolioStore.getState().recalcMetrics();
+  }, [allowed, onboardingDone]);
 
   if (!loading && !allowed && pathname !== "/settings") {
     return (

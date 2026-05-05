@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { STOCKS_PM_ONBOARDING_USER_META_KEY } from "@/lib/onboarding-meta";
+import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 
 const FALLBACK_STARTER_SYMBOLS = ["AAPL", "MSFT", "SPY"];
 
@@ -65,6 +66,7 @@ export default function OnboardingPage() {
       }
 
       setOnboardingComplete(true);
+      await flushCurrentPortfolioSnapshotNow(true);
       await createClient().auth.updateUser({
         data: { [STOCKS_PM_ONBOARDING_USER_META_KEY]: true },
       });

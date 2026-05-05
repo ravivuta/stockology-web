@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SoldLot, StockHolding, TradeLot } from "@/store/portfolioStore";
 
-type PortfolioSlice = {
+export type PortfolioSlice = {
   cashBalance: number;
   stocks: StockHolding[];
   lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }>;
@@ -42,7 +42,7 @@ function holdingPayload(s: StockHolding, lots: { open: TradeLot[]; sold: SoldLot
     targetPrice: optimized && s.targetPrice != null ? s.targetPrice : null,
     recommendation: s.recommendation?.action ?? null,
     moving_avg: s.movingAvg ?? s.recommendation?.movingAvg ?? null,
-    isShortlisted: s.isShortlisted ?? true,
+    isShortlisted: s.isShortlisted ?? false,
     noAutoBuy: s.suppressTradeActions ?? null,
     enableRSIReversalGate: s.enableRSIReversalGate ?? true,
     rsiPeriod: s.rsiPeriod ?? null,
@@ -78,7 +78,6 @@ export function portfolioSyncFingerprint(state: PortfolioSlice): string {
       s.symbol,
       s.quantity,
       s.averageCost,
-      s.lastPrice,
       s.shortSMA,
       s.dynamicFactor,
       s.pendingOptimization,

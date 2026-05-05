@@ -162,7 +162,7 @@ export default function NewsPage() {
     try {
       const syms = [...new Set([...stocks.map((s) => s.symbol), "SPY"].filter(Boolean))];
       if (syms.length > 0) {
-        await runRefreshPipeline(syms);
+        await runRefreshPipeline(syms, { includeSnapshot: true });
       }
       await load();
       setSpyHistoryRefreshKey((value) => value + 1);

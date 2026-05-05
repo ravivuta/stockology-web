@@ -137,11 +137,12 @@ export default function DashboardPage() {
 
   async function manualRefresh() {
     setRefreshing(true);
-    await runRefreshPipeline(stocks.map((s) => s.symbol));
-    recalc();
-    usePortfolioStore.setState({ lastRefreshAt: new Date().toISOString() });
-    debouncedRecalc();
-    setRefreshing(false);
+    try {
+      await runRefreshPipeline(stocks.map((s) => s.symbol), { includeSnapshot: true });
+      debouncedRecalc();
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   return (

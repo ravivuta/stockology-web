@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
-import { upsertPortfolioSnapshotForCloudUser } from "@/lib/portfolio-cloud-sync";
+import { pushPortfolioSnapshotSlice } from "@/lib/portfolio-snapshot-client";
 import { fetchTickerHydrationFromTables, type TickerHydrationPriceRow } from "@/lib/ticker-direct-hydration";
 import { usePortfolioStore, type StockHolding } from "@/store/portfolioStore";
 import {
@@ -255,11 +255,11 @@ export function CsvImportExportBar({
     if (!authUserId) return;
     const dataUserId = await resolveStocksPmDataUserId(supabase, authUserId);
     const state = usePortfolioStore.getState();
-    await upsertPortfolioSnapshotForCloudUser(supabase, dataUserId, {
+    await pushPortfolioSnapshotSlice(dataUserId, {
       cashBalance: state.cashBalance,
       stocks: state.stocks,
       lotsBySymbol: state.lotsBySymbol,
-    });
+    }, { force: true, supabase });
   }
 
   async function applyImport(

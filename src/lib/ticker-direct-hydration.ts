@@ -1,11 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseStockPeg } from "@/lib/stock-metric-parse";
+import type { StockHolding } from "@/store/portfolioStore";
 
 /** Same shape as fetch-ticker-data `prices[sym]` for {@link mapPriceRowToPatch}. */
 export type TickerHydrationPriceRow = {
   symbol?: string;
   last_price?: number;
   daily_pct_change?: number;
+  last_updated?: string | null;
   analyst_target?: number | null;
   analyst_average?: number | string | null;
   market_cap?: number | null;
@@ -15,6 +17,55 @@ export type TickerHydrationPriceRow = {
   is_etf?: boolean | null;
 };
 
+export type TickerHydrationSentimentRow = {
+  sentiment_score: number;
+};
+
+export function mapTickerHydrationPriceRowToPatch(
+  p: TickerHydrationPriceRow,
+  sentimentScore?: number | null
+): Partial<StockHolding> {
+  const patch: Partial<StockHolding> = {};
+  if (p.last_price != null && Number.isFinite(Number(p.last_price))) {
+    patch.lastPrice = Number(p.last_price);
+  }
+  if (p.daily_pct_change != null && Number.isFinite(Number(p.daily_pct_change))) {
+    patch.dailyChangePercent = Number(p.daily_pct_change);
+  }
+  if (typeof p.company_name === "string" && p.company_name.trim()) {
+    patch.name = p.company_name.trim();
+  }
+  if (p.analyst_target != null) {
+    const target = Number(p.analyst_target);
+    if (Number.isFinite(target) && target > 0) patch.analystTarget = target;
+  }
+  const analystAverage = p.analyst_average;
+  if (analystAverage != null) {
+    if (typeof analystAverage === "number" && Number.isFinite(analystAverage)) {
+      patch.analystAvg = analystAverage.toFixed(2);
+    } else if (typeof analystAverage === "string" && analystAverage.trim()) {
+      const parsed = parseFloat(analystAverage);
+      patch.analystAvg = Number.isFinite(parsed) ? parsed.toFixed(2) : analystAverage.trim();
+    }
+  }
+  if (p.market_cap != null) {
+    const marketCap = Number(p.market_cap);
+    if (Number.isFinite(marketCap) && marketCap > 0) patch.marketCap = marketCap;
+  }
+  const peg = parseStockPeg(p.peg_ratio);
+  if (peg !== undefined) patch.peg = peg;
+  if (p.beta != null) {
+    const beta = Number(p.beta);
+    if (Number.isFinite(beta)) patch.beta = beta;
+  }
+  if (p.is_etf === true) patch.isETF = true;
+  else if (p.is_etf === false) patch.isETF = false;
+  if (sentimentScore != null && Number.isFinite(Number(sentimentScore))) {
+    patch.aiSentimentScore = Number(sentimentScore);
+  }
+  return patch;
+}
+
 /**
  * Load live prices + fundamentals from Supabase tables (same sources as fetch-ticker-data
  * refresh path). Works without invoking edge functions.
@@ -22,14 +73,14 @@ export type TickerHydrationPriceRow = {
 export async function fetchTickerHydrationFromTables(
   supabase: SupabaseClient,
   symbols: string[]
-): Promise<{ prices: Record<string, TickerHydrationPriceRow>; sentiment: Record<string, { sentiment_score: number }> }> {
+): Promise<{ prices: Record<string, TickerHydrationPriceRow>; sentiment: Record<string, TickerHydrationSentimentRow> }> {
   const upper = [...new Set(symbols.map((s) => s.trim().toUpperCase()))].filter(Boolean);
   if (upper.length === 0) return { prices: {}, sentiment: {} };
 
   const [pricesRes, fundRes, sentRes] = await Promise.all([
     supabase
       .from("ticker_prices")
-      .select("symbol, last_price, daily_pct_change")
+      .select("symbol, last_price, daily_pct_change, last_updated")
       .in("symbol", upper)
       .eq("skip", false)
       .gt("last_price", 0),
@@ -87,6 +138,7 @@ export async function fetchTickerHydrationFromTables(
       symbol: sym,
       last_price: row.last_price != null ? Number(row.last_price) : undefined,
       daily_pct_change: row.daily_pct_change != null ? Number(row.daily_pct_change) : undefined,
+      last_updated: typeof row.last_updated === "string" ? row.last_updated : null,
       ...mergeFundamentals(sym, f),
     };
   }
@@ -96,7 +148,7 @@ export async function fetchTickerHydrationFromTables(
     prices[sym] = { symbol: sym, ...mergeFundamentals(sym, fundBySym[sym]) };
   }
 
-  const sentiment: Record<string, { sentiment_score: number }> = {};
+  const sentiment: Record<string, TickerHydrationSentimentRow> = {};
   for (const row of sentRes.data ?? []) {
     const sym = row.symbol as string;
     if (!sym || row.sentiment_score == null) continue;

@@ -12,6 +12,7 @@ import { SymbolTradeCombobox } from "@/components/portfolio/SymbolTradeCombobox"
 import { StockDetailModal } from "@/components/stock/StockDetailModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
+import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 
 type SortKey = "symbol" | "lastPrice" | "change" | "analyst" | "upside" | "score" | "signal";
 
@@ -71,7 +72,6 @@ function columnFilterClass(active: boolean, tone: "amber" | "emerald") {
  */
 export default function WatchlistPage() {
   const stocks = usePortfolioStore((s) => s.stocks);
-  const recalc = usePortfolioStore((s) => s.recalcMetrics);
   const removeStock = usePortfolioStore((s) => s.removeStock);
   const addStock = usePortfolioStore((s) => s.addStock);
   const [query, setQuery] = useState("");
@@ -167,16 +167,18 @@ export default function WatchlistPage() {
   async function refresh() {
     if (stocks.length === 0) return;
     setRefreshing(true);
-    await runRefreshPipeline(stocks.map((s) => s.symbol));
-    recalc();
-    usePortfolioStore.setState({ lastRefreshAt: new Date().toISOString() });
-    setRefreshing(false);
+    try {
+      await runRefreshPipeline(stocks.map((s) => s.symbol), { includeSnapshot: true });
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   function addWatchlistSymbol() {
     const sym = newSymbol.trim().toUpperCase().replace(/[^A-Z0-9.-]/g, "");
     if (!sym) return;
     addStock({ symbol: sym, quantity: 0, averageCost: 0, lastPrice: 0 });
+    void flushCurrentPortfolioSnapshotNow(true);
     setNewSymbol("");
   }
 
@@ -192,6 +194,12 @@ export default function WatchlistPage() {
           >
             {refreshing ? "Refreshing…" : "Refresh quotes"}
           </button>
+          <Link
+            href="/simulation#watchlist-simulation"
+            className={appCtaButton("ui-hover-spotlight px-4 py-2 text-sm")}
+          >
+            Simulate watchlist
+          </Link>
           <CsvImportExportBar exportFilename="stocks-pm-watchlist.csv" importMode="watchlist" />
           <Link href="/csv-help" className="ui-hover-text text-sm text-primary underline-offset-2 hover:underline">
             CSV help

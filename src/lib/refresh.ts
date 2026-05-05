@@ -1,7 +1,55 @@
 "use client";
 
+import {
+  mapTickerHydrationPriceRowToPatch,
+  type TickerHydrationPriceRow,
+  type TickerHydrationSentimentRow,
+} from "@/lib/ticker-direct-hydration";
+import { parseCloudSnapshotForStore } from "@/lib/cloud-snapshot-hydration";
+import type { PortfolioSnapshotRow } from "@/lib/cloud-portfolio";
+import {
+  markLastPushedPortfolioFingerprint,
+} from "@/lib/portfolio-snapshot-client";
+import { portfolioSyncFingerprint } from "@/lib/portfolio-cloud-sync";
+import type { StockHolding } from "@/store/portfolioStore";
+import { usePortfolioStore } from "@/store/portfolioStore";
+
 const MAX_REFRESH_SYMBOLS = 250;
 const MAX_SYMBOL_LEN = 16;
+
+type RefreshPipelineResponse = {
+  ok: boolean;
+  message?: string;
+  refreshed_at?: string;
+  data_user_id?: string;
+  prices?: Record<string, TickerHydrationPriceRow>;
+  sentiment?: Record<string, TickerHydrationSentimentRow>;
+  snapshot?: (PortfolioSnapshotRow & { updated_at?: string | null }) | null;
+  fresh_symbols?: string[];
+  stale_symbols?: string[];
+};
+
+export type RefreshPipelineResult = {
+  ok: boolean;
+  message?: string;
+  refreshedAt?: string;
+  hydratedSymbols: string[];
+  freshSymbols: string[];
+  staleSymbols: string[];
+};
+
+const lastAppliedSnapshotByUser = new Map<string, string>();
+
+function canSafelyApplySnapshot(
+  startedMutationAt: string | null,
+  currentMutationAt: string | null,
+  guardMs: number
+) {
+  if (currentMutationAt && currentMutationAt !== startedMutationAt) return false;
+  if (!currentMutationAt) return true;
+  const ageMs = Date.now() - Date.parse(currentMutationAt);
+  return !Number.isFinite(ageMs) || ageMs >= guardMs;
+}
 
 function sanitizeSymbols(symbols: string[]): string[] {
   const out: string[] = [];
@@ -19,18 +67,107 @@ function sanitizeSymbols(symbols: string[]): string[] {
   return out;
 }
 
-export async function runRefreshPipeline(symbols: string[]): Promise<{ ok: boolean; message?: string }> {
+export async function runRefreshPipeline(
+  symbols: string[],
+  options?: {
+    optimizePending?: boolean;
+    includeSnapshot?: boolean;
+    snapshotLocalMutationGuardMs?: number;
+  }
+): Promise<RefreshPipelineResult> {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+  const startedMutationAt = usePortfolioStore.getState().lastLocalMutationAt;
+
   try {
     const clean = sanitizeSymbols(symbols);
     const res = await fetch(`${basePath}/api/python/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ symbols: clean }),
+      body: JSON.stringify({
+        symbols: clean,
+        include_snapshot: options?.includeSnapshot === true,
+      }),
     });
-    const data = await res.json();
-    return { ok: data.ok === true, message: data.message };
+    const data = (await res.json().catch(() => null)) as RefreshPipelineResponse | null;
+
+    if (!res.ok || !data?.ok) {
+      return {
+        ok: false,
+        message: data?.message ?? "Refresh failed",
+        hydratedSymbols: [],
+        freshSymbols: [],
+        staleSymbols: [],
+      };
+    }
+
+    const snapshotGuardMs = options?.snapshotLocalMutationGuardMs ?? 2 * 60 * 1000;
+    const dataUserId = data.data_user_id?.trim() ?? "";
+    const snapshotUpdatedAt =
+      typeof data.snapshot?.updated_at === "string" ? data.snapshot.updated_at : "";
+    const currentMutationAt = usePortfolioStore.getState().lastLocalMutationAt;
+
+    if (
+      options?.includeSnapshot === true &&
+      data.snapshot &&
+      canSafelyApplySnapshot(startedMutationAt, currentMutationAt, snapshotGuardMs) &&
+      (!dataUserId || lastAppliedSnapshotByUser.get(dataUserId) !== snapshotUpdatedAt)
+    ) {
+      const parsed = parseCloudSnapshotForStore(data.snapshot);
+      usePortfolioStore.getState().replaceFromCloudSync({
+        ...parsed,
+        onboardingComplete: true,
+      });
+      if (dataUserId) {
+        if (snapshotUpdatedAt) lastAppliedSnapshotByUser.set(dataUserId, snapshotUpdatedAt);
+        markLastPushedPortfolioFingerprint(
+          dataUserId,
+          portfolioSyncFingerprint({
+            cashBalance: parsed.cashBalance,
+            stocks: parsed.stocks,
+            lotsBySymbol: parsed.lotsBySymbol,
+          })
+        );
+      }
+    }
+
+    const prices = data.prices ?? {};
+    const sentiment = data.sentiment ?? {};
+    const patches: Array<{ symbol: string; patch: Partial<StockHolding> }> = [];
+
+    for (const [symbol, row] of Object.entries(prices)) {
+      const patch = mapTickerHydrationPriceRowToPatch(row, sentiment[symbol]?.sentiment_score);
+      if (Object.keys(patch).length > 0) {
+        patches.push({ symbol, patch });
+      }
+    }
+
+    if (patches.length > 0) {
+      usePortfolioStore.getState().bulkUpdateStocks(patches);
+    }
+
+    if (options?.optimizePending !== false) {
+      await usePortfolioStore.getState().optimizePendingStocks();
+    }
+
+    usePortfolioStore.setState({
+      lastRefreshAt: data.refreshed_at ?? new Date().toISOString(),
+    });
+
+    return {
+      ok: true,
+      message: data.message,
+      refreshedAt: data.refreshed_at,
+      hydratedSymbols: patches.map((item) => item.symbol),
+      freshSymbols: data.fresh_symbols ?? [],
+      staleSymbols: data.stale_symbols ?? [],
+    };
   } catch (e) {
-    return { ok: false, message: String(e) };
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : String(e),
+      hydratedSymbols: [],
+      freshSymbols: [],
+      staleSymbols: [],
+    };
   }
 }

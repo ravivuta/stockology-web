@@ -1,9 +1,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { computeRiskReturnScore } from "@/lib/ios-recommendation";
+import { computeRiskReturnScore, recommendedWatchlistSize, stockPassesRiskFilter } from "@/lib/ios-recommendation";
+import { getRecommendationHistoryCloses } from "@/lib/recommendation-history-cache";
 import { buildRecommendation } from "@/lib/recommendation";
 import type { CsvImportRow, CsvImportTrade } from "@/lib/csvPortfolio";
 import { buildTradeJournalFromLots } from "@/lib/trade-journal-from-lots";
+import { analystTargetUpsidePct } from "@/lib/marketFormat";
 
 export type LotStatus = "open" | "partiallySold" | "fullySold" | "washSaleRestricted";
 
@@ -105,12 +107,14 @@ type State = {
   onboardingComplete: boolean;
   optimizing: boolean;
   lastRefreshAt: string | null;
+  lastLocalMutationAt: string | null;
   clearCachesOnReset: () => void;
   setCash: (n: number) => void;
   setSettings: (p: Partial<Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "etfProfitTarget" | "stockProfitTarget" | "useAISentimentForRecommendations" | "useRSIGatingForRecommendations" | "sellOnlyLongTermQualified" | "timezone" | "region">>) => void;
   addStock: (s: Partial<StockHolding> & { symbol: string }) => void;
   /** Merge fields into an existing symbol and rebuild recommendation. */
   updateStock: (symbol: string, patch: Partial<StockHolding>) => void;
+  bulkUpdateStocks: (patches: { symbol: string; patch: Partial<StockHolding> }[]) => void;
   removeStock: (symbol: string) => void;
   recordTrade: (
     symbol: string,
@@ -126,6 +130,8 @@ type State = {
   resetAll: () => void;
   setOptimizing: (v: boolean) => void;
   setOnboardingComplete: (v: boolean) => void;
+  optimizeStock: (symbol: string) => Promise<{ ok: boolean; error?: string }>;
+  optimizePendingStocks: () => Promise<void>;
   importCsvRows: (rows: CsvImportRow[], mode: "portfolio" | "watchlist", trades?: CsvImportTrade[]) => {
     importType: "holdings" | "watchlist";
     importedSymbols: string[];
@@ -150,6 +156,14 @@ function uid() {
 function defaultImportPurchaseDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
+
+type OptimizedStrategyPayload = {
+  shortSMA: number;
+  dynamicFactor: number;
+  stockLimit: number;
+  transactionLimit: number;
+  pendingOptimization: boolean;
+};
 
 function preserveImportedMetadata(existing: StockHolding | undefined) {
   if (!existing) return {};
@@ -222,6 +236,56 @@ type RecalcContext = {
   lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }>;
 };
 
+type ShortlistContext = Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize">;
+
+async function requestOptimizedStrategy(
+  stock: StockHolding,
+  state: Pick<
+    State,
+    | "portfolioSize"
+    | "etfProfitTarget"
+    | "stockProfitTarget"
+    | "useRSIGatingForRecommendations"
+  >
+): Promise<OptimizedStrategyPayload> {
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+  const response = await fetch(`${basePath}/api/python/optimization`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      symbol: stock.symbol,
+      quantity: stock.quantity,
+      averageCost: stock.averageCost,
+      analystTarget: stock.analystTarget,
+      analystAvg: stock.analystAvg,
+      marketCap: stock.marketCap,
+      peg: stock.peg,
+      isETF: stock.isETF,
+      enableRSIReversalGate: stock.enableRSIReversalGate,
+      rsiPeriod: stock.rsiPeriod,
+      rsiOversoldThreshold: stock.rsiOversoldThreshold,
+      rsiOverboughtThreshold: stock.rsiOverboughtThreshold,
+      rsiHysteresisPoints: stock.rsiHysteresisPoints,
+      rsiMinRisingDays: stock.rsiMinRisingDays,
+      portfolioSize: state.portfolioSize,
+      watchlistCount: recommendedWatchlistSize(state.portfolioSize),
+      etfProfitTargetPercent: state.etfProfitTarget,
+      stockProfitTargetPercent: state.stockProfitTarget,
+      useRSIGating: state.useRSIGatingForRecommendations,
+    }),
+  });
+
+  const payload = (await response.json().catch(() => null)) as
+    | { error?: string; strategy?: OptimizedStrategyPayload }
+    | null;
+
+  if (!response.ok || !payload?.strategy) {
+    throw new Error(payload?.error || `Optimization failed for ${stock.symbol}`);
+  }
+
+  return payload.strategy;
+}
+
 function reduceOpenLotsFifo(openLots: TradeLot[], qtyToSell: number): TradeLot[] {
   let remaining = qtyToSell;
   const next = [...openLots]
@@ -252,6 +316,7 @@ function recalcHolding(
   return {
     ...next,
     recommendation: buildRecommendation(next, {
+      closes: getRecommendationHistoryCloses(next.symbol),
       etfProfitTarget: ctx.etfProfitTarget,
       stockProfitTarget: ctx.stockProfitTarget,
       useAISentiment: ctx.useAISentimentForRecommendations,
@@ -261,6 +326,69 @@ function recalcHolding(
       soldLots: lots.sold,
     }),
   };
+}
+
+function derivePortfolioState(
+  stocksInput: StockHolding[],
+  cashBalance: number,
+  recalcCtx: RecalcContext,
+  shortlistCtx: ShortlistContext
+): { stocks: StockHolding[]; portfolioSize: number } {
+  const recalcedStocks = stocksInput.map((s) => recalcHolding(s, recalcCtx));
+  const portfolioSize = recalcedStocks.reduce((a, x) => a + x.quantity * (x.lastPrice ?? 0), 0) + cashBalance;
+  const idealWatchlistSize = recommendedWatchlistSize(portfolioSize);
+
+  const stocksWithRisk = recalcedStocks.map((stock) => ({
+    ...stock,
+    isVisibleInRisk: stockPassesRiskFilter(
+      stock,
+      shortlistCtx.riskAppetite,
+      shortlistCtx.enableRiskFilter,
+      analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)
+    ),
+  }));
+
+  const shortlistedSymbols = new Set<string>();
+
+  if (shortlistCtx.limitWatchlistSize) {
+    const holdingSymbols = stocksWithRisk.filter((stock) => stock.quantity > 0);
+    const unownedEtfs = stocksWithRisk.filter((stock) => stock.quantity <= 0 && stock.isETF === true);
+    const eligibleOthers = stocksWithRisk
+      .filter((stock) => stock.quantity <= 0 && stock.isETF !== true && stock.isVisibleInRisk)
+      .filter((stock) => (stock.lastPrice ?? 0) < stock.transactionLimit)
+      .sort((a, b) => {
+        const cmp = (b.score ?? Number.NEGATIVE_INFINITY) - (a.score ?? Number.NEGATIVE_INFINITY);
+        return cmp === 0 ? a.symbol.localeCompare(b.symbol) : cmp;
+      });
+
+    for (const stock of holdingSymbols) shortlistedSymbols.add(stock.symbol);
+    for (const stock of unownedEtfs) shortlistedSymbols.add(stock.symbol);
+
+    const remainingSlots = idealWatchlistSize - holdingSymbols.length;
+    if (remainingSlots > 0) {
+      for (const stock of eligibleOthers.slice(0, remainingSlots)) {
+        shortlistedSymbols.add(stock.symbol);
+      }
+    }
+  } else {
+    for (const stock of stocksWithRisk) {
+      if (stock.quantity > 0 || stock.isETF === true || stock.isVisibleInRisk) {
+        shortlistedSymbols.add(stock.symbol);
+      }
+    }
+  }
+
+  const stocks = stocksWithRisk.map((stock) => {
+    const isShortlisted = shortlistedSymbols.has(stock.symbol);
+    return {
+      ...stock,
+      isShortlisted,
+      isInWatchlistSize: isShortlisted,
+      recommendation: isShortlisted ? stock.recommendation : undefined,
+    };
+  });
+
+  return { stocks, portfolioSize };
 }
 
 const defaultStock = (partial: Partial<StockHolding> & { symbol: string }): StockHolding => ({
@@ -277,9 +405,9 @@ const defaultStock = (partial: Partial<StockHolding> & { symbol: string }): Stoc
   lastPrice: partial.lastPrice ?? partial.averageCost ?? 100,
   dailyChangePercent: partial.dailyChangePercent ?? 0,
   score: partial.score,
-  isShortlisted: partial.isShortlisted ?? true,
-  isVisibleInRisk: partial.isVisibleInRisk ?? true,
-  isInWatchlistSize: partial.isInWatchlistSize ?? true,
+  isShortlisted: partial.isShortlisted ?? false,
+  isVisibleInRisk: partial.isVisibleInRisk ?? false,
+  isInWatchlistSize: partial.isInWatchlistSize ?? false,
   analystTarget: partial.analystTarget,
   analystAvg: partial.analystAvg ?? "4.2",
   beta: partial.beta ?? 1.1,
@@ -318,12 +446,31 @@ export const usePortfolioStore = create<State>()(
       onboardingComplete: false,
       optimizing: false,
       lastRefreshAt: null,
+      lastLocalMutationAt: null,
       clearCachesOnReset: () => {
         if (typeof window !== "undefined") {
           localStorage.removeItem("stocks-pm-portfolio");
         }
       },
-      setCash: (n) => set({ cashBalance: n, portfolioSize: get().stocks.reduce((a, s) => a + s.quantity * (s.lastPrice ?? 0), 0) + n }),
+      setCash: (n) =>
+        set((st) => {
+          const mutationAt = new Date().toISOString();
+          const recalcCtx: RecalcContext = {
+            etfProfitTarget: st.etfProfitTarget,
+            stockProfitTarget: st.stockProfitTarget,
+            useAISentimentForRecommendations: st.useAISentimentForRecommendations,
+            useRSIGatingForRecommendations: st.useRSIGatingForRecommendations,
+            sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
+            lotsBySymbol: st.lotsBySymbol,
+          };
+          const derived = derivePortfolioState(st.stocks, n, recalcCtx, st);
+          return {
+            cashBalance: n,
+            stocks: derived.stocks,
+            portfolioSize: derived.portfolioSize,
+            lastLocalMutationAt: mutationAt,
+          };
+        }),
       setSettings: (p) =>
         set((st) => {
           const nextState = { ...st, ...p };
@@ -335,27 +482,28 @@ export const usePortfolioStore = create<State>()(
             sellOnlyLongTermQualified: nextState.sellOnlyLongTermQualified,
             lotsBySymbol: st.lotsBySymbol,
           };
-          const stocks = st.stocks.map((s) => recalcHolding(s, ctx));
-          const total = stocks.reduce((a, x) => a + x.quantity * (x.lastPrice ?? 0), 0) + st.cashBalance;
-          return { ...p, stocks, portfolioSize: total };
+          const derived = derivePortfolioState(st.stocks, st.cashBalance, ctx, nextState);
+          return { ...p, stocks: derived.stocks, portfolioSize: derived.portfolioSize };
         }),
       addStock: (s) =>
         set((st) => {
-          const nh = recalcHolding(defaultStock(s), {
+          const mutationAt = new Date().toISOString();
+          const ctx: RecalcContext = {
             etfProfitTarget: st.etfProfitTarget,
             stockProfitTarget: st.stockProfitTarget,
             useAISentimentForRecommendations: st.useAISentimentForRecommendations,
             useRSIGatingForRecommendations: st.useRSIGatingForRecommendations,
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
             lotsBySymbol: st.lotsBySymbol,
-          });
-          const stocks = [...st.stocks.filter((x) => x.symbol !== nh.symbol), nh];
-          const total = stocks.reduce((a, x) => a + x.quantity * (x.lastPrice ?? 0), 0) + st.cashBalance;
-          return { stocks, portfolioSize: total };
+          };
+          const stocks = [...st.stocks.filter((x) => x.symbol !== s.symbol.toUpperCase()), defaultStock({ ...s, symbol: s.symbol.toUpperCase() })];
+          const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st);
+          return { stocks: derived.stocks, portfolioSize: derived.portfolioSize, lastLocalMutationAt: mutationAt };
         }),
       updateStock: (symbol, patch) =>
         set((st) => {
           const sym = symbol.toUpperCase();
+          const mutationAt = new Date().toISOString();
           const ctx: RecalcContext = {
             etfProfitTarget: st.etfProfitTarget,
             stockProfitTarget: st.stockProfitTarget,
@@ -366,23 +514,66 @@ export const usePortfolioStore = create<State>()(
           };
           const stocks = st.stocks.map((s) => {
             if (s.symbol !== sym) return s;
-            return recalcHolding({ ...s, ...patch, symbol: sym }, ctx);
+            return { ...s, ...patch, symbol: sym };
           });
-          const total = stocks.reduce((a, x) => a + x.quantity * (x.lastPrice ?? 0), 0) + st.cashBalance;
-          return { stocks, portfolioSize: total };
+          const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st);
+          return { stocks: derived.stocks, portfolioSize: derived.portfolioSize, lastLocalMutationAt: mutationAt };
+        }),
+      bulkUpdateStocks: (patches) =>
+        set((st) => {
+          if (patches.length === 0) return {};
+          const patchMap = new Map<string, Partial<StockHolding>>();
+          for (const item of patches) {
+            const symbol = item.symbol.trim().toUpperCase();
+            if (!symbol || Object.keys(item.patch).length === 0) continue;
+            const prev = patchMap.get(symbol);
+            patchMap.set(symbol, prev ? { ...prev, ...item.patch } : item.patch);
+          }
+          if (patchMap.size === 0) return {};
+
+          const ctx: RecalcContext = {
+            etfProfitTarget: st.etfProfitTarget,
+            stockProfitTarget: st.stockProfitTarget,
+            useAISentimentForRecommendations: st.useAISentimentForRecommendations,
+            useRSIGatingForRecommendations: st.useRSIGatingForRecommendations,
+            sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
+            lotsBySymbol: st.lotsBySymbol,
+          };
+          const stocks = st.stocks.map((stock) => {
+            const patch = patchMap.get(stock.symbol);
+            if (!patch) return stock;
+            return { ...stock, ...patch, symbol: stock.symbol };
+          });
+          const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st);
+          return { stocks: derived.stocks, portfolioSize: derived.portfolioSize };
         }),
       removeStock: (symbol) =>
         set((st) => {
+          const mutationAt = new Date().toISOString();
           const stocks = st.stocks.filter((s) => s.symbol !== symbol);
           const lots = { ...st.lotsBySymbol };
           delete lots[symbol];
-          const total = stocks.reduce((a, x) => a + x.quantity * (x.lastPrice ?? 0), 0) + st.cashBalance;
-          return { stocks, lotsBySymbol: lots, portfolioSize: total };
+          const ctx: RecalcContext = {
+            etfProfitTarget: st.etfProfitTarget,
+            stockProfitTarget: st.stockProfitTarget,
+            useAISentimentForRecommendations: st.useAISentimentForRecommendations,
+            useRSIGatingForRecommendations: st.useRSIGatingForRecommendations,
+            sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
+            lotsBySymbol: lots,
+          };
+          const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st);
+          return {
+            stocks: derived.stocks,
+            lotsBySymbol: lots,
+            portfolioSize: derived.portfolioSize,
+            lastLocalMutationAt: mutationAt,
+          };
         }),
       recordTrade: (symbol, side, qty, price, date, options) => {
         if (qty <= 0 || !Number.isFinite(price)) return;
         const sym = symbol.toUpperCase();
         set((st) => {
+          const mutationAt = new Date().toISOString();
           const existing = st.stocks.find((s) => s.symbol === sym);
           const cashBefore = st.cashBalance;
           const journalBase = {
@@ -427,7 +618,8 @@ export const usePortfolioStore = create<State>()(
             };
             let stocks: StockHolding[];
             if (!existing) {
-              const nh = recalcHolding(
+              stocks = [
+                ...st.stocks,
                 defaultStock({
                   symbol: sym,
                   quantity: qty,
@@ -435,9 +627,7 @@ export const usePortfolioStore = create<State>()(
                   lastPrice: price,
                   pendingOptimization: true,
                 }),
-                ctx
-              );
-              stocks = [...st.stocks, nh];
+              ];
             } else {
               stocks = st.stocks.map((s) => {
                 if (s.symbol !== sym) return s;
@@ -446,13 +636,20 @@ export const usePortfolioStore = create<State>()(
                   const costBasis = q0 * avg0 + qty * price;
                   const q1 = q0 + qty;
                   const avg1 = q1 > 0 ? costBasis / q1 : 0;
-                  return recalcHolding({ ...s, quantity: q1, averageCost: avg1, lastPrice: price }, ctx);
+                  return { ...s, quantity: q1, averageCost: avg1, lastPrice: price };
                 });
             }
             const entry: TradeJournalEntry = { ...journalBase, side: "BUY", lotId };
             const journal = [...st.tradeJournal, entry].slice(-200);
-            const total = stocks.reduce((a, x) => a + x.quantity * (x.lastPrice ?? 0), 0) + newCash;
-            return { stocks, lotsBySymbol: lots, cashBalance: newCash, tradeJournal: journal, portfolioSize: total };
+            const derived = derivePortfolioState(stocks, newCash, ctx, st);
+            return {
+              stocks: derived.stocks,
+              lotsBySymbol: lots,
+              cashBalance: newCash,
+              tradeJournal: journal,
+              portfolioSize: derived.portfolioSize,
+              lastLocalMutationAt: mutationAt,
+            };
           }
 
           /* SELL */
@@ -483,12 +680,19 @@ export const usePortfolioStore = create<State>()(
           const stocks = st.stocks.map((s) => {
             if (s.symbol !== sym) return s;
             const q1 = Math.max(0, s.quantity - sellQty);
-            return recalcHolding({ ...s, quantity: q1, lastPrice: price }, ctx);
+            return { ...s, quantity: q1, lastPrice: price };
           });
           const entry: TradeJournalEntry = { ...journalBase, side: "SELL", quantity: sellQty };
           const journal = [...st.tradeJournal, entry].slice(-200);
-          const total = stocks.reduce((a, x) => a + x.quantity * (x.lastPrice ?? 0), 0) + newCash;
-          return { stocks, lotsBySymbol: lots, cashBalance: newCash, tradeJournal: journal, portfolioSize: total };
+          const derived = derivePortfolioState(stocks, newCash, ctx, st);
+          return {
+            stocks: derived.stocks,
+            lotsBySymbol: lots,
+            cashBalance: newCash,
+            tradeJournal: journal,
+            portfolioSize: derived.portfolioSize,
+            lastLocalMutationAt: mutationAt,
+          };
         });
       },
       undoLastTrade: () => {
@@ -496,6 +700,7 @@ export const usePortfolioStore = create<State>()(
         const entry = st.tradeJournal[st.tradeJournal.length - 1];
         if (!entry || entry.undoable === false) return false;
         set((s) => {
+          const mutationAt = new Date().toISOString();
           const sym = entry.symbol;
           const journal = s.tradeJournal.slice(0, -1);
           const newCash = entry.cashBefore;
@@ -521,19 +726,23 @@ export const usePortfolioStore = create<State>()(
             } else {
               stocks = s.stocks.map((x) => {
                 if (x.symbol !== sym) return x;
-                return recalcHolding(
-                  {
-                    ...x,
-                    quantity: entry.quantityBefore,
-                    averageCost: entry.averageCostBefore,
-                    lastPrice: entry.lastPriceBefore,
-                  },
-                  ctx
-                );
+                return {
+                  ...x,
+                  quantity: entry.quantityBefore,
+                  averageCost: entry.averageCostBefore,
+                  lastPrice: entry.lastPriceBefore,
+                };
               });
             }
-            const total = stocks.reduce((a, x) => a + x.quantity * (x.lastPrice ?? 0), 0) + newCash;
-            return { stocks, lotsBySymbol: lots, cashBalance: newCash, tradeJournal: journal, portfolioSize: total };
+            const derived = derivePortfolioState(stocks, newCash, ctx, s);
+            return {
+              stocks: derived.stocks,
+              lotsBySymbol: lots,
+              cashBalance: newCash,
+              tradeJournal: journal,
+              portfolioSize: derived.portfolioSize,
+              lastLocalMutationAt: mutationAt,
+            };
           }
           /* undo SELL */
           const lots = { ...s.lotsBySymbol };
@@ -567,18 +776,22 @@ export const usePortfolioStore = create<State>()(
           };
           const stocks = s.stocks.map((x) => {
             if (x.symbol !== sym) return x;
-            return recalcHolding(
-              {
-                ...x,
-                quantity: entry.quantityBefore,
-                averageCost: entry.averageCostBefore,
-                lastPrice: entry.lastPriceBefore,
-              },
-              ctx
-            );
+            return {
+              ...x,
+              quantity: entry.quantityBefore,
+              averageCost: entry.averageCostBefore,
+              lastPrice: entry.lastPriceBefore,
+            };
           });
-          const total = stocks.reduce((a, x) => a + x.quantity * (x.lastPrice ?? 0), 0) + newCash;
-          return { stocks, lotsBySymbol: lots, cashBalance: newCash, tradeJournal: journal, portfolioSize: total };
+          const derived = derivePortfolioState(stocks, newCash, ctx, s);
+          return {
+            stocks: derived.stocks,
+            lotsBySymbol: lots,
+            cashBalance: newCash,
+            tradeJournal: journal,
+            portfolioSize: derived.portfolioSize,
+            lastLocalMutationAt: mutationAt,
+          };
         });
         return true;
       },
@@ -592,9 +805,8 @@ export const usePortfolioStore = create<State>()(
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
             lotsBySymbol: st.lotsBySymbol,
           };
-          const stocks = st.stocks.map((s) => recalcHolding(s, ctx));
-          const total = stocks.reduce((a, x) => a + x.quantity * (x.lastPrice ?? 0), 0) + st.cashBalance;
-          return { stocks, portfolioSize: total };
+          const derived = derivePortfolioState(st.stocks, st.cashBalance, ctx, st);
+          return { stocks: derived.stocks, portfolioSize: derived.portfolioSize };
         }),
       resetAll: () => {
         get().clearCachesOnReset();
@@ -606,10 +818,119 @@ export const usePortfolioStore = create<State>()(
           tradeJournal: [],
           onboardingComplete: false,
           lastRefreshAt: null,
+          lastLocalMutationAt: null,
         });
       },
       setOptimizing: (v) => set({ optimizing: v }),
       setOnboardingComplete: (v) => set({ onboardingComplete: v }),
+      optimizeStock: async (symbol) => {
+        const sym = symbol.trim().toUpperCase();
+        const current = get();
+        const stock = current.stocks.find((s) => s.symbol === sym);
+        if (!stock) return { ok: false, error: `Stock ${sym} was not found.` };
+        if (current.optimizing) return { ok: false, error: "Optimization already running." };
+
+        get().setOptimizing(true);
+        try {
+          let strategy: OptimizedStrategyPayload | null = null;
+          try {
+            strategy = await requestOptimizedStrategy(stock, current);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : `Optimization failed for ${sym}`;
+            set((st) => {
+              const ctx: RecalcContext = {
+                etfProfitTarget: st.etfProfitTarget,
+                stockProfitTarget: st.stockProfitTarget,
+                useAISentimentForRecommendations: st.useAISentimentForRecommendations,
+                useRSIGatingForRecommendations: st.useRSIGatingForRecommendations,
+                sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
+                lotsBySymbol: st.lotsBySymbol,
+              };
+              const stocks = st.stocks.map((item) =>
+                item.symbol === sym ? { ...item, pendingOptimization: false } : item
+              );
+              const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st);
+              return { stocks: derived.stocks, portfolioSize: derived.portfolioSize };
+            });
+            return { ok: false, error: message };
+          }
+
+          set((st) => {
+            const mutationAt = new Date().toISOString();
+            const ctx: RecalcContext = {
+              etfProfitTarget: st.etfProfitTarget,
+              stockProfitTarget: st.stockProfitTarget,
+              useAISentimentForRecommendations: st.useAISentimentForRecommendations,
+              useRSIGatingForRecommendations: st.useRSIGatingForRecommendations,
+              sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
+              lotsBySymbol: st.lotsBySymbol,
+            };
+            const stocks = st.stocks.map((item) =>
+              item.symbol === sym ? { ...item, ...strategy } : item
+            );
+            const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st);
+            return { stocks: derived.stocks, portfolioSize: derived.portfolioSize, lastLocalMutationAt: mutationAt };
+          });
+          return { ok: true };
+        } finally {
+          get().setOptimizing(false);
+        }
+      },
+      optimizePendingStocks: async () => {
+        const state = get();
+        if (state.optimizing) return;
+        const pendingSymbols = state.stocks
+          .filter((stock) => stock.pendingOptimization)
+          .map((stock) => stock.symbol);
+        if (pendingSymbols.length === 0) return;
+
+        get().setOptimizing(true);
+        try {
+          for (const symbol of pendingSymbols) {
+            const latest = get();
+            const stock = latest.stocks.find((item) => item.symbol === symbol);
+            if (!stock || !stock.pendingOptimization) continue;
+
+            try {
+              const strategy = await requestOptimizedStrategy(stock, latest);
+              set((st) => {
+                const mutationAt = new Date().toISOString();
+                const ctx: RecalcContext = {
+                  etfProfitTarget: st.etfProfitTarget,
+                  stockProfitTarget: st.stockProfitTarget,
+                  useAISentimentForRecommendations: st.useAISentimentForRecommendations,
+                  useRSIGatingForRecommendations: st.useRSIGatingForRecommendations,
+                  sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
+                  lotsBySymbol: st.lotsBySymbol,
+                };
+                const stocks = st.stocks.map((item) =>
+                  item.symbol === symbol ? { ...item, ...strategy } : item
+                );
+                const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st);
+                return { stocks: derived.stocks, portfolioSize: derived.portfolioSize, lastLocalMutationAt: mutationAt };
+              });
+            } catch {
+              set((st) => {
+                const ctx: RecalcContext = {
+                  etfProfitTarget: st.etfProfitTarget,
+                  stockProfitTarget: st.stockProfitTarget,
+                  useAISentimentForRecommendations: st.useAISentimentForRecommendations,
+                  useRSIGatingForRecommendations: st.useRSIGatingForRecommendations,
+                  sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
+                  lotsBySymbol: st.lotsBySymbol,
+                };
+                const stocks = st.stocks.map((item) =>
+                  item.symbol === symbol ? { ...item, pendingOptimization: false } : item
+                );
+                const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st);
+                return { stocks: derived.stocks, portfolioSize: derived.portfolioSize };
+              });
+            }
+          }
+        } finally {
+          get().setOptimizing(false);
+        }
+      },
       importCsvRows: (rows, mode, trades = []) => {
         const grouped = new Map<string, CsvImportRow[]>();
         for (const row of rows) {
@@ -634,6 +955,7 @@ export const usePortfolioStore = create<State>()(
         let importedTradeCount = 0;
 
         set((st) => {
+          const mutationAt = new Date().toISOString();
           const keepExisting =
             mode === "watchlist"
               ? st.stocks
@@ -751,13 +1073,17 @@ export const usePortfolioStore = create<State>()(
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
             lotsBySymbol,
           };
-          const stocks = [...stockMap.values()]
-            .sort((a, b) => a.symbol.localeCompare(b.symbol))
-            .map((s) => recalcHolding(s, ctx));
+          const sortedStocks = [...stockMap.values()].sort((a, b) => a.symbol.localeCompare(b.symbol));
           const tradeJournal = buildTradeJournalFromLots(lotsBySymbol);
-          const portfolioSize = stocks.reduce((a, x) => a + x.quantity * (x.lastPrice ?? 0), 0) + st.cashBalance;
+          const derived = derivePortfolioState(sortedStocks, st.cashBalance, ctx, st);
 
-          return { stocks, lotsBySymbol, tradeJournal, portfolioSize };
+          return {
+            stocks: derived.stocks,
+            lotsBySymbol,
+            tradeJournal,
+            portfolioSize: derived.portfolioSize,
+            lastLocalMutationAt: mutationAt,
+          };
         });
         return {
           importType,
@@ -778,16 +1104,14 @@ export const usePortfolioStore = create<State>()(
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
             lotsBySymbol: payload.lotsBySymbol,
           };
-          const stocks = payload.stocks.map((s) => recalcHolding(s, ctx));
-          const portfolioSize =
-            stocks.reduce((a, x) => a + x.quantity * (x.lastPrice ?? 0), 0) + payload.cashBalance;
+          const derived = derivePortfolioState(payload.stocks, payload.cashBalance, ctx, st);
           const inferredJournal = buildTradeJournalFromLots(payload.lotsBySymbol);
           return {
             cashBalance: payload.cashBalance,
-            stocks,
+            stocks: derived.stocks,
             lotsBySymbol: payload.lotsBySymbol,
             tradeJournal: inferredJournal,
-            portfolioSize,
+            portfolioSize: derived.portfolioSize,
             onboardingComplete: payload.onboardingComplete,
           };
         }),

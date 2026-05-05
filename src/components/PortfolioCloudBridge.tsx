@@ -1,17 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useEffect, useState } from "react";
 import { snapshotIndicatesExistingAccount } from "@/lib/cloud-portfolio";
 import { parseCloudSnapshotForStore } from "@/lib/cloud-snapshot-hydration";
 import {
   portfolioSyncFingerprint,
-  upsertPortfolioSnapshotForCloudUser,
 } from "@/lib/portfolio-cloud-sync";
 import {
   ACTIVE_DATA_USER_KEY,
   clearPortfolioSessionStorageFlags,
 } from "@/lib/clear-portfolio-client-state";
+import { pushPortfolioSnapshotSlice } from "@/lib/portfolio-snapshot-client";
 import { usePortfolioStore } from "@/store/portfolioStore";
 
 export type CloudSnapshotHydrationProps = {
@@ -31,7 +30,6 @@ export function PortfolioCloudBridge({
   cloudSnapshot: CloudSnapshotHydrationProps;
 }) {
   const [syncReady, setSyncReady] = useState(false);
-  const lastPushedRef = useRef<string>("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -49,17 +47,24 @@ export function PortfolioCloudBridge({
         setSyncReady(true);
         return;
       }
-      if (cloudSnapshot && snapshotIndicatesExistingAccount(cloudSnapshot)) {
+      const state = usePortfolioStore.getState();
+      const shouldApplySnapshotOnce =
+        cloudSnapshot &&
+        (
+          snapshotIndicatesExistingAccount(cloudSnapshot) ||
+          state.cashBalance > 0 ||
+          state.stocks.length > 0 ||
+          state.onboardingComplete
+        );
+      if (cloudSnapshot && shouldApplySnapshotOnce) {
         const parsed = parseCloudSnapshotForStore({
           holdings: cloudSnapshot.holdings,
           cash_balance: cloudSnapshot.cash_balance,
         });
-        if (parsed.stocks.length > 0 || parsed.cashBalance > 0) {
-          usePortfolioStore.getState().replaceFromCloudSync({
-            ...parsed,
-            onboardingComplete: true,
-          });
-        }
+        usePortfolioStore.getState().replaceFromCloudSync({
+          ...parsed,
+          onboardingComplete: true,
+        });
         sessionStorage.setItem(key, "1");
       }
     } finally {
@@ -78,13 +83,7 @@ export function PortfolioCloudBridge({
       timer = setTimeout(async () => {
         const state = usePortfolioStore.getState();
         const slice = { cashBalance: state.cashBalance, stocks: state.stocks, lotsBySymbol: state.lotsBySymbol };
-        const fp = portfolioSyncFingerprint(slice);
-        if (fp === lastPushedRef.current) return;
-        const supabase = createClient();
-        const { error } = await upsertPortfolioSnapshotForCloudUser(supabase, dataUserId, slice);
-        if (!error) {
-          lastPushedRef.current = fp;
-        }
+        await pushPortfolioSnapshotSlice(dataUserId, slice);
       }, debounceMs);
     };
 

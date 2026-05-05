@@ -104,8 +104,8 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
 
       <ModalSection className="min-h-0 shrink-0 space-y-4 px-4 py-4 text-sm text-subtle">
         <p className="leading-relaxed">
-          Entry uses an SMA trend filter; adds trigger near your dynamic factor below average cost. Limits cap position and trade size. Automated parameter search runs in the
-          Stocks PM mobile app.
+          Entry uses an SMA trend filter; adds trigger near your dynamic factor below average cost. Limits cap position and trade size. Use Optimize on the stock details screen
+          to run the same web-side parameter search against cached historical data.
         </p>
 
         <div className="rounded-xl border border-border bg-background/60 p-3 text-xs leading-relaxed dark:border-foreground/10 dark:bg-yale/20">

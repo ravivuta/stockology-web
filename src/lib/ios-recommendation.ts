@@ -403,6 +403,30 @@ export function recommendedWatchlistSize(portfolioSize: number): number {
   return Math.max(7, Math.min(75, Math.round(stocks)));
 }
 
+/**
+ * Mirrors iOS `Stock.calculateLimits(...)`.
+ */
+export function calculateTradingLimits(
+  portfolioSize: number,
+  isETF?: boolean,
+  score?: number | null,
+  watchlistSize = 10
+): { stockLimit: number; transactionLimit: number } {
+  const safeWatchlistSize = Math.max(1, Math.round(watchlistSize) || 1);
+  const baseStockLimit = Math.max(0, portfolioSize) / safeWatchlistSize;
+
+  let riskMultiplier = 1;
+  if (isETF === true) {
+    riskMultiplier = 10;
+  } else if ((score ?? 0) < 50) {
+    riskMultiplier = 0.5;
+  }
+
+  const stockLimit = baseStockLimit * riskMultiplier;
+  const transactionLimit = stockLimit * (isETF === true ? 0.1 : 0.25);
+  return { stockLimit, transactionLimit };
+}
+
 export type RecFactor = { label: string; detail: string; passes: boolean };
 
 export type RecommendationFactorOptions = {
