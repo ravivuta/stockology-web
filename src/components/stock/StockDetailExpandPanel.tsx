@@ -298,7 +298,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   return (
     <div
       className={cn(
-        "relative flex h-full max-h-full min-h-0 flex-col overflow-hidden text-foreground",
+        "relative flex h-full max-h-full min-h-0 flex-1 flex-col overflow-hidden text-foreground",
         embedded
           ? "border-t border-border/70 bg-transparent"
           : "rounded-[1.4rem] border border-border/80 bg-elevated shadow-[0_22px_60px_-46px_rgba(15,23,42,0.55)] dark:border-white/[0.08]"

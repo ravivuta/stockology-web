@@ -16,8 +16,8 @@ export function StockDetailModal({ symbol, onClose }: Props) {
       onClose={onClose}
       size="lg"
       titleId="stock-detail-modal-title"
-      shellClassName="items-stretch p-0 sm:items-stretch sm:p-0"
-      panelClassName="max-w-[min(100vw,88rem)] h-[100dvh] max-h-[100dvh] overflow-visible border-transparent bg-transparent shadow-none"
+      shellClassName="!items-stretch !p-0 sm:!items-stretch sm:!p-0"
+      panelClassName="!h-[100dvh] !max-h-[100dvh] !max-w-[min(100vw,88rem)] overflow-visible border-transparent bg-transparent shadow-none"
     >
       <ModalSection className="sr-only">
         <h2 id="stock-detail-modal-title">Stock details</h2>
@@ -32,7 +32,9 @@ export function StockDetailModal({ symbol, onClose }: Props) {
           >
             <X className="h-5 w-5" />
           </button>
-          <StockDetailExpandPanel symbol={symbol} />
+          <div className="flex min-h-0 flex-1">
+            <StockDetailExpandPanel symbol={symbol} />
+          </div>
         </div>
       ) : null}
     </AppModal>
