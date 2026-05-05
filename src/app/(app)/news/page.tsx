@@ -191,15 +191,8 @@ export default function NewsPage() {
             </span>
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">News</h1>
-              <p className="mt-1 text-sm text-subtle">Headlines from AI sentiment for your watchlist and macro stories.</p>
             </div>
           </div>
-          {!noConfig && !loading && (
-            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-subtle">
-              Same feed as the Stocks PM mobile app. Pull to refresh on iOS; here, use{" "}
-              <span className="font-medium text-foreground/80">Refresh</span> to pull the latest.
-            </p>
-          )}
         </div>
         <button
           type="button"

@@ -160,6 +160,7 @@ export default function PortfolioPage() {
 
   /** Portfolio page lists positions only; watchlist-only symbols (0 qty) stay in store for trading elsewhere. */
   const holdings = useMemo(() => stocks.filter((s) => s.quantity > 0), [stocks]);
+  const portfolioCountText = holdings.length === 1 ? "1 holding" : `${holdings.length} holdings`;
 
   function isActionable(action: string | undefined): boolean {
     if (!action) return false;
@@ -287,8 +288,7 @@ export default function PortfolioPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-foreground">Portfolio</h1>
+      <div className="flex flex-wrap justify-end gap-2">
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -318,18 +318,24 @@ export default function PortfolioPage() {
 
       <div className="space-y-8">
         <div className="ui-hover-lift rounded-2xl border border-border bg-elevated p-3">
-            <div className="md:hidden">
-              <button
-                type="button"
-                aria-expanded={mobileControlsOpen}
-                aria-controls="portfolio-mobile-controls"
-                onClick={() => setMobileControlsOpen((open) => !open)}
-                className="w-full rounded-xl border border-border bg-background px-4 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
-              >
-                {mobileControlsOpen ? "Hide filters & add stock" : "Show filters & add stock"}
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-lg font-semibold text-foreground">Portfolio</p>
+                <p className="text-xs text-subtle">{portfolioCountText}</p>
+              </div>
+              <div className="md:hidden">
+                <button
+                  type="button"
+                  aria-expanded={mobileControlsOpen}
+                  aria-controls="portfolio-mobile-controls"
+                  onClick={() => setMobileControlsOpen((open) => !open)}
+                  className="rounded-xl border border-border bg-background px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
+                >
+                  {mobileControlsOpen ? "Hide add holding" : "Show add holding"}
+                </button>
+              </div>
             </div>
-            <div id="portfolio-mobile-controls" className={`${mobileControlsOpen ? "mt-3 flex" : "hidden"} flex-wrap items-end gap-2 md:mt-0 md:flex`}>
+            <div id="portfolio-mobile-controls" className={`${mobileControlsOpen ? "mt-3 flex" : "hidden"} flex-wrap items-end gap-2 md:mt-3 md:flex`}>
               <div className="grid min-w-[18rem] flex-1 items-end gap-2 sm:grid-cols-[minmax(11rem,1.5fr)_7.5rem_6.5rem_auto]">
                 <label className="flex min-w-0 flex-col gap-1 text-[11px] text-subtle">
                   Add New Stock/Holding

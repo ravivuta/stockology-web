@@ -181,14 +181,7 @@ export default function WatchlistPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Watchlist</h1>
-          <p className="mt-1 text-sm text-subtle">
-            All symbols you track, including every holding. Positions with shares still appear here alongside watch-only names.
-          </p>
-          <p className="mt-2 text-xs text-subtle">{watchlistCountText}</p>
-        </div>
+      <div className="flex flex-wrap justify-end gap-2">
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <button
             type="button"
@@ -207,7 +200,10 @@ export default function WatchlistPage() {
 
       <div className="ui-hover-lift rounded-2xl border border-border bg-elevated p-3">
         <div className="flex flex-wrap items-end gap-2">
-          <div className="hidden h-10 w-px self-end bg-border/80 dark:bg-white/[0.08] md:block" aria-hidden />
+          <div className="min-w-[12rem] flex-1">
+            <p className="text-lg font-semibold text-foreground">Watchlist</p>
+            <p className="mt-1 text-xs text-subtle">{watchlistCountText}</p>
+          </div>
           <div className="ml-auto flex flex-wrap items-end gap-2">
             <label className="flex min-w-[9rem] flex-col gap-1 text-[11px] text-subtle">
               Add Stock
