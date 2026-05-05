@@ -468,56 +468,99 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
 
             <SectionCard
               compact={dense}
-              title={hasPosition ? "Position overview" : "Quote overview"}
-              description={
-                hasPosition
-                  ? "Current exposure, cost basis, and mark-to-market performance for this holding."
-                  : "Live quote and consensus data for this watchlist symbol."
-              }
+              title="Score details"
+              description="Composite score, flagged recommendation checks, and score components used by the Stocks PM rules."
             >
-              <div className="rounded-xl border border-border/60 bg-background/35 p-3 dark:border-white/[0.07] dark:bg-white/[0.02]">
-                {hasPosition ? (
+              <div className={dense ? "space-y-3" : "space-y-4"}>
+                <div className="rounded-xl border border-border/60 bg-background/35 p-3 dark:border-white/[0.07] dark:bg-white/[0.02]">
                   <DetailFieldGrid
                     compact={dense}
                     columns={3}
                     items={[
-                      { label: "Quantity", value: formatNumberMax2(stock.quantity) },
-                      { label: "Avg cost", value: formatCurrency(stock.averageCost) },
-                      { label: "Last", value: formatCurrency(last) },
-                      { label: "Market value", value: formatCurrency(positionValue) },
                       {
-                        label: "Unrealized P/L",
-                        value: `${formatCurrency(unrealized)} (${formatPercent(unrealizedPct, true)})`,
-                        valueClassName: unrealized >= 0 ? "text-primary" : "text-error",
-                        fullWidth: true,
+                        label: "Composite score",
+                        value: formatScoreDisplay(stock.score),
+                        detail: "Final risk-return score used by recommendation gating",
                       },
-                    ]}
-                  />
-                ) : (
-                  <DetailFieldGrid
-                    compact={dense}
-                    columns={2}
-                    items={[
-                      { label: "Last price", value: formatCurrency(last) },
                       {
-                        label: "Day change",
-                        value: stock.dailyChangePercent != null ? formatPercent(stock.dailyChangePercent, true) : "—",
-                        valueClassName:
-                          stock.dailyChangePercent == null
-                            ? undefined
-                            : stock.dailyChangePercent >= 0
-                              ? "text-primary"
-                              : "text-error",
-                      },
-                      { label: "Analyst target", value: stock.analystTarget != null ? formatCurrency(stock.analystTarget) : "—" },
-                      {
-                        label: "Consensus",
+                        label: "Analyst rating",
                         value: stock.analystAvg?.trim() || "—",
                         valueClassName: analystRatingTone(stock.analystAvg),
                       },
+                      {
+                        label: "Upside",
+                        value: formatUpsidePct(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)),
+                        valueClassName: valueTone(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)),
+                      },
+                      ...(stock.aiSentimentScore != null
+                        ? [{ label: "AI sentiment", value: String(stock.aiSentimentScore), detail: "Scaled headline sentiment" } satisfies DetailField]
+                        : []),
+                      ...(hasPosition
+                        ? [
+                            { label: "Position value", value: formatCurrency(positionValue) },
+                            {
+                              label: "Unrealized P/L",
+                              value: `${formatCurrency(unrealized)} (${formatPercent(unrealizedPct, true)})`,
+                              valueClassName: unrealized >= 0 ? "text-primary" : "text-error",
+                            },
+                          ]
+                        : []),
                     ]}
                   />
-                )}
+                </div>
+
+                <div
+                  className={cn(
+                    "rounded-xl border border-border/70 bg-background/45 dark:border-white/[0.07] dark:bg-white/[0.03]",
+                    dense ? "p-3" : "p-4"
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Factors considered</p>
+                      <p className={cn("text-subtle", dense ? "mt-0.5 text-[11px]" : "mt-1 text-xs")}>
+                        Rules checked for the current recommendation, shown as flagged factors.
+                      </p>
+                    </div>
+                    <span className={cn("font-medium text-subtle", dense ? "text-[10px]" : "text-xs")}>
+                      {recommendationFactors.filter((factor) => factor.passes).length}/{recommendationFactors.length} passed
+                    </span>
+                  </div>
+                  <div className={cn(dense ? "mt-3 space-y-1.5" : "mt-4 space-y-2")}>
+                    {recommendationFactors.map((factor) => (
+                      <FactorFlagRow
+                        key={`${factor.label}-${factor.detail}`}
+                        compact={dense}
+                        label={factor.label}
+                        detail={factor.detail}
+                        passes={factor.passes}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border/70 bg-background/45 p-3 dark:border-white/[0.07] dark:bg-white/[0.03]">
+                  <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Score inputs</p>
+                  <p className={cn("text-subtle", dense ? "mt-0.5 text-[11px]" : "mt-1 text-xs")}>
+                    Components used for the iOS-aligned risk-return score.
+                  </p>
+                  {scoreRows ? (
+                    <div className={dense ? "mt-3 space-y-2" : "mt-4 space-y-2.5"}>
+                      <SnapshotRow compact={dense} label="Analyst rating" value={scoreRows.analystLine} hint={scoreRows.analystPoints} />
+                      <SnapshotRow compact={dense} label="Upside to target" value={scoreRows.upsideLine} hint={scoreRows.upsidePoints} />
+                      <SnapshotRow compact={dense} label="Market cap" value={scoreRows.capLine} hint={scoreRows.capPoints} />
+                      <SnapshotRow compact={dense} label="PEG ratio" value={scoreRows.pegLine} hint={scoreRows.pegPoints} />
+                      {stock.score != null ? (
+                        <SnapshotRow
+                          compact={dense}
+                          label="Composite score"
+                          value={formatScoreDisplay(stock.score)}
+                          hint="Final rules score used by recommendation gating"
+                        />
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </SectionCard>
 
@@ -609,58 +652,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                     />
                   </div>
 
-                  <div
-                    className={cn(
-                      "rounded-xl border border-border/70 bg-background/45 dark:border-white/[0.07] dark:bg-white/[0.03]",
-                      dense ? "p-3" : "p-4"
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Factors considered</p>
-                        <p className={cn("text-subtle", dense ? "mt-0.5 text-[11px]" : "mt-1 text-xs")}>
-                          Rules checked for the current recommendation, shown as flagged factors.
-                        </p>
-                      </div>
-                      <span className={cn("font-medium text-subtle", dense ? "text-[10px]" : "text-xs")}>
-                        {recommendationFactors.filter((factor) => factor.passes).length}/{recommendationFactors.length} passed
-                      </span>
-                    </div>
-                    <div className={cn(dense ? "mt-3 space-y-1.5" : "mt-4 space-y-2")}>
-                      {recommendationFactors.map((factor) => (
-                        <FactorFlagRow
-                          key={`${factor.label}-${factor.detail}`}
-                          compact={dense}
-                          label={factor.label}
-                          detail={factor.detail}
-                          passes={factor.passes}
-                        />
-                      ))}
-                    </div>
-
-                    <div className={cn("border-t border-border/60 dark:border-white/[0.06]", dense ? "mt-3 pt-3" : "mt-4 pt-4")}>
-                      <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Score inputs</p>
-                      <p className={cn("text-subtle", dense ? "mt-0.5 text-[11px]" : "mt-1 text-xs")}>
-                        Components used for the iOS-aligned risk-return score.
-                      </p>
-                      {scoreRows ? (
-                        <div className={dense ? "mt-3 space-y-2" : "mt-4 space-y-2.5"}>
-                          <SnapshotRow compact={dense} label="Analyst rating" value={scoreRows.analystLine} hint={scoreRows.analystPoints} />
-                          <SnapshotRow compact={dense} label="Upside to target" value={scoreRows.upsideLine} hint={scoreRows.upsidePoints} />
-                          <SnapshotRow compact={dense} label="Market cap" value={scoreRows.capLine} hint={scoreRows.capPoints} />
-                          <SnapshotRow compact={dense} label="PEG ratio" value={scoreRows.pegLine} hint={scoreRows.pegPoints} />
-                          {stock.score != null ? (
-                            <SnapshotRow
-                              compact={dense}
-                              label="Composite score"
-                              value={formatScoreDisplay(stock.score)}
-                              hint="Final rules score used by recommendation gating"
-                            />
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
                 </div>
               ) : (
                 <p className={cn("text-subtle", dense ? "text-sm" : "text-base")}>
@@ -668,9 +659,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                 </p>
               )}
             </SectionCard>
-          </div>
-
-          <div className={dense ? "space-y-3" : "space-y-4"}>
             <SectionCard
               compact={dense}
               title="Record a trade"

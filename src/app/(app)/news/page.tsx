@@ -190,7 +190,7 @@ export default function NewsPage() {
               <Newspaper className="h-5 w-5" aria-hidden />
             </span>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">News</h1>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Market News</h1>
             </div>
           </div>
         </div>
@@ -216,7 +216,7 @@ export default function NewsPage() {
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary dark:border-primary/25 dark:bg-primary/15">
-                Market pulse
+                Historical Data
               </div>
               <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-2">
                 <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">SPY</h2>
@@ -324,7 +324,7 @@ export default function NewsPage() {
           {!noConfig && (
             <>
               <div className="rounded-2xl border border-border/80 bg-elevated p-1 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.03]">
-                <p className="px-4 pt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-subtle">View</p>
+                <p className="px-4 pt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-subtle">Show News:</p>
                 <div className="mt-2 flex flex-col gap-1 p-1 sm:flex-row sm:flex-wrap xl:flex-col">
                   {filterTabs.map((t) => {
                     const active = feedFilter === t.id;
