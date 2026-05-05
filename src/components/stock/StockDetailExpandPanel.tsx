@@ -102,10 +102,10 @@ function SectionCard({
     <section
       className={cn(
         "border border-border/80 bg-elevated shadow-sm dark:border-white/[0.08]",
-        compact ? "rounded-xl p-3" : "rounded-[1.2rem] p-3.5"
+        compact ? "rounded-xl p-3" : "rounded-[1.15rem] p-3"
       )}
     >
-      <div className={cn("border-b border-border/60 dark:border-white/[0.06]", compact ? "pb-2" : "pb-2.5")}>
+      <div className={cn("border-b border-border/60 dark:border-white/[0.06]", compact ? "pb-2" : "pb-2")}>
         <h3 className={cn("font-semibold text-foreground", compact ? "text-sm" : "text-base")}>{title}</h3>
         {description ? (
           <p className={cn("mt-1 text-subtle", compact ? "line-clamp-2 text-xs leading-snug" : "text-xs leading-snug")}>
@@ -113,7 +113,7 @@ function SectionCard({
           </p>
         ) : null}
       </div>
-      <div className={compact ? "pt-3" : "pt-3"}>{children}</div>
+      <div className={compact ? "pt-3" : "pt-2.5"}>{children}</div>
     </section>
   );
 }
@@ -298,7 +298,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   return (
     <div
       className={cn(
-        "relative flex max-h-full min-h-0 flex-col overflow-hidden text-foreground",
+        "relative flex h-full max-h-full min-h-0 flex-col overflow-hidden text-foreground",
         embedded
           ? "border-t border-border/70 bg-transparent"
           : "rounded-[1.4rem] border border-border/80 bg-elevated shadow-[0_22px_60px_-46px_rgba(15,23,42,0.55)] dark:border-white/[0.08]"
@@ -308,10 +308,10 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       <div
         className={cn(
           "relative border-b border-border/70 dark:border-white/[0.08]",
-          dense ? "px-3 py-3" : "px-4 py-4 sm:px-5 sm:py-5"
+          dense ? "px-3 py-3" : "px-4 py-3.5 sm:px-5 sm:py-4"
         )}
       >
-        <div className={cn("grid items-start gap-3", dense ? "grid-cols-1" : "lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.95fr)] lg:gap-4")}>
+        <div className={cn("grid items-start gap-3", dense ? "grid-cols-1" : "lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.95fr)] lg:gap-3")}>
           <div className="min-w-0">
             {showBackLink && (
               <Link
@@ -343,7 +343,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                 </span>
               ) : null}
             </div>
-            <div className="mt-2.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <h2 className={cn("font-bold tracking-tight", dense ? "text-2xl" : "text-[2.4rem] leading-none")}>{stock.symbol}</h2>
               {stock.name ? (
                 <span
@@ -354,11 +354,11 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                 </span>
               ) : null}
             </div>
-            <div className={cn("mt-2.5 flex flex-wrap items-end gap-x-3 gap-y-1.5", dense ? "mt-2" : "sm:gap-x-4")}>
+            <div className={cn("mt-2 flex flex-wrap items-end gap-x-3 gap-y-1.5", dense ? "mt-2" : "sm:gap-x-4")}>
               <span className={cn("font-semibold tabular-nums tracking-tight text-foreground", dense ? "text-3xl" : "text-5xl leading-none")}>
                 {formatCurrency(last)}
               </span>
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {stock.dailyChangePercent != null ? (
                   <p className={cn("font-semibold tabular-nums", dense ? "text-sm" : "text-lg", valueTone(stock.dailyChangePercent))}>
                     {formatPercent(stock.dailyChangePercent, true)} today
@@ -400,8 +400,8 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               </div>
             </div>
           </div>
-          <div className="rounded-xl border border-border/70 bg-background/40 p-2.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
-            <div className="mb-1.5 flex items-center justify-between gap-3">
+          <div className="rounded-xl border border-border/70 bg-background/40 p-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
+            <div className="mb-1 flex items-center justify-between gap-3">
               <div>
                 <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>Price chart</p>
                 <p className={cn("text-subtle", dense ? "mt-0.5 text-[10px]" : "mt-0.5 text-[11px]")}>
@@ -451,11 +451,11 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       <div
         style={{ scrollbarGutter: "stable" }}
         className={cn(
-          dense ? "min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3 pr-2" : "min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 pr-3 sm:px-5 sm:py-5"
+          dense ? "min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3 pr-2" : "min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3 pr-3 sm:px-5 sm:py-4"
         )}
       >
-        <div className={dense ? "space-y-3" : "space-y-4"}>
-          <div className={cn("grid items-start", dense ? "gap-3" : "gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.15fr)_minmax(0,1fr)]")}>
+        <div className={dense ? "space-y-3" : "space-y-3"}>
+          <div className={cn("grid items-start", dense ? "gap-3" : "gap-3 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.15fr)_minmax(0,1fr)]")}>
             <SectionCard
               compact={dense}
               title="Snapshot"
@@ -502,14 +502,14 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               }
               description="Composite score and score inputs used by the Stocks PM rules."
             >
-              <div className={dense ? "space-y-3" : "space-y-4"}>
+              <div className={dense ? "space-y-3" : "space-y-3"}>
                 <div>
                   <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Score inputs</p>
                   <p className={cn("text-subtle", dense ? "mt-0.5 text-[11px]" : "mt-1 text-xs")}>
                     Components used for the iOS-aligned risk-return score.
                   </p>
                   {scoreRows ? (
-                    <div className={dense ? "mt-3 space-y-2" : "mt-4 space-y-2.5"}>
+                    <div className={dense ? "mt-3 space-y-2" : "mt-3 space-y-2"}>
                       <SnapshotRow
                         compact={dense}
                         label="Analyst rating"
@@ -556,7 +556,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               description="Rules-based signal from your holdings, limits, and moving averages using the same logic as the Stocks PM mobile app."
             >
               {rec ? (
-                <div className={dense ? "space-y-3" : "space-y-4"}>
+                <div className={dense ? "space-y-3" : "space-y-3"}>
                   <p
                     className={cn(
                       "inline-flex rounded-lg border border-primary/25 bg-primary/10 font-bold tracking-tight text-primary",
@@ -591,7 +591,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                     />
                   </div>
 
-                  <div className={cn("border-t border-border/60 dark:border-white/[0.06]", dense ? "pt-3" : "pt-4")}>
+                  <div className={cn("border-t border-border/60 dark:border-white/[0.06]", dense ? "pt-3" : "pt-3")}>
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Factors considered</p>
@@ -603,7 +603,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                         {recommendationFactors.filter((factor) => factor.passes).length}/{recommendationFactors.length} passed
                       </span>
                     </div>
-                    <div className={cn(dense ? "mt-3 space-y-1.5" : "mt-4 space-y-2")}>
+                    <div className={cn(dense ? "mt-3 space-y-1.5" : "mt-3 space-y-1.5")}>
                       {recommendationFactors.map((factor) => (
                         <FactorFlagRow
                           key={`${factor.label}-${factor.detail}`}

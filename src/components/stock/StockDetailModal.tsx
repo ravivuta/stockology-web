@@ -23,7 +23,7 @@ export function StockDetailModal({ symbol, onClose }: Props) {
         <h2 id="stock-detail-modal-title">Stock details</h2>
       </ModalSection>
       {symbol ? (
-        <div className="relative flex min-h-0 flex-1">
+        <div className="relative flex h-full min-h-0 flex-1">
           <button
             type="button"
             onClick={onClose}

@@ -178,7 +178,7 @@ export function StockHistoricalChart({
   );
 
   return (
-    <div className={compact ? "space-y-2" : "space-y-3"} aria-label={`Price chart for ${symbol}`}>
+    <div className={compact ? "space-y-2" : "space-y-2.5"} aria-label={`Price chart for ${symbol}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         {!hideRangeSelector ? (
           <div className="flex flex-wrap items-center gap-2">
@@ -247,7 +247,7 @@ export function StockHistoricalChart({
 
       {!loading && !error && chartData.length > 0 && (
         <div
-          className={`${chart.plotShellClass} w-full ${compact ? "h-[150px] sm:h-[165px]" : "h-[240px] sm:h-[260px]"}`}
+          className={`${chart.plotShellClass} w-full ${compact ? "h-[150px] sm:h-[165px]" : "h-[208px] sm:h-[224px]"}`}
         >
           <div className={chart.gridLineClass} />
           <ResponsiveContainer width="100%" height="100%">
