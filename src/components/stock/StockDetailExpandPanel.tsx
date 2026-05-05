@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Settings, X, XCircle } from "lucide-react";
+import { CheckCircle2, PlusCircle, Settings, X, XCircle } from "lucide-react";
 import {
   computeRecommendationFactors,
   scoreBreakdownRows,
@@ -15,6 +15,7 @@ import { useSupabaseStockHistory } from "@/hooks/useSupabaseStockHistory";
 import { lastSma } from "@/lib/stock-chart";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { cn } from "@/lib/utils";
+import { AppModal, ModalSection } from "@/components/ui/AppModal";
 import { StockHistoricalChart } from "./StockHistoricalChart";
 import { StockStrategyModal } from "./StockStrategyModal";
 
@@ -92,7 +93,7 @@ function SectionCard({
   children,
   compact,
 }: {
-  title: string;
+  title: React.ReactNode;
   description?: string;
   children: React.ReactNode;
   compact?: boolean;
@@ -176,6 +177,8 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const { points, loading: histLoading, error: histError } = useSupabaseStockHistory(stock ? symbol : null);
 
   const [strategyOpen, setStrategyOpen] = useState(false);
+  const [tradeModalOpen, setTradeModalOpen] = useState(false);
+  const [lotsModalOpen, setLotsModalOpen] = useState(false);
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [qty, setQty] = useState("1");
   const [price, setPrice] = useState("");
@@ -287,6 +290,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
         tradeAccountType === "unknown" ? null : tradeAccountType === "retirement",
     });
     setPrice("");
+    setTradeModalOpen(false);
   }
 
   const dense = Boolean(embedded);
@@ -370,9 +374,16 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                     </p>
                   </div>
                 ) : null}
-                <p className={cn("text-subtle", dense ? "text-[11px]" : "text-sm")}>
-                  {histLoading ? "Refreshing history and recommendation context" : "Live quote with synced rule-based recommendation"}
-                </p>
+                <button
+                  type="button"
+                  onClick={() => setLotsModalOpen(true)}
+                  className={cn(
+                    "ui-hover-pop inline-flex items-center rounded-full border border-border/80 bg-background/70 font-semibold text-foreground dark:border-white/[0.08] dark:bg-white/[0.04]",
+                    dense ? "px-2.5 py-1 text-[10px]" : "px-3 py-1.5 text-xs"
+                  )}
+                >
+                  Open lots
+                </button>
               </div>
             </div>
           </div>
@@ -407,19 +418,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
             />
           </div>
         </div>
-        <div className={cn("mt-3 flex shrink-0 items-center gap-1.5 sm:gap-2", dense ? "justify-end" : "justify-between")}>
-          <button
-            type="button"
-            onClick={() => setStrategyOpen(true)}
-            className={cn(
-              "ui-hover-pop inline-flex items-center gap-1.5 border border-white/45 bg-white/75 font-semibold text-foreground shadow-sm backdrop-blur-lg dark:border-white/10 dark:bg-white/[0.06] sm:gap-2",
-              dense ? "rounded-lg px-2.5 py-1.5 text-xs" : "rounded-xl px-3.5 py-2 text-sm"
-            )}
-            aria-label="Strategy parameters"
-          >
-            <Settings className={dense ? "h-3.5 w-3.5" : "h-4 w-4"} />
-            Parameters
-          </button>
+        <div className={cn("mt-3 flex shrink-0 items-center gap-1.5 sm:gap-2", "justify-end")}>
           {onClose && (
             <button
               type="button"
@@ -480,49 +479,18 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
 
             <SectionCard
               compact={dense}
-              title="Score"
+              title={
+                <span className="flex items-center justify-between gap-3">
+                  <span>Score</span>
+                  <span className={cn("tabular-nums", dense ? "text-sm" : "text-base", scoreTone(stock.score))}>
+                    {formatScoreDisplay(stock.score)}
+                  </span>
+                </span>
+              }
               description="Composite score and score inputs used by the Stocks PM rules."
             >
               <div className={dense ? "space-y-3" : "space-y-4"}>
-                <div className="rounded-xl border border-border/60 bg-background/35 p-3 dark:border-white/[0.07] dark:bg-white/[0.02]">
-                  <DetailFieldGrid
-                    compact={dense}
-                    columns={2}
-                    items={[
-                      {
-                        label: "Composite score",
-                        value: formatScoreDisplay(stock.score),
-                        detail: "Final risk-return score used by recommendation gating",
-                        valueClassName: scoreTone(stock.score),
-                      },
-                      {
-                        label: "Analyst rating",
-                        value: stock.analystAvg?.trim() || "—",
-                        valueClassName: analystRatingTone(stock.analystAvg),
-                      },
-                      {
-                        label: "Upside",
-                        value: formatUpsidePct(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)),
-                        valueClassName: valueTone(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)),
-                      },
-                      ...(stock.aiSentimentScore != null
-                        ? [{ label: "AI sentiment", value: String(stock.aiSentimentScore), detail: "Scaled headline sentiment" } satisfies DetailField]
-                        : []),
-                      ...(hasPosition
-                        ? [
-                            { label: "Position value", value: formatCurrency(positionValue) },
-                            {
-                              label: "Unrealized P/L",
-                              value: `${formatCurrency(unrealized)} (${formatPercent(unrealizedPct, true)})`,
-                              valueClassName: unrealized >= 0 ? "text-primary" : "text-error",
-                            },
-                          ]
-                        : []),
-                    ]}
-                  />
-                </div>
-
-                <div className="rounded-xl border border-border/70 bg-background/45 p-3 dark:border-white/[0.07] dark:bg-white/[0.03]">
+                <div>
                   <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Score inputs</p>
                   <p className={cn("text-subtle", dense ? "mt-0.5 text-[11px]" : "mt-1 text-xs")}>
                     Components used for the iOS-aligned risk-return score.
@@ -545,15 +513,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                       />
                       <SnapshotRow compact={dense} label="Market cap" value={scoreRows.capLine} hint={scoreRows.capPoints} />
                       <SnapshotRow compact={dense} label="PEG ratio" value={scoreRows.pegLine} hint={scoreRows.pegPoints} />
-                      {stock.score != null ? (
-                        <SnapshotRow
-                          compact={dense}
-                          label="Composite score"
-                          value={formatScoreDisplay(stock.score)}
-                          hint="Final rules score used by recommendation gating"
-                          valueClassName={scoreTone(stock.score)}
-                        />
-                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -562,7 +521,36 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
 
             <SectionCard
               compact={dense}
-              title="Recommendation"
+              title={
+                <span className="flex items-center justify-between gap-3">
+                  <span>Recommendation</span>
+                  <span className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setStrategyOpen(true)}
+                      className={cn(
+                        "ui-hover-pop inline-flex items-center gap-1.5 border border-white/45 bg-white/75 font-semibold text-foreground shadow-sm backdrop-blur-lg dark:border-white/10 dark:bg-white/[0.06] sm:gap-2",
+                        dense ? "rounded-lg px-2 py-1 text-[10px]" : "rounded-lg px-2.5 py-1.5 text-xs"
+                      )}
+                      aria-label="Strategy parameters"
+                    >
+                      <Settings className={dense ? "h-3.5 w-3.5" : "h-4 w-4"} />
+                      Parameters
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTradeModalOpen(true)}
+                      className={cn(
+                        "ui-hover-pop inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 font-semibold text-primary",
+                        dense ? "px-2 py-1 text-[10px]" : "px-2.5 py-1.5 text-xs"
+                      )}
+                    >
+                      <PlusCircle className={dense ? "h-3.5 w-3.5" : "h-4 w-4"} />
+                      Record trade
+                    </button>
+                  </span>
+                </span>
+              }
               description="Rules-based signal from your holdings, limits, and moving averages using the same logic as the Stocks PM mobile app."
             >
               {rec ? (
@@ -577,7 +565,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                   </p>
                   <p className={cn("leading-snug text-foreground/90", dense ? "text-sm" : "text-sm")}>{rec.comments}</p>
 
-                  <div className="rounded-xl border border-border/70 bg-background/45 p-3 dark:border-white/[0.07] dark:bg-white/[0.03]">
+                  <div>
                     <DetailFieldGrid
                       compact={dense}
                       columns={2}
@@ -601,12 +589,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                     />
                   </div>
 
-                  <div
-                    className={cn(
-                      "rounded-xl border border-border/70 bg-background/45 dark:border-white/[0.07] dark:bg-white/[0.03]",
-                      dense ? "p-3" : "p-4"
-                    )}
-                  >
+                  <div className={cn("border-t border-border/60 dark:border-white/[0.06]", dense ? "pt-3" : "pt-4")}>
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Factors considered</p>
@@ -639,238 +622,167 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               )}
             </SectionCard>
           </div>
-
-          {(hasPosition || lotSummary.openLots.length > 0) ? (
-            <div className={cn("grid items-start", dense ? "gap-3" : "gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(22rem,0.95fr)] 2xl:grid-cols-[minmax(0,1.85fr)_minmax(24rem,0.9fr)]")}>
-              <SectionCard
-                compact={dense}
-                title="Open lots"
-                description="Active lots for this holding. Account type shows whether each lot is taxable or retirement."
-              >
-                {lotSummary.openLots.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-[720px] w-full text-left">
-                      <thead className="border-b border-border/60 text-[11px] uppercase tracking-[0.12em] text-subtle dark:border-white/[0.06]">
-                        <tr>
-                          <th className={cn("pb-2 pr-3 font-semibold", dense ? "text-[10px]" : "text-[11px]")}>Bought</th>
-                          <th className={cn("pb-2 pr-3 text-right font-semibold", dense ? "text-[10px]" : "text-[11px]")}>Qty</th>
-                          <th className={cn("pb-2 pr-3 text-right font-semibold", dense ? "text-[10px]" : "text-[11px]")}>Cost/share</th>
-                          <th className={cn("pb-2 pr-3 text-right font-semibold", dense ? "text-[10px]" : "text-[11px]")}>Basis</th>
-                          <th className={cn("pb-2 pr-3 text-right font-semibold", dense ? "text-[10px]" : "text-[11px]")}>Value</th>
-                          <th className={cn("pb-2 pr-3 text-right font-semibold", dense ? "text-[10px]" : "text-[11px]")}>P/L</th>
-                          <th className={cn("pb-2 pr-3 font-semibold", dense ? "text-[10px]" : "text-[11px]")}>Account type</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {lotSummary.openLots.map((lot) => {
-                          const lotMarketValue = lot.quantity * last;
-                          const lotCostBasis = lot.quantity * lot.costBasis;
-                          const lotUnrealized = lotMarketValue - lotCostBasis;
-
-                          return (
-                            <tr key={lot.id} className="border-b border-border/50 text-foreground last:border-b-0 dark:border-white/[0.06]">
-                              <td className={cn("py-2 pr-3", dense ? "text-[11px]" : "text-sm")}>{formatDateLabel(lot.purchaseDate)}</td>
-                              <td className={cn("py-2 pr-3 text-right tabular-nums", dense ? "text-[11px]" : "text-sm")}>{formatNumberMax2(lot.quantity)}</td>
-                              <td className={cn("py-2 pr-3 text-right tabular-nums", dense ? "text-[11px]" : "text-sm")}>{formatCurrency(lot.costBasis)}</td>
-                              <td className={cn("py-2 pr-3 text-right tabular-nums", dense ? "text-[11px]" : "text-sm")}>{formatCurrency(lotCostBasis)}</td>
-                              <td className={cn("py-2 pr-3 text-right tabular-nums", dense ? "text-[11px]" : "text-sm")}>{formatCurrency(lotMarketValue)}</td>
-                              <td className={cn("py-2 pr-3 text-right tabular-nums", dense ? "text-[11px]" : "text-sm", lotUnrealized >= 0 ? "text-primary" : "text-error")}>
-                                {formatCurrency(lotUnrealized)}
-                              </td>
-                              <td className={cn("py-2 pr-3", dense ? "text-[11px]" : "text-sm")}>{formatAccountType(lot.isRetirementAccount)}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className={cn("mt-3 text-subtle", dense ? "text-xs" : "text-sm")}>
-                    No open lot records are available for this symbol yet.
-                  </p>
-                )}
-              </SectionCard>
-              <SectionCard
-                compact={dense}
-                title="Record a trade"
-                description="Enter a buy or sell to update cash, shares, average cost, and lots for this symbol."
-              >
-                <div className={cn("grid", dense ? "gap-2" : "gap-2.5 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2")}>
-                  <label className={cn("flex flex-col font-medium text-foreground", dense ? "gap-1 text-xs" : "gap-1.5 text-sm")}>
-                    Side
-                    <select
-                      value={side}
-                      onChange={(e) => setSide(e.target.value as "BUY" | "SELL")}
-                      className={cn(
-                        "rounded-lg border border-border bg-background text-foreground dark:border-white/10",
-                        dense ? "px-2 py-1.5 text-xs" : "rounded-xl px-3 py-2 text-sm"
-                      )}
-                    >
-                      <option value="BUY">Buy</option>
-                      <option value="SELL">Sell</option>
-                    </select>
-                  </label>
-                  <label className={cn("flex flex-col font-medium text-foreground", dense ? "gap-1 text-xs" : "gap-1.5 text-sm")}>
-                    Quantity
-                    <input
-                      value={qty}
-                      onChange={(e) => setQty(e.target.value)}
-                      placeholder="Qty"
-                      className={cn(
-                        "border border-border bg-background tabular-nums text-foreground dark:border-white/10",
-                        dense ? "rounded-lg px-2 py-1.5 text-xs" : "rounded-xl px-3 py-2 text-sm"
-                      )}
-                    />
-                  </label>
-                  <label className={cn("flex flex-col font-medium text-foreground", dense ? "gap-1 text-xs" : "gap-1.5 text-sm")}>
-                    Price (optional)
-                    <input
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      placeholder={`Default ${formatDecimal(last)}`}
-                      className={cn(
-                        "border border-border bg-background tabular-nums text-foreground dark:border-white/10",
-                        dense ? "rounded-lg px-2 py-1.5 text-xs" : "rounded-xl px-3 py-2 text-sm"
-                      )}
-                    />
-                  </label>
-                  <label className={cn("flex flex-col font-medium text-foreground", dense ? "gap-1 text-xs" : "gap-1.5 text-sm")}>
-                    Account name
-                    <input
-                      value={tradeAccountName}
-                      onChange={(e) => setTradeAccountName(e.target.value)}
-                      placeholder="Brokerage / IRA"
-                      disabled={side === "SELL"}
-                      className={cn(
-                        "border border-border bg-background text-foreground disabled:opacity-60 dark:border-white/10",
-                        dense ? "rounded-lg px-2 py-1.5 text-xs" : "rounded-xl px-3 py-2 text-sm"
-                      )}
-                    />
-                  </label>
-                  <label className={cn("flex flex-col font-medium text-foreground", dense ? "gap-1 text-xs" : "gap-1.5 text-sm")}>
-                    Account type
-                    <select
-                      value={tradeAccountType}
-                      onChange={(e) => setTradeAccountType(e.target.value as "unknown" | "retirement" | "taxable")}
-                      disabled={side === "SELL"}
-                      className={cn(
-                        "rounded-lg border border-border bg-background text-foreground disabled:opacity-60 dark:border-white/10",
-                        dense ? "px-2 py-1.5 text-xs" : "rounded-xl px-3 py-2 text-sm"
-                      )}
-                    >
-                      <option value="unknown">Unknown</option>
-                      <option value="retirement">Retirement</option>
-                      <option value="taxable">Taxable</option>
-                    </select>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={applyTrade}
-                    className={cn(
-                      appCtaButton("ui-hover-spotlight justify-center"),
-                      dense ? "rounded-lg px-3 py-1.5 text-xs" : "rounded-xl px-4 py-2 text-sm sm:self-end"
-                    )}
-                  >
-                    Apply trade
-                  </button>
-                </div>
-                <p className={cn("text-subtle", dense ? "mt-2 text-[11px]" : "mt-3 text-xs")}>
-                  Account fields are stored on new buy lots and carried into CSV export and stock-detail lot history.
-                </p>
-              </SectionCard>
-            </div>
-          ) : (
-            <SectionCard
-              compact={dense}
-              title="Record a trade"
-              description="Enter a buy or sell to update cash, shares, average cost, and lots for this symbol."
-            >
-              <div className={cn("grid", dense ? "gap-2" : "gap-2.5 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2")}>
-                <label className={cn("flex flex-col font-medium text-foreground", dense ? "gap-1 text-xs" : "gap-1.5 text-sm")}>
-                  Side
-                  <select
-                    value={side}
-                    onChange={(e) => setSide(e.target.value as "BUY" | "SELL")}
-                    className={cn(
-                      "rounded-lg border border-border bg-background text-foreground dark:border-white/10",
-                      dense ? "px-2 py-1.5 text-xs" : "rounded-xl px-3 py-2 text-sm"
-                    )}
-                  >
-                    <option value="BUY">Buy</option>
-                    <option value="SELL">Sell</option>
-                  </select>
-                </label>
-                <label className={cn("flex flex-col font-medium text-foreground", dense ? "gap-1 text-xs" : "gap-1.5 text-sm")}>
-                  Quantity
-                  <input
-                    value={qty}
-                    onChange={(e) => setQty(e.target.value)}
-                    placeholder="Qty"
-                    className={cn(
-                      "border border-border bg-background tabular-nums text-foreground dark:border-white/10",
-                      dense ? "rounded-lg px-2 py-1.5 text-xs" : "rounded-xl px-3 py-2 text-sm"
-                    )}
-                  />
-                </label>
-                <label className={cn("flex flex-col font-medium text-foreground", dense ? "gap-1 text-xs" : "gap-1.5 text-sm")}>
-                  Price (optional)
-                  <input
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    placeholder={`Default ${formatDecimal(last)}`}
-                    className={cn(
-                      "border border-border bg-background tabular-nums text-foreground dark:border-white/10",
-                      dense ? "rounded-lg px-2 py-1.5 text-xs" : "rounded-xl px-3 py-2 text-sm"
-                    )}
-                  />
-                </label>
-                <label className={cn("flex flex-col font-medium text-foreground", dense ? "gap-1 text-xs" : "gap-1.5 text-sm")}>
-                  Account name
-                  <input
-                    value={tradeAccountName}
-                    onChange={(e) => setTradeAccountName(e.target.value)}
-                    placeholder="Brokerage / IRA"
-                    disabled={side === "SELL"}
-                    className={cn(
-                      "border border-border bg-background text-foreground disabled:opacity-60 dark:border-white/10",
-                      dense ? "rounded-lg px-2 py-1.5 text-xs" : "rounded-xl px-3 py-2 text-sm"
-                    )}
-                  />
-                </label>
-                <label className={cn("flex flex-col font-medium text-foreground", dense ? "gap-1 text-xs" : "gap-1.5 text-sm")}>
-                  Account type
-                  <select
-                    value={tradeAccountType}
-                    onChange={(e) => setTradeAccountType(e.target.value as "unknown" | "retirement" | "taxable")}
-                    disabled={side === "SELL"}
-                    className={cn(
-                      "rounded-lg border border-border bg-background text-foreground disabled:opacity-60 dark:border-white/10",
-                      dense ? "px-2 py-1.5 text-xs" : "rounded-xl px-3 py-2 text-sm"
-                    )}
-                  >
-                    <option value="unknown">Unknown</option>
-                    <option value="retirement">Retirement</option>
-                    <option value="taxable">Taxable</option>
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  onClick={applyTrade}
-                  className={cn(
-                    appCtaButton("ui-hover-spotlight justify-center"),
-                    dense ? "rounded-lg px-3 py-1.5 text-xs" : "rounded-xl px-4 py-2 text-sm sm:self-end"
-                  )}
-                >
-                  Apply trade
-                </button>
-              </div>
-              <p className={cn("text-subtle", dense ? "mt-2 text-[11px]" : "mt-3 text-xs")}>
-                Account fields are stored on new buy lots and carried into CSV export and stock-detail lot history.
-              </p>
-            </SectionCard>
-          )}
         </div>
       </div>
+
+      <AppModal open={tradeModalOpen} onClose={() => setTradeModalOpen(false)} size="md" titleId="trade-modal-title">
+        <ModalSection className="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-elevated px-4 py-3 dark:border-foreground/10">
+          <div>
+            <h3 id="trade-modal-title" className="text-base font-semibold tracking-tight text-foreground">
+              Record Trade
+            </h3>
+            <p className="mt-0.5 text-xs text-subtle">
+              Update cash, shares, average cost, and lots for {stock.symbol}.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setTradeModalOpen(false)}
+            className="rounded-lg border border-transparent p-2 text-subtle hover:border-border/80 hover:bg-white/55 hover:text-foreground dark:hover:border-white/[0.08] dark:hover:bg-white/[0.06]"
+            aria-label="Close trade dialog"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </ModalSection>
+        <ModalSection className="min-h-0 flex-1 px-4 py-4">
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
+              Side
+              <select
+                value={side}
+                onChange={(e) => setSide(e.target.value as "BUY" | "SELL")}
+                className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground dark:border-white/10"
+              >
+                <option value="BUY">Buy</option>
+                <option value="SELL">Sell</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
+              Quantity
+              <input
+                value={qty}
+                onChange={(e) => setQty(e.target.value)}
+                placeholder="Qty"
+                className="rounded-xl border border-border bg-background px-3 py-2 text-sm tabular-nums text-foreground dark:border-white/10"
+              />
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
+              Price (optional)
+              <input
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder={`Default ${formatDecimal(last)}`}
+                className="rounded-xl border border-border bg-background px-3 py-2 text-sm tabular-nums text-foreground dark:border-white/10"
+              />
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
+              Account name
+              <input
+                value={tradeAccountName}
+                onChange={(e) => setTradeAccountName(e.target.value)}
+                placeholder="Brokerage / IRA"
+                disabled={side === "SELL"}
+                className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground disabled:opacity-60 dark:border-white/10"
+              />
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground sm:col-span-2">
+              Account type
+              <select
+                value={tradeAccountType}
+                onChange={(e) => setTradeAccountType(e.target.value as "unknown" | "retirement" | "taxable")}
+                disabled={side === "SELL"}
+                className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground disabled:opacity-60 dark:border-white/10"
+              >
+                <option value="unknown">Unknown</option>
+                <option value="retirement">Retirement</option>
+                <option value="taxable">Taxable</option>
+              </select>
+            </label>
+          </div>
+          <p className="mt-3 text-xs text-subtle">
+            Account fields are stored on new buy lots and carried into CSV export and stock-detail lot history.
+          </p>
+        </ModalSection>
+        <ModalSection className="flex justify-end gap-2 border-t border-border px-4 py-4 dark:border-foreground/10">
+          <button
+            type="button"
+            onClick={() => setTradeModalOpen(false)}
+            className="ui-hover-pop rounded-xl border border-border px-4 py-2 text-sm text-foreground"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={applyTrade}
+            className={cn(appCtaButton("ui-hover-spotlight justify-center"), "rounded-xl px-4 py-2 text-sm")}
+          >
+            Apply trade
+          </button>
+        </ModalSection>
+      </AppModal>
+
+      <AppModal open={lotsModalOpen} onClose={() => setLotsModalOpen(false)} size="lg" titleId="lots-modal-title">
+        <ModalSection className="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-elevated px-4 py-3 dark:border-foreground/10">
+          <div>
+            <h3 id="lots-modal-title" className="text-base font-semibold tracking-tight text-foreground">
+              Open Lots
+            </h3>
+            <p className="mt-0.5 text-xs text-subtle">
+              Active lots for {stock.symbol}. Account type shows whether each lot is taxable or retirement.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setLotsModalOpen(false)}
+            className="rounded-lg border border-transparent p-2 text-subtle hover:border-border/80 hover:bg-white/55 hover:text-foreground dark:hover:border-white/[0.08] dark:hover:bg-white/[0.06]"
+            aria-label="Close open lots dialog"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </ModalSection>
+        <ModalSection className="min-h-0 flex-1 px-4 py-4">
+          {lotSummary.openLots.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-[720px] w-full text-left">
+                <thead className="border-b border-border/60 text-[11px] uppercase tracking-[0.12em] text-subtle dark:border-white/[0.06]">
+                  <tr>
+                    <th className="pb-2 pr-3 font-semibold">Bought</th>
+                    <th className="pb-2 pr-3 text-right font-semibold">Qty</th>
+                    <th className="pb-2 pr-3 text-right font-semibold">Cost/share</th>
+                    <th className="pb-2 pr-3 text-right font-semibold">Basis</th>
+                    <th className="pb-2 pr-3 text-right font-semibold">Value</th>
+                    <th className="pb-2 pr-3 text-right font-semibold">P/L</th>
+                    <th className="pb-2 pr-3 font-semibold">Account type</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lotSummary.openLots.map((lot) => {
+                    const lotMarketValue = lot.quantity * last;
+                    const lotCostBasis = lot.quantity * lot.costBasis;
+                    const lotUnrealized = lotMarketValue - lotCostBasis;
+
+                    return (
+                      <tr key={lot.id} className="border-b border-border/50 text-foreground last:border-b-0 dark:border-white/[0.06]">
+                        <td className="py-2 pr-3 text-sm">{formatDateLabel(lot.purchaseDate)}</td>
+                        <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatNumberMax2(lot.quantity)}</td>
+                        <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatCurrency(lot.costBasis)}</td>
+                        <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatCurrency(lotCostBasis)}</td>
+                        <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatCurrency(lotMarketValue)}</td>
+                        <td className={cn("py-2 pr-3 text-right text-sm tabular-nums", lotUnrealized >= 0 ? "text-primary" : "text-error")}>
+                          {formatCurrency(lotUnrealized)}
+                        </td>
+                        <td className="py-2 pr-3 text-sm">{formatAccountType(lot.isRetirementAccount)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-subtle">No open lot records are available for this symbol yet.</p>
+          )}
+        </ModalSection>
+      </AppModal>
 
       <StockStrategyModal
         open={strategyOpen}
