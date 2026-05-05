@@ -374,16 +374,29 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                     </p>
                   </div>
                 ) : null}
-                <button
-                  type="button"
-                  onClick={() => setLotsModalOpen(true)}
-                  className={cn(
-                    "ui-hover-pop inline-flex items-center rounded-full border border-border/80 bg-background/70 font-semibold text-foreground dark:border-white/[0.08] dark:bg-white/[0.04]",
-                    dense ? "px-2.5 py-1 text-[10px]" : "px-3 py-1.5 text-xs"
-                  )}
-                >
-                  Open lots
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLotsModalOpen(true)}
+                    className={cn(
+                      "ui-hover-pop inline-flex items-center rounded-full border border-border/80 bg-background/70 font-semibold text-foreground dark:border-white/[0.08] dark:bg-white/[0.04]",
+                      dense ? "px-2.5 py-1 text-[10px]" : "px-3 py-1.5 text-xs"
+                    )}
+                  >
+                    Open lots
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTradeModalOpen(true)}
+                    className={cn(
+                      "ui-hover-pop inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 font-semibold text-primary",
+                      dense ? "px-2.5 py-1 text-[10px]" : "px-3 py-1.5 text-xs"
+                    )}
+                  >
+                    <PlusCircle className={dense ? "h-3.5 w-3.5" : "h-4 w-4"} />
+                    Record trade
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -418,8 +431,8 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
             />
           </div>
         </div>
-        <div className={cn("mt-3 flex shrink-0 items-center gap-1.5 sm:gap-2", "justify-end")}>
-          {onClose && (
+        {onClose && embedded ? (
+          <div className="mt-3 flex shrink-0 items-center justify-end gap-1.5 sm:gap-2">
             <button
               type="button"
               onClick={onClose}
@@ -431,8 +444,8 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
             >
               <X className={dense ? "h-4 w-4" : "h-5 w-5"} />
             </button>
-          )}
-        </div>
+          </div>
+        ) : null}
       </div>
 
       <div
@@ -524,11 +537,11 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               title={
                 <span className="flex items-center justify-between gap-3">
                   <span>Recommendation</span>
-                  <span className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setStrategyOpen(true)}
-                      className={cn(
+                <span className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStrategyOpen(true)}
+                    className={cn(
                         "ui-hover-pop inline-flex items-center gap-1.5 border border-white/45 bg-white/75 font-semibold text-foreground shadow-sm backdrop-blur-lg dark:border-white/10 dark:bg-white/[0.06] sm:gap-2",
                         dense ? "rounded-lg px-2 py-1 text-[10px]" : "rounded-lg px-2.5 py-1.5 text-xs"
                       )}
@@ -536,17 +549,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                     >
                       <Settings className={dense ? "h-3.5 w-3.5" : "h-4 w-4"} />
                       Parameters
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTradeModalOpen(true)}
-                      className={cn(
-                        "ui-hover-pop inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 font-semibold text-primary",
-                        dense ? "px-2 py-1 text-[10px]" : "px-2.5 py-1.5 text-xs"
-                      )}
-                    >
-                      <PlusCircle className={dense ? "h-3.5 w-3.5" : "h-4 w-4"} />
-                      Record trade
                     </button>
                   </span>
                 </span>
@@ -721,7 +723,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
         </ModalSection>
       </AppModal>
 
-      <AppModal open={lotsModalOpen} onClose={() => setLotsModalOpen(false)} size="lg" titleId="lots-modal-title">
+      <AppModal open={lotsModalOpen} onClose={() => setLotsModalOpen(false)} size="xl" titleId="lots-modal-title">
         <ModalSection className="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-elevated px-4 py-3 dark:border-foreground/10">
           <div>
             <h3 id="lots-modal-title" className="text-base font-semibold tracking-tight text-foreground">

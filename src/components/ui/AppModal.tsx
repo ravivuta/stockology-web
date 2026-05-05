@@ -8,6 +8,7 @@ const SIZE_CLASS = {
   sm: "max-w-sm",
   md: "max-w-lg",
   lg: "max-w-2xl",
+  xl: "max-w-4xl",
 } as const;
 
 export const modalStaggerContainer: Variants = {
@@ -52,6 +53,7 @@ export type AppModalProps = {
   children: React.ReactNode;
   size?: keyof typeof SIZE_CLASS;
   className?: string;
+  shellClassName?: string;
   panelClassName?: string;
   titleId?: string;
   describedById?: string;
@@ -65,6 +67,7 @@ export function AppModal({
   children,
   size = "md",
   className,
+  shellClassName,
   panelClassName,
   titleId,
   describedById,
@@ -160,7 +163,7 @@ export function AppModal({
             aria-modal="true"
             aria-labelledby={titleId}
             aria-describedby={describedById}
-            className="pointer-events-none fixed inset-0 z-[201] flex items-end justify-center p-0 sm:items-center sm:p-4"
+            className={`pointer-events-none fixed inset-0 z-[201] flex items-end justify-center p-0 sm:items-center sm:p-4 ${shellClassName ?? ""}`.trim()}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={panelShellExit}

@@ -8,6 +8,8 @@ import { createClient } from "@/lib/supabase/client";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { STOCKS_PM_ONBOARDING_USER_META_KEY } from "@/lib/onboarding-meta";
 
+const FALLBACK_STARTER_SYMBOLS = ["AAPL", "MSFT", "SPY"];
+
 const steps = [
   { title: "Strategy", body: "Practice emotionless rules: buy near moving averages, scale in, take profits at targets." },
   { title: "Recommendations", body: "Signals use trend, targets, and position limits — all educational, not financial advice." },
@@ -20,25 +22,57 @@ export default function OnboardingPage() {
   const [i, setI] = useState(0);
   const [cash, setCash] = useState("10000");
   const [risk, setRisk] = useState<"Low" | "Medium" | "High">("Medium");
+  const [isFinishing, setIsFinishing] = useState(false);
   const setCashStore = usePortfolioStore((s) => s.setCash);
   const setSettings = usePortfolioStore((s) => s.setSettings);
   const setOnboardingComplete = usePortfolioStore((s) => s.setOnboardingComplete);
   const addStock = usePortfolioStore((s) => s.addStock);
   const router = useRouter();
 
+  async function fetchStarterSymbols() {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc("get_top_recommended_stocks");
+      if (error) throw error;
+      if (!Array.isArray(data)) return FALLBACK_STARTER_SYMBOLS;
+
+      const symbols = data
+        .map((row) => (typeof row?.symbol === "string" ? row.symbol.trim().toUpperCase() : ""))
+        .filter(Boolean);
+
+      return symbols.length > 0 ? [...new Set(symbols)] : FALLBACK_STARTER_SYMBOLS;
+    } catch (error) {
+      console.warn("[onboarding starter symbols]", error);
+      return FALLBACK_STARTER_SYMBOLS;
+    }
+  }
+
   async function finish() {
+    if (isFinishing) return;
+    setIsFinishing(true);
+
     const v = parseFloat(cash.replace(/,/g, "")) || 0;
-    setCashStore(v);
-    setSettings({ riskAppetite: risk });
-    ["AAPL", "MSFT", "SPY"].forEach((sym) => {
-      addStock({ symbol: sym, quantity: 0, averageCost: 0, lastPrice: 100 + Math.random() * 50, pendingOptimization: true });
-    });
-    setOnboardingComplete(true);
-    await createClient().auth.updateUser({
-      data: { [STOCKS_PM_ONBOARDING_USER_META_KEY]: true },
-    });
-    router.refresh();
-    router.replace("/dashboard");
+    const starterSymbols = await fetchStarterSymbols();
+
+    try {
+      setCashStore(v);
+      setSettings({ riskAppetite: risk });
+
+      if (usePortfolioStore.getState().stocks.length === 0) {
+        starterSymbols.forEach((sym) => {
+          addStock({ symbol: sym, quantity: 0, averageCost: 0, lastPrice: 100 + Math.random() * 50, pendingOptimization: true });
+        });
+      }
+
+      setOnboardingComplete(true);
+      await createClient().auth.updateUser({
+        data: { [STOCKS_PM_ONBOARDING_USER_META_KEY]: true },
+      });
+      router.refresh();
+      router.replace("/dashboard");
+    } finally {
+      setIsFinishing(false);
+    }
   }
 
   return (
@@ -104,9 +138,10 @@ export default function OnboardingPage() {
             className={appCtaButton(
               "ui-hover-spotlight min-h-[52px] flex-1 rounded-2xl py-4 text-base sm:min-h-14 sm:text-lg"
             )}
+            disabled={isFinishing}
             onClick={() => (i < steps.length - 1 ? setI((x) => x + 1) : finish())}
           >
-            {i < steps.length - 1 ? "Next" : "Get started"}
+            {i < steps.length - 1 ? "Next" : isFinishing ? "Setting up..." : "Get started"}
           </button>
         </div>
       </div>
