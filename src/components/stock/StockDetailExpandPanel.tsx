@@ -6,6 +6,7 @@ import { CheckCircle2, PlusCircle, Settings, X, XCircle } from "lucide-react";
 import {
   computeRecommendationFactors,
   scoreBreakdownRows,
+  sentimentLabelForScore,
 } from "@/lib/ios-recommendation";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
 import { buildRecommendation } from "@/lib/recommendation";
@@ -78,6 +79,24 @@ function scoreTone(score: number | null | undefined): string {
   if (score >= 60) return "text-amber-600 dark:text-amber-300";
   if (score >= 50) return "text-red-600/85 dark:text-red-300";
   return "text-red-600 dark:text-red-400";
+}
+
+function sentimentTone(score: number | null | undefined): string {
+  if (score == null || !Number.isFinite(score)) return "text-foreground";
+  if (score >= 70) return "text-emerald-600 dark:text-emerald-400";
+  if (score >= 55) return "text-primary dark:text-primary";
+  if (score >= 45) return "text-foreground";
+  if (score >= 30) return "text-amber-600 dark:text-amber-300";
+  return "text-red-600 dark:text-red-400";
+}
+
+function sentimentFill(score: number | null | undefined): string {
+  if (score == null || !Number.isFinite(score)) return "bg-border";
+  if (score >= 70) return "bg-emerald-500";
+  if (score >= 55) return "bg-primary";
+  if (score >= 45) return "bg-slate-400 dark:bg-slate-500";
+  if (score >= 30) return "bg-amber-500";
+  return "bg-red-500";
 }
 
 type Props = {
@@ -294,6 +313,8 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   }
 
   const dense = Boolean(embedded);
+  const aiSentimentScore = stock.aiSentimentScore;
+  const hasAiSentiment = stock.isETF !== true && aiSentimentScore != null && Number.isFinite(aiSentimentScore) && aiSentimentScore > 0;
 
   return (
     <div
@@ -400,35 +421,73 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               </div>
             </div>
           </div>
-          <div className="rounded-xl border border-border/70 bg-background/40 p-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
-            <div className="mb-1 flex items-center justify-between gap-3">
-              <div>
-                <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>Price chart</p>
-                <p className={cn("text-subtle", dense ? "mt-0.5 text-[10px]" : "mt-0.5 text-[11px]")}>
-                  Choose a range (1w–5y). The dashed line is your average cost when you hold a position.
-                </p>
-              </div>
-              {rec ? (
-                <span
-                  className={cn(
-                    "inline-flex rounded-full border px-2.5 py-1 font-bold tracking-[0.14em]",
-                    dense ? "text-[9px]" : "text-[10px]",
-                    recommendationTone(rec.action)
-                  )}
-                >
-                  {rec.action.replace("_", " ")}
-                </span>
-              ) : null}
-            </div>
-            <StockHistoricalChart
-              symbol={stock.symbol}
-              smaPeriod={stock.shortSMA}
-              averageCost={hasPosition && stock.averageCost > 0 ? stock.averageCost : null}
-              points={points}
-              loading={histLoading}
-              error={histError}
+          <div className={cn("grid gap-3", dense ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1fr)_15rem]")}>
+            <SectionCard
               compact
-            />
+              title={
+                <span className="flex items-center justify-between gap-2">
+                  <span>AI Sentiment</span>
+                  {hasAiSentiment ? (
+                    <span className={cn("tabular-nums text-sm", sentimentTone(aiSentimentScore))}>
+                      {Math.round(aiSentimentScore)}/100
+                    </span>
+                  ) : null}
+                </span>
+              }
+            >
+              {stock.isETF === true ? (
+                <p className="text-xs text-subtle">AI sentiment is not shown for ETFs.</p>
+              ) : hasAiSentiment ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className={cn("text-sm font-semibold", sentimentTone(aiSentimentScore))}>
+                      {sentimentLabelForScore(aiSentimentScore)}
+                    </span>
+                    <span className="text-[11px] tabular-nums text-subtle">
+                      {Math.round(aiSentimentScore)}/100
+                    </span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-border/80 dark:bg-white/[0.08]">
+                    <div
+                      className={cn("h-full rounded-full transition-[width]", sentimentFill(aiSentimentScore))}
+                      style={{ width: `${Math.max(0, Math.min(100, aiSentimentScore))}%` }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-subtle">No AI sentiment score is available for this stock yet.</p>
+              )}
+            </SectionCard>
+            <div className="rounded-xl border border-border/70 bg-background/40 p-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
+              <div className="mb-1 flex items-center justify-between gap-3">
+                <div>
+                  <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>Price chart</p>
+                  <p className={cn("text-subtle", dense ? "mt-0.5 text-[10px]" : "mt-0.5 text-[11px]")}>
+                    Choose a range (1w–5y). The dashed line is your average cost when you hold a position.
+                  </p>
+                </div>
+                {rec ? (
+                  <span
+                    className={cn(
+                      "inline-flex rounded-full border px-2.5 py-1 font-bold tracking-[0.14em]",
+                      dense ? "text-[9px]" : "text-[10px]",
+                      recommendationTone(rec.action)
+                    )}
+                  >
+                    {rec.action.replace("_", " ")}
+                  </span>
+                ) : null}
+              </div>
+              <StockHistoricalChart
+                symbol={stock.symbol}
+                smaPeriod={stock.shortSMA}
+                averageCost={hasPosition && stock.averageCost > 0 ? stock.averageCost : null}
+                points={points}
+                loading={histLoading}
+                error={histError}
+                compact
+              />
+            </div>
           </div>
         </div>
         {onClose && embedded ? (
@@ -455,7 +514,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
         )}
       >
         <div className={dense ? "space-y-3" : "space-y-3"}>
-          <div className={cn("grid items-start", dense ? "gap-3" : "gap-3 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.15fr)_minmax(0,1fr)]")}>
+          <div className={cn("grid items-start", dense ? "gap-3" : "gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)_minmax(0,1.15fr)]")}>
             <SectionCard
               compact={dense}
               title="Snapshot"
@@ -500,14 +559,10 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                   </span>
                 </span>
               }
-              description="Composite score and score inputs used by the Stocks PM rules."
             >
               <div className={dense ? "space-y-3" : "space-y-3"}>
                 <div>
                   <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Score inputs</p>
-                  <p className={cn("text-subtle", dense ? "mt-0.5 text-[11px]" : "mt-1 text-xs")}>
-                    Components used for the iOS-aligned risk-return score.
-                  </p>
                   {scoreRows ? (
                     <div className={dense ? "mt-3 space-y-2" : "mt-3 space-y-2"}>
                       <SnapshotRow
@@ -553,7 +608,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                   </span>
                 </span>
               }
-              description="Rules-based signal from your holdings, limits, and moving averages using the same logic as the Stocks PM mobile app."
             >
               {rec ? (
                 <div className={dense ? "space-y-3" : "space-y-3"}>
@@ -567,37 +621,10 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                   </p>
                   <p className={cn("leading-snug text-foreground/90", dense ? "text-sm" : "text-sm")}>{rec.comments}</p>
 
-                  <div>
-                    <DetailFieldGrid
-                      compact={dense}
-                      columns={2}
-                      items={[
-                        { label: "Next buy near", value: formatCurrency(rec.nextBuyPrice) },
-                        { label: `MA (${stock.shortSMA})`, value: formatCurrency(rec.movingAvg) },
-                        {
-                          label: "Expected return",
-                          value: formatPercent(rec.expectedReturnPct, true),
-                          valueClassName: valueTone(rec.expectedReturnPct),
-                        },
-                        ...(stock.aiSentimentScore != null
-                          ? [{
-                              label: "AI sentiment",
-                              value: String(stock.aiSentimentScore),
-                              detail: "Scaled headline sentiment",
-                              valueClassName: valueTone(stock.aiSentimentScore),
-                            } satisfies DetailField]
-                          : []),
-                      ]}
-                    />
-                  </div>
-
                   <div className={cn("border-t border-border/60 dark:border-white/[0.06]", dense ? "pt-3" : "pt-3")}>
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Factors considered</p>
-                        <p className={cn("text-subtle", dense ? "mt-0.5 text-[11px]" : "mt-1 text-xs")}>
-                          Rules checked for the current recommendation, shown as flagged factors.
-                        </p>
                       </div>
                       <span className={cn("font-medium text-subtle", dense ? "text-[10px]" : "text-xs")}>
                         {recommendationFactors.filter((factor) => factor.passes).length}/{recommendationFactors.length} passed
