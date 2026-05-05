@@ -351,10 +351,10 @@ export default function SettingsPage() {
                           <span className="font-medium tabular-nums text-foreground">{row.is_active ? "Yes" : "No"}</span>
                         </li>
                       ) : null}
-                      {row.billing_exempt != null ? (
+                      {row.billing_exempt === true ? (
                         <li className="flex justify-between gap-4">
                           <span className="text-subtle">Billing exempt</span>
-                          <span className="font-medium tabular-nums text-foreground">{row.billing_exempt ? "Yes" : "No"}</span>
+                          <span className="font-medium tabular-nums text-foreground">Yes</span>
                         </li>
                       ) : null}
                       {row.trial_expires_at ? (
@@ -397,11 +397,11 @@ export default function SettingsPage() {
                       </Link>
                     ) : null}
                   </div>
-                  <p className="text-[10px] leading-snug text-subtle">
-                    {hasBillingExempt
-                      ? "Billing-exempt accounts keep app access without expiry and are never routed through Stripe."
-                      : "Website signup now grants a 3-month app-managed trial with no credit card required. Stripe Checkout is only used when you choose to start a paid subscription."}
-                  </p>
+                  {!hasBillingExempt ? (
+                    <p className="text-[10px] leading-snug text-subtle">
+                      Website signup now grants a 3-month app-managed trial with no credit card required. Stripe Checkout is only used when you choose to start a paid subscription.
+                    </p>
+                  ) : null}
                 </div>
               )}
             </SettingsCard>
