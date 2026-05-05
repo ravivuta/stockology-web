@@ -330,17 +330,6 @@ export default function PortfolioPage() {
               </button>
             </div>
             <div id="portfolio-mobile-controls" className={`${mobileControlsOpen ? "mt-3 flex" : "hidden"} flex-wrap items-end gap-2 md:mt-0 md:flex`}>
-              <label className="flex min-w-[11rem] flex-1 flex-col gap-1 text-[11px] text-subtle sm:max-w-xs">
-                Filter
-                <input
-                  type="search"
-                  placeholder="Filter symbol…"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-                />
-              </label>
-              <div className="hidden h-10 w-px self-end bg-border/80 dark:bg-white/[0.08] md:block" aria-hidden />
               <div className="grid min-w-[18rem] flex-1 items-end gap-2 sm:grid-cols-[minmax(11rem,1.5fr)_7.5rem_6.5rem_auto]">
                 <label className="flex min-w-0 flex-col gap-1 text-[11px] text-subtle">
                   Add New Stock/Holding
@@ -399,7 +388,32 @@ export default function PortfolioPage() {
               </colgroup>
               <thead className="bg-muted/60 text-subtle dark:bg-white/[0.05]">
                 <tr>
-                  <SortableHeaderCell label="Symbol" column="symbol" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
+                  <th
+                    scope="col"
+                    aria-sort={sort === "symbol" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
+                    className="px-4 pb-2 pt-3 text-center text-xs font-semibold tracking-wide"
+                  >
+                    <div className="flex flex-col items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleSort("symbol")}
+                        className="inline-flex items-center justify-center gap-1 transition-colors hover:text-foreground"
+                      >
+                        <span>Symbol</span>
+                        <span aria-hidden="true" className={`text-[10px] ${sort === "symbol" ? "text-foreground" : "text-subtle/70"}`}>
+                          {sort === "symbol" ? (sortDirection === "asc" ? "▲" : "▼") : "↕"}
+                        </span>
+                      </button>
+                      <input
+                        type="search"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Type to filter"
+                        className="w-full min-w-0 rounded-lg border border-border bg-background px-2.5 py-1.5 text-[11px] font-medium normal-case tracking-normal text-foreground placeholder:text-subtle"
+                        aria-label="Filter portfolio symbols"
+                      />
+                    </div>
+                  </th>
                   <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
                   <SortableHeaderCell label="Chg" column="today" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
                   <SortableHeaderCell label="Qty" column="quantity" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />

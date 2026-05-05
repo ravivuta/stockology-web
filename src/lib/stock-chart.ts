@@ -1,6 +1,6 @@
 export type PricePoint = { date: string; close: number };
 
-export const CHART_RANGES = ["1w", "3mo", "6mo", "1y", "5y"] as const;
+export const CHART_RANGES = ["1w", "1mo", "3mo", "6mo", "1y", "5y"] as const;
 export type ChartRange = (typeof CHART_RANGES)[number];
 
 const MS_DAY = 86400000;
@@ -28,6 +28,8 @@ export function sliceForRange(points: PricePoint[], range: ChartRange): PricePoi
   const calendarSpanDays =
     range === "1w"
       ? 12
+      : range === "1mo"
+        ? 35
       : range === "3mo"
         ? 100
         : range === "6mo"

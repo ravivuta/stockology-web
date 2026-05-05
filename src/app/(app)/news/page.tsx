@@ -226,17 +226,14 @@ export default function NewsPage() {
                 Market pulse
               </div>
               <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-2">
-                <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">SPY 5Y</h2>
+                <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">SPY</h2>
                 {latestSpyPoint ? (
                   <p className="text-sm font-medium text-subtle">
-                    Last cached close <span className="tabular-nums text-foreground">{formatCurrency(latestSpyPoint.close)}</span>
+                    Last close: <span className="tabular-nums text-foreground">{formatCurrency(latestSpyPoint.close)}</span>
                     <span className="ml-2">{latestSpyPoint.date}</span>
                   </p>
                 ) : null}
               </div>
-              <p className="mt-2 max-w-3xl text-sm leading-relaxed text-subtle">
-                Five-year `SPY` trend from the local historical cache. When Refresh pulls new cached history, the latest daily point is reloaded here.
-              </p>
             </div>
             <div className="flex items-center gap-2 text-xs text-subtle">
               <ArrowUpRight className="h-3.5 w-3.5 text-primary" aria-hidden />
@@ -250,7 +247,7 @@ export default function NewsPage() {
             loading={spyLoading}
             error={spyError}
             initialRange="5y"
-            hideRangeSelector
+            allowedRanges={["1w", "1mo", "3mo", "1y", "5y"]}
           />
         </section>
       )}

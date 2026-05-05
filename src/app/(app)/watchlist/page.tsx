@@ -207,16 +207,6 @@ export default function WatchlistPage() {
 
       <div className="ui-hover-lift rounded-2xl border border-border bg-elevated p-3">
         <div className="flex flex-wrap items-end gap-2">
-          <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-[11px] text-subtle sm:max-w-xs">
-            Filter
-            <input
-              type="search"
-              placeholder="Filter symbol…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-            />
-          </label>
           <div className="hidden h-10 w-px self-end bg-border/80 dark:bg-white/[0.08] md:block" aria-hidden />
           <div className="ml-auto flex flex-wrap items-end gap-2">
             <label className="flex min-w-[9rem] flex-col gap-1 text-[11px] text-subtle">
@@ -254,7 +244,28 @@ export default function WatchlistPage() {
           </colgroup>
           <thead className="bg-muted/60 text-xs font-semibold uppercase tracking-wide text-subtle dark:bg-white/[0.05]">
             <tr>
-              <SortableHeaderCell label="Symbol" column="symbol" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
+              <th scope="col" aria-sort={sort === "symbol" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className="px-2 py-3 text-center sm:px-3">
+                <div className="flex flex-col items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("symbol")}
+                    className="inline-flex items-center justify-center gap-1 transition-colors hover:text-foreground"
+                  >
+                    <span>Symbol</span>
+                    <span aria-hidden="true" className={`text-[10px] ${sort === "symbol" ? "text-foreground" : "text-subtle/70"}`}>
+                      {sort === "symbol" ? (sortDirection === "asc" ? "▲" : "▼") : "↕"}
+                    </span>
+                  </button>
+                  <input
+                    type="search"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Type to filter"
+                    className="w-full min-w-0 rounded-lg border border-border bg-background px-2.5 py-1.5 text-[11px] font-medium normal-case tracking-normal text-foreground placeholder:text-subtle"
+                    aria-label="Filter watchlist symbols"
+                  />
+                </div>
+              </th>
               <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
               <SortableHeaderCell label="Today %" column="change" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
               <SortableHeaderCell label="Analyst Rating" column="analyst" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />

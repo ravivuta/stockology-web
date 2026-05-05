@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import {
   CHART_RANGES,
@@ -29,7 +29,17 @@ type Props = {
   compact?: boolean;
   initialRange?: ChartRange;
   hideRangeSelector?: boolean;
+  allowedRanges?: ChartRange[];
 };
+
+function chartRangeLabel(range: ChartRange): string {
+  if (range === "1w") return "1W";
+  if (range === "1mo") return "1MO";
+  if (range === "3mo") return "3MO";
+  if (range === "6mo") return "6MO";
+  if (range === "1y") return "1Y";
+  return "5Y";
+}
 
 function axisTickMs(ms: number) {
   const d = new Date(ms);
@@ -46,9 +56,20 @@ export function StockHistoricalChart({
   compact,
   initialRange = "3mo",
   hideRangeSelector = false,
+  allowedRanges,
 }: Props) {
   const chart = useDashboardChartTheme();
-  const [range, setRange] = useState<ChartRange>(initialRange);
+  const rangeOptions = useMemo(() => {
+    if (!allowedRanges || allowedRanges.length === 0) return CHART_RANGES;
+    return allowedRanges;
+  }, [allowedRanges]);
+  const [range, setRange] = useState<ChartRange>(rangeOptions.includes(initialRange) ? initialRange : rangeOptions[0] ?? "3mo");
+
+  useEffect(() => {
+    if (!rangeOptions.includes(range)) {
+      setRange(rangeOptions.includes(initialRange) ? initialRange : rangeOptions[0] ?? "3mo");
+    }
+  }, [initialRange, range, rangeOptions]);
 
   const sliced = useMemo(() => (points ? sliceForRange(points, range) : []), [points, range]);
   const chartData = useMemo(() => {
@@ -89,7 +110,7 @@ export function StockHistoricalChart({
           <div
             className={`flex flex-wrap gap-0.5 rounded-lg border border-border/80 bg-background/90 dark:border-white/10 ${compact ? "p-0.5" : "gap-1 rounded-xl p-1"}`}
           >
-            {CHART_RANGES.map((r) => (
+            {rangeOptions.map((r) => (
               <button
                 key={r}
                 type="button"
@@ -100,7 +121,7 @@ export function StockHistoricalChart({
                   range === r ? cn(APP_CTA_FILL, "shadow-sm") : "text-subtle hover:text-foreground"
                 )}
               >
-                {r}
+                {chartRangeLabel(r)}
               </button>
             ))}
           </div>
@@ -108,7 +129,7 @@ export function StockHistoricalChart({
           <div
             className={`inline-flex items-center rounded-full border border-border/80 bg-background/90 font-semibold uppercase tracking-[0.14em] text-subtle dark:border-white/10 ${compact ? "px-2.5 py-1 text-[10px]" : "px-3 py-1.5 text-[11px]"}`}
           >
-            {range}
+            {chartRangeLabel(range)}
           </div>
         )}
         {pct != null && (
@@ -116,7 +137,6 @@ export function StockHistoricalChart({
             className={`font-bold tabular-nums ${compact ? "text-xs" : "text-sm"} ${pct >= 0 ? "text-primary" : "text-error"}`}
           >
             {formatPercent(pct, true)}
-            <span className={`ml-1 font-medium text-subtle ${compact ? "text-[10px]" : "text-xs"}`}>in range</span>
           </span>
         )}
       </div>
