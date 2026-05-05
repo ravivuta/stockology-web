@@ -69,6 +69,16 @@ function analystRatingTone(value: string | null | undefined): string {
   return "text-red-600 dark:text-red-400";
 }
 
+function scoreTone(score: number | null | undefined): string {
+  if (score == null || !Number.isFinite(score)) return "text-foreground";
+  if (score >= 90) return "text-emerald-600 dark:text-emerald-400";
+  if (score >= 80) return "text-emerald-600/90 dark:text-emerald-300";
+  if (score >= 70) return "text-primary dark:text-primary";
+  if (score >= 60) return "text-amber-600 dark:text-amber-300";
+  if (score >= 50) return "text-red-600/85 dark:text-red-300";
+  return "text-red-600 dark:text-red-400";
+}
+
 type Props = {
   symbol: string;
   embedded?: boolean;
@@ -369,9 +379,9 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
           <div className="rounded-xl border border-border/70 bg-background/40 p-2.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
             <div className="mb-1.5 flex items-center justify-between gap-3">
               <div>
-                <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>Snapshot</p>
+                <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>Price chart</p>
                 <p className={cn("text-subtle", dense ? "mt-0.5 text-[10px]" : "mt-0.5 text-[11px]")}>
-                  Latest quote context and core fundamentals.
+                  Choose a range (1w–5y). The dashed line is your average cost when you hold a position.
                 </p>
               </div>
               {rec ? (
@@ -386,30 +396,14 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                 </span>
               ) : null}
             </div>
-            <DetailFieldGrid
+            <StockHistoricalChart
+              symbol={stock.symbol}
+              smaPeriod={stock.shortSMA}
+              averageCost={hasPosition && stock.averageCost > 0 ? stock.averageCost : null}
+              points={points}
+              loading={histLoading}
+              error={histError}
               compact
-              columns={3}
-              items={[
-                { label: "Beta", value: stock.beta != null ? formatDecimal(stock.beta) : "—" },
-                { label: "Market cap", value: stock.marketCap != null ? formatCompactCurrency(stock.marketCap) : "—" },
-                { label: "PEG ratio", value: stock.peg != null ? formatDecimal(stock.peg) : "—" },
-                {
-                  label: "Analyst avg",
-                  value: stock.analystAvg?.trim() || "—",
-                  valueClassName: analystRatingTone(stock.analystAvg),
-                },
-                {
-                  label: "Analyst target",
-                  value: stock.analystTarget != null ? formatCurrency(stock.analystTarget) : "—",
-                  detail: formatUpsidePct(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)),
-                  valueClassName: valueTone(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)),
-                },
-                {
-                  label: `SMA(${stock.shortSMA})`,
-                  value: smaForSnapshot != null ? formatCurrency(smaForSnapshot) : "—",
-                  detail: stock.isETF ? "ETF" : "Stock",
-                },
-              ]}
             />
           </div>
         </div>
@@ -448,39 +442,58 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
           dense ? "min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3 pr-2" : "min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 pr-3 sm:px-5 sm:py-5"
         )}
       >
-        <div className={cn("grid items-start", dense ? "gap-3" : "gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(21rem,0.95fr)] 2xl:grid-cols-[minmax(0,1.72fr)_minmax(23rem,0.9fr)]")}>
-          <div className={dense ? "space-y-3" : "space-y-4"}>
+        <div className={dense ? "space-y-3" : "space-y-4"}>
+          <div className={cn("grid items-start", dense ? "gap-3" : "gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.15fr)_minmax(0,1fr)]")}>
             <SectionCard
               compact={dense}
-              title="Price chart"
-              description="Choose a range (1w–5y). The dashed line is your average cost when you hold a position."
+              title="Snapshot"
+              description="Latest quote context and core fundamentals."
             >
-              <StockHistoricalChart
-                symbol={stock.symbol}
-                smaPeriod={stock.shortSMA}
-                averageCost={hasPosition && stock.averageCost > 0 ? stock.averageCost : null}
-                points={points}
-                loading={histLoading}
-                error={histError}
-                compact={dense}
-              />
+              <div className="rounded-xl border border-border/60 bg-background/35 p-3 dark:border-white/[0.07] dark:bg-white/[0.02]">
+                <DetailFieldGrid
+                  compact={dense}
+                  columns={2}
+                  items={[
+                    { label: "Beta", value: stock.beta != null ? formatDecimal(stock.beta) : "—" },
+                    { label: "Market cap", value: stock.marketCap != null ? formatCompactCurrency(stock.marketCap) : "—" },
+                    { label: "PEG ratio", value: stock.peg != null ? formatDecimal(stock.peg) : "—" },
+                    {
+                      label: "Analyst avg",
+                      value: stock.analystAvg?.trim() || "—",
+                      valueClassName: analystRatingTone(stock.analystAvg),
+                    },
+                    {
+                      label: "Analyst target",
+                      value: stock.analystTarget != null ? formatCurrency(stock.analystTarget) : "—",
+                      detail: formatUpsidePct(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)),
+                      valueClassName: valueTone(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)),
+                    },
+                    {
+                      label: `SMA(${stock.shortSMA})`,
+                      value: smaForSnapshot != null ? formatCurrency(smaForSnapshot) : "—",
+                      detail: stock.isETF ? "ETF" : "Stock",
+                    },
+                  ]}
+                />
+              </div>
             </SectionCard>
 
             <SectionCard
               compact={dense}
-              title="Score details"
-              description="Composite score, flagged recommendation checks, and score components used by the Stocks PM rules."
+              title="Score"
+              description="Composite score and score inputs used by the Stocks PM rules."
             >
               <div className={dense ? "space-y-3" : "space-y-4"}>
                 <div className="rounded-xl border border-border/60 bg-background/35 p-3 dark:border-white/[0.07] dark:bg-white/[0.02]">
                   <DetailFieldGrid
                     compact={dense}
-                    columns={3}
+                    columns={2}
                     items={[
                       {
                         label: "Composite score",
                         value: formatScoreDisplay(stock.score),
                         detail: "Final risk-return score used by recommendation gating",
+                        valueClassName: scoreTone(stock.score),
                       },
                       {
                         label: "Analyst rating",
@@ -509,36 +522,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                   />
                 </div>
 
-                <div
-                  className={cn(
-                    "rounded-xl border border-border/70 bg-background/45 dark:border-white/[0.07] dark:bg-white/[0.03]",
-                    dense ? "p-3" : "p-4"
-                  )}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Factors considered</p>
-                      <p className={cn("text-subtle", dense ? "mt-0.5 text-[11px]" : "mt-1 text-xs")}>
-                        Rules checked for the current recommendation, shown as flagged factors.
-                      </p>
-                    </div>
-                    <span className={cn("font-medium text-subtle", dense ? "text-[10px]" : "text-xs")}>
-                      {recommendationFactors.filter((factor) => factor.passes).length}/{recommendationFactors.length} passed
-                    </span>
-                  </div>
-                  <div className={cn(dense ? "mt-3 space-y-1.5" : "mt-4 space-y-2")}>
-                    {recommendationFactors.map((factor) => (
-                      <FactorFlagRow
-                        key={`${factor.label}-${factor.detail}`}
-                        compact={dense}
-                        label={factor.label}
-                        detail={factor.detail}
-                        passes={factor.passes}
-                      />
-                    ))}
-                  </div>
-                </div>
-
                 <div className="rounded-xl border border-border/70 bg-background/45 p-3 dark:border-white/[0.07] dark:bg-white/[0.03]">
                   <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Score inputs</p>
                   <p className={cn("text-subtle", dense ? "mt-0.5 text-[11px]" : "mt-1 text-xs")}>
@@ -546,8 +529,20 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                   </p>
                   {scoreRows ? (
                     <div className={dense ? "mt-3 space-y-2" : "mt-4 space-y-2.5"}>
-                      <SnapshotRow compact={dense} label="Analyst rating" value={scoreRows.analystLine} hint={scoreRows.analystPoints} />
-                      <SnapshotRow compact={dense} label="Upside to target" value={scoreRows.upsideLine} hint={scoreRows.upsidePoints} />
+                      <SnapshotRow
+                        compact={dense}
+                        label="Analyst rating"
+                        value={scoreRows.analystLine}
+                        hint={scoreRows.analystPoints}
+                        valueClassName={analystRatingTone(stock.analystAvg)}
+                      />
+                      <SnapshotRow
+                        compact={dense}
+                        label="Upside to target"
+                        value={scoreRows.upsideLine}
+                        hint={scoreRows.upsidePoints}
+                        valueClassName={valueTone(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget))}
+                      />
                       <SnapshotRow compact={dense} label="Market cap" value={scoreRows.capLine} hint={scoreRows.capPoints} />
                       <SnapshotRow compact={dense} label="PEG ratio" value={scoreRows.pegLine} hint={scoreRows.pegPoints} />
                       {stock.score != null ? (
@@ -556,6 +551,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                           label="Composite score"
                           value={formatScoreDisplay(stock.score)}
                           hint="Final rules score used by recommendation gating"
+                          valueClassName={scoreTone(stock.score)}
                         />
                       ) : null}
                     </div>
@@ -564,7 +560,88 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               </div>
             </SectionCard>
 
-            {(hasPosition || lotSummary.openLots.length > 0) && (
+            <SectionCard
+              compact={dense}
+              title="Recommendation"
+              description="Rules-based signal from your holdings, limits, and moving averages using the same logic as the Stocks PM mobile app."
+            >
+              {rec ? (
+                <div className={dense ? "space-y-3" : "space-y-4"}>
+                  <p
+                    className={cn(
+                      "inline-flex rounded-lg border border-primary/25 bg-primary/10 font-bold tracking-tight text-primary",
+                      dense ? "px-2.5 py-1 text-sm" : "px-3 py-1.5 text-lg"
+                    )}
+                  >
+                    {rec.action}
+                  </p>
+                  <p className={cn("leading-snug text-foreground/90", dense ? "text-sm" : "text-sm")}>{rec.comments}</p>
+
+                  <div className="rounded-xl border border-border/70 bg-background/45 p-3 dark:border-white/[0.07] dark:bg-white/[0.03]">
+                    <DetailFieldGrid
+                      compact={dense}
+                      columns={2}
+                      items={[
+                        { label: "Next buy near", value: formatCurrency(rec.nextBuyPrice) },
+                        { label: `MA (${stock.shortSMA})`, value: formatCurrency(rec.movingAvg) },
+                        {
+                          label: "Expected return",
+                          value: formatPercent(rec.expectedReturnPct, true),
+                          valueClassName: valueTone(rec.expectedReturnPct),
+                        },
+                        ...(stock.aiSentimentScore != null
+                          ? [{
+                              label: "AI sentiment",
+                              value: String(stock.aiSentimentScore),
+                              detail: "Scaled headline sentiment",
+                              valueClassName: valueTone(stock.aiSentimentScore),
+                            } satisfies DetailField]
+                          : []),
+                      ]}
+                    />
+                  </div>
+
+                  <div
+                    className={cn(
+                      "rounded-xl border border-border/70 bg-background/45 dark:border-white/[0.07] dark:bg-white/[0.03]",
+                      dense ? "p-3" : "p-4"
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Factors considered</p>
+                        <p className={cn("text-subtle", dense ? "mt-0.5 text-[11px]" : "mt-1 text-xs")}>
+                          Rules checked for the current recommendation, shown as flagged factors.
+                        </p>
+                      </div>
+                      <span className={cn("font-medium text-subtle", dense ? "text-[10px]" : "text-xs")}>
+                        {recommendationFactors.filter((factor) => factor.passes).length}/{recommendationFactors.length} passed
+                      </span>
+                    </div>
+                    <div className={cn(dense ? "mt-3 space-y-1.5" : "mt-4 space-y-2")}>
+                      {recommendationFactors.map((factor) => (
+                        <FactorFlagRow
+                          key={`${factor.label}-${factor.detail}`}
+                          compact={dense}
+                          label={factor.label}
+                          detail={factor.detail}
+                          passes={factor.passes}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                </div>
+              ) : (
+                <p className={cn("text-subtle", dense ? "text-sm" : "text-base")}>
+                  No recommendation yet — refresh quotes from Portfolio or Dashboard.
+                </p>
+              )}
+            </SectionCard>
+          </div>
+
+          {(hasPosition || lotSummary.openLots.length > 0) ? (
+            <div className={cn("grid items-start", dense ? "gap-3" : "gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(22rem,0.95fr)] 2xl:grid-cols-[minmax(0,1.85fr)_minmax(24rem,0.9fr)]")}>
               <SectionCard
                 compact={dense}
                 title="Open lots"
@@ -613,52 +690,96 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                   </p>
                 )}
               </SectionCard>
-            )}
-          </div>
-
-          <div className={cn(dense ? "space-y-3" : "space-y-4 xl:sticky xl:top-3")}>
-            <SectionCard
-              compact={dense}
-              title="Recommendation"
-              description="Rules-based signal from your holdings, limits, and moving averages using the same logic as the Stocks PM mobile app."
-            >
-              {rec ? (
-                <div className={dense ? "space-y-3" : "space-y-4"}>
-                  <p
+              <SectionCard
+                compact={dense}
+                title="Record a trade"
+                description="Enter a buy or sell to update cash, shares, average cost, and lots for this symbol."
+              >
+                <div className={cn("grid", dense ? "gap-2" : "gap-2.5 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2")}>
+                  <label className={cn("flex flex-col font-medium text-foreground", dense ? "gap-1 text-xs" : "gap-1.5 text-sm")}>
+                    Side
+                    <select
+                      value={side}
+                      onChange={(e) => setSide(e.target.value as "BUY" | "SELL")}
+                      className={cn(
+                        "rounded-lg border border-border bg-background text-foreground dark:border-white/10",
+                        dense ? "px-2 py-1.5 text-xs" : "rounded-xl px-3 py-2 text-sm"
+                      )}
+                    >
+                      <option value="BUY">Buy</option>
+                      <option value="SELL">Sell</option>
+                    </select>
+                  </label>
+                  <label className={cn("flex flex-col font-medium text-foreground", dense ? "gap-1 text-xs" : "gap-1.5 text-sm")}>
+                    Quantity
+                    <input
+                      value={qty}
+                      onChange={(e) => setQty(e.target.value)}
+                      placeholder="Qty"
+                      className={cn(
+                        "border border-border bg-background tabular-nums text-foreground dark:border-white/10",
+                        dense ? "rounded-lg px-2 py-1.5 text-xs" : "rounded-xl px-3 py-2 text-sm"
+                      )}
+                    />
+                  </label>
+                  <label className={cn("flex flex-col font-medium text-foreground", dense ? "gap-1 text-xs" : "gap-1.5 text-sm")}>
+                    Price (optional)
+                    <input
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      placeholder={`Default ${formatDecimal(last)}`}
+                      className={cn(
+                        "border border-border bg-background tabular-nums text-foreground dark:border-white/10",
+                        dense ? "rounded-lg px-2 py-1.5 text-xs" : "rounded-xl px-3 py-2 text-sm"
+                      )}
+                    />
+                  </label>
+                  <label className={cn("flex flex-col font-medium text-foreground", dense ? "gap-1 text-xs" : "gap-1.5 text-sm")}>
+                    Account name
+                    <input
+                      value={tradeAccountName}
+                      onChange={(e) => setTradeAccountName(e.target.value)}
+                      placeholder="Brokerage / IRA"
+                      disabled={side === "SELL"}
+                      className={cn(
+                        "border border-border bg-background text-foreground disabled:opacity-60 dark:border-white/10",
+                        dense ? "rounded-lg px-2 py-1.5 text-xs" : "rounded-xl px-3 py-2 text-sm"
+                      )}
+                    />
+                  </label>
+                  <label className={cn("flex flex-col font-medium text-foreground", dense ? "gap-1 text-xs" : "gap-1.5 text-sm")}>
+                    Account type
+                    <select
+                      value={tradeAccountType}
+                      onChange={(e) => setTradeAccountType(e.target.value as "unknown" | "retirement" | "taxable")}
+                      disabled={side === "SELL"}
+                      className={cn(
+                        "rounded-lg border border-border bg-background text-foreground disabled:opacity-60 dark:border-white/10",
+                        dense ? "px-2 py-1.5 text-xs" : "rounded-xl px-3 py-2 text-sm"
+                      )}
+                    >
+                      <option value="unknown">Unknown</option>
+                      <option value="retirement">Retirement</option>
+                      <option value="taxable">Taxable</option>
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={applyTrade}
                     className={cn(
-                      "inline-flex rounded-lg border border-primary/25 bg-primary/10 font-bold tracking-tight text-primary",
-                      dense ? "px-2.5 py-1 text-sm" : "px-3 py-1.5 text-lg"
+                      appCtaButton("ui-hover-spotlight justify-center"),
+                      dense ? "rounded-lg px-3 py-1.5 text-xs" : "rounded-xl px-4 py-2 text-sm sm:self-end"
                     )}
                   >
-                    {rec.action}
-                  </p>
-                  <p className={cn("leading-snug text-foreground/90", dense ? "text-sm" : "text-sm")}>{rec.comments}</p>
-
-                  <div className="rounded-xl border border-border/70 bg-background/45 p-3 dark:border-white/[0.07] dark:bg-white/[0.03]">
-                    <DetailFieldGrid
-                      compact={dense}
-                      columns={3}
-                      items={[
-                        { label: "Next buy near", value: formatCurrency(rec.nextBuyPrice) },
-                        { label: `MA (${stock.shortSMA})`, value: formatCurrency(rec.movingAvg) },
-                        { label: "Expected return", value: formatPercent(rec.expectedReturnPct, true) },
-                        ...(stock.score != null
-                          ? [{ label: "Score", value: formatScoreDisplay(stock.score), detail: "Risk-return composite" } satisfies DetailField]
-                          : []),
-                        ...(stock.aiSentimentScore != null
-                          ? [{ label: "AI sentiment", value: String(stock.aiSentimentScore), detail: "Scaled headline sentiment" } satisfies DetailField]
-                          : []),
-                      ]}
-                    />
-                  </div>
-
+                    Apply trade
+                  </button>
                 </div>
-              ) : (
-                <p className={cn("text-subtle", dense ? "text-sm" : "text-base")}>
-                  No recommendation yet — refresh quotes from Portfolio or Dashboard.
+                <p className={cn("text-subtle", dense ? "mt-2 text-[11px]" : "mt-3 text-xs")}>
+                  Account fields are stored on new buy lots and carried into CSV export and stock-detail lot history.
                 </p>
-              )}
-            </SectionCard>
+              </SectionCard>
+            </div>
+          ) : (
             <SectionCard
               compact={dense}
               title="Record a trade"
@@ -747,7 +868,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                 Account fields are stored on new buy lots and carried into CSV export and stock-detail lot history.
               </p>
             </SectionCard>
-          </div>
+          )}
         </div>
       </div>
 
@@ -795,7 +916,19 @@ function FactorFlagRow({
   );
 }
 
-function SnapshotRow({ label, value, hint, compact }: { label: string; value: string; hint?: string; compact?: boolean }) {
+function SnapshotRow({
+  label,
+  value,
+  hint,
+  compact,
+  valueClassName,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  compact?: boolean;
+  valueClassName?: string;
+}) {
   return (
     <li
       className={cn(
@@ -808,7 +941,8 @@ function SnapshotRow({ label, value, hint, compact }: { label: string; value: st
         <span
           className={cn(
             "text-right font-semibold tabular-nums text-foreground",
-            compact ? "text-sm" : "text-base"
+            compact ? "text-sm" : "text-base",
+            valueClassName
           )}
         >
           {value}
