@@ -55,7 +55,15 @@ function recommendationTone(action: string | undefined): string {
   if (normalized === "SELL") return "border-red-500/30 bg-red-500/14 text-red-700 dark:text-red-200";
   if (normalized === "REDUCE") return "border-amber-500/30 bg-amber-500/14 text-amber-800 dark:text-amber-200";
   if (normalized.startsWith("WAIT")) return "border-border/80 bg-background/75 text-subtle dark:border-white/[0.08] dark:bg-white/[0.05]";
-  return "border-primary/30 bg-primary/14 text-primary";
+  return "border-emerald-500/30 bg-emerald-500/14 text-emerald-700 dark:text-emerald-300";
+}
+
+function recommendationTextTone(action: string | undefined): string {
+  const normalized = action?.toUpperCase() ?? "";
+  if (normalized === "SELL") return "text-red-700 dark:text-red-200";
+  if (normalized === "REDUCE") return "text-amber-800 dark:text-amber-200";
+  if (normalized.startsWith("WAIT")) return "text-subtle";
+  return "text-emerald-700 dark:text-emerald-300";
 }
 
 function valueTone(value: number | null | undefined): string {
@@ -316,11 +324,12 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const recommendationFactors = useMemo(() => {
     if (!stock || !rec) return [];
     return computeRecommendationFactors(stock, rec, {
+      useAISentiment: useAISentimentForRecommendations,
       useRSIGating: useRSIGatingForRecommendations,
       sellOnlyLongTermQualified,
       closes,
     });
-  }, [closes, rec, sellOnlyLongTermQualified, stock, useRSIGatingForRecommendations]);
+  }, [closes, rec, sellOnlyLongTermQualified, stock, useAISentimentForRecommendations, useRSIGatingForRecommendations]);
   const scoreRows = useMemo(() => (stock ? scoreBreakdownRows(stock) : null), [stock]);
   const dense = Boolean(embedded);
   const stockSymbol = stock?.symbol ?? null;
@@ -746,13 +755,14 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                 <div className={dense ? "space-y-3" : "space-y-3"}>
                   <p
                     className={cn(
-                      "inline-flex rounded-lg border border-primary/25 bg-primary/10 font-bold tracking-tight text-primary",
+                      "inline-flex rounded-lg border font-bold tracking-tight",
+                      recommendationTone(rec.action),
                       dense ? "px-2.5 py-1 text-sm" : "px-3 py-1.5 text-lg"
                     )}
                   >
                     {rec.action}
                   </p>
-                  <p className={cn("leading-snug text-foreground/90", dense ? "text-sm" : "text-sm")}>{rec.comments}</p>
+                  <p className={cn("leading-snug", recommendationTextTone(rec.action), dense ? "text-sm" : "text-sm")}>{rec.comments}</p>
 
                   <div className={cn("border-t border-border/60 dark:border-white/[0.06]", dense ? "pt-3" : "pt-3")}>
                     <div className="flex items-center justify-between gap-3">

@@ -408,6 +408,7 @@ export type RecFactor = { label: string; detail: string; passes: boolean };
 export type RecommendationFactorOptions = {
   skipWashSale?: boolean;
   useRSIGating?: boolean;
+  useAISentiment?: boolean;
   sellOnlyLongTermQualified?: boolean;
   closes?: number[];
 };
@@ -420,6 +421,7 @@ export function computeRecommendationFactors(
   const {
     skipWashSale = false,
     useRSIGating = true,
+    useAISentiment = true,
     sellOnlyLongTermQualified = false,
     closes = [],
   } = options;
@@ -472,7 +474,7 @@ export function computeRecommendationFactors(
       }
       break;
     case "SELL":
-      if (stock.analystTarget != null && stock.analystTarget > 0) {
+      if (!rec.comments.includes("RSI overbought reversal") && stock.analystTarget != null && stock.analystTarget > 0) {
         factors.push({
           label: "Price at/above analyst target",
           detail: `${formatCurrency(currentPrice)} ≥ ${formatCurrency(stock.analystTarget)}`,
@@ -503,23 +505,25 @@ export function computeRecommendationFactors(
     if (!isETF) {
       factors.push({
         label: "Score ≥ 50",
-        detail: `${score.toFixed(2)}/100`,
+        detail: `${score.toFixed(1)}/100`,
         passes: score >= 50,
       });
       factors.push({
         label: "Expected return > 25%",
-        detail: `${rec.expectedReturnPct.toFixed(2)}%`,
+        detail: `${rec.expectedReturnPct.toFixed(1)}%`,
         passes: rec.expectedReturnPct > 25,
       });
-      const aiPass = aiScore == null || !(aiScore > 0) || aiScore >= 50;
-      factors.push({
-        label: "AI sentiment OK (≥ 50)",
-        detail:
-          aiScore != null && aiScore > 0
-            ? `${aiScore.toFixed(0)}/100 — ${sentimentLabelForScore(aiScore)}`
-            : "N/A — not blocking",
-        passes: aiPass,
-      });
+      if (useAISentiment) {
+        const aiPass = aiScore == null || !(aiScore > 0) || aiScore >= 50;
+        factors.push({
+          label: "AI sentiment OK (≥ 50)",
+          detail:
+            aiScore != null && aiScore > 0
+              ? `${aiScore.toFixed(0)}/100 — ${sentimentLabelForScore(aiScore)}`
+              : "N/A — not blocking",
+          passes: aiPass,
+        });
+      }
     }
 
     const maxHoldingLimit = 2 * stockLimit;
@@ -529,24 +533,13 @@ export function computeRecommendationFactors(
       passes: costBasis < maxHoldingLimit,
     });
 
-    if (useRSIGating && closes.length > 0) {
-      const passesRsi = passesRSIReversalWithHysteresis(
-        closes,
-        stock.rsiPeriod ?? 14,
-        stock.rsiOversoldThreshold ?? 30,
-        stock.rsiHysteresisPoints ?? 5,
-        stock.rsiMinRisingDays ?? 2
-      );
-      factors.push({
-        label: "RSI reversal confirmed",
-        detail: stock.enableRSIReversalGate === false ? "Per-stock RSI gate disabled" : passesRsi ? "Momentum reversal confirmed" : "Waiting for reversal confirmation",
-        passes: stock.enableRSIReversalGate === false ? true : passesRsi,
-      });
-    }
-
     factors.push({
       label: "Wash sale clear",
-      detail: skipWashSale ? "Skipped" : getWashSaleInfo(stock).displayText,
+      detail: skipWashSale
+        ? "Skipped"
+        : getWashSaleInfo(stock).canBuy
+          ? "No restriction active"
+          : `Restricted until ${getWashSaleInfo(stock).restrictedUntil?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) ?? "unknown"}`,
       passes: skipWashSale ? true : getWashSaleInfo(stock).canBuy,
     });
   }
@@ -569,19 +562,58 @@ export function computeRecommendationFactors(
     });
   }
 
-  if (["REDUCE", "WAIT_REDUCE"].includes(action) && useRSIGating && closes.length > 0 && stock.quantity > 0) {
-    const passesSellRsi = passesRSISellSignalWithHysteresis(
-      closes,
-      stock.rsiPeriod ?? 14,
-      stock.rsiOverboughtThreshold ?? 70,
-      stock.rsiHysteresisPoints ?? 5,
-      stock.rsiMinRisingDays ?? 2
-    );
-    factors.push({
-      label: "RSI trim signal",
-      detail: passesSellRsi ? "Overbought reversal confirmed" : "No overbought reversal confirmation",
-      passes: passesSellRsi,
-    });
+  const rsiPeriod = stock.rsiPeriod ?? 14;
+  const rsiCurrentValue = rsiSeries(closes, rsiPeriod).at(-1);
+  if (rsiCurrentValue != null) {
+    const rsiGateEnabled = useRSIGating && (stock.enableRSIReversalGate ?? true);
+    if (rsiGateEnabled) {
+      const oversoldThreshold = stock.rsiOversoldThreshold ?? 30;
+      const overboughtThreshold = stock.rsiOverboughtThreshold ?? 70;
+      const rsiHysteresisPoints = stock.rsiHysteresisPoints ?? 5;
+      const rsiMinRisingDays = stock.rsiMinRisingDays ?? 2;
+      const buyReversalDetected = passesRSIReversalWithHysteresis(
+        closes,
+        rsiPeriod,
+        oversoldThreshold,
+        rsiHysteresisPoints,
+        rsiMinRisingDays
+      );
+      const sellReversalDetected = passesRSISellSignalWithHysteresis(
+        closes,
+        rsiPeriod,
+        overboughtThreshold,
+        rsiHysteresisPoints,
+        rsiMinRisingDays
+      );
+      const isRSIBlockedForCurrentRecommendation = rec.comments.includes("RSI reversal gate active");
+      const rsiValueText = rsiCurrentValue.toFixed(0);
+
+      let statusLabel = `Non-blocking | RSI ${rsiValueText}`;
+      let passesStatus = true;
+
+      if (isRSIBlockedForCurrentRecommendation) {
+        if (rsiCurrentValue < oversoldThreshold) {
+          statusLabel = `Blocking: Oversold, reversal pending | RSI ${rsiValueText}`;
+        } else if (rsiCurrentValue > overboughtThreshold) {
+          statusLabel = `Blocking: Overbought, reversal pending | RSI ${rsiValueText}`;
+        } else {
+          statusLabel = `Blocking: Reversal not confirmed | RSI ${rsiValueText}`;
+        }
+        passesStatus = false;
+      } else if (buyReversalDetected || sellReversalDetected) {
+        statusLabel = `Reversal detected | RSI ${rsiValueText}`;
+      } else if (rsiCurrentValue < oversoldThreshold) {
+        statusLabel = `Non-blocking: Oversold | RSI ${rsiValueText}`;
+      } else if (rsiCurrentValue > overboughtThreshold) {
+        statusLabel = `Non-blocking: Overbought | RSI ${rsiValueText}`;
+      }
+
+      factors.push({
+        label: "Technical Analysis: RSI Gate",
+        detail: statusLabel,
+        passes: passesStatus,
+      });
+    }
   }
 
   return factors;
