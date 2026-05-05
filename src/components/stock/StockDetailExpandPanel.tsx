@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, PlusCircle, Settings, X, XCircle } from "lucide-react";
+import { CheckCircle2, Pencil, PlusCircle, Settings, X, XCircle } from "lucide-react";
 import {
   computeRecommendationFactors,
   scoreBreakdownRows,
@@ -234,6 +234,7 @@ function DetailFieldGrid({
 export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink }: Props) {
   const stocks = usePortfolioStore((s) => s.stocks);
   const recordTrade = usePortfolioStore((s) => s.recordTrade);
+  const editOpenLot = usePortfolioStore((s) => s.editOpenLot);
   const updateStock = usePortfolioStore((s) => s.updateStock);
   const optimizeStock = usePortfolioStore((s) => s.optimizeStock);
   const optimizing = usePortfolioStore((s) => s.optimizing);
@@ -250,11 +251,17 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const [strategyOpen, setStrategyOpen] = useState(false);
   const [tradeModalOpen, setTradeModalOpen] = useState(false);
   const [lotsModalOpen, setLotsModalOpen] = useState(false);
+  const [editingLotId, setEditingLotId] = useState<string | null>(null);
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [qty, setQty] = useState("1");
   const [price, setPrice] = useState("");
   const [tradeAccountName, setTradeAccountName] = useState("");
   const [tradeAccountType, setTradeAccountType] = useState<"unknown" | "retirement" | "taxable">("unknown");
+  const [lotDate, setLotDate] = useState("");
+  const [lotQuantity, setLotQuantity] = useState("");
+  const [lotPrice, setLotPrice] = useState("");
+  const [lotAccount, setLotAccount] = useState("");
+  const [lotAccountType, setLotAccountType] = useState<"unknown" | "retirement" | "taxable">("unknown");
   const [aiNewsItems, setAiNewsItems] = useState<StockSentimentNewsItem[]>([]);
   const [aiNewsLoading, setAiNewsLoading] = useState(false);
   const [optimizationMessage, setOptimizationMessage] = useState<string | null>(null);
@@ -290,6 +297,10 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       soldLots,
     };
   }, [lots, stock]);
+  const editingLot = useMemo(
+    () => lotSummary.openLots.find((lot) => lot.id === editingLotId) ?? null,
+    [editingLotId, lotSummary.openLots]
+  );
   const storedRec = stock?.recommendation;
   const rec = useMemo(() => {
     if (!stock) return undefined;
@@ -401,6 +412,57 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const unrealized = positionValue - stock.quantity * stock.averageCost;
   const unrealizedPct = stock.quantity * stock.averageCost > 0 ? (unrealized / (stock.quantity * stock.averageCost)) * 100 : 0;
 
+  function inputDateValue(value: string | undefined) {
+    if (!value) return new Date().toISOString().slice(0, 10);
+    const parsed = Date.parse(value);
+    if (!Number.isFinite(parsed)) return new Date().toISOString().slice(0, 10);
+    return new Date(parsed).toISOString().slice(0, 10);
+  }
+
+  function openLotEditor(lot: (typeof lotSummary.openLots)[number]) {
+    setEditingLotId(lot.id);
+    setLotDate(inputDateValue(lot.purchaseDate));
+    setLotQuantity(String(formatNumberMax2(lot.quantity)));
+    setLotPrice(String(lot.costBasis.toFixed(2)));
+    setLotAccount(lot.account ?? "");
+    setLotAccountType(
+      lot.isRetirementAccount == null
+        ? "unknown"
+        : lot.isRetirementAccount
+          ? "retirement"
+          : "taxable"
+    );
+  }
+
+  function closeLotEditor() {
+    setEditingLotId(null);
+    setLotDate("");
+    setLotQuantity("");
+    setLotPrice("");
+    setLotAccount("");
+    setLotAccountType("unknown");
+  }
+
+  function saveLotEdit() {
+    if (!editingLot) return;
+    const nextQty = Number.parseFloat(lotQuantity);
+    const nextPrice = Number.parseFloat(lotPrice);
+    if (!lotDate || !Number.isFinite(nextQty) || nextQty <= 0 || !Number.isFinite(nextPrice) || nextPrice <= 0) {
+      return;
+    }
+
+    editOpenLot(symbol, editingLot.id, {
+      purchaseDate: lotDate,
+      quantity: nextQty,
+      costBasis: nextPrice,
+      account: lotAccount.trim() || "",
+      isRetirementAccount:
+        lotAccountType === "unknown" ? null : lotAccountType === "retirement",
+    });
+    void flushCurrentPortfolioSnapshotNow(true);
+    closeLotEditor();
+  }
+
   function applyTrade() {
     const q = parseFloat(qty) || 0;
     if (q <= 0 || !Number.isFinite(tradePrice) || tradePrice <= 0) return;
@@ -482,16 +544,20 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                 </span>
               ) : null}
             </div>
-            <div className={cn("mt-2 flex flex-wrap items-end gap-x-3 gap-y-1.5", dense ? "mt-2" : "sm:gap-x-4")}>
-              <span className={cn("font-semibold tabular-nums tracking-tight text-foreground", dense ? "text-3xl" : "text-5xl leading-none")}>
-                {formatCurrency(last)}
-              </span>
+            <div className={cn("mt-2 flex flex-wrap items-start gap-x-3 gap-y-1.5", dense ? "mt-2" : "sm:gap-x-4")}>
               <div className="space-y-0.5">
+                <span
+                  className={cn("block font-semibold tabular-nums tracking-tight text-foreground", dense ? "text-3xl" : "text-5xl leading-none")}
+                >
+                  {formatCurrency(last)}
+                </span>
                 {stock.dailyChangePercent != null ? (
                   <p className={cn("font-semibold tabular-nums", dense ? "text-sm" : "text-lg", valueTone(stock.dailyChangePercent))}>
                     {formatPercent(stock.dailyChangePercent, true)} today
                   </p>
                 ) : null}
+              </div>
+              <div className="space-y-0.5">
                 {hasPosition ? (
                   <div className={cn("space-y-0.5", dense ? "text-[11px]" : "text-sm")}>
                     <p className="tabular-nums text-foreground/88">
@@ -958,6 +1024,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                     <th className="pb-2 pr-3 text-right font-semibold">Value</th>
                     <th className="pb-2 pr-3 text-right font-semibold">P/L</th>
                     <th className="pb-2 pr-3 font-semibold">Account type</th>
+                    <th className="pb-2 text-right font-semibold">Edit</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -977,6 +1044,16 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                           {formatCurrency(lotUnrealized)}
                         </td>
                         <td className="py-2 pr-3 text-sm">{formatAccountType(lot.isRetirementAccount)}</td>
+                        <td className="py-2 text-right">
+                          <button
+                            type="button"
+                            onClick={() => openLotEditor(lot)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-border/70 px-2.5 py-1 text-xs text-foreground hover:bg-background/70 dark:border-white/[0.08] dark:hover:bg-white/[0.05]"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Edit
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -986,6 +1063,93 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
           ) : (
             <p className="text-sm text-subtle">No open lot records are available for this symbol yet.</p>
           )}
+        </ModalSection>
+      </AppModal>
+
+      <AppModal open={editingLot != null} onClose={closeLotEditor} size="md" titleId="edit-lot-modal-title">
+        <ModalSection className="border-b border-border bg-elevated px-4 py-3 dark:border-foreground/10">
+          <h3 id="edit-lot-modal-title" className="text-base font-semibold tracking-tight text-foreground">
+            Edit Lot
+          </h3>
+        </ModalSection>
+        <ModalSection className="space-y-4 px-4 py-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="space-y-1 text-sm text-foreground">
+              <span>Bought</span>
+              <input
+                type="date"
+                value={lotDate}
+                onChange={(e) => setLotDate(e.target.value)}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+              />
+            </label>
+            <label className="space-y-1 text-sm text-foreground">
+              <span>Quantity</span>
+              <input
+                type="number"
+                min="0"
+                step="0.0001"
+                value={lotQuantity}
+                onChange={(e) => setLotQuantity(e.target.value)}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+              />
+            </label>
+            <label className="space-y-1 text-sm text-foreground">
+              <span>Price per share</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={lotPrice}
+                onChange={(e) => setLotPrice(e.target.value)}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+              />
+            </label>
+            <label className="space-y-1 text-sm text-foreground">
+              <span>Account</span>
+              <input
+                type="text"
+                value={lotAccount}
+                onChange={(e) => setLotAccount(e.target.value)}
+                placeholder="Optional"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+              />
+            </label>
+          </div>
+          <label className="space-y-1 text-sm text-foreground">
+            <span>Account type</span>
+            <select
+              value={lotAccountType}
+              onChange={(e) => setLotAccountType(e.target.value as "unknown" | "retirement" | "taxable")}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+            >
+              <option value="unknown">Unknown</option>
+              <option value="retirement">Retirement</option>
+              <option value="taxable">Taxable</option>
+            </select>
+          </label>
+          {Number.isFinite(Number.parseFloat(lotQuantity)) && Number.isFinite(Number.parseFloat(lotPrice)) ? (
+            <div className="rounded-lg border border-border/70 bg-background/50 px-3 py-2 text-sm text-subtle">
+              Total cost {formatCurrency((Number.parseFloat(lotQuantity) || 0) * (Number.parseFloat(lotPrice) || 0))}
+            </div>
+          ) : null}
+        </ModalSection>
+        <ModalSection className="flex items-center justify-end gap-2 border-t border-border bg-elevated px-4 py-3 dark:border-foreground/10">
+          <button
+            type="button"
+            onClick={closeLotEditor}
+            className="rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-background/70"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={saveLotEdit}
+            disabled={!lotDate || (Number.parseFloat(lotQuantity) || 0) <= 0 || (Number.parseFloat(lotPrice) || 0) <= 0}
+            className={cn(appCtaButton("ui-hover-spotlight rounded-lg px-3 py-2 text-sm"), "disabled:opacity-50")}
+          >
+            Save
+          </button>
         </ModalSection>
       </AppModal>
 

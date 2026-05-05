@@ -6,7 +6,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import type { StockHolding } from "@/store/portfolioStore";
 import { isBuyOrSellAction } from "@/lib/recommendation";
 
-const MAX_VISIBLE = 10;
+const MAX_VISIBLE = 4;
 
 function pickActions(stocks: StockHolding[]) {
   const held = stocks.filter((s) => s.quantity > 0 && isBuyOrSellAction(s.recommendation?.action));
@@ -59,11 +59,10 @@ function ActionRow({ stock, dimmed }: { stock: StockHolding; dimmed?: boolean })
 export function RecommendedActionsWidget({ stocks }: { stocks: StockHolding[] }) {
   const reduceMotion = useReducedMotion();
   const { items, source } = useMemo(() => pickActions(stocks), [stocks]);
-  if (items.length === 0) return null;
+  const destination = source === "holdings" ? "/portfolio" : "/watchlist";
 
   const hasOverflow = items.length > MAX_VISIBLE;
   const visible = hasOverflow ? items.slice(0, MAX_VISIBLE) : items;
-  const peek = hasOverflow ? items[MAX_VISIBLE] : null;
 
   return (
     <motion.section
@@ -72,44 +71,42 @@ export function RecommendedActionsWidget({ stocks }: { stocks: StockHolding[] })
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: reduceMotion ? 0 : 0.08 }}
     >
-      <div className="mb-4">
-        <h2 className="text-base font-semibold tracking-tight">Recommended actions</h2>
-        <p className="mt-0.5 text-xs text-subtle">
-          {source === "holdings"
-            ? "Signals for positions you hold (aligned with iOS Recommendation tab)."
-            : "No held positions need action — showing watchlist entry signals."}
-        </p>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold tracking-tight">Recommended Actions</h2>
+        {items.length > 0 ? (
+          <Link href={destination} className="ui-hover-text text-xs font-semibold text-primary">
+            See all
+          </Link>
+        ) : null}
       </div>
 
-      <div className="space-y-2">
-        <ul className="space-y-2">
-          {visible.map((s) => (
-            <li key={s.symbol}>
-              <ActionRow stock={s} />
-            </li>
-          ))}
-        </ul>
+      {visible.length === 0 ? (
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-background/50 px-3 py-3 dark:bg-white/5">
+          <span className="text-base leading-none text-primary" aria-hidden>
+            ✓
+          </span>
+          <p className="text-sm text-subtle">No actions needed — all stocks are in WAIT status</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <ul className="space-y-2">
+            {visible.map((s) => (
+              <li key={s.symbol}>
+                <ActionRow stock={s} />
+              </li>
+            ))}
+          </ul>
 
-        {peek && (
-          <div className="pt-1">
-            <div
-              className="relative h-[2.125rem] overflow-hidden rounded-xl border border-border/60 bg-background/30 dark:bg-white/5"
-              aria-hidden
-            >
-              <div className="absolute inset-x-0 top-0 origin-top scale-[0.98] blur-[3px] opacity-[0.45]">
-                <ActionRow stock={peek} dimmed />
-              </div>
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-[color-mix(in_srgb,var(--theme-surface-elevated)_50%,transparent)] to-[var(--theme-surface-elevated)] dark:via-[color-mix(in_srgb,var(--theme-surface-elevated)_35%,transparent)] dark:to-[var(--theme-surface-elevated)]" />
-            </div>
+          {hasOverflow ? (
             <Link
-              href="/watchlist"
-              className="ui-hover-text mt-3 block text-center text-sm font-semibold text-primary"
+              href={destination}
+              className="ui-hover-text block pt-1 text-center text-xs font-medium text-subtle"
             >
-              View more
+              +{items.length - MAX_VISIBLE} more
             </Link>
-          </div>
-        )}
-      </div>
+          ) : null}
+        </div>
+      )}
     </motion.section>
   );
 }

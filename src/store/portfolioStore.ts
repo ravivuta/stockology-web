@@ -115,6 +115,17 @@ type State = {
   /** Merge fields into an existing symbol and rebuild recommendation. */
   updateStock: (symbol: string, patch: Partial<StockHolding>) => void;
   bulkUpdateStocks: (patches: { symbol: string; patch: Partial<StockHolding> }[]) => void;
+  editOpenLot: (
+    symbol: string,
+    lotId: string,
+    updates: {
+      purchaseDate: string;
+      quantity: number;
+      costBasis: number;
+      account?: string;
+      isRetirementAccount?: boolean | null;
+    }
+  ) => void;
   removeStock: (symbol: string) => void;
   recordTrade: (
     symbol: string,
@@ -303,6 +314,15 @@ function reduceOpenLotsFifo(openLots: TradeLot[], qtyToSell: number): TradeLot[]
   return next
     .filter((lot) => lot.quantity > 1e-6)
     .sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate));
+}
+
+function summarizeOpenLots(openLots: TradeLot[]) {
+  const totalQty = openLots.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0);
+  const totalBasis = openLots.reduce((sum, lot) => sum + Math.max(0, lot.quantity) * Math.max(0, lot.costBasis), 0);
+  return {
+    quantity: totalQty,
+    averageCost: totalQty > 0 ? totalBasis / totalQty : 0,
+  };
 }
 
 /** Risk–return score + iOS-aligned recommendation (same as `RecommendationEngine` + `calculateScore`). */
@@ -546,6 +566,72 @@ export const usePortfolioStore = create<State>()(
           });
           const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st);
           return { stocks: derived.stocks, portfolioSize: derived.portfolioSize };
+        }),
+      editOpenLot: (symbol, lotId, updates) =>
+        set((st) => {
+          const sym = symbol.trim().toUpperCase();
+          const quantity = Number(updates.quantity);
+          const costBasis = Number(updates.costBasis);
+          const purchaseDate = updates.purchaseDate.trim();
+          if (!sym || !lotId || quantity <= 0 || !Number.isFinite(quantity) || costBasis <= 0 || !Number.isFinite(costBasis) || !purchaseDate) {
+            return {};
+          }
+
+          const existing = st.stocks.find((item) => item.symbol === sym);
+          if (!existing) return {};
+
+          const bundle = st.lotsBySymbol[sym];
+          if (!bundle || bundle.open.length === 0) return {};
+
+          const openLots = bundle.open.map((lot) =>
+            lot.id === lotId
+              ? {
+                  ...lot,
+                  purchaseDate,
+                  quantity,
+                  costBasis,
+                  account: updates.account?.trim() || "",
+                  isRetirementAccount:
+                    updates.isRetirementAccount == null ? null : Boolean(updates.isRetirementAccount),
+                }
+              : lot
+          );
+          if (!openLots.some((lot) => lot.id === lotId)) return {};
+
+          openLots.sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate));
+          const lots = {
+            ...st.lotsBySymbol,
+            [sym]: {
+              open: openLots,
+              sold: bundle.sold.map((lot) => ({ ...lot })),
+            },
+          };
+          const syncedHolding = summarizeOpenLots(openLots);
+          const mutationAt = new Date().toISOString();
+          const ctx: RecalcContext = {
+            etfProfitTarget: st.etfProfitTarget,
+            stockProfitTarget: st.stockProfitTarget,
+            useAISentimentForRecommendations: st.useAISentimentForRecommendations,
+            useRSIGatingForRecommendations: st.useRSIGatingForRecommendations,
+            sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
+            lotsBySymbol: lots,
+          };
+          const stocks = st.stocks.map((item) =>
+            item.symbol === sym
+              ? {
+                  ...item,
+                  quantity: syncedHolding.quantity,
+                  averageCost: syncedHolding.quantity > 0 ? syncedHolding.averageCost : item.averageCost,
+                }
+              : item
+          );
+          const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st);
+          return {
+            stocks: derived.stocks,
+            lotsBySymbol: lots,
+            portfolioSize: derived.portfolioSize,
+            lastLocalMutationAt: mutationAt,
+          };
         }),
       removeStock: (symbol) =>
         set((st) => {
