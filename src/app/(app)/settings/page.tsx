@@ -121,12 +121,6 @@ export default function SettingsPage() {
     }
   }, [allowed, billingState, loading, router]);
 
-  useEffect(() => {
-    if (!loading && !allowed && !billingState) {
-      router.replace("/billing/refresh?next=/settings");
-    }
-  }, [allowed, billingState, loading, router]);
-
   const scrollToId = useCallback((id: string) => {
     setActiveSection(id);
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });

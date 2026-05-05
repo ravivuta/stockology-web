@@ -43,8 +43,7 @@ type PendingMappingImport = {
   mapping: CsvColumnMapping;
   defaultAccountName: string;
   defaultRetirementAccount: "no" | "yes";
-  savePreset: boolean;
-  presetName: string;
+  activePresetId: string | null;
 };
 
 type ImportProgress = {
@@ -359,8 +358,7 @@ export function CsvImportExportBar({
               mapping: suggestCsvColumnMapping(headers, loadSavedMappingMemory()),
               defaultAccountName: "",
               defaultRetirementAccount: "no",
-              savePreset: false,
-              presetName: "",
+              activePresetId: null,
             });
             finishImportProgress();
             return;
@@ -475,7 +473,7 @@ export function CsvImportExportBar({
                 {savedPresets.length > 0 ? (
                   <div className="space-y-2">
                     {savedPresets.map((preset) => {
-                      const isActive = pendingMappingImport?.presetName.trim().toLowerCase() === preset.name.trim().toLowerCase();
+                      const isActive = pendingMappingImport?.activePresetId === preset.id;
                       return (
                         <div
                           key={preset.id}
@@ -498,7 +496,7 @@ export function CsvImportExportBar({
                                         mapping: preset.mapping,
                                         defaultAccountName: preset.defaultAccountName,
                                         defaultRetirementAccount: preset.defaultRetirementAccount,
-                                        presetName: preset.name,
+                                        activePresetId: preset.id,
                                       }
                                     : current
                                 );
@@ -513,11 +511,10 @@ export function CsvImportExportBar({
                                 const next = removeSavedMappingPreset(preset.id);
                                 setSavedPresets(next);
                                 setPendingMappingImport((current) =>
-                                  current && current.presetName.trim().toLowerCase() === preset.name.trim().toLowerCase()
+                                  current && current.activePresetId === preset.id
                                     ? {
                                         ...current,
-                                        savePreset: false,
-                                        presetName: "",
+                                        activePresetId: null,
                                       }
                                     : current
                                 );
@@ -545,7 +542,7 @@ export function CsvImportExportBar({
                 value={pendingMappingImport?.defaultAccountName ?? ""}
                 onChange={(e) => {
                   const value = e.target.value;
-                  setPendingMappingImport((current) => (current ? { ...current, defaultAccountName: value } : current));
+                  setPendingMappingImport((current) => (current ? { ...current, defaultAccountName: value, activePresetId: null } : current));
                 }}
                 placeholder="Brokerage, IRA, Roth, Taxable…"
                 className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
@@ -560,42 +557,13 @@ export function CsvImportExportBar({
                 value={pendingMappingImport?.defaultRetirementAccount ?? "no"}
                 onChange={(e) => {
                   const value = e.target.value as "no" | "yes";
-                  setPendingMappingImport((current) => (current ? { ...current, defaultRetirementAccount: value } : current));
+                  setPendingMappingImport((current) => (current ? { ...current, defaultRetirementAccount: value, activePresetId: null } : current));
                 }}
                 className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
               >
                 <option value="no">Taxable</option>
                 <option value="yes">Retirement</option>
               </select>
-            </div>
-            <div className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
-              <div>
-                <p className="text-sm font-medium text-foreground">Save For Future</p>
-                <p className="mt-1 text-xs text-subtle">Store this mapping and import defaults as a reusable preset.</p>
-              </div>
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm text-foreground">
-                  <input
-                    type="checkbox"
-                    checked={pendingMappingImport?.savePreset ?? false}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setPendingMappingImport((current) => (current ? { ...current, savePreset: checked } : current));
-                    }}
-                  />
-                  Save this mapping preset
-                </label>
-                <input
-                  value={pendingMappingImport?.presetName ?? ""}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setPendingMappingImport((current) => (current ? { ...current, presetName: value } : current));
-                  }}
-                  placeholder="Preset name"
-                  disabled={!pendingMappingImport?.savePreset}
-                  className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground disabled:opacity-50"
-                />
-              </div>
             </div>
             <div className="rounded-xl border border-border/80 bg-background/60 p-3">
               <p className="text-sm font-medium text-foreground">Column Mapping</p>
@@ -618,6 +586,7 @@ export function CsvImportExportBar({
                       current
                         ? {
                             ...current,
+                            activePresetId: null,
                             mapping: {
                               ...current.mapping,
                               [field.key]: value,
@@ -656,9 +625,10 @@ export function CsvImportExportBar({
                 try {
                   beginImportProgress("Saving column mapping", 18);
                   saveMappingMemory(pendingMappingImport.mapping);
-                  if (pendingMappingImport.savePreset && pendingMappingImport.presetName.trim()) {
+                  const presetName = pendingMappingImport.defaultAccountName.trim();
+                  if (presetName) {
                     const next = upsertSavedMappingPreset({
-                      name: pendingMappingImport.presetName,
+                      name: presetName,
                       mapping: pendingMappingImport.mapping,
                       defaultAccountName: pendingMappingImport.defaultAccountName,
                       defaultRetirementAccount: pendingMappingImport.defaultRetirementAccount,

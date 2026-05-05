@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { safeRelativeRedirectPath } from "@/lib/safe-redirect";
 import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
+import { getSubscriptionRowForUser } from "@/lib/subscription-admin";
+import { subscriptionAllowsAccess } from "@/lib/subscription-state";
 import { syncLatestStripeSubscriptionForUser } from "@/lib/stripe/subscription-sync";
 
 export const runtime = "nodejs";
@@ -25,6 +27,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const dataUserId = await syncStocksPmAuthUser(supabase, user.id);
+    const currentRow = await getSubscriptionRowForUser(dataUserId);
+    if (subscriptionAllowsAccess(currentRow)) {
+      return NextResponse.redirect(new URL(returnTo, request.url));
+    }
+
     const result = await syncLatestStripeSubscriptionForUser({
       userId: dataUserId,
       email: user.email ?? "",

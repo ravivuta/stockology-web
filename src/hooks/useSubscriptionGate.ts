@@ -22,6 +22,11 @@ export function useSubscriptionGate(userId: string | undefined, serverRow?: SubR
       setLoading(false);
       return;
     }
+    if (fromServer) {
+      setRow(serverRow);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     (async () => {
       if (!cancelled) {
