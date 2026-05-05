@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
@@ -76,6 +76,9 @@ function actionableFilterClass(active: boolean) {
 
 function PortfolioSummaryTiles({
   cash,
+  cashInput,
+  onCashInputChange,
+  onSaveCash,
   assetsValue,
   netWorth,
   totalGainLoss,
@@ -83,6 +86,9 @@ function PortfolioSummaryTiles({
   portfolioTodayChange,
 }: {
   cash: number;
+  cashInput: string;
+  onCashInputChange: (value: string) => void;
+  onSaveCash: () => void;
   assetsValue: number;
   netWorth: number;
   totalGainLoss: number;
@@ -94,6 +100,27 @@ function PortfolioSummaryTiles({
       <div className="rounded-xl border border-border/80 bg-elevated px-4 py-3 shadow-sm dark:border-white/[0.08]">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Cash balance</p>
         <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">{formatCurrency(cash)}</p>
+        <div className="mt-2 flex items-end gap-2">
+          <label className="min-w-0 flex-1 text-[10px] text-subtle">
+            <span className="sr-only">Edit cash balance</span>
+            <input
+              value={cashInput}
+              onChange={(e) => onCashInputChange(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && onSaveCash()}
+              className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm text-foreground"
+              inputMode="decimal"
+              placeholder="0"
+              aria-label="Cash balance"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={onSaveCash}
+            className={appCtaButton("ui-hover-pop px-3 py-1.5 text-xs")}
+          >
+            Save
+          </button>
+        </div>
       </div>
       <div className="rounded-xl border border-border/80 bg-elevated px-4 py-3 shadow-sm dark:border-white/[0.08]">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Assets value</p>
@@ -143,6 +170,7 @@ function PortfolioSummaryTiles({
 export default function PortfolioPage() {
   const stocks = usePortfolioStore((s) => s.stocks);
   const cash = usePortfolioStore((s) => s.cashBalance);
+  const setCash = usePortfolioStore((s) => s.setCash);
   const recalc = usePortfolioStore((s) => s.recalcMetrics);
   const addStock = usePortfolioStore((s) => s.addStock);
   const updateStock = usePortfolioStore((s) => s.updateStock);
@@ -154,6 +182,7 @@ export default function PortfolioPage() {
   const [newSymbol, setNewSymbol] = useState("");
   const [newQuantity, setNewQuantity] = useState("1");
   const [newAverageCost, setNewAverageCost] = useState("");
+  const [cashInput, setCashInput] = useState(String(cash));
   const [refreshing, setRefreshing] = useState(false);
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
@@ -161,6 +190,10 @@ export default function PortfolioPage() {
   /** Portfolio page lists positions only; watchlist-only symbols (0 qty) stay in store for trading elsewhere. */
   const holdings = useMemo(() => stocks.filter((s) => s.quantity > 0), [stocks]);
   const portfolioCountText = holdings.length === 1 ? "1 holding" : `${holdings.length} holdings`;
+
+  useEffect(() => {
+    setCashInput(String(cash));
+  }, [cash]);
 
   function isActionable(action: string | undefined): boolean {
     if (!action) return false;
@@ -256,6 +289,12 @@ export default function PortfolioPage() {
     setRefreshing(false);
   }
 
+  function saveCash() {
+    const n = parseFloat(cashInput.replace(/,/g, "")) || 0;
+    setCash(n);
+    recalc();
+  }
+
   function addHolding() {
     const sym = newSymbol.trim().toUpperCase().replace(/[^A-Z0-9.-]/g, "");
     const quantity = parseFloat(newQuantity);
@@ -308,6 +347,9 @@ export default function PortfolioPage() {
       <div className="hidden gap-3 md:grid md:grid-cols-2 lg:grid-cols-4">
         <PortfolioSummaryTiles
           cash={cash}
+          cashInput={cashInput}
+          onCashInputChange={setCashInput}
+          onSaveCash={saveCash}
           assetsValue={assetsValue}
           netWorth={netWorth}
           totalGainLoss={totalGainLoss}
@@ -317,27 +359,29 @@ export default function PortfolioPage() {
       </div>
 
       <div className="space-y-8">
-        <div className="ui-hover-lift rounded-2xl border border-border bg-elevated p-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-lg font-semibold text-foreground">Portfolio</p>
-                <p className="text-xs text-subtle">{portfolioCountText}</p>
-              </div>
-              <div className="md:hidden">
-                <button
-                  type="button"
-                  aria-expanded={mobileControlsOpen}
-                  aria-controls="portfolio-mobile-controls"
-                  onClick={() => setMobileControlsOpen((open) => !open)}
-                  className="rounded-xl border border-border bg-background px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
-                >
-                  {mobileControlsOpen ? "Hide add holding" : "Show add holding"}
-                </button>
-              </div>
+        <div className="ui-hover-lift rounded-2xl border border-border bg-elevated px-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-3">
+            <div>
+              <p className="text-base font-semibold text-foreground">Portfolio</p>
+              <p className="text-xs text-subtle">{portfolioCountText}</p>
             </div>
-            <div id="portfolio-mobile-controls" className={`${mobileControlsOpen ? "mt-3 flex" : "hidden"} flex-wrap items-end gap-2 md:mt-3 md:flex`}>
-              <div className="grid min-w-[18rem] flex-1 items-end gap-2 sm:grid-cols-[minmax(11rem,1.5fr)_7.5rem_6.5rem_auto]">
-                <label className="flex min-w-0 flex-col gap-1 text-[11px] text-subtle">
+            <div className="md:hidden">
+              <button
+                type="button"
+                aria-expanded={mobileControlsOpen}
+                aria-controls="portfolio-mobile-controls"
+                onClick={() => setMobileControlsOpen((open) => !open)}
+                className="rounded-xl border border-border bg-background px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
+              >
+                {mobileControlsOpen ? "Hide add holding" : "Show add holding"}
+              </button>
+            </div>
+            <div
+              id="portfolio-mobile-controls"
+              className={`${mobileControlsOpen ? "mt-2 flex w-full" : "hidden"} flex-wrap items-end gap-2 md:mt-0 md:ml-auto md:flex md:w-auto`}
+            >
+              <div className="grid min-w-[18rem] flex-1 items-end gap-2 sm:grid-cols-[minmax(11rem,1.45fr)_7rem_6rem_auto] md:min-w-[34rem] md:flex-none">
+                <label className="flex min-w-0 flex-col gap-0.5 text-[10px] text-subtle">
                   Add New Stock/Holding
                   <SymbolTradeCombobox
                     id="portfolio-add-holding-symbol"
@@ -346,7 +390,7 @@ export default function PortfolioPage() {
                     portfolioStocks={stocks}
                   />
                 </label>
-                <label className="flex min-w-0 flex-col gap-1 text-[11px] text-subtle">
+                <label className="flex min-w-0 flex-col gap-0.5 text-[10px] text-subtle">
                   Avg cost
                   <input
                     value={newAverageCost}
@@ -356,7 +400,7 @@ export default function PortfolioPage() {
                     className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
                   />
                 </label>
-                <label className="flex min-w-0 flex-col gap-1 text-[11px] text-subtle">
+                <label className="flex min-w-0 flex-col gap-0.5 text-[10px] text-subtle">
                   Qty
                   <input
                     value={newQuantity}
@@ -375,6 +419,7 @@ export default function PortfolioPage() {
                 </button>
               </div>
             </div>
+          </div>
         </div>
 
         <div className="ui-hover-lift overflow-x-auto rounded-2xl border border-border bg-elevated">
