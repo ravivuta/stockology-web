@@ -8,7 +8,7 @@ import { fetchHistoricalPricePoints } from "@/lib/supabase-stock-history";
 const DEFAULT_DAYS = 2000;
 
 /** Daily OHLC history from the account backend when configured; otherwise callers fall back to public data. */
-export function useSupabaseStockHistory(symbol: string | null, days: number = DEFAULT_DAYS) {
+export function useSupabaseStockHistory(symbol: string | null, days: number = DEFAULT_DAYS, refreshKey: number = 0) {
   const [points, setPoints] = useState<PricePoint[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +55,7 @@ export function useSupabaseStockHistory(symbol: string | null, days: number = DE
     return () => {
       cancelled = true;
     };
-  }, [symbol, days]);
+  }, [symbol, days, refreshKey]);
 
   return { points, loading, error };
 }

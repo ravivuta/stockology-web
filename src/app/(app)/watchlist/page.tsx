@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { appCtaButton, glassFilterToggle } from "@/lib/appCtaClasses";
+import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { runRefreshPipeline } from "@/lib/refresh";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
@@ -51,6 +51,19 @@ function analystRatingTextClass(value: string | null | undefined): string {
   if (rating >= 3.0) return "text-amber-600 dark:text-amber-300";
   if (rating >= 2.5) return "text-red-600/85 dark:text-red-300";
   return "text-red-600 dark:text-red-400";
+}
+
+function columnFilterClass(active: boolean, tone: "amber" | "emerald") {
+  const base =
+    "rounded-full border px-2.5 py-1 text-[10px] font-semibold normal-case tracking-normal transition-colors";
+  if (tone === "amber") {
+    return active
+      ? `${base} border-amber-500/35 bg-amber-500/16 text-amber-800 dark:border-amber-400/35 dark:bg-amber-400/16 dark:text-amber-200`
+      : `${base} border-border/80 bg-background/70 text-subtle hover:border-amber-500/25 hover:text-amber-700 dark:border-white/[0.08] dark:bg-white/[0.04] dark:hover:text-amber-200`;
+  }
+  return active
+    ? `${base} border-emerald-500/35 bg-emerald-500/16 text-emerald-800 dark:border-emerald-400/35 dark:bg-emerald-400/16 dark:text-emerald-200`
+    : `${base} border-border/80 bg-background/70 text-subtle hover:border-emerald-500/25 hover:text-emerald-700 dark:border-white/[0.08] dark:bg-white/[0.04] dark:hover:text-emerald-200`;
 }
 
 /**
@@ -204,20 +217,6 @@ export default function WatchlistPage() {
               className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
             />
           </label>
-          <button
-            type="button"
-            onClick={() => setShowShortlisted((v) => !v)}
-            className={glassFilterToggle(showShortlisted, "amber")}
-          >
-            Show shortlisted
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowActionable((v) => !v)}
-            className={glassFilterToggle(showActionable, "emerald")}
-          >
-            Show actionable
-          </button>
           <div className="hidden h-10 w-px self-end bg-border/80 dark:bg-white/[0.08] md:block" aria-hidden />
           <div className="ml-auto flex flex-wrap items-end gap-2">
             <label className="flex min-w-[9rem] flex-col gap-1 text-[11px] text-subtle">
@@ -243,14 +242,15 @@ export default function WatchlistPage() {
       <div className="w-full overflow-x-auto rounded-2xl border border-border bg-elevated">
         <table className="w-full table-fixed border-collapse text-sm">
           <colgroup>
-            <col style={{ width: "14%" }} />
+            <col style={{ width: "12%" }} />
+            <col style={{ width: "10%" }} />
             <col style={{ width: "10%" }} />
             <col style={{ width: "10%" }} />
             <col style={{ width: "10%" }} />
             <col style={{ width: "10%" }} />
             <col style={{ width: "12%" }} />
             <col style={{ width: "12%" }} />
-            <col style={{ width: "8%" }} />
+            <col style={{ width: "6%" }} />
           </colgroup>
           <thead className="bg-muted/60 text-xs font-semibold uppercase tracking-wide text-subtle dark:bg-white/[0.05]">
             <tr>
@@ -258,9 +258,41 @@ export default function WatchlistPage() {
               <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
               <SortableHeaderCell label="Today %" column="change" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
               <SortableHeaderCell label="Analyst Rating" column="analyst" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
+              <th scope="col" className="px-2 py-3 text-center sm:px-3">
+                <div className="flex flex-col items-center gap-2">
+                  <span>Shortlisted</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowShortlisted((value) => !value)}
+                    className={columnFilterClass(showShortlisted, "amber")}
+                  >
+                    {showShortlisted ? "Showing Yes only" : "Filter Yes"}
+                  </button>
+                </div>
+              </th>
               <SortableHeaderCell label="Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
               <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
-              <SortableHeaderCell label="Recommendation" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="min-w-0 px-2 py-3 sm:px-3" />
+              <th scope="col" aria-sort={sort === "signal" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className="min-w-0 px-2 py-3 text-center sm:px-3">
+                <div className="flex flex-col items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("signal")}
+                    className="inline-flex items-center justify-center gap-1 transition-colors hover:text-foreground"
+                  >
+                    <span>Recommendation</span>
+                    <span aria-hidden="true" className={`text-[10px] ${sort === "signal" ? "text-foreground" : "text-subtle/70"}`}>
+                      {sort === "signal" ? (sortDirection === "asc" ? "▲" : "▼") : "↕"}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowActionable((value) => !value)}
+                    className={columnFilterClass(showActionable, "emerald")}
+                  >
+                    {showActionable ? "Showing actionable" : "Filter actionable"}
+                  </button>
+                </div>
+              </th>
               <th scope="col" className="px-2 py-3 text-center sm:px-3">
                 <span className="sr-only">Actions</span>
               </th>
@@ -269,7 +301,7 @@ export default function WatchlistPage() {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-subtle sm:px-5">
+                <td colSpan={9} className="px-4 py-8 text-center text-subtle sm:px-5">
                   No symbols yet. Add a symbol in the toolbar above, import CSV, or finish onboarding.
                 </td>
               </tr>
@@ -310,6 +342,9 @@ export default function WatchlistPage() {
                       title="Consensus / average rating when available from data refresh"
                     >
                       <span className="block truncate">{rating && !Number.isNaN(Number.parseFloat(rating)) ? formatDecimal(Number.parseFloat(rating)) : "—"}</span>
+                    </td>
+                    <td className="px-2 py-3 text-center font-medium text-subtle sm:px-3">
+                      {s.isShortlisted ? "Yes" : "No"}
                     </td>
                     <td
                       className={`min-w-0 px-2 py-3 text-center tabular-nums font-medium sm:px-3 ${upsideTextClass(upside)}`}

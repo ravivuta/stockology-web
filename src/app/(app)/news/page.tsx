@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Newspaper, RefreshCw, Search, Sparkles } from "lucide-react";
+import { ArrowUpRight, Loader2, Newspaper, RefreshCw, Search, Sparkles } from "lucide-react";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { runRefreshPipeline } from "@/lib/refresh";
@@ -15,6 +15,9 @@ import {
   type NewsFeedItem,
 } from "@/lib/news-feed";
 import { safeHttpUrlForHref } from "@/lib/safe-external-url";
+import { useSupabaseStockHistory } from "@/hooks/useSupabaseStockHistory";
+import { StockHistoricalChart } from "@/components/stock/StockHistoricalChart";
+import { formatCurrency } from "@/lib/numberFormat";
 
 type FeedFilter = "all" | "macro" | "portfolio";
 
@@ -108,6 +111,8 @@ export default function NewsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [spyHistoryRefreshKey, setSpyHistoryRefreshKey] = useState(0);
+  const { points: spyPoints, loading: spyLoading, error: spyError } = useSupabaseStockHistory("SPY", 2000, spyHistoryRefreshKey);
   const load = useCallback(async () => {
     if (!hasSupabaseConfig()) {
       setItems([]);
@@ -149,15 +154,18 @@ export default function NewsPage() {
     return { total: items.length, macro, portfolio: port };
   }, [items, portfolioSymbols]);
 
+  const latestSpyPoint = useMemo(() => spyPoints?.[spyPoints.length - 1] ?? null, [spyPoints]);
+
   async function onRefresh() {
     if (!hasSupabaseConfig()) return;
     setRefreshing(true);
     try {
-      const syms = stocks.map((s) => s.symbol).filter(Boolean);
+      const syms = [...new Set([...stocks.map((s) => s.symbol), "SPY"].filter(Boolean))];
       if (syms.length > 0) {
         await runRefreshPipeline(syms);
       }
       await load();
+      setSpyHistoryRefreshKey((value) => value + 1);
     } finally {
       setRefreshing(false);
     }
@@ -209,6 +217,43 @@ export default function NewsPage() {
           Refresh feed
         </button>
       </div>
+
+      {!noConfig && (
+        <section className="rounded-3xl border border-border/80 bg-elevated p-4 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.03] sm:p-5">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary dark:border-primary/25 dark:bg-primary/15">
+                Market pulse
+              </div>
+              <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-2">
+                <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">SPY 5Y</h2>
+                {latestSpyPoint ? (
+                  <p className="text-sm font-medium text-subtle">
+                    Last cached close <span className="tabular-nums text-foreground">{formatCurrency(latestSpyPoint.close)}</span>
+                    <span className="ml-2">{latestSpyPoint.date}</span>
+                  </p>
+                ) : null}
+              </div>
+              <p className="mt-2 max-w-3xl text-sm leading-relaxed text-subtle">
+                Five-year `SPY` trend from the local historical cache. When Refresh pulls new cached history, the latest daily point is reloaded here.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-subtle">
+              <ArrowUpRight className="h-3.5 w-3.5 text-primary" aria-hidden />
+              S&amp;P 500 proxy
+            </div>
+          </div>
+          <StockHistoricalChart
+            symbol="SPY"
+            smaPeriod={200}
+            points={spyPoints}
+            loading={spyLoading}
+            error={spyError}
+            initialRange="5y"
+            hideRangeSelector
+          />
+        </section>
+      )}
 
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-12 xl:gap-10">
         {/* Main: article grid — second on mobile so filters appear first */}

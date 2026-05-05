@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { appCtaButton, glassFilterToggle } from "@/lib/appCtaClasses";
+import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { runRefreshPipeline } from "@/lib/refresh";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
@@ -64,6 +64,14 @@ function upsideTextClass(upside: number | null | undefined): string {
   if (upside > 0) return "text-emerald-600 dark:text-emerald-400";
   if (upside < 0) return "text-red-600 dark:text-red-400";
   return "text-subtle";
+}
+
+function actionableFilterClass(active: boolean) {
+  const base =
+    "rounded-full border px-2.5 py-1 text-[10px] font-semibold normal-case tracking-normal transition-colors";
+  return active
+    ? `${base} border-emerald-500/35 bg-emerald-500/16 text-emerald-800 dark:border-emerald-400/35 dark:bg-emerald-400/16 dark:text-emerald-200`
+    : `${base} border-border/80 bg-background/70 text-subtle hover:border-emerald-500/25 hover:text-emerald-700 dark:border-white/[0.08] dark:bg-white/[0.04] dark:hover:text-emerald-200`;
 }
 
 function PortfolioSummaryTiles({
@@ -332,13 +340,6 @@ export default function PortfolioPage() {
                   className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
                 />
               </label>
-              <button
-                type="button"
-                onClick={() => setShowActionable((v) => !v)}
-                className={glassFilterToggle(showActionable, "emerald")}
-              >
-                Show actionable stocks
-              </button>
               <div className="hidden h-10 w-px self-end bg-border/80 dark:bg-white/[0.08] md:block" aria-hidden />
               <div className="grid min-w-[18rem] flex-1 items-end gap-2 sm:grid-cols-[minmax(11rem,1.5fr)_7.5rem_6.5rem_auto]">
                 <label className="flex min-w-0 flex-col gap-1 text-[11px] text-subtle">
@@ -408,7 +409,27 @@ export default function PortfolioPage() {
                   <SortableHeaderCell label="P/L" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
                   <SortableHeaderCell label="Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
                   <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
-                  <SortableHeaderCell label="Recommendation" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
+                  <th scope="col" aria-sort={sort === "signal" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className="px-4 pb-2 pt-3 text-center text-xs font-semibold tracking-wide">
+                    <div className="flex flex-col items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleSort("signal")}
+                        className="inline-flex items-center justify-center gap-1 transition-colors hover:text-foreground"
+                      >
+                        <span>Recommendation</span>
+                        <span aria-hidden="true" className={`text-[10px] ${sort === "signal" ? "text-foreground" : "text-subtle/70"}`}>
+                          {sort === "signal" ? (sortDirection === "asc" ? "▲" : "▼") : "↕"}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowActionable((value) => !value)}
+                        className={actionableFilterClass(showActionable)}
+                      >
+                        {showActionable ? "Showing actionable" : "Filter actionable"}
+                      </button>
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody>

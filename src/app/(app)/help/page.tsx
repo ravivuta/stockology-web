@@ -42,7 +42,7 @@ const SECTIONS: Section[] = [
   {
     category: "overview",
     title: "Getting Started",
-    body: "Add stocks to your watchlist, set your portfolio size, and let the app analyze market data to provide personalized recommendations. The app automatically refreshes once daily at market open (9:30 AM ET) and sends notifications when recommendations become actionable.",
+    body: "Add stocks to your watchlist, set your portfolio size, and let the app analyze market data to provide personalized recommendations. On the web, quotes refresh automatically about every 5 minutes while the app is open. iOS can also notify you when recommendations become actionable.",
   },
   {
     category: "stock-detail",
@@ -127,7 +127,7 @@ const SECTIONS: Section[] = [
   {
     category: "account",
     title: "Profile & Settings",
-    body: "Access account information, subscription management, timezone/country settings, and auto-refresh preferences in the 3-tab profile view.",
+    body: "Access account information, subscription management, timezone/country settings, and the latest quote refresh time in Settings.",
   },
 ];
 

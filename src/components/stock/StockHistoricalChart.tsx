@@ -27,6 +27,8 @@ type Props = {
   error: string | null;
   /** Shorter chart + tighter chrome for table expand rows (watchlist, dashboard, etc.). */
   compact?: boolean;
+  initialRange?: ChartRange;
+  hideRangeSelector?: boolean;
 };
 
 function axisTickMs(ms: number) {
@@ -34,9 +36,19 @@ function axisTickMs(ms: number) {
   return `${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
-export function StockHistoricalChart({ symbol, smaPeriod, averageCost, points, loading, error, compact }: Props) {
+export function StockHistoricalChart({
+  symbol,
+  smaPeriod,
+  averageCost,
+  points,
+  loading,
+  error,
+  compact,
+  initialRange = "3mo",
+  hideRangeSelector = false,
+}: Props) {
   const chart = useDashboardChartTheme();
-  const [range, setRange] = useState<ChartRange>("3mo");
+  const [range, setRange] = useState<ChartRange>(initialRange);
 
   const sliced = useMemo(() => (points ? sliceForRange(points, range) : []), [points, range]);
   const chartData = useMemo(() => {
@@ -73,24 +85,32 @@ export function StockHistoricalChart({ symbol, smaPeriod, averageCost, points, l
   return (
     <div className={compact ? "space-y-2" : "space-y-3"} aria-label={`Price chart for ${symbol}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div
-          className={`flex flex-wrap gap-0.5 rounded-lg border border-border/80 bg-background/90 dark:border-white/10 ${compact ? "p-0.5" : "gap-1 rounded-xl p-1"}`}
-        >
-          {CHART_RANGES.map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => setRange(r)}
-              className={cn(
-                "rounded-md font-semibold",
-                compact ? "px-2 py-1 text-[10px]" : "rounded-lg px-3 py-1.5 text-xs",
-                range === r ? cn(APP_CTA_FILL, "shadow-sm") : "text-subtle hover:text-foreground"
-              )}
-            >
-              {r}
-            </button>
-          ))}
-        </div>
+        {!hideRangeSelector ? (
+          <div
+            className={`flex flex-wrap gap-0.5 rounded-lg border border-border/80 bg-background/90 dark:border-white/10 ${compact ? "p-0.5" : "gap-1 rounded-xl p-1"}`}
+          >
+            {CHART_RANGES.map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setRange(r)}
+                className={cn(
+                  "rounded-md font-semibold",
+                  compact ? "px-2 py-1 text-[10px]" : "rounded-lg px-3 py-1.5 text-xs",
+                  range === r ? cn(APP_CTA_FILL, "shadow-sm") : "text-subtle hover:text-foreground"
+                )}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div
+            className={`inline-flex items-center rounded-full border border-border/80 bg-background/90 font-semibold uppercase tracking-[0.14em] text-subtle dark:border-white/10 ${compact ? "px-2.5 py-1 text-[10px]" : "px-3 py-1.5 text-[11px]"}`}
+          >
+            {range}
+          </div>
+        )}
         {pct != null && (
           <span
             className={`font-bold tabular-nums ${compact ? "text-xs" : "text-sm"} ${pct >= 0 ? "text-primary" : "text-error"}`}

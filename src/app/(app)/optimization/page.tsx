@@ -19,7 +19,7 @@ export default function OptimizationPage() {
         <Link href="/portfolio" className="ui-hover-text text-primary underline">
           Portfolio
         </Link>{" "}
-        for quotes and recommendations—the web only refreshes when you ask it to (no background jobs in the browser).
+        for quotes and recommendations. While the web app is open, quotes auto-refresh about every 5 minutes in the browser.
       </p>
       <div className="ui-hover-lift rounded-2xl border border-border bg-elevated p-6 text-sm text-subtle">
         <p className="font-medium text-foreground">Coming next</p>
