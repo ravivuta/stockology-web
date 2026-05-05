@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, PlusCircle, Settings, X, XCircle } from "lucide-react";
 import {
@@ -9,8 +9,11 @@ import {
   sentimentLabelForScore,
 } from "@/lib/ios-recommendation";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
+import { formatNewsRelativeDate, parseNewsPublishedAt, sentimentDotClass, type NewsSourceRow } from "@/lib/news-feed";
 import { buildRecommendation } from "@/lib/recommendation";
 import { formatCompactCurrency, formatCurrency, formatDecimal, formatNumberMax2, formatPercent } from "@/lib/numberFormat";
+import { safeHttpUrlForHref } from "@/lib/safe-external-url";
+import { createClient } from "@/lib/supabase/client";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { useSupabaseStockHistory } from "@/hooks/useSupabaseStockHistory";
 import { lastSma } from "@/lib/stock-chart";
@@ -105,6 +108,44 @@ type Props = {
   onClose?: () => void;
   showBackLink?: boolean;
 };
+
+type StockSentimentNewsItem = {
+  id: string;
+  title: string;
+  url: string | null;
+  source: string;
+  sentiment: string | null;
+  publishedAtRaw: string;
+  publishedAt: Date;
+};
+
+function normalizeAiNewsItems(raw: unknown): StockSentimentNewsItem[] {
+  if (!Array.isArray(raw)) return [];
+
+  const items = raw
+    .filter((item): item is NewsSourceRow => item != null && typeof item === "object")
+    .map((item, index) => {
+      const title = typeof item.title === "string" ? item.title.trim() : "";
+      if (!title) return null;
+      const publishedAtRaw = typeof item.published_at === "string" ? item.published_at : "";
+      const url = safeHttpUrlForHref(typeof item.url === "string" ? item.url : null);
+      const source = typeof item.source === "string" && item.source.trim() ? item.source.trim() : "News";
+      const sentiment = typeof item.sentiment === "string" && item.sentiment.trim() ? item.sentiment.trim() : null;
+      return {
+        id: `${title}|${url ?? ""}|${publishedAtRaw}|${index}`.slice(0, 400),
+        title,
+        url,
+        source,
+        sentiment,
+        publishedAtRaw,
+        publishedAt: parseNewsPublishedAt(publishedAtRaw),
+      } satisfies StockSentimentNewsItem;
+    })
+    .filter((item): item is StockSentimentNewsItem => item != null);
+
+  items.sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
+  return items.slice(0, 5);
+}
 
 function SectionCard({
   title,
@@ -203,6 +244,8 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const [price, setPrice] = useState("");
   const [tradeAccountName, setTradeAccountName] = useState("");
   const [tradeAccountType, setTradeAccountType] = useState<"unknown" | "retirement" | "taxable">("unknown");
+  const [aiNewsItems, setAiNewsItems] = useState<StockSentimentNewsItem[]>([]);
+  const [aiNewsLoading, setAiNewsLoading] = useState(false);
 
   const smaFromHistory = useMemo(() => {
     if (!points || !stock) return null;
@@ -279,6 +322,51 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     });
   }, [closes, rec, sellOnlyLongTermQualified, stock, useRSIGatingForRecommendations]);
   const scoreRows = useMemo(() => (stock ? scoreBreakdownRows(stock) : null), [stock]);
+  const dense = Boolean(embedded);
+  const stockSymbol = stock?.symbol ?? null;
+  const stockIsEtf = stock?.isETF === true;
+  const aiSentimentScore = stock?.aiSentimentScore;
+  const hasAiSentiment = stockIsEtf !== true && aiSentimentScore != null && Number.isFinite(aiSentimentScore) && aiSentimentScore > 0;
+
+  useEffect(() => {
+    if (!stockSymbol || stockIsEtf) {
+      setAiNewsItems([]);
+      setAiNewsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadAiNews = async () => {
+      setAiNewsLoading(true);
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from("ai_sentiment_scores")
+          .select("news_sources, last_updated")
+          .eq("symbol", stockSymbol)
+          .order("last_updated", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (error) throw error;
+        if (!cancelled) {
+          setAiNewsItems(normalizeAiNewsItems(data?.news_sources));
+        }
+      } catch (error) {
+        console.warn("[stock ai sentiment news]", error);
+        if (!cancelled) setAiNewsItems([]);
+      } finally {
+        if (!cancelled) setAiNewsLoading(false);
+      }
+    };
+
+    void loadAiNews();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [stockIsEtf, stockSymbol]);
 
   if (!stock) {
     return (
@@ -311,11 +399,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     setPrice("");
     setTradeModalOpen(false);
   }
-
-  const dense = Boolean(embedded);
-  const aiSentimentScore = stock.aiSentimentScore;
-  const hasAiSentiment = stock.isETF !== true && aiSentimentScore != null && Number.isFinite(aiSentimentScore) && aiSentimentScore > 0;
-
   return (
     <div
       className={cn(
@@ -421,44 +504,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               </div>
             </div>
           </div>
-          <div className={cn("grid gap-3", dense ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1fr)_15rem]")}>
-            <SectionCard
-              compact
-              title={
-                <span className="flex items-center justify-between gap-2">
-                  <span>AI Sentiment</span>
-                  {hasAiSentiment ? (
-                    <span className={cn("tabular-nums text-sm", sentimentTone(aiSentimentScore))}>
-                      {Math.round(aiSentimentScore)}/100
-                    </span>
-                  ) : null}
-                </span>
-              }
-            >
-              {stock.isETF === true ? (
-                <p className="text-xs text-subtle">AI sentiment is not shown for ETFs.</p>
-              ) : hasAiSentiment ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className={cn("text-sm font-semibold", sentimentTone(aiSentimentScore))}>
-                      {sentimentLabelForScore(aiSentimentScore)}
-                    </span>
-                    <span className="text-[11px] tabular-nums text-subtle">
-                      {Math.round(aiSentimentScore)}/100
-                    </span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-border/80 dark:bg-white/[0.08]">
-                    <div
-                      className={cn("h-full rounded-full transition-[width]", sentimentFill(aiSentimentScore))}
-                      style={{ width: `${Math.max(0, Math.min(100, aiSentimentScore))}%` }}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <p className="text-xs text-subtle">No AI sentiment score is available for this stock yet.</p>
-              )}
-            </SectionCard>
-            <div className="rounded-xl border border-border/70 bg-background/40 p-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
+          <div className="rounded-xl border border-border/70 bg-background/40 p-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
               <div className="mb-1 flex items-center justify-between gap-3">
                 <div>
                   <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>Price chart</p>
@@ -487,7 +533,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                 error={histError}
                 compact
               />
-            </div>
           </div>
         </div>
         {onClose && embedded ? (
@@ -515,39 +560,127 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       >
         <div className={dense ? "space-y-3" : "space-y-3"}>
           <div className={cn("grid items-start", dense ? "gap-3" : "gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)_minmax(0,1.15fr)]")}>
-            <SectionCard
-              compact={dense}
-              title="Snapshot"
-              description="Latest quote context and core fundamentals."
-            >
-              <div className="rounded-xl border border-border/60 bg-background/35 p-3 dark:border-white/[0.07] dark:bg-white/[0.02]">
-                <DetailFieldGrid
-                  compact={dense}
-                  columns={2}
-                  items={[
-                    { label: "Beta", value: stock.beta != null ? formatDecimal(stock.beta) : "—" },
-                    { label: "Market cap", value: stock.marketCap != null ? formatCompactCurrency(stock.marketCap) : "—" },
-                    { label: "PEG ratio", value: stock.peg != null ? formatDecimal(stock.peg) : "—" },
-                    {
-                      label: "Analyst avg",
-                      value: stock.analystAvg?.trim() || "—",
-                      valueClassName: analystRatingTone(stock.analystAvg),
-                    },
-                    {
-                      label: "Analyst target",
-                      value: stock.analystTarget != null ? formatCurrency(stock.analystTarget) : "—",
-                      detail: formatUpsidePct(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)),
-                      valueClassName: valueTone(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)),
-                    },
-                    {
-                      label: `SMA(${stock.shortSMA})`,
-                      value: smaForSnapshot != null ? formatCurrency(smaForSnapshot) : "—",
-                      detail: stock.isETF ? "ETF" : "Stock",
-                    },
-                  ]}
-                />
-              </div>
-            </SectionCard>
+            <div className={dense ? "space-y-3" : "space-y-3"}>
+              <SectionCard
+                compact={dense}
+                title="Snapshot"
+                description="Latest quote context and core fundamentals."
+              >
+                <div className="rounded-xl border border-border/60 bg-background/35 p-3 dark:border-white/[0.07] dark:bg-white/[0.02]">
+                  <DetailFieldGrid
+                    compact={dense}
+                    columns={2}
+                    items={[
+                      { label: "Beta", value: stock.beta != null ? formatDecimal(stock.beta) : "—" },
+                      { label: "Market cap", value: stock.marketCap != null ? formatCompactCurrency(stock.marketCap) : "—" },
+                      { label: "PEG ratio", value: stock.peg != null ? formatDecimal(stock.peg) : "—" },
+                      {
+                        label: "Analyst avg",
+                        value: stock.analystAvg?.trim() || "—",
+                        valueClassName: analystRatingTone(stock.analystAvg),
+                      },
+                      {
+                        label: "Analyst target",
+                        value: stock.analystTarget != null ? formatCurrency(stock.analystTarget) : "—",
+                        detail: formatUpsidePct(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)),
+                        valueClassName: valueTone(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)),
+                      },
+                      {
+                        label: `SMA(${stock.shortSMA})`,
+                        value: smaForSnapshot != null ? formatCurrency(smaForSnapshot) : "—",
+                        detail: stock.isETF ? "ETF" : "Stock",
+                      },
+                    ]}
+                  />
+                </div>
+              </SectionCard>
+
+              <SectionCard
+                compact={dense}
+                title={
+                  <span className="flex items-center justify-between gap-3">
+                    <span>AI Sentiment</span>
+                    {hasAiSentiment ? (
+                      <span className={cn("tabular-nums", dense ? "text-sm" : "text-base", sentimentTone(aiSentimentScore))}>
+                        {Math.round(aiSentimentScore)}/100
+                      </span>
+                    ) : null}
+                  </span>
+                }
+              >
+                {stock.isETF === true ? (
+                  <p className={cn("text-subtle", dense ? "text-xs" : "text-sm")}>AI sentiment is not shown for ETFs.</p>
+                ) : hasAiSentiment ? (
+                  <div className={dense ? "space-y-3" : "space-y-3"}>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className={cn("font-semibold", dense ? "text-sm" : "text-base", sentimentTone(aiSentimentScore))}>
+                        {sentimentLabelForScore(aiSentimentScore)}
+                      </span>
+                      <span className={cn("tabular-nums text-subtle", dense ? "text-[11px]" : "text-xs")}>
+                        {Math.round(aiSentimentScore)}/100
+                      </span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-border/80 dark:bg-white/[0.08]">
+                      <div
+                        className={cn("h-full rounded-full transition-[width]", sentimentFill(aiSentimentScore))}
+                        style={{ width: `${Math.max(0, Math.min(100, aiSentimentScore))}%` }}
+                      />
+                    </div>
+                    <div className={cn("border-t border-border/60 pt-3 dark:border-white/[0.06]", dense ? "space-y-2.5" : "space-y-3")}>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Latest news</p>
+                        {aiNewsLoading ? (
+                          <span className={cn("text-subtle", dense ? "text-[10px]" : "text-xs")}>Loading…</span>
+                        ) : null}
+                      </div>
+                      {aiNewsItems.length > 0 ? (
+                        <div className={dense ? "space-y-2" : "space-y-2.5"}>
+                          {aiNewsItems.map((item) => (
+                            <div key={item.id} className="border-b border-border/50 pb-2 last:border-b-0 last:pb-0 dark:border-white/[0.06]">
+                              {item.url ? (
+                                <a
+                                  href={item.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={cn(
+                                    "line-clamp-2 font-medium text-foreground hover:text-primary",
+                                    dense ? "text-xs" : "text-sm"
+                                  )}
+                                >
+                                  {item.title}
+                                </a>
+                              ) : (
+                                <p className={cn("line-clamp-2 font-medium text-foreground", dense ? "text-xs" : "text-sm")}>
+                                  {item.title}
+                                </p>
+                              )}
+                              <div className={cn("mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-subtle", dense ? "text-[10px]" : "text-xs")}>
+                                <span>{item.source}</span>
+                                {item.publishedAtRaw ? <span>{formatNewsRelativeDate(item.publishedAt)}</span> : null}
+                                {item.sentiment ? (
+                                  <span className="inline-flex items-center gap-1">
+                                    <span className={cn("h-1.5 w-1.5 rounded-full", sentimentDotClass(item.sentiment))} />
+                                    {item.sentiment}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : aiNewsLoading ? null : (
+                        <p className={cn("text-subtle", dense ? "text-xs" : "text-sm")}>
+                          No stock-specific AI news items are available yet.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className={cn("text-subtle", dense ? "text-xs" : "text-sm")}>
+                    No AI sentiment score is available for this stock yet.
+                  </p>
+                )}
+              </SectionCard>
+            </div>
 
             <SectionCard
               compact={dense}
