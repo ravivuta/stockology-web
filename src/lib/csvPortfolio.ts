@@ -244,6 +244,54 @@ export function extractCsvHeaders(text: string): string[] {
   return splitCsvLine(firstLine, delimiter).map((header) => header.replace(/^"+|"+$/g, "").trim()).filter(Boolean);
 }
 
+export function parseWatchlistCsv(
+  text: string
+): { ok: true; rows: CsvImportRow[]; skipped: string[] } | { ok: false; error: string } {
+  const symbolOnly = parseSymbolOnlyText(text);
+  if (symbolOnly) return symbolOnly;
+
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return { ok: false, error: "No data rows in CSV." };
+
+  const delimiter = detectDelimiter(lines[0] ?? "");
+  const headers = splitCsvLine(lines[0] ?? "", delimiter).map((header) => header.replace(/^"+|"+$/g, "").trim());
+  const symbolIndex = headers.findIndex((header) => CSV_IMPORT_CANDIDATES.symbol.some((candidate) => normKey(header) === normKey(candidate)));
+  const nameIndex = headers.findIndex((header) => CSV_IMPORT_CANDIDATES.name.some((candidate) => normKey(header) === normKey(candidate)));
+
+  if (symbolIndex < 0) {
+    return { ok: false, error: "Could not find a symbol column for watchlist import." };
+  }
+
+  const skipped: string[] = [];
+  const rows: CsvImportRow[] = [];
+
+  for (const line of lines.slice(1)) {
+    const cells = splitCsvLine(line, delimiter).map((cell) => cell.replace(/^"+|"+$/g, "").trim());
+    const symbol = (cells[symbolIndex] ?? "").toUpperCase();
+    if (!symbol) continue;
+    if (!isValidTicker(symbol)) {
+      skipped.push(symbol);
+      continue;
+    }
+    const name = nameIndex >= 0 ? cells[nameIndex] ?? "" : "";
+    rows.push({
+      symbol,
+      qty: 0,
+      price: 0,
+      name: name || undefined,
+    });
+  }
+
+  if (rows.length === 0) {
+    return { ok: false, error: skipped.length > 0 ? "No valid symbol rows found." : "No data rows in CSV." };
+  }
+
+  return { ok: true, rows, skipped };
+}
+
 export function shouldShowCsvMapping(text: string): boolean {
   const headers = extractCsvHeaders(text);
   if (headers.length === 0) return false;

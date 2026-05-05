@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Briefcase,
   CreditCard,
-  Database,
   Palette,
   RefreshCw,
   Sparkles,
@@ -18,6 +17,7 @@ import { useSubscriptionGate } from "@/hooks/useSubscriptionGate";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { appCtaButton } from "@/lib/appCtaClasses";
+import { recommendedWatchlistSize } from "@/lib/ios-recommendation";
 import { formatCurrency } from "@/lib/numberFormat";
 import { cn } from "@/lib/utils";
 
@@ -25,8 +25,13 @@ const SECTIONS = [
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "subscription", label: "Subscription", icon: CreditCard },
   { id: "portfolio", label: "Portfolio", icon: Briefcase },
-  { id: "data", label: "Data", icon: Database },
 ] as const;
+
+const RISK_APPETITE_DETAILS: Record<"Low" | "Medium" | "High", string> = {
+  Low: "Conservative. Holdings, ETFs, and large-cap stocks with roughly $100B+ market cap and 4.5+ analyst ratings.",
+  Medium: "Balanced. Includes low-risk names plus large-cap stocks around $50B+ market cap with 4.0+ analyst ratings.",
+  High: "Aggressive. Includes low and medium profiles plus smaller caps around $10B+ with 3.5+ analyst ratings or names showing 25%+ upside.",
+};
 
 function SettingsCard({
   id,
@@ -75,7 +80,10 @@ export default function SettingsPage() {
   const [userId, setUserId] = useState<string | undefined>();
   const { row, loading, allowed } = useSubscriptionGate(userId);
   const cashBalance = usePortfolioStore((s) => s.cashBalance);
+  const portfolioSize = usePortfolioStore((s) => s.portfolioSize);
+  const stockCount = usePortfolioStore((s) => s.stocks.length);
   const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
+  const enableRiskFilter = usePortfolioStore((s) => s.enableRiskFilter);
   const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
   const etfProfitTarget = usePortfolioStore((s) => s.etfProfitTarget);
   const stockProfitTarget = usePortfolioStore((s) => s.stockProfitTarget);
@@ -84,17 +92,15 @@ export default function SettingsPage() {
   const sellOnlyLongTermQualified = usePortfolioStore((s) => s.sellOnlyLongTermQualified);
   const timezone = usePortfolioStore((s) => s.timezone);
   const region = usePortfolioStore((s) => s.region);
-  const setCash = usePortfolioStore((s) => s.setCash);
   const setSettings = usePortfolioStore((s) => s.setSettings);
   const resetAll = usePortfolioStore((s) => s.resetAll);
   const recalc = usePortfolioStore((s) => s.recalcMetrics);
-  const lastRefreshAt = usePortfolioStore((s) => s.lastRefreshAt);
 
-  const [cashInput, setCashInput] = useState(String(cashBalance));
   const [activeSection, setActiveSection] = useState<string>(SECTIONS[0].id);
   const [resetOpen, setResetOpen] = useState(false);
   const billingState = searchParams.get("billing");
   const billingDetail = searchParams.get("billing_detail");
+  const idealWatchlistSize = recommendedWatchlistSize(portfolioSize);
 
   useEffect(() => {
     let cancelled = false;
@@ -110,10 +116,6 @@ export default function SettingsPage() {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    setCashInput(String(cashBalance));
-  }, [cashBalance]);
 
   useEffect(() => {
     if (billingState === "success" && !loading && !allowed) {
@@ -140,12 +142,6 @@ export default function SettingsPage() {
     }
     return () => obs.disconnect();
   }, []);
-
-  function saveCash() {
-    const n = parseFloat(cashInput.replace(/,/g, "")) || 0;
-    setCash(n);
-    recalc();
-  }
 
   const inputClass =
     "w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm text-foreground shadow-sm transition-[border-color,box-shadow] placeholder:text-subtle focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/25 dark:border-white/[0.1] dark:bg-yale/30";
@@ -219,10 +215,13 @@ export default function SettingsPage() {
               id="appearance"
               icon={Palette}
               title="Appearance"
-              description="Choose light, dark, or auto mode for this browser. Your choice is remembered on this device."
+              description="Choose light, dark, or auto mode for this device. Auto switches by time of day and your choice is remembered for future sessions."
             >
               <div className="flex flex-col gap-2">
                 <ThemeToggle />
+                <p className="text-[10px] leading-snug text-subtle">
+                  Light mode keeps the brighter silver surface treatment. Dark mode keeps the deeper blue and black presentation used across Stocks PM.
+                </p>
               </div>
             </SettingsCard>
 
@@ -389,42 +388,24 @@ export default function SettingsPage() {
           <SettingsCard
             id="portfolio"
             icon={Briefcase}
-            title="Portfolio"
-            description="Cash, risk posture, profit targets, and locale fields used across recommendations."
+            title="Portfolio and Recommendations Settings"
+            description="Recommendation filters, profit targets, and locale fields aligned with the Stocks PM decision logic."
           >
             <div className="grid gap-3 md:grid-cols-2">
-              <div className="md:col-span-2">
-                <label className="block">
-                  <FieldLabel>Cash balance</FieldLabel>
-                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-2">
-                    <input
-                      value={cashInput}
-                      onChange={(e) => setCashInput(e.target.value)}
-                      className={cn(inputClass, "min-w-0")}
-                    />
-                    <button
-                      type="button"
-                      onClick={saveCash}
-                      className={appCtaButton("ui-hover-spotlight w-fit justify-self-start px-4 py-1.5 text-sm sm:justify-self-auto")}
-                    >
-                      Save cash
-                    </button>
-                  </div>
-                </label>
-              </div>
-
               <div className="self-start">
-                <label className="block">
-                  <FieldLabel>Risk appetite</FieldLabel>
-                  <select
-                    value={riskAppetite}
-                    onChange={(e) => setSettings({ riskAppetite: e.target.value as "Low" | "Medium" | "High" })}
-                    className={cn(inputClass, "cursor-pointer")}
-                  >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                  </select>
+                <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
+                    checked={enableRiskFilter}
+                    onChange={(e) => setSettings({ enableRiskFilter: e.target.checked })}
+                  />
+                  <span>
+                    <span className="block text-[12px] font-medium leading-snug text-foreground">Filter by risk appetite</span>
+                    <span className="mt-px block text-[10px] leading-snug text-subtle">
+                      When enabled, non-holdings are screened by market cap, analyst rating, and upside rules before they can qualify for recommendations.
+                    </span>
+                  </span>
                 </label>
               </div>
 
@@ -438,10 +419,34 @@ export default function SettingsPage() {
                   />
                   <span>
                     <span className="block text-[12px] font-medium leading-snug text-foreground">Enforce ideal watchlist size</span>
-                    <span className="mt-px block text-[10px] leading-snug text-subtle">Aligns with strategy caps.</span>
+                    <span className="mt-px block text-[10px] leading-snug text-subtle">
+                      Uses portfolio size to shortlist top-scored stocks. Recommendations are limited to that shortlist. Current ideal size: {idealWatchlistSize} of {stockCount} tracked symbols.
+                    </span>
                   </span>
                 </label>
               </div>
+
+              {enableRiskFilter ? (
+                <div className="self-start">
+                  <label className="block">
+                    <FieldLabel>Investment risk appetite</FieldLabel>
+                    <select
+                      value={riskAppetite}
+                      onChange={(e) => setSettings({ riskAppetite: e.target.value as "Low" | "Medium" | "High" })}
+                      className={cn(inputClass, "cursor-pointer")}
+                    >
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                    </select>
+                  </label>
+                  <p className="mt-1 text-[10px] leading-snug text-subtle">{RISK_APPETITE_DETAILS[riskAppetite]}</p>
+                </div>
+              ) : (
+                <div className="self-start rounded-md border border-dashed border-border/80 bg-background/30 px-2.5 py-2 text-[10px] leading-snug text-subtle dark:border-white/[0.08] dark:bg-white/[0.02]">
+                  Risk appetite selection is hidden until the filter is enabled, matching iOS behavior.
+                </div>
+              )}
 
               <div>
                 <label className="block">
@@ -453,6 +458,9 @@ export default function SettingsPage() {
                     className={inputClass}
                   />
                 </label>
+                <p className="mt-1 text-[10px] leading-snug text-subtle">
+                  ETFs use this target directly. A SELL can trigger once ETF profit reaches this percentage.
+                </p>
               </div>
 
               <div>
@@ -465,6 +473,9 @@ export default function SettingsPage() {
                     className={inputClass}
                   />
                 </label>
+                <p className="mt-1 text-[10px] leading-snug text-subtle">
+                  Stocks use this only as fallback when no analyst target price is available.
+                </p>
               </div>
 
               <div className="md:col-span-2 grid gap-2">
@@ -477,7 +488,9 @@ export default function SettingsPage() {
                   />
                   <span>
                     <span className="block text-[12px] font-medium leading-snug text-foreground">Use AI sentiment gate</span>
-                    <span className="mt-px block text-[10px] leading-snug text-subtle">Matches the iOS BUY/ADD sentiment override.</span>
+                    <span className="mt-px block text-[10px] leading-snug text-subtle">
+                      AI sentiment from the latest news digest can suppress BUY or ADD when sentiment is bearish. When disabled, AI data may still load but it does not block recommendations.
+                    </span>
                   </span>
                 </label>
                 <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
@@ -489,7 +502,9 @@ export default function SettingsPage() {
                   />
                   <span>
                     <span className="block text-[12px] font-medium leading-snug text-foreground">Use RSI reversal gating</span>
-                    <span className="mt-px block text-[10px] leading-snug text-subtle">Applies the same RSI confirmation rules iOS uses for entries and trims.</span>
+                    <span className="mt-px block text-[10px] leading-snug text-subtle">
+                      RSI reversal confirmation can suppress BUY or ADD until oversold momentum reversal is confirmed. When disabled, RSI will not block recommendations.
+                    </span>
                   </span>
                 </label>
                 <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
@@ -501,7 +516,9 @@ export default function SettingsPage() {
                   />
                   <span>
                     <span className="block text-[12px] font-medium leading-snug text-foreground">Only sell long-term qualified lots</span>
-                    <span className="mt-px block text-[10px] leading-snug text-subtle">Matches the iOS long-term SELL/REDUCE restriction.</span>
+                    <span className="mt-px block text-[10px] leading-snug text-subtle">
+                      SELL and REDUCE stay blocked until holdings are older than 365 days, while retirement-account lots remain eligible regardless of holding period.
+                    </span>
                   </span>
                 </label>
               </div>
@@ -530,29 +547,8 @@ export default function SettingsPage() {
                   Re-run recommendations
                 </button>
               </div>
-            </div>
-          </SettingsCard>
-
-          <SettingsCard
-            id="data"
-            icon={Database}
-            title="Data & import"
-            description="Refresh metadata and CSV formats. Destructive actions are isolated below."
-          >
-            <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
-              <div className="flex flex-col gap-2">
-                <div className="rounded-md border border-border/70 bg-background/40 px-2.5 py-2 dark:border-white/[0.08] dark:bg-yale/20">
-                  <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-subtle">Last quote refresh</p>
-                  <p className="mt-px text-xs font-medium leading-snug text-foreground">{lastRefreshAt ? new Date(lastRefreshAt).toLocaleString() : "—"}</p>
-                </div>
-                <p className="text-[11px] leading-snug text-subtle">
-                  CSV formats:{" "}
-                  <Link href="/csv-help" className="ui-hover-text font-medium text-primary underline-offset-2 hover:underline">
-                    Import &amp; export help
-                  </Link>
-                </p>
-              </div>
-              <div className="flex flex-col rounded-md border border-error/30 bg-error-bg/80 p-2.5 dark:border-error/35 dark:bg-error-bg/50">
+              <div className="md:col-span-2">
+                <div className="flex flex-col rounded-md border border-error/30 bg-error-bg/80 p-2.5 dark:border-error/35 dark:bg-error-bg/50">
                 <p className="text-xs font-semibold text-error">Danger zone</p>
                 <p className="mt-0.5 text-[10px] leading-snug text-subtle">
                   Clears local portfolio in this browser. Cloud sync may repopulate when signed in.
@@ -564,6 +560,7 @@ export default function SettingsPage() {
                 >
                   Reset local portfolio
                 </button>
+                </div>
               </div>
             </div>
           </SettingsCard>

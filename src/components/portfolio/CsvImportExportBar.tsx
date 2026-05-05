@@ -9,6 +9,7 @@ import { usePortfolioStore, type StockHolding } from "@/store/portfolioStore";
 import {
   CSV_IMPORT_FIELDS,
   parsePortfolioCsv,
+  parseWatchlistCsv,
   shouldShowCsvMapping,
   suggestCsvColumnMapping,
   normalizeCsvHeader,
@@ -365,13 +366,23 @@ export function CsvImportExportBar({
           }
 
           updateImportProgress("Parsing CSV", 36);
-          const res = await parsePortfolioCsv(text);
-          if (!res.ok) {
-            setFlash({ kind: "err", text: res.error });
-            finishImportProgress();
-            return;
+          if (importMode === "watchlist") {
+            const res = parseWatchlistCsv(text);
+            if (!res.ok) {
+              setFlash({ kind: "err", text: res.error });
+              finishImportProgress();
+              return;
+            }
+            await applyImport(res.rows, res.skipped, undefined, []);
+          } else {
+            const res = await parsePortfolioCsv(text);
+            if (!res.ok) {
+              setFlash({ kind: "err", text: res.error });
+              finishImportProgress();
+              return;
+            }
+            await applyImport(res.rows, res.skipped, undefined, res.trades);
           }
-          await applyImport(res.rows, res.skipped, undefined, res.trades);
           updateImportProgress("Finishing import", 100);
         } catch (error) {
           setFlash({

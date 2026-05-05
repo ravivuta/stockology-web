@@ -67,7 +67,7 @@ function columnFilterClass(active: boolean, tone: "amber" | "emerald") {
 }
 
 /**
- * Watchlist includes every tracked symbol: zero-qty names and all holdings (they stay on the watchlist automatically).
+ * Watchlist page shows watch-only symbols. Active holdings stay on Portfolio.
  */
 export default function WatchlistPage() {
   const stocks = usePortfolioStore((s) => s.stocks);
@@ -83,6 +83,7 @@ export default function WatchlistPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION.symbol);
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
+  const watchlistStocks = useMemo(() => stocks.filter((s) => s.quantity <= 0), [stocks]);
 
   function isActionable(action: string | undefined): boolean {
     if (!action) return false;
@@ -107,13 +108,13 @@ export default function WatchlistPage() {
     setSortDirection(DEFAULT_SORT_DIRECTION[next]);
   }
 
-  const totalTrackedCount = stocks.length;
+  const totalTrackedCount = watchlistStocks.length;
 
   const rows = useMemo(() => {
     const q = query.trim().toUpperCase();
-    const filtered = stocks
+    const filtered = watchlistStocks
       .filter((s) => {
-        if (showShortlisted && (!s.isShortlisted || s.quantity > 0)) return false;
+        if (showShortlisted && !s.isShortlisted) return false;
         if (showActionable && !isActionable(s.recommendation?.action)) return false;
         if (!q) return true;
         return (
@@ -158,7 +159,7 @@ export default function WatchlistPage() {
     });
 
     return filtered;
-  }, [query, showActionable, showShortlisted, sort, sortDirection, stocks]);
+  }, [query, showActionable, showShortlisted, sort, sortDirection, watchlistStocks]);
 
   const hasActiveFilters = showShortlisted || showActionable || query.trim().length > 0;
   const watchlistCountText = hasActiveFilters ? `Showing ${rows.length} of ${totalTrackedCount}` : `Total: ${totalTrackedCount}`;
@@ -309,7 +310,7 @@ export default function WatchlistPage() {
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={9} className="px-4 py-8 text-center text-subtle sm:px-5">
-                  No symbols yet. Add a symbol in the toolbar above, import CSV, or finish onboarding.
+                  No watchlist symbols yet. Add a symbol in the toolbar above or import a watchlist CSV.
                 </td>
               </tr>
             ) : (
@@ -319,12 +320,16 @@ export default function WatchlistPage() {
                 return (
                   <tr
                     key={s.symbol}
-                    className="transition-colors duration-150 hover:bg-muted/50 dark:hover:bg-white/[0.04]"
+                    className="cursor-pointer transition-colors duration-150 hover:bg-muted/50 dark:hover:bg-white/[0.04]"
+                    onClick={() => setDetailSymbol(s.symbol)}
                   >
                     <td className="min-w-0 px-2 py-3 align-middle font-medium text-foreground sm:px-3">
                       <button
                         type="button"
-                        onClick={() => setDetailSymbol(s.symbol)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setDetailSymbol(s.symbol);
+                        }}
                         className={`ui-hover-text inline-flex max-w-full min-w-0 justify-center text-center hover:underline ${recSymbolTextClass(s.recommendation?.action)}`}
                       >
                         <span className="min-w-0 truncate">{s.symbol}</span>
@@ -374,7 +379,10 @@ export default function WatchlistPage() {
                     <td className="px-2 py-3 text-center sm:px-3">
                       <button
                         type="button"
-                        onClick={() => setRemoveTarget(s.symbol)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setRemoveTarget(s.symbol);
+                        }}
                         className="ui-hover-text text-xs text-error hover:underline"
                       >
                         Remove

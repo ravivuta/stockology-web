@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { Check, Pencil, X } from "lucide-react";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { runRefreshPipeline } from "@/lib/refresh";
@@ -77,6 +78,9 @@ function actionableFilterClass(active: boolean) {
 function PortfolioSummaryTiles({
   cash,
   cashInput,
+  isCashEditing,
+  onStartCashEdit,
+  onCancelCashEdit,
   onCashInputChange,
   onSaveCash,
   assetsValue,
@@ -87,6 +91,9 @@ function PortfolioSummaryTiles({
 }: {
   cash: number;
   cashInput: string;
+  isCashEditing: boolean;
+  onStartCashEdit: () => void;
+  onCancelCashEdit: () => void;
   onCashInputChange: (value: string) => void;
   onSaveCash: () => void;
   assetsValue: number;
@@ -99,27 +106,55 @@ function PortfolioSummaryTiles({
     <>
       <div className="rounded-xl border border-border/80 bg-elevated px-4 py-3 shadow-sm dark:border-white/[0.08]">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Cash balance</p>
-        <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">{formatCurrency(cash)}</p>
-        <div className="mt-2 flex items-end gap-2">
-          <label className="min-w-0 flex-1 text-[10px] text-subtle">
-            <span className="sr-only">Edit cash balance</span>
-            <input
-              value={cashInput}
-              onChange={(e) => onCashInputChange(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && onSaveCash()}
-              className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm text-foreground"
-              inputMode="decimal"
-              placeholder="0"
-              aria-label="Cash balance"
-            />
-          </label>
-          <button
-            type="button"
-            onClick={onSaveCash}
-            className={appCtaButton("ui-hover-pop px-3 py-1.5 text-xs")}
-          >
-            Save
-          </button>
+        <div className="mt-1 flex items-center gap-2">
+          {isCashEditing ? (
+            <>
+              <label className="min-w-0 flex-1 text-[10px] text-subtle">
+                <span className="sr-only">Edit cash balance</span>
+                <input
+                  value={cashInput}
+                  onChange={(e) => onCashInputChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") onSaveCash();
+                    if (e.key === "Escape") onCancelCashEdit();
+                  }}
+                  className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm font-semibold text-foreground"
+                  inputMode="decimal"
+                  placeholder="0"
+                  aria-label="Cash balance"
+                  autoFocus
+                />
+              </label>
+              <button
+                type="button"
+                onClick={onSaveCash}
+                className={appCtaButton("ui-hover-pop px-2 py-1.5 text-xs")}
+                aria-label="Save cash balance"
+              >
+                <Check className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={onCancelCashEdit}
+                className="rounded-lg border border-border bg-background px-2 py-1.5 text-subtle transition-colors hover:text-foreground"
+                aria-label="Cancel cash edit"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-lg font-semibold tabular-nums text-foreground">{formatCurrency(cash)}</p>
+              <button
+                type="button"
+                onClick={onStartCashEdit}
+                className="rounded-lg border border-border/70 bg-background/60 p-1.5 text-subtle transition-colors hover:text-foreground"
+                aria-label="Edit cash balance"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
         </div>
       </div>
       <div className="rounded-xl border border-border/80 bg-elevated px-4 py-3 shadow-sm dark:border-white/[0.08]">
@@ -183,6 +218,7 @@ export default function PortfolioPage() {
   const [newQuantity, setNewQuantity] = useState("1");
   const [newAverageCost, setNewAverageCost] = useState("");
   const [cashInput, setCashInput] = useState(String(cash));
+  const [isCashEditing, setIsCashEditing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
@@ -293,6 +329,17 @@ export default function PortfolioPage() {
     const n = parseFloat(cashInput.replace(/,/g, "")) || 0;
     setCash(n);
     recalc();
+    setIsCashEditing(false);
+  }
+
+  function startCashEdit() {
+    setCashInput(String(cash));
+    setIsCashEditing(true);
+  }
+
+  function cancelCashEdit() {
+    setCashInput(String(cash));
+    setIsCashEditing(false);
   }
 
   function addHolding() {
@@ -348,6 +395,9 @@ export default function PortfolioPage() {
         <PortfolioSummaryTiles
           cash={cash}
           cashInput={cashInput}
+          isCashEditing={isCashEditing}
+          onStartCashEdit={startCashEdit}
+          onCancelCashEdit={cancelCashEdit}
           onCashInputChange={setCashInput}
           onSaveCash={saveCash}
           assetsValue={assetsValue}
@@ -508,13 +558,17 @@ export default function PortfolioPage() {
                   return (
                     <tr
                       key={s.symbol}
-                      className="transition-colors duration-150 hover:bg-muted/50 dark:hover:bg-white/[0.04]"
+                      className="cursor-pointer transition-colors duration-150 hover:bg-muted/50 dark:hover:bg-white/[0.04]"
+                      onClick={() => setDetailSymbol(s.symbol)}
                     >
                       <td className="px-4 py-3 align-middle text-center">
                         <div className="min-w-0">
                           <button
                             type="button"
-                            onClick={() => setDetailSymbol(s.symbol)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setDetailSymbol(s.symbol);
+                            }}
                             className={`ui-hover-text inline-flex max-w-full items-center justify-center gap-1 truncate font-medium hover:underline ${recSymbolTextClass(s.recommendation?.action)}`}
                           >
                             {s.symbol}
