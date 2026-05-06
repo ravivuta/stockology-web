@@ -332,6 +332,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     () => (points ?? []).map((point) => point.close).filter((value) => Number.isFinite(value)),
     [points]
   );
+  const isShortlistedForPortfolio = stock?.isShortlisted ?? ((stock?.quantity ?? 0) > 0 || stock?.isETF === true);
   const lotSummary = useMemo(() => {
     const openLots = [...(lots?.open ?? [])].sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate));
     const soldLots = [...(lots?.sold ?? [])].sort((a, b) => b.saleDate.localeCompare(a.saleDate));
@@ -469,7 +470,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const suppressTradeActions = stock?.suppressTradeActions ?? false;
   const excludeFromShortlist = stock?.excludeFromShortlist ?? false;
   const canToggleShortlistExclusion = (stock?.quantity ?? 0) <= 0 || excludeFromShortlist;
-  const isShortlistedForPortfolio = stock?.isShortlisted ?? ((stock?.quantity ?? 0) > 0 || stock?.isETF === true);
 
   useEffect(() => {
     if (!stockSymbol || stockIsEtf) {
