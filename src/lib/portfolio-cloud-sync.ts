@@ -44,6 +44,7 @@ function holdingPayload(s: StockHolding, lots: { open: TradeLot[]; sold: SoldLot
     moving_avg: s.movingAvg ?? s.recommendation?.movingAvg ?? null,
     isShortlisted: s.isShortlisted ?? false,
     noAutoBuy: s.suppressTradeActions ?? null,
+    excludeFromShortlist: s.excludeFromShortlist ?? null,
     enableRSIReversalGate: s.enableRSIReversalGate ?? true,
     rsiPeriod: s.rsiPeriod ?? null,
     rsiOversoldThreshold: s.rsiOversoldThreshold ?? null,

@@ -468,6 +468,14 @@ export function computeRecommendationFactors(
     passes: isShortlisted,
   });
 
+  if (stock.excludeFromShortlist === true) {
+    factors.push({
+      label: "User override: Excluded from Shortlist",
+      detail: "You excluded this stock — no recommendations generated",
+      passes: false,
+    });
+  }
+
   if (stock.quantity > 0) {
     factors.push({
       label: "Trade actions enabled",
@@ -589,7 +597,7 @@ export function computeRecommendationFactors(
   const rsiPeriod = stock.rsiPeriod ?? 14;
   const rsiCurrentValue = rsiSeries(closes, rsiPeriod).at(-1);
   if (rsiCurrentValue != null) {
-    const rsiGateEnabled = useRSIGating && (stock.enableRSIReversalGate ?? true);
+    const rsiGateEnabled = useRSIGating;
     if (rsiGateEnabled) {
       const oversoldThreshold = stock.rsiOversoldThreshold ?? 30;
       const overboughtThreshold = stock.rsiOverboughtThreshold ?? 70;
@@ -795,7 +803,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
   const metricScore = stock.score ?? 0;
   const washSaleInfo = skipWashSaleCheck ? null : getWashSaleInfo(stock);
   const shouldApplyAISentimentGate = useAISentiment && !relaxScoreRequirement && stock.isETF !== true;
-  const rsiGateEnabled = useRSIGating && (stock.enableRSIReversalGate ?? true);
+  const rsiGateEnabled = useRSIGating;
   const rsiPeriod = stock.rsiPeriod ?? 14;
   const rsiOversoldThreshold = stock.rsiOversoldThreshold ?? 30;
   const rsiOverboughtThreshold = stock.rsiOverboughtThreshold ?? 70;

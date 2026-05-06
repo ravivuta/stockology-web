@@ -22,8 +22,6 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
   const [stockLimit, setStockLimit] = useState(String(stock.stockLimit));
   const [transactionLimit, setTransactionLimit] = useState(String(stock.transactionLimit));
   const [targetPrice, setTargetPrice] = useState(stock.targetPrice != null ? String(stock.targetPrice) : "");
-  const [suppressTradeActions, setSuppressTradeActions] = useState(stock.suppressTradeActions ?? false);
-  const [enableRSIReversalGate, setEnableRSIReversalGate] = useState(stock.enableRSIReversalGate ?? true);
   const [rsiPeriod, setRsiPeriod] = useState(String(stock.rsiPeriod ?? 14));
   const [rsiOversoldThreshold, setRsiOversoldThreshold] = useState(String(stock.rsiOversoldThreshold ?? 30));
   const [rsiOverboughtThreshold, setRsiOverboughtThreshold] = useState(String(stock.rsiOverboughtThreshold ?? 70));
@@ -37,8 +35,6 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
     setStockLimit(String(stock.stockLimit));
     setTransactionLimit(String(stock.transactionLimit));
     setTargetPrice(stock.targetPrice != null ? String(stock.targetPrice) : "");
-    setSuppressTradeActions(stock.suppressTradeActions ?? false);
-    setEnableRSIReversalGate(stock.enableRSIReversalGate ?? true);
     setRsiPeriod(String(stock.rsiPeriod ?? 14));
     setRsiOversoldThreshold(String(stock.rsiOversoldThreshold ?? 30));
     setRsiOverboughtThreshold(String(stock.rsiOverboughtThreshold ?? 70));
@@ -79,8 +75,6 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
       stockLimit: sl,
       transactionLimit: tl,
       targetPrice: tp,
-      suppressTradeActions,
-      enableRSIReversalGate,
       rsiPeriod: nextRsiPeriod,
       rsiOversoldThreshold: nextOversold,
       rsiOverboughtThreshold: nextOverbought,
@@ -182,30 +176,6 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
                 placeholder="Override analyst / default"
                 className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
               />
-            </label>
-            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-background/50 px-3 py-2">
-              <input
-                type="checkbox"
-                checked={suppressTradeActions}
-                onChange={(e) => setSuppressTradeActions(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
-              />
-              <span>
-                <span className="block text-xs font-medium text-foreground">Suppress trade actions</span>
-                <span className="mt-0.5 block text-[11px] text-subtle">Keeps the signal in WAIT while preserving targets and metrics.</span>
-              </span>
-            </label>
-            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-background/50 px-3 py-2">
-              <input
-                type="checkbox"
-                checked={enableRSIReversalGate}
-                onChange={(e) => setEnableRSIReversalGate(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
-              />
-              <span>
-                <span className="block text-xs font-medium text-foreground">Enable RSI reversal gate</span>
-                <span className="mt-0.5 block text-[11px] text-subtle">Matches the iOS per-stock RSI confirmation toggle.</span>
-              </span>
             </label>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block">

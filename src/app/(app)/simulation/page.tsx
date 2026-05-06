@@ -109,7 +109,6 @@ export default function SimulationPage() {
           marketCap: trackedStock?.marketCap,
           peg: trackedStock?.peg,
           isETF: trackedStock?.isETF,
-          enableRSIReversalGate: trackedStock?.enableRSIReversalGate,
           rsiPeriod: trackedStock?.rsiPeriod,
           rsiOversoldThreshold: trackedStock?.rsiOversoldThreshold,
           rsiOverboughtThreshold: trackedStock?.rsiOverboughtThreshold,

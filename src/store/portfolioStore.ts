@@ -79,6 +79,7 @@ export type StockHolding = {
   /** Precomputed SMA for user's period (e.g. from iOS snapshot `moving_avg`). */
   movingAvg?: number;
   suppressTradeActions?: boolean;
+  excludeFromShortlist?: boolean;
   enableRSIReversalGate?: boolean;
   rsiPeriod?: number;
   rsiOversoldThreshold?: number;
@@ -193,6 +194,7 @@ function preserveImportedMetadata(existing: StockHolding | undefined) {
     isETF: existing.isETF,
     movingAvg: existing.movingAvg,
     suppressTradeActions: existing.suppressTradeActions,
+    excludeFromShortlist: existing.excludeFromShortlist,
     enableRSIReversalGate: existing.enableRSIReversalGate,
     rsiPeriod: existing.rsiPeriod,
     rsiOversoldThreshold: existing.rsiOversoldThreshold,
@@ -272,7 +274,6 @@ async function requestOptimizedStrategy(
       marketCap: stock.marketCap,
       peg: stock.peg,
       isETF: stock.isETF,
-      enableRSIReversalGate: stock.enableRSIReversalGate,
       rsiPeriod: stock.rsiPeriod,
       rsiOversoldThreshold: stock.rsiOversoldThreshold,
       rsiOverboughtThreshold: stock.rsiOverboughtThreshold,
@@ -371,10 +372,10 @@ function derivePortfolioState(
   const shortlistedSymbols = new Set<string>();
 
   if (shortlistCtx.limitWatchlistSize) {
-    const holdingSymbols = stocksWithRisk.filter((stock) => stock.quantity > 0);
-    const unownedEtfs = stocksWithRisk.filter((stock) => stock.quantity <= 0 && stock.isETF === true);
+    const holdingSymbols = stocksWithRisk.filter((stock) => stock.quantity > 0 && stock.excludeFromShortlist !== true);
+    const unownedEtfs = stocksWithRisk.filter((stock) => stock.quantity <= 0 && stock.isETF === true && stock.excludeFromShortlist !== true);
     const eligibleOthers = stocksWithRisk
-      .filter((stock) => stock.quantity <= 0 && stock.isETF !== true && stock.isVisibleInRisk)
+      .filter((stock) => stock.quantity <= 0 && stock.isETF !== true && stock.isVisibleInRisk && stock.excludeFromShortlist !== true)
       .filter((stock) => (stock.lastPrice ?? 0) < stock.transactionLimit)
       .sort((a, b) => {
         const cmp = (b.score ?? Number.NEGATIVE_INFINITY) - (a.score ?? Number.NEGATIVE_INFINITY);
@@ -392,6 +393,7 @@ function derivePortfolioState(
     }
   } else {
     for (const stock of stocksWithRisk) {
+      if (stock.excludeFromShortlist === true) continue;
       if (stock.quantity > 0 || stock.isETF === true || stock.isVisibleInRisk) {
         shortlistedSymbols.add(stock.symbol);
       }
@@ -436,6 +438,7 @@ const defaultStock = (partial: Partial<StockHolding> & { symbol: string }): Stoc
   isETF: partial.isETF ?? false,
   movingAvg: partial.movingAvg,
   suppressTradeActions: partial.suppressTradeActions ?? false,
+  excludeFromShortlist: partial.excludeFromShortlist ?? false,
   enableRSIReversalGate: partial.enableRSIReversalGate ?? true,
   rsiPeriod: partial.rsiPeriod ?? 14,
   rsiOversoldThreshold: partial.rsiOversoldThreshold ?? 30,
@@ -711,6 +714,7 @@ export const usePortfolioStore = create<State>()(
                   quantity: qty,
                   averageCost: price,
                   lastPrice: price,
+                  excludeFromShortlist: false,
                   pendingOptimization: true,
                 }),
               ];
@@ -722,7 +726,7 @@ export const usePortfolioStore = create<State>()(
                   const costBasis = q0 * avg0 + qty * price;
                   const q1 = q0 + qty;
                   const avg1 = q1 > 0 ? costBasis / q1 : 0;
-                  return { ...s, quantity: q1, averageCost: avg1, lastPrice: price };
+                  return { ...s, quantity: q1, averageCost: avg1, lastPrice: price, excludeFromShortlist: false };
                 });
             }
             const entry: TradeJournalEntry = { ...journalBase, side: "BUY", lotId };

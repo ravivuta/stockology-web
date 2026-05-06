@@ -17,6 +17,7 @@ type RawHolding = {
   isShortlisted?: boolean | null;
   moving_avg?: number | null;
   noAutoBuy?: boolean | null;
+  excludeFromShortlist?: boolean | null;
   enableRSIReversalGate?: boolean | null;
   rsiPeriod?: number | null;
   rsiOversoldThreshold?: number | null;
@@ -166,6 +167,7 @@ function parseRawHolding(raw: unknown): { stock: StockHolding; lots: { open: Tra
     isVisibleInRisk: true,
     isInWatchlistSize: true,
     suppressTradeActions: h.noAutoBuy === true,
+    excludeFromShortlist: h.excludeFromShortlist === true,
     enableRSIReversalGate: h.enableRSIReversalGate ?? true,
     rsiPeriod: h.rsiPeriod != null && Number.isFinite(Number(h.rsiPeriod)) ? Math.round(Number(h.rsiPeriod)) : 14,
     rsiOversoldThreshold:
