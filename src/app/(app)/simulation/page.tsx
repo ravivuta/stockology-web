@@ -22,6 +22,7 @@ type SingleSimulationResponse = {
 type WatchlistSimulationResponse = {
   ok?: boolean;
   error?: string;
+  years?: number;
   universe?: {
     totalTracked: number;
     totalSimulated: number;
@@ -69,7 +70,8 @@ function formatPct(value: number) {
 export default function SimulationPage() {
   const [symbol, setSymbol] = useState("AAPL");
   const [capital, setCapital] = useState("10000");
-  const [years, setYears] = useState("1");
+  const [symbolYears, setSymbolYears] = useState("1");
+  const [watchlistYears, setWatchlistYears] = useState("1");
   const [result, setResult] = useState<SingleSimulationResponse | null>(null);
   const [watchlistResult, setWatchlistResult] = useState<WatchlistSimulationResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -99,7 +101,7 @@ export default function SimulationPage() {
         body: JSON.stringify({
           symbol: symbol.trim().toUpperCase(),
           capital: parseFloat(capital) || 0,
-          years: parseInt(years, 10) || 1,
+          years: parseInt(symbolYears, 10) || 1,
           shortSMA: trackedStock?.shortSMA,
           dynamicFactor: trackedStock?.dynamicFactor,
           stockLimit: trackedStock?.stockLimit,
@@ -137,7 +139,7 @@ export default function SimulationPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          years: parseInt(years, 10) || 1,
+          years: parseInt(watchlistYears, 10) || 1,
           portfolioSize,
           riskAppetite,
           enableRiskFilter,
@@ -177,7 +179,7 @@ export default function SimulationPage() {
           </label>
           <label className="block text-sm font-medium text-foreground">
             Years
-            <select value={years} onChange={(e) => setYears(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground">
+            <select value={symbolYears} onChange={(e) => setSymbolYears(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground">
               <option value="1">1 year</option>
               <option value="2">2 years</option>
               <option value="3">3 years</option>
@@ -239,6 +241,20 @@ export default function SimulationPage() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
+            <label className="rounded-xl border border-border/70 bg-background/50 p-3 text-sm font-medium text-foreground">
+              Historical Period
+              <select
+                value={watchlistYears}
+                onChange={(e) => setWatchlistYears(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+              >
+                <option value="1">1 year</option>
+                <option value="2">2 years</option>
+                <option value="3">3 years</option>
+                <option value="4">4 years</option>
+                <option value="5">5 years</option>
+              </select>
+            </label>
             <div className="rounded-xl border border-border/70 bg-background/50 p-3 text-sm">
               <div className="text-xs uppercase tracking-[0.18em] text-subtle">Universe</div>
               <div className="mt-1 font-medium text-foreground">{watchlistTrackedCount} tracked symbols</div>
@@ -258,6 +274,12 @@ export default function SimulationPage() {
               <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <div className="rounded-xl border border-border/70 bg-background/50 p-3">
+                    <div className="text-xs uppercase tracking-[0.18em] text-subtle">Period</div>
+                    <div className="mt-1 text-xl font-semibold text-foreground">
+                      {watchlistResult.years ?? parseInt(watchlistYears, 10) || 1} year{(watchlistResult.years ?? parseInt(watchlistYears, 10) || 1) > 1 ? "s" : ""}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-border/70 bg-background/50 p-3">
                     <div className="text-xs uppercase tracking-[0.18em] text-subtle">Return</div>
                     <div className={`mt-1 text-xl font-semibold ${metricTone(watchlistResult.result.totalReturn)}`}>{formatPct(watchlistResult.result.totalReturn)}</div>
                   </div>
@@ -269,7 +291,7 @@ export default function SimulationPage() {
                     <div className="text-xs uppercase tracking-[0.18em] text-subtle">Trades</div>
                     <div className="mt-1 text-xl font-semibold text-foreground">{watchlistResult.result.totalTrades}</div>
                   </div>
-                  <div className="rounded-xl border border-border/70 bg-background/50 p-3">
+                  <div className="rounded-xl border border-border/70 bg-background/50 p-3 sm:col-span-2 xl:col-span-1">
                     <div className="text-xs uppercase tracking-[0.18em] text-subtle">Avg Win Rate</div>
                     <div className="mt-1 text-xl font-semibold text-foreground">{formatPct(watchlistResult.result.avgWinRate)}</div>
                   </div>
