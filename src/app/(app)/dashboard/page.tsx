@@ -521,7 +521,7 @@ function GainerLoserBars({
     <div className="space-y-10">
       <div>
         <div className="mb-3 flex flex-wrap items-baseline gap-2">
-          <h3 className="text-sm font-semibold text-primary">Gainers</h3>
+          <h3 className="text-sm font-semibold text-[color:var(--dashboard-chart-gain)]">Gainers</h3>
           <span className="text-xs text-subtle">Cost basis {fmtShort(totalGainerCb)}</span>
         </div>
         {sortedG.length === 0 ? (
@@ -545,10 +545,22 @@ function GainerLoserBars({
                     selectedSymbol === g.symbol ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""
                   }`}
                 >
-                  <span className="text-[9px] font-bold tabular-nums text-primary">{fmtShort(gain)}</span>
+                  <span className="text-[9px] font-bold tabular-nums text-[color:var(--dashboard-chart-gain)]">{fmtShort(gain)}</span>
                   <div className="flex w-9 flex-col justify-end overflow-hidden rounded-md shadow-sm" style={{ height: barH }}>
-                    <div className="w-full bg-primary transition-all duration-500" style={{ height: gainH }} />
-                    <div className="w-full bg-muted" style={{ height: costH }} />
+                    <div
+                      className="w-full transition-all duration-500"
+                      style={{
+                        height: gainH,
+                        backgroundColor: "color-mix(in srgb, var(--dashboard-chart-gain) 84%, var(--theme-surface-elevated))",
+                      }}
+                    />
+                    <div
+                      className="w-full"
+                      style={{
+                        height: costH,
+                        backgroundColor: "color-mix(in srgb, var(--dashboard-chart-cost-basis) 78%, var(--theme-surface-elevated))",
+                      }}
+                    />
                   </div>
                   <span className="text-[8px] font-medium tabular-nums text-subtle">{fmtShort(costBasis)}</span>
                   <span className="text-[8px] font-semibold text-foreground">{g.symbol}</span>
@@ -599,7 +611,7 @@ function GainerLoserBars({
                       className="w-full"
                       style={{
                         height: curH,
-                        backgroundColor: "color-mix(in srgb, var(--dashboard-chart-holdings) 72%, var(--theme-surface-elevated))",
+                        backgroundColor: "color-mix(in srgb, var(--dashboard-chart-cost-basis) 78%, var(--theme-surface-elevated))",
                       }}
                     />
                   </div>
