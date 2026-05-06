@@ -1024,102 +1024,141 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               </SectionCard>
             </div>
 
-            <SectionCard
-              compact={dense}
-              title={
-                <span className="flex items-center justify-between gap-3">
-                <span>Recommendation</span>
-                <span className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleOptimize}
-                    disabled={optimizing || !stock.pendingOptimization}
-                    className={cn(
-                      "ui-hover-pop inline-flex items-center gap-1.5 border font-semibold shadow-sm backdrop-blur-lg sm:gap-2 disabled:cursor-not-allowed disabled:opacity-60",
-                      stock.pendingOptimization
-                        ? "border-primary/25 bg-primary/10 text-primary"
-                        : "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-                      dense ? "rounded-lg px-2 py-1 text-[10px]" : "rounded-lg px-2.5 py-1.5 text-xs"
-                    )}
-                    aria-label="Optimize parameters"
-                  >
-                    {optimizing ? "Optimizing…" : stock.pendingOptimization ? "Optimize" : "Optimized"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStrategyOpen(true)}
-                    className={cn(
-                        "ui-hover-pop inline-flex items-center gap-1.5 border border-white/45 bg-white/75 font-semibold text-foreground shadow-sm backdrop-blur-lg dark:border-white/10 dark:bg-white/[0.06] sm:gap-2",
+            <div className={dense ? "space-y-3" : "space-y-3"}>
+              <SectionCard
+                compact={dense}
+                title={
+                  <span className="flex items-center justify-between gap-3">
+                  <span>Recommendation</span>
+                  <span className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleOptimize}
+                      disabled={optimizing || !stock.pendingOptimization}
+                      className={cn(
+                        "ui-hover-pop inline-flex items-center gap-1.5 border font-semibold shadow-sm backdrop-blur-lg sm:gap-2 disabled:cursor-not-allowed disabled:opacity-60",
+                        stock.pendingOptimization
+                          ? "border-primary/25 bg-primary/10 text-primary"
+                          : "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
                         dense ? "rounded-lg px-2 py-1 text-[10px]" : "rounded-lg px-2.5 py-1.5 text-xs"
                       )}
-                      aria-label="Strategy"
+                      aria-label="Optimize parameters"
                     >
-                      <Settings className={dense ? "h-3.5 w-3.5" : "h-4 w-4"} />
-                      Strategy
+                      {optimizing ? "Optimizing…" : stock.pendingOptimization ? "Optimize" : "Optimized"}
                     </button>
-                  </span>
-                </span>
-              }
-            >
-              <div className={dense ? "space-y-3" : "space-y-3"}>
-                {optimizationMessage ? (
-                  <p className={cn("text-subtle", dense ? "text-[11px]" : "text-xs")}>{optimizationMessage}</p>
-                ) : null}
-                <div className="flex flex-wrap items-center gap-3">
-                  {rec ? (
-                    <p
+                    <button
+                      type="button"
+                      onClick={() => setStrategyOpen(true)}
                       className={cn(
-                        "inline-flex rounded-lg border font-bold tracking-tight",
-                        recommendationTone(rec.action),
-                        dense ? "px-2.5 py-1 text-sm" : "px-3 py-1.5 text-lg"
-                      )}
-                    >
-                      {rec.action}
-                    </p>
+                          "ui-hover-pop inline-flex items-center gap-1.5 border border-white/45 bg-white/75 font-semibold text-foreground shadow-sm backdrop-blur-lg dark:border-white/10 dark:bg-white/[0.06] sm:gap-2",
+                          dense ? "rounded-lg px-2 py-1 text-[10px]" : "rounded-lg px-2.5 py-1.5 text-xs"
+                        )}
+                        aria-label="Strategy"
+                      >
+                        <Settings className={dense ? "h-3.5 w-3.5" : "h-4 w-4"} />
+                        Strategy
+                      </button>
+                    </span>
+                  </span>
+                }
+              >
+                <div className={dense ? "space-y-3" : "space-y-3"}>
+                  {optimizationMessage ? (
+                    <p className={cn("text-subtle", dense ? "text-[11px]" : "text-xs")}>{optimizationMessage}</p>
                   ) : null}
+                  <div className="flex flex-wrap items-center gap-3">
+                    {rec ? (
+                      <p
+                        className={cn(
+                          "inline-flex rounded-lg border font-bold tracking-tight",
+                          recommendationTone(rec.action),
+                          dense ? "px-2.5 py-1 text-sm" : "px-3 py-1.5 text-lg"
+                        )}
+                      >
+                        {rec.action}
+                      </p>
+                    ) : null}
+                    {rec ? (
+                      <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-background/50 px-3 py-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                        <input
+                          type="checkbox"
+                          checked={suppressTradeActions}
+                          onChange={(e) => handleSuppressTradeActionsChange(e.target.checked)}
+                          className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
+                          aria-label="Supress recommendation actions for this stock"
+                        />
+                        <span>
+                          <span className={cn("block font-medium text-foreground", dense ? "text-[11px]" : "text-xs")}>
+                            Supress recommendation actions for this stock
+                          </span>
+                          <span className="mt-0.5 block text-[11px] text-subtle">
+                            Keeps the signal in WAIT while preserving targets and metrics.
+                          </span>
+                        </span>
+                      </label>
+                    ) : null}
+                  </div>
                   {rec ? (
-                    <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-background/50 px-3 py-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
-                      <input
-                        type="checkbox"
-                        checked={suppressTradeActions}
-                        onChange={(e) => handleSuppressTradeActionsChange(e.target.checked)}
-                        className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
-                        aria-label="Supress recommendation actions for this stock"
-                      />
-                      <span>
-                        <span className={cn("block font-medium text-foreground", dense ? "text-[11px]" : "text-xs")}>
-                          Supress recommendation actions for this stock
+                    <>
+                      <p className={cn("leading-snug", recommendationTextTone(rec.action), dense ? "text-sm" : "text-sm")}>{rec.comments}</p>
+                    </>
+                  ) : (
+                    <p className={cn("text-subtle", dense ? "text-sm" : "text-base")}>
+                      {excludeFromShortlist
+                        ? "This stock is excluded from your shortlist, so no recommendation is generated."
+                        : "No recommendation yet — refresh quotes from Portfolio or Dashboard."}
+                    </p>
+                  )}
+                  {recommendationActionFactors.length > 0 ? (
+                    <div className={cn("border-t border-border/60 dark:border-white/[0.06]", dense ? "pt-3" : "pt-3")}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Factors considered</p>
+                        </div>
+                        <span className={cn("font-medium text-subtle", dense ? "text-[10px]" : "text-xs")}>
+                          {recommendationActionFactors.filter((factor) => factor.passes).length}/{recommendationActionFactors.length} passed
                         </span>
-                        <span className="mt-0.5 block text-[11px] text-subtle">
-                          Keeps the signal in WAIT while preserving targets and metrics.
-                        </span>
-                      </span>
-                    </label>
+                      </div>
+                      <div className={cn(dense ? "mt-3 space-y-1.5" : "mt-3 space-y-1.5")}>
+                        {recommendationActionFactors.map((factor) => (
+                          <FactorFlagRow
+                            key={`${factor.label}-${factor.detail}`}
+                            compact={dense}
+                            label={factor.label}
+                            detail={factor.detail}
+                            passes={factor.passes}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   ) : null}
                 </div>
-                {rec ? (
-                  <>
-                    <p className={cn("leading-snug", recommendationTextTone(rec.action), dense ? "text-sm" : "text-sm")}>{rec.comments}</p>
-                  </>
-                ) : (
-                  <p className={cn("text-subtle", dense ? "text-sm" : "text-base")}>
-                    {excludeFromShortlist
-                      ? "This stock is excluded from your shortlist, so no recommendation is generated."
-                      : "No recommendation yet — refresh quotes from Portfolio or Dashboard."}
-                  </p>
-                )}
-                {recommendationActionFactors.length > 0 ? (
-                  <div className={cn("border-t border-border/60 dark:border-white/[0.06]", dense ? "pt-3" : "pt-3")}>
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Factors considered</p>
-                      </div>
-                      <span className={cn("font-medium text-subtle", dense ? "text-[10px]" : "text-xs")}>
-                        {recommendationActionFactors.filter((factor) => factor.passes).length}/{recommendationActionFactors.length} passed
-                      </span>
-                    </div>
+              </SectionCard>
+
+              <SectionCard
+                compact={dense}
+                title={
+                  <span className="flex items-center justify-between gap-3">
+                    <span>Shortlisted</span>
+                    <span
+                      className={cn(
+                        "inline-flex rounded-lg border px-2.5 py-1 font-semibold tracking-tight",
+                        isShortlistedForPortfolio
+                          ? "border-emerald-500/30 bg-emerald-500/14 text-emerald-700 dark:text-emerald-300"
+                          : "border-red-500/30 bg-red-500/14 text-red-700 dark:text-red-200",
+                        dense ? "text-[10px]" : "text-xs"
+                      )}
+                    >
+                      {isShortlistedForPortfolio ? "YES" : "NO"}
+                    </span>
+                  </span>
+                }
+              >
+                <div className={dense ? "space-y-3" : "space-y-3"}>
+                  <div>
+                    <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Status reasons</p>
                     <div className={cn(dense ? "mt-3 space-y-1.5" : "mt-3 space-y-1.5")}>
-                      {recommendationActionFactors.map((factor) => (
+                      {shortlistFactors.map((factor) => (
                         <FactorFlagRow
                           key={`${factor.label}-${factor.detail}`}
                           compact={dense}
@@ -1130,74 +1169,37 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                       ))}
                     </div>
                   </div>
-                ) : null}
-              </div>
-            </SectionCard>
-
-            <SectionCard
-              compact={dense}
-              title={
-                <span className="flex items-center justify-between gap-3">
-                  <span>Shortlisted</span>
-                  <span
-                    className={cn(
-                      "inline-flex rounded-lg border px-2.5 py-1 font-semibold tracking-tight",
-                      isShortlistedForPortfolio
-                        ? "border-emerald-500/30 bg-emerald-500/14 text-emerald-700 dark:text-emerald-300"
-                        : "border-red-500/30 bg-red-500/14 text-red-700 dark:text-red-200",
-                      dense ? "text-[10px]" : "text-xs"
-                    )}
-                  >
-                    {isShortlistedForPortfolio ? "YES" : "NO"}
-                  </span>
-                </span>
-              }
-            >
-              <div className={dense ? "space-y-3" : "space-y-3"}>
-                <div>
-                  <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Status reasons</p>
-                  <div className={cn(dense ? "mt-3 space-y-1.5" : "mt-3 space-y-1.5")}>
-                    {shortlistFactors.map((factor) => (
-                      <FactorFlagRow
-                        key={`${factor.label}-${factor.detail}`}
-                        compact={dense}
-                        label={factor.label}
-                        detail={factor.detail}
-                        passes={factor.passes}
+                  {shortlistReasons.length > 0 ? (
+                    <div className="rounded-xl border border-border/70 bg-background/45 px-3 py-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                      {shortlistReasons.map((reason) => (
+                        <p key={reason} className={cn("text-subtle", dense ? "text-[11px]" : "text-xs")}>
+                          {reason}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
+                  {canToggleShortlistExclusion ? (
+                    <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-background/50 px-3 py-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                      <input
+                        type="checkbox"
+                        checked={excludeFromShortlist}
+                        onChange={(e) => handleExcludeFromShortlistChange(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
+                        aria-label="Exclude from shortlist"
                       />
-                    ))}
-                  </div>
+                      <span>
+                        <span className={cn("block font-medium text-foreground", dense ? "text-[11px]" : "text-xs")}>
+                          Exclude from shortlist
+                        </span>
+                        <span className="mt-0.5 block text-[11px] text-subtle">
+                          Remove this stock from shortlisting and recommendations.
+                        </span>
+                      </span>
+                    </label>
+                  ) : null}
                 </div>
-                {shortlistReasons.length > 0 ? (
-                  <div className="rounded-xl border border-border/70 bg-background/45 px-3 py-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
-                    {shortlistReasons.map((reason) => (
-                      <p key={reason} className={cn("text-subtle", dense ? "text-[11px]" : "text-xs")}>
-                        {reason}
-                      </p>
-                    ))}
-                  </div>
-                ) : null}
-                {canToggleShortlistExclusion ? (
-                  <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-background/50 px-3 py-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
-                    <input
-                      type="checkbox"
-                      checked={excludeFromShortlist}
-                      onChange={(e) => handleExcludeFromShortlistChange(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
-                      aria-label="Exclude from shortlist"
-                    />
-                    <span>
-                      <span className={cn("block font-medium text-foreground", dense ? "text-[11px]" : "text-xs")}>
-                        Exclude from shortlist
-                      </span>
-                      <span className="mt-0.5 block text-[11px] text-subtle">
-                        Remove this stock from shortlisting and recommendations.
-                      </span>
-                    </span>
-                  </label>
-                ) : null}
-              </div>
-            </SectionCard>
+              </SectionCard>
+            </div>
           </div>
         </div>
       </div>
