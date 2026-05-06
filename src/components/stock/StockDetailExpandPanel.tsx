@@ -1219,23 +1219,25 @@ function SnapshotRow({
         compact ? "pb-1.5 last:pb-0" : "pb-2 last:pb-0"
       )}
     >
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className={cn("font-medium text-foreground/80", compact ? "text-xs" : "text-sm")}>{label}</span>
-        <span
-          className={cn(
-            "text-right font-semibold tabular-nums text-foreground",
-            compact ? "text-sm" : "text-base",
-            valueClassName
-          )}
-        >
-          {value}
-        </span>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+          <span className={cn("font-medium text-foreground/80", compact ? "text-xs" : "text-sm")}>{label}</span>
+          <span
+            className={cn(
+              "font-semibold tabular-nums text-foreground",
+              compact ? "text-xs" : "text-sm",
+              valueClassName
+            )}
+          >
+            {value}
+          </span>
+        </div>
+        {hint ? (
+          <span className={cn("shrink-0 text-subtle", compact ? "text-[10px]" : "text-xs")}>
+            {hint}
+          </span>
+        ) : null}
       </div>
-      {hint ? (
-        <p className={cn("text-subtle", compact ? "mt-1 text-[10px] leading-snug" : "mt-1.5 text-xs leading-relaxed")}>
-          {hint}
-        </p>
-      ) : null}
     </li>
   );
 }
