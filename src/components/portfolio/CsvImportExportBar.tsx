@@ -197,6 +197,18 @@ function dedupeSymbolRows(rows: CsvImportRow[]): CsvImportRow[] {
   return out;
 }
 
+function hasExistingPositionData(
+  symbol: string,
+  stocks: StockHolding[],
+  lotsBySymbol: Record<string, { open: { quantity: number }[]; sold: { quantity: number }[] }>
+): boolean {
+  const existing = stocks.find((stock) => stock.symbol.toUpperCase() === symbol.toUpperCase());
+  if (!existing) return false;
+  if (existing.quantity > 0) return true;
+  const lots = lotsBySymbol[existing.symbol];
+  return !!lots && (lots.open.length > 0 || lots.sold.length > 0);
+}
+
 export function CsvImportExportBar({
   exportFilename,
   exportStocks,
@@ -295,8 +307,12 @@ export function CsvImportExportBar({
               : row
           );
     const normalizedRows = importMode === "watchlist" ? dedupeSymbolRows(rows) : rows;
+    const importRows =
+      importMode === "watchlist"
+        ? normalizedRows.filter((row) => !hasExistingPositionData(row.symbol, storeStocks, lotsBySymbol))
+        : normalizedRows;
     const outcome = importCsvRows(
-      importMode === "watchlist" ? normalizedRows : normalizedWithDefaults,
+      importMode === "watchlist" ? importRows : normalizedWithDefaults,
       importMode,
       importedTrades
     );
@@ -316,11 +332,16 @@ export function CsvImportExportBar({
         : "";
 
     if (importMode === "watchlist") {
-      const alreadyTracked = outcome.importedCount - outcome.addedCount;
+      const alreadyTracked = normalizedRows.length - outcome.addedCount;
+      const preservedHoldings = normalizedRows.filter((row) =>
+        hasExistingPositionData(row.symbol, storeStocks, lotsBySymbol)
+      ).length;
       const trackedNote = alreadyTracked > 0 ? ` ${alreadyTracked} already tracked.` : "";
+      const preservedNote =
+        preservedHoldings > 0 ? ` Preserved ${preservedHoldings} existing holding${preservedHoldings === 1 ? "" : "s"} and lot history.` : "";
       setFlash({
         kind: "ok",
-        text: `Imported ${outcome.addedCount} new watchlist symbol(s).${trackedNote}${invalidNote}`,
+        text: `Imported ${outcome.addedCount} new watchlist symbol(s).${trackedNote}${preservedNote}${invalidNote}`,
       });
       return;
     }

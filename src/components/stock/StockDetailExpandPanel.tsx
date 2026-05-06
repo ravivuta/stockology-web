@@ -15,6 +15,7 @@ import { formatCompactCurrency, formatCurrency, formatDecimal, formatNumberMax2,
 import { safeHttpUrlForHref } from "@/lib/safe-external-url";
 import { createClient } from "@/lib/supabase/client";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
+import { parseSuggestedQuantity, suggestedTradeType } from "@/lib/tradePrefill";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { useSupabaseStockHistory } from "@/hooks/useSupabaseStockHistory";
 import { lastSma } from "@/lib/stock-chart";
@@ -156,6 +157,51 @@ function normalizeAiNewsItems(raw: unknown): StockSentimentNewsItem[] {
   return items.slice(0, 5);
 }
 
+type SavedTradeAccountProfile = {
+  name: string;
+  isRetirementAccount: boolean | null;
+};
+
+const CSV_MAPPING_PRESETS_KEY = "stocks-pm-csv-mapping-presets:v1";
+const NEW_PROFILE_VALUE = "__new__";
+const SHARE_FRACTION_TOLERANCE = 0.000001;
+
+function loadSavedTradeAccountProfiles(): SavedTradeAccountProfile[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(CSV_MAPPING_PRESETS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    const unique = new Map<string, SavedTradeAccountProfile>();
+    for (const item of parsed) {
+      if (!item || typeof item !== "object") continue;
+      const name = typeof item.defaultAccountName === "string" ? item.defaultAccountName.trim() : "";
+      if (!name || unique.has(name)) continue;
+      const selection = typeof item.defaultRetirementAccount === "string" ? item.defaultRetirementAccount.toLowerCase() : "";
+      unique.set(name, {
+        name,
+        isRetirementAccount: selection === "yes" ? true : selection === "no" ? false : null,
+      });
+    }
+
+    return [...unique.values()].sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    return [];
+  }
+}
+
+function formatShareQuantity(value: number): string {
+  const isWhole = Math.abs(Math.round(value) - value) < SHARE_FRACTION_TOLERANCE;
+  if (isWhole) return String(Math.round(value));
+
+  let text = value.toFixed(4);
+  while (text.includes(".") && text.endsWith("0")) text = text.slice(0, -1);
+  if (text.endsWith(".")) text = text.slice(0, -1);
+  return text;
+}
+
 function SectionCard({
   title,
   description,
@@ -252,9 +298,12 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const [tradeModalOpen, setTradeModalOpen] = useState(false);
   const [lotsModalOpen, setLotsModalOpen] = useState(false);
   const [editingLotId, setEditingLotId] = useState<string | null>(null);
-  const [side, setSide] = useState<"BUY" | "SELL">("BUY");
-  const [qty, setQty] = useState("1");
+  const [side, setSide] = useState<"BUY" | "SELL" | null>(null);
+  const [qty, setQty] = useState("");
   const [price, setPrice] = useState("");
+  const [tradeDate, setTradeDate] = useState(new Date().toISOString().slice(0, 10));
+  const [savedTradeProfiles, setSavedTradeProfiles] = useState<SavedTradeAccountProfile[]>([]);
+  const [selectedTradeProfile, setSelectedTradeProfile] = useState(NEW_PROFILE_VALUE);
   const [tradeAccountName, setTradeAccountName] = useState("");
   const [tradeAccountType, setTradeAccountType] = useState<"unknown" | "retirement" | "taxable">("unknown");
   const [lotDate, setLotDate] = useState("");
@@ -392,6 +441,53 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     };
   }, [stockIsEtf, stockSymbol]);
 
+  useEffect(() => {
+    if (!tradeModalOpen || !stock) return;
+
+    const nextProfiles = loadSavedTradeAccountProfiles();
+    setSavedTradeProfiles(nextProfiles);
+    setSelectedTradeProfile(NEW_PROFILE_VALUE);
+    setTradeAccountName("");
+    setTradeAccountType("unknown");
+    setTradeDate(new Date().toISOString().slice(0, 10));
+    setQty("");
+    setPrice("");
+
+    const nextSide = rec ? suggestedTradeType(rec.action) : null;
+    const lastPrice = stock.lastPrice ?? 0;
+    setSide(nextSide);
+
+    if (nextSide && lastPrice > 0) {
+      setPrice(lastPrice.toFixed(2));
+    }
+
+    if (nextSide === "SELL") {
+      setQty(formatShareQuantity(Math.max(stock.quantity, 0)));
+      return;
+    }
+
+    if (nextSide === "BUY") {
+      const suggestedQty = parseSuggestedQuantity(rec?.comments ?? "");
+      if (suggestedQty && suggestedQty > 0) {
+        setQty(formatShareQuantity(suggestedQty));
+      }
+    }
+  }, [rec, stock, tradeModalOpen]);
+
+  useEffect(() => {
+    if (selectedTradeProfile === NEW_PROFILE_VALUE) return;
+    const profile = savedTradeProfiles.find((item) => item.name === selectedTradeProfile);
+    if (!profile) return;
+    setTradeAccountName(profile.name);
+    setTradeAccountType(
+      profile.isRetirementAccount == null
+        ? "unknown"
+        : profile.isRetirementAccount
+          ? "retirement"
+          : "taxable"
+    );
+  }, [savedTradeProfiles, selectedTradeProfile]);
+
   if (!stock) {
     return (
       <div className={`border-border bg-muted/30 px-4 py-6 text-sm text-subtle ${embedded ? "border-t" : ""}`}>
@@ -406,7 +502,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   }
 
   const last = stock.lastPrice ?? 0;
-  const tradePrice = price ? parseFloat(price) : last;
   const hasPosition = stock.quantity > 0;
   const positionValue = stock.quantity * last;
   const unrealized = positionValue - stock.quantity * stock.averageCost;
@@ -464,16 +559,52 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   }
 
   function applyTrade() {
-    const q = parseFloat(qty) || 0;
-    if (q <= 0 || !Number.isFinite(tradePrice) || tradePrice <= 0) return;
-    recordTrade(symbol, side, q, tradePrice, new Date().toISOString().slice(0, 10), {
-      account: tradeAccountName.trim() || undefined,
+    if (!side || !stock) return;
+
+    const enteredQty = Number.parseFloat(qty);
+    const enteredPrice = Number.parseFloat(price);
+    if (!Number.isFinite(enteredQty) || enteredQty <= 0 || !Number.isFinite(enteredPrice) || enteredPrice <= 0 || !tradeDate) {
+      return;
+    }
+
+    let normalizedQty = Math.abs(enteredQty);
+    if (side === "SELL") {
+      const currentQty = Math.max(stock.quantity, 0);
+      const fractionalRemainder = currentQty - Math.floor(currentQty);
+      const enteredWholePart = Math.floor(normalizedQty);
+      const wholePartMatches = Math.abs(enteredWholePart - Math.floor(currentQty)) < SHARE_FRACTION_TOLERANCE;
+      const ignoredFractionalPart =
+        fractionalRemainder > SHARE_FRACTION_TOLERANCE &&
+        Math.abs(normalizedQty - enteredWholePart) < SHARE_FRACTION_TOLERANCE &&
+        wholePartMatches;
+      const clampedSellQty = Math.min(normalizedQty, currentQty);
+      const remainingQty = Math.max(0, currentQty - clampedSellQty);
+      const shouldCloseSmallRemainder =
+        remainingQty > SHARE_FRACTION_TOLERANCE && remainingQty < 1;
+
+      normalizedQty = ignoredFractionalPart || shouldCloseSmallRemainder ? currentQty : clampedSellQty;
+    }
+
+    if (normalizedQty <= 0) return;
+
+    recordTrade(symbol, side, normalizedQty, enteredPrice, tradeDate, {
+      account: side === "BUY" ? tradeAccountName.trim() || undefined : undefined,
       isRetirementAccount:
-        tradeAccountType === "unknown" ? null : tradeAccountType === "retirement",
+        side === "BUY"
+          ? tradeAccountType === "unknown"
+            ? null
+            : tradeAccountType === "retirement"
+          : undefined,
     });
     void flushCurrentPortfolioSnapshotNow(true);
-    setPrice("");
     setTradeModalOpen(false);
+    setSide(null);
+    setQty("");
+    setPrice("");
+    setTradeDate(new Date().toISOString().slice(0, 10));
+    setSelectedTradeProfile(NEW_PROFILE_VALUE);
+    setTradeAccountName("");
+    setTradeAccountType("unknown");
   }
 
   async function handleOptimize() {
@@ -917,64 +1048,145 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
             <X className="h-4 w-4" />
           </button>
         </ModalSection>
-        <ModalSection className="min-h-0 flex-1 px-4 py-4">
+        <ModalSection className="min-h-0 flex-1 space-y-4 px-4 py-4">
+          <div className="space-y-1.5">
+            <span className="text-sm font-medium text-foreground">Action</span>
+            <div className="grid grid-cols-2 gap-2">
+              {(["BUY", "SELL"] as const).map((option) => {
+                const active = side === option;
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setSide(option)}
+                    className={cn(
+                      "rounded-xl border px-3 py-2 text-sm font-medium transition-colors",
+                      active
+                        ? "border-primary/40 bg-primary/10 text-primary"
+                        : "border-border bg-background text-foreground dark:border-white/10"
+                    )}
+                  >
+                    {option === "BUY" ? "Buy" : "Sell"}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="grid gap-2.5 sm:grid-cols-2">
             <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
-              Side
-              <select
-                value={side}
-                onChange={(e) => setSide(e.target.value as "BUY" | "SELL")}
-                className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground dark:border-white/10"
-              >
-                <option value="BUY">Buy</option>
-                <option value="SELL">Sell</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
               Quantity
-              <input
-                value={qty}
-                onChange={(e) => setQty(e.target.value)}
-                placeholder="Qty"
-                className="rounded-xl border border-border bg-background px-3 py-2 text-sm tabular-nums text-foreground dark:border-white/10"
-              />
+              <div className="flex gap-2">
+                <input
+                  value={qty}
+                  onChange={(e) => setQty(e.target.value)}
+                  placeholder="Quantity"
+                  className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm tabular-nums text-foreground dark:border-white/10"
+                />
+                {side === "SELL" ? (
+                  <button
+                    type="button"
+                    onClick={() => setQty(formatShareQuantity(Math.max(stock.quantity, 0)))}
+                    disabled={stock.quantity <= 0}
+                    className="rounded-xl border border-border px-3 py-2 text-xs font-medium text-foreground disabled:opacity-60"
+                  >
+                    Sell All
+                  </button>
+                ) : null}
+              </div>
             </label>
             <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
-              Price (optional)
-              <input
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder={`Default ${formatDecimal(last)}`}
-                className="rounded-xl border border-border bg-background px-3 py-2 text-sm tabular-nums text-foreground dark:border-white/10"
-              />
-            </label>
-            <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
-              Account name
-              <input
-                value={tradeAccountName}
-                onChange={(e) => setTradeAccountName(e.target.value)}
-                placeholder="Brokerage / IRA"
-                disabled={side === "SELL"}
-                className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground disabled:opacity-60 dark:border-white/10"
-              />
+              Price
+              <div className="flex gap-2">
+                <input
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="Price"
+                  className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm tabular-nums text-foreground dark:border-white/10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setPrice(last > 0 ? last.toFixed(2) : "")}
+                  disabled={last <= 0}
+                  className="rounded-xl border border-border px-3 py-2 text-xs font-medium text-foreground disabled:opacity-60"
+                >
+                  Current
+                </button>
+              </div>
             </label>
             <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground sm:col-span-2">
-              Account type
-              <select
-                value={tradeAccountType}
-                onChange={(e) => setTradeAccountType(e.target.value as "unknown" | "retirement" | "taxable")}
-                disabled={side === "SELL"}
-                className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground disabled:opacity-60 dark:border-white/10"
-              >
-                <option value="unknown">Unknown</option>
-                <option value="retirement">Retirement</option>
-                <option value="taxable">Taxable</option>
-              </select>
+              Trade Date
+              <input
+                type="date"
+                value={tradeDate}
+                onChange={(e) => setTradeDate(e.target.value)}
+                className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground dark:border-white/10"
+              />
             </label>
           </div>
-          <p className="mt-3 text-xs text-subtle">
-            Account fields are stored on new buy lots and carried into CSV export and stock-detail lot history.
-          </p>
+
+          {side === "BUY" ? (
+            <section className="rounded-2xl border border-border/80 bg-background/45 p-3 dark:border-white/[0.08] dark:bg-white/[0.03]">
+              <h4 className="text-sm font-semibold text-foreground">Lot Details</h4>
+              <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+                <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground sm:col-span-2">
+                  Use Existing Profile
+                  <select
+                    value={selectedTradeProfile}
+                    onChange={(e) => setSelectedTradeProfile(e.target.value)}
+                    className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground dark:border-white/10"
+                  >
+                    <option value={NEW_PROFILE_VALUE}>Add New Account/Profile</option>
+                    {savedTradeProfiles.map((profile) => (
+                      <option key={profile.name} value={profile.name}>
+                        {profile.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {selectedTradeProfile === NEW_PROFILE_VALUE ? (
+                  <>
+                    <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground sm:col-span-2">
+                      Account/Profile (optional)
+                      <input
+                        value={tradeAccountName}
+                        onChange={(e) => setTradeAccountName(e.target.value)}
+                        placeholder="Brokerage / IRA"
+                        className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground dark:border-white/10"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground sm:col-span-2">
+                      Account Type
+                      <select
+                        value={tradeAccountType}
+                        onChange={(e) => setTradeAccountType(e.target.value as "unknown" | "retirement" | "taxable")}
+                        className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground dark:border-white/10"
+                      >
+                        <option value="unknown">Unknown</option>
+                        <option value="retirement">Retirement</option>
+                        <option value="taxable">Taxable</option>
+                      </select>
+                    </label>
+                  </>
+                ) : (
+                  <>
+                    <div className="sm:col-span-2">
+                      <span className="text-xs font-medium uppercase tracking-[0.12em] text-subtle">Account/Profile</span>
+                      <p className="mt-1 rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground dark:border-white/10">
+                        {selectedTradeProfile}
+                      </p>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <span className="text-xs font-medium uppercase tracking-[0.12em] text-subtle">Account Type</span>
+                      <p className="mt-1 rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground dark:border-white/10">
+                        {tradeAccountType === "unknown" ? "Unknown" : tradeAccountType === "retirement" ? "Retirement" : "Taxable"}
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </section>
+          ) : null}
         </ModalSection>
         <ModalSection className="flex justify-end gap-2 border-t border-border px-4 py-4 dark:border-foreground/10">
           <button
@@ -988,8 +1200,9 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
             type="button"
             onClick={applyTrade}
             className={cn(appCtaButton("ui-hover-spotlight justify-center"), "rounded-xl px-4 py-2 text-sm")}
+            disabled={side == null || qty.trim().length === 0 || price.trim().length === 0}
           >
-            Apply trade
+            Save
           </button>
         </ModalSection>
       </AppModal>

@@ -1065,6 +1065,8 @@ export const usePortfolioStore = create<State>()(
 
           for (const [symbol, symbolRows] of grouped.entries()) {
             const existing = stockMap.get(symbol);
+            const existingLots = lotsBySymbol[symbol];
+            const hasExistingLotHistory = !!existingLots && (existingLots.open.length > 0 || existingLots.sold.length > 0);
             const imported = buildImportedOpenLots(symbolRows);
             const hasImportedHoldings = imported.totalQty > 0;
 
@@ -1112,7 +1114,7 @@ export const usePortfolioStore = create<State>()(
               continue;
             }
 
-            if ((existing?.quantity ?? 0) > 0) continue;
+            if ((existing?.quantity ?? 0) > 0 || hasExistingLotHistory) continue;
 
             delete lotsBySymbol[symbol];
             stockMap.set(

@@ -35,7 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <>
-      <PortfolioCloudBridge dataUserId={dataUserId} cloudSnapshot={latestSnapshot ?? null} />
+      <PortfolioCloudBridge authUserId={user.id} dataUserId={dataUserId} cloudSnapshot={latestSnapshot ?? null} />
       <AppShell
         user={user}
         dataUserId={dataUserId}
