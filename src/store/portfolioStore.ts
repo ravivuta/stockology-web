@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { computeRiskReturnScore, recommendedWatchlistSize, stockPassesRiskFilter } from "@/lib/ios-recommendation";
+import { calculateTradingLimits, computeRiskReturnScore, recommendedWatchlistSize, stockPassesRiskFilter } from "@/lib/ios-recommendation";
 import { getRecommendationHistoryCloses } from "@/lib/recommendation-history-cache";
 import { buildRecommendation } from "@/lib/recommendation";
 import type { CsvImportRow, CsvImportTrade } from "@/lib/csvPortfolio";
@@ -250,6 +250,10 @@ type RecalcContext = {
 };
 
 type ShortlistContext = Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize">;
+type DeriveOptions = {
+  shouldRecalculateLimits?: boolean;
+  forceRecalculateAllHoldingLimits?: boolean;
+};
 
 async function requestOptimizedStrategy(
   stock: StockHolding,
@@ -353,11 +357,54 @@ function derivePortfolioState(
   stocksInput: StockHolding[],
   cashBalance: number,
   recalcCtx: RecalcContext,
-  shortlistCtx: ShortlistContext
+  shortlistCtx: ShortlistContext,
+  options?: DeriveOptions
 ): { stocks: StockHolding[]; portfolioSize: number } {
-  const recalcedStocks = stocksInput.map((s) => recalcHolding(s, recalcCtx));
-  const portfolioSize = recalcedStocks.reduce((a, x) => a + x.quantity * (x.lastPrice ?? 0), 0) + cashBalance;
+  const shouldRecalculateLimits = options?.shouldRecalculateLimits ?? true;
+  const forceRecalculateAllHoldingLimits = options?.forceRecalculateAllHoldingLimits ?? false;
+
+  const scoredStocks = stocksInput.map((stock) => ({
+    ...stock,
+    score: stock.isETF ? undefined : computeRiskReturnScore(stock),
+  }));
+  const portfolioSize = scoredStocks.reduce((sum, stock) => sum + stock.quantity * (stock.lastPrice ?? 0), 0) + cashBalance;
   const idealWatchlistSize = recommendedWatchlistSize(portfolioSize);
+
+  let stocksWithLimits = scoredStocks;
+  if (shouldRecalculateLimits) {
+    const recommendedWatchlistSizeForLimits = shortlistCtx.limitWatchlistSize
+      ? idealWatchlistSize
+      : Math.max(
+          stocksWithLimits.filter((stock) => {
+            if (stock.excludeFromShortlist === true) return false;
+            if (stock.quantity > 0 || stock.isETF === true) return true;
+            if (shortlistCtx.enableRiskFilter) {
+              return stockPassesRiskFilter(
+                stock,
+                shortlistCtx.riskAppetite,
+                shortlistCtx.enableRiskFilter,
+                analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)
+              );
+            }
+            return true;
+          }).length,
+          1
+        );
+
+    stocksWithLimits = stocksWithLimits.map((stock) => {
+      if (stock.pendingOptimization === false && !forceRecalculateAllHoldingLimits) {
+        return stock;
+      }
+      const limits = calculateTradingLimits(portfolioSize, stock.isETF, stock.score, recommendedWatchlistSizeForLimits);
+      return {
+        ...stock,
+        stockLimit: limits.stockLimit,
+        transactionLimit: limits.transactionLimit,
+      };
+    });
+  }
+
+  const recalcedStocks = stocksWithLimits.map((s) => recalcHolding(s, recalcCtx));
 
   const stocksWithRisk = recalcedStocks.map((stock) => ({
     ...stock,
@@ -496,6 +543,7 @@ export const usePortfolioStore = create<State>()(
         }),
       setSettings: (p) =>
         set((st) => {
+          const mutationAt = new Date().toISOString();
           const nextState = { ...st, ...p };
           const ctx: RecalcContext = {
             etfProfitTarget: nextState.etfProfitTarget,
@@ -505,8 +553,12 @@ export const usePortfolioStore = create<State>()(
             sellOnlyLongTermQualified: nextState.sellOnlyLongTermQualified,
             lotsBySymbol: st.lotsBySymbol,
           };
-          const derived = derivePortfolioState(st.stocks, st.cashBalance, ctx, nextState);
-          return { ...p, stocks: derived.stocks, portfolioSize: derived.portfolioSize };
+          const derived = derivePortfolioState(st.stocks, st.cashBalance, ctx, nextState, {
+            shouldRecalculateLimits: true,
+            forceRecalculateAllHoldingLimits:
+              p.limitWatchlistSize != null && p.limitWatchlistSize !== st.limitWatchlistSize,
+          });
+          return { ...p, stocks: derived.stocks, portfolioSize: derived.portfolioSize, lastLocalMutationAt: mutationAt };
         }),
       addStock: (s) =>
         set((st) => {
@@ -887,6 +939,7 @@ export const usePortfolioStore = create<State>()(
       },
       recalcMetrics: () =>
         set((st) => {
+          const mutationAt = new Date().toISOString();
           const ctx: RecalcContext = {
             etfProfitTarget: st.etfProfitTarget,
             stockProfitTarget: st.stockProfitTarget,
@@ -896,10 +949,11 @@ export const usePortfolioStore = create<State>()(
             lotsBySymbol: st.lotsBySymbol,
           };
           const derived = derivePortfolioState(st.stocks, st.cashBalance, ctx, st);
-          return { stocks: derived.stocks, portfolioSize: derived.portfolioSize };
+          return { stocks: derived.stocks, portfolioSize: derived.portfolioSize, lastLocalMutationAt: mutationAt };
         }),
       resetAll: () => {
         get().clearCachesOnReset();
+        const mutationAt = new Date().toISOString();
         set({
           cashBalance: 0,
           portfolioSize: 0,
@@ -908,7 +962,7 @@ export const usePortfolioStore = create<State>()(
           tradeJournal: [],
           onboardingComplete: false,
           lastRefreshAt: null,
-          lastLocalMutationAt: null,
+          lastLocalMutationAt: mutationAt,
         });
       },
       setOptimizing: (v) => set({ optimizing: v }),
@@ -1196,7 +1250,9 @@ export const usePortfolioStore = create<State>()(
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
             lotsBySymbol: payload.lotsBySymbol,
           };
-          const derived = derivePortfolioState(payload.stocks, payload.cashBalance, ctx, st);
+          const derived = derivePortfolioState(payload.stocks, payload.cashBalance, ctx, st, {
+            shouldRecalculateLimits: false,
+          });
           const inferredJournal = buildTradeJournalFromLots(payload.lotsBySymbol);
           return {
             cashBalance: payload.cashBalance,

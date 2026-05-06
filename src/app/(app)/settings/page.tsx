@@ -19,6 +19,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { recommendedWatchlistSize } from "@/lib/ios-recommendation";
 import { formatCurrency } from "@/lib/numberFormat";
+import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { isPaidSubscriptionTier } from "@/lib/subscription-state";
 import { cn } from "@/lib/utils";
 
@@ -104,6 +105,19 @@ export default function SettingsPage() {
   const idealWatchlistSize = recommendedWatchlistSize(portfolioSize);
   const hasPaidPlan = isPaidSubscriptionTier(row?.subscription_tier);
   const hasBillingExempt = row?.billing_exempt === true;
+
+  function persistSettingsPatch(
+    patch: Parameters<typeof setSettings>[0]
+  ) {
+    setSettings(patch);
+    void flushCurrentPortfolioSnapshotNow(true);
+  }
+
+  async function handleResetConfirm() {
+    resetAll();
+    await flushCurrentPortfolioSnapshotNow(true, { allowEmptyHoldings: true });
+    setResetOpen(false);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -420,7 +434,7 @@ export default function SettingsPage() {
                     type="checkbox"
                     className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
                     checked={enableRiskFilter}
-                    onChange={(e) => setSettings({ enableRiskFilter: e.target.checked })}
+                    onChange={(e) => persistSettingsPatch({ enableRiskFilter: e.target.checked })}
                   />
                   <span>
                     <span className="block text-[12px] font-medium leading-snug text-foreground">Filter by risk appetite</span>
@@ -437,7 +451,7 @@ export default function SettingsPage() {
                     type="checkbox"
                     className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
                     checked={limitWatchlistSize}
-                    onChange={(e) => setSettings({ limitWatchlistSize: e.target.checked })}
+                    onChange={(e) => persistSettingsPatch({ limitWatchlistSize: e.target.checked })}
                   />
                   <span>
                     <span className="block text-[12px] font-medium leading-snug text-foreground">Enforce ideal watchlist size</span>
@@ -454,7 +468,7 @@ export default function SettingsPage() {
                     <FieldLabel>Investment risk appetite</FieldLabel>
                     <select
                       value={riskAppetite}
-                      onChange={(e) => setSettings({ riskAppetite: e.target.value as "Low" | "Medium" | "High" })}
+                      onChange={(e) => persistSettingsPatch({ riskAppetite: e.target.value as "Low" | "Medium" | "High" })}
                       className={cn(inputClass, "cursor-pointer")}
                     >
                       <option value="Low">Low</option>
@@ -476,7 +490,7 @@ export default function SettingsPage() {
                   <input
                     type="number"
                     value={etfProfitTarget}
-                    onChange={(e) => setSettings({ etfProfitTarget: Number(e.target.value) })}
+                    onChange={(e) => persistSettingsPatch({ etfProfitTarget: Number(e.target.value) })}
                     className={inputClass}
                   />
                 </label>
@@ -491,7 +505,7 @@ export default function SettingsPage() {
                   <input
                     type="number"
                     value={stockProfitTarget}
-                    onChange={(e) => setSettings({ stockProfitTarget: Number(e.target.value) })}
+                    onChange={(e) => persistSettingsPatch({ stockProfitTarget: Number(e.target.value) })}
                     className={inputClass}
                   />
                 </label>
@@ -506,7 +520,7 @@ export default function SettingsPage() {
                     type="checkbox"
                     className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
                     checked={useAISentimentForRecommendations}
-                    onChange={(e) => setSettings({ useAISentimentForRecommendations: e.target.checked })}
+                    onChange={(e) => persistSettingsPatch({ useAISentimentForRecommendations: e.target.checked })}
                   />
                   <span>
                     <span className="block text-[12px] font-medium leading-snug text-foreground">Use AI sentiment gate</span>
@@ -520,7 +534,7 @@ export default function SettingsPage() {
                     type="checkbox"
                     className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
                     checked={useRSIGatingForRecommendations}
-                    onChange={(e) => setSettings({ useRSIGatingForRecommendations: e.target.checked })}
+                    onChange={(e) => persistSettingsPatch({ useRSIGatingForRecommendations: e.target.checked })}
                   />
                   <span>
                     <span className="block text-[12px] font-medium leading-snug text-foreground">Use RSI reversal gating</span>
@@ -534,7 +548,7 @@ export default function SettingsPage() {
                     type="checkbox"
                     className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
                     checked={sellOnlyLongTermQualified}
-                    onChange={(e) => setSettings({ sellOnlyLongTermQualified: e.target.checked })}
+                    onChange={(e) => persistSettingsPatch({ sellOnlyLongTermQualified: e.target.checked })}
                   />
                   <span>
                     <span className="block text-[12px] font-medium leading-snug text-foreground">Only sell long-term qualified lots</span>
@@ -562,7 +576,10 @@ export default function SettingsPage() {
               <div className="md:col-span-2">
                 <button
                   type="button"
-                  onClick={() => recalc()}
+                  onClick={() => {
+                    recalc();
+                    void flushCurrentPortfolioSnapshotNow(true);
+                  }}
                   className="ui-hover-pop inline-flex items-center gap-1.5 rounded-md border border-primary/35 px-3 py-1.5 text-sm font-medium text-foreground dark:border-primary/28"
                 >
                   <RefreshCw className="h-3.5 w-3.5 opacity-80" aria-hidden />
@@ -592,7 +609,7 @@ export default function SettingsPage() {
       <ConfirmModal
         open={resetOpen}
         onClose={() => setResetOpen(false)}
-        onConfirm={() => resetAll()}
+        onConfirm={handleResetConfirm}
         title="Reset local portfolio?"
         description="This removes tracked symbols, trades, and local preferences in this browser. Sign in again or import CSV to rebuild."
         confirmLabel="Reset"

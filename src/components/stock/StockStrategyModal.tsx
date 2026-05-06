@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { formatCurrency } from "@/lib/numberFormat";
 import { AppModal, ModalSection } from "@/components/ui/AppModal";
@@ -177,63 +177,75 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
                 className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
               />
             </label>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block">
-                <span className="text-xs font-medium text-foreground">RSI period</span>
-                <input
-                  type="number"
-                  min={2}
-                  max={30}
-                  value={rsiPeriod}
-                  onChange={(e) => setRsiPeriod(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-medium text-foreground">RSI oversold threshold</span>
-                <input
-                  type="number"
-                  min={10}
-                  max={50}
-                  value={rsiOversoldThreshold}
-                  onChange={(e) => setRsiOversoldThreshold(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-medium text-foreground">RSI overbought threshold</span>
-                <input
-                  type="number"
-                  min={50}
-                  max={90}
-                  value={rsiOverboughtThreshold}
-                  onChange={(e) => setRsiOverboughtThreshold(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-medium text-foreground">RSI hysteresis points</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={20}
-                  value={rsiHysteresisPoints}
-                  onChange={(e) => setRsiHysteresisPoints(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-medium text-foreground">RSI min rising days</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={5}
-                  value={rsiMinRisingDays}
-                  onChange={(e) => setRsiMinRisingDays(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-                />
-              </label>
-            </div>
+            <details className="group rounded-xl border border-border bg-background/35 px-3 py-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-1 text-sm font-medium text-foreground [&::-webkit-details-marker]:hidden">
+                <span>RSI parameters</span>
+                <span className="flex items-center gap-2 text-xs text-subtle">
+                  {rsiPeriod}/{rsiOversoldThreshold}/{rsiOverboughtThreshold}
+                  <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                </span>
+              </summary>
+              <p className="mt-1 text-xs leading-relaxed text-subtle">
+                Controls the RSI reversal confirmation used by simulations and recommendations when the global RSI gate is enabled.
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="text-xs font-medium text-foreground">RSI period</span>
+                  <input
+                    type="number"
+                    min={2}
+                    max={30}
+                    value={rsiPeriod}
+                    onChange={(e) => setRsiPeriod(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium text-foreground">RSI oversold threshold</span>
+                  <input
+                    type="number"
+                    min={10}
+                    max={50}
+                    value={rsiOversoldThreshold}
+                    onChange={(e) => setRsiOversoldThreshold(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium text-foreground">RSI overbought threshold</span>
+                  <input
+                    type="number"
+                    min={50}
+                    max={90}
+                    value={rsiOverboughtThreshold}
+                    onChange={(e) => setRsiOverboughtThreshold(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium text-foreground">RSI hysteresis points</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={20}
+                    value={rsiHysteresisPoints}
+                    onChange={(e) => setRsiHysteresisPoints(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                  />
+                </label>
+                <label className="block sm:col-span-2">
+                  <span className="text-xs font-medium text-foreground">RSI min rising days</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={5}
+                    value={rsiMinRisingDays}
+                    onChange={(e) => setRsiMinRisingDays(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                  />
+                </label>
+              </div>
+            </details>
 
             <div className="flex flex-wrap gap-2 pt-2">
               <button type="submit" className={appCtaButton("ui-hover-spotlight px-4 py-2 text-sm")}>

@@ -10,6 +10,7 @@ import type { PortfolioSnapshotRow } from "@/lib/cloud-portfolio";
 import {
   markLastPushedPortfolioFingerprint,
 } from "@/lib/portfolio-snapshot-client";
+import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { portfolioSyncFingerprint } from "@/lib/portfolio-cloud-sync";
 import type { StockHolding } from "@/store/portfolioStore";
 import { usePortfolioStore } from "@/store/portfolioStore";
@@ -152,6 +153,13 @@ export async function runRefreshPipeline(
     usePortfolioStore.setState({
       lastRefreshAt: data.refreshed_at ?? new Date().toISOString(),
     });
+
+    if (options?.includeSnapshot === true) {
+      const saveResult = await flushCurrentPortfolioSnapshotNow(true);
+      if (saveResult.error) {
+        console.warn("[runRefreshPipeline]", saveResult.error.message);
+      }
+    }
 
     return {
       ok: true,

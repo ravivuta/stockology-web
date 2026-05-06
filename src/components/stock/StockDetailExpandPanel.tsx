@@ -733,17 +733,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               >
                 {hasPosition ? "Holding" : "Watchlist"}
               </span>
-              {rec ? (
-                <span
-                  className={cn(
-                    "inline-flex rounded-full border px-2.5 py-1 font-bold tracking-[0.14em]",
-                    dense ? "text-[9px]" : "text-[10px]",
-                    recommendationTone(rec.action)
-                  )}
-                >
-                  {rec.action.replace("_", " ")}
-                </span>
-              ) : null}
             </div>
             <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <h2 className={cn("font-bold tracking-tight", dense ? "text-2xl" : "text-[2.4rem] leading-none")}>{stock.symbol}</h2>
@@ -814,17 +803,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                     Choose a range (1w–5y). The dashed line is your average cost when you hold a position.
                   </p>
                 </div>
-                {rec ? (
-                  <span
-                    className={cn(
-                      "inline-flex rounded-full border px-2.5 py-1 font-bold tracking-[0.14em]",
-                      dense ? "text-[9px]" : "text-[10px]",
-                      recommendationTone(rec.action)
-                    )}
-                  >
-                    {rec.action.replace("_", " ")}
-                  </span>
-                ) : null}
               </div>
               <StockHistoricalChart
                 symbol={stock.symbol}
