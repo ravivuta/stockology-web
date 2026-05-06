@@ -394,6 +394,29 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       closes,
     });
   }, [closes, rec, sellOnlyLongTermQualified, stock, useAISentimentForRecommendations, useRSIGatingForRecommendations]);
+  const recommendationStatusFactors = useMemo(() => {
+    if (!stock) return [];
+    if (recommendationFactors.length > 0) return recommendationFactors;
+
+    const isShortlisted = stock.isShortlisted ?? (stock.quantity > 0 || stock.isETF === true);
+    const factors = [
+      {
+        label: "Shortlisted",
+        detail: isShortlisted ? "Yes" : "Not in top watchlist",
+        passes: isShortlisted,
+      },
+    ];
+
+    if (stock.excludeFromShortlist === true) {
+      factors.push({
+        label: "User override: Excluded from Shortlist",
+        detail: "You excluded this stock — no recommendations generated",
+        passes: false,
+      });
+    }
+
+    return factors;
+  }, [recommendationFactors, stock]);
   const scoreRows = useMemo(() => (stock ? scoreBreakdownRows(stock) : null), [stock]);
   const dense = Boolean(embedded);
   const stockSymbol = stock?.symbol ?? null;
@@ -1052,28 +1075,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                 {rec ? (
                   <>
                     <p className={cn("leading-snug", recommendationTextTone(rec.action), dense ? "text-sm" : "text-sm")}>{rec.comments}</p>
-
-                    <div className={cn("border-t border-border/60 dark:border-white/[0.06]", dense ? "pt-3" : "pt-3")}>
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Factors considered</p>
-                        </div>
-                        <span className={cn("font-medium text-subtle", dense ? "text-[10px]" : "text-xs")}>
-                          {recommendationFactors.filter((factor) => factor.passes).length}/{recommendationFactors.length} passed
-                        </span>
-                      </div>
-                      <div className={cn(dense ? "mt-3 space-y-1.5" : "mt-3 space-y-1.5")}>
-                        {recommendationFactors.map((factor) => (
-                          <FactorFlagRow
-                            key={`${factor.label}-${factor.detail}`}
-                            compact={dense}
-                            label={factor.label}
-                            detail={factor.detail}
-                            passes={factor.passes}
-                          />
-                        ))}
-                      </div>
-                    </div>
                   </>
                 ) : (
                   <p className={cn("text-subtle", dense ? "text-sm" : "text-base")}>
@@ -1082,6 +1083,27 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                       : "No recommendation yet — refresh quotes from Portfolio or Dashboard."}
                   </p>
                 )}
+                <div className={cn("border-t border-border/60 dark:border-white/[0.06]", dense ? "pt-3" : "pt-3")}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Factors considered</p>
+                    </div>
+                    <span className={cn("font-medium text-subtle", dense ? "text-[10px]" : "text-xs")}>
+                      {recommendationStatusFactors.filter((factor) => factor.passes).length}/{recommendationStatusFactors.length} passed
+                    </span>
+                  </div>
+                  <div className={cn(dense ? "mt-3 space-y-1.5" : "mt-3 space-y-1.5")}>
+                    {recommendationStatusFactors.map((factor) => (
+                      <FactorFlagRow
+                        key={`${factor.label}-${factor.detail}`}
+                        compact={dense}
+                        label={factor.label}
+                        detail={factor.detail}
+                        passes={factor.passes}
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
             </SectionCard>
           </div>

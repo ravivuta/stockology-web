@@ -85,6 +85,7 @@ export default function SimulationPage() {
   const stockProfitTarget = usePortfolioStore((s) => s.stockProfitTarget);
   const useRSIGatingForRecommendations = usePortfolioStore((s) => s.useRSIGatingForRecommendations);
   const watchlistTrackedCount = stocks.length;
+  const selectedWatchlistYears = watchlistResult?.years ?? Number.parseInt(watchlistYears, 10) ?? 1;
   const trackedStock = useMemo(
     () => stocks.find((stock) => stock.symbol === symbol.trim().toUpperCase()),
     [stocks, symbol]
@@ -276,7 +277,7 @@ export default function SimulationPage() {
                   <div className="rounded-xl border border-border/70 bg-background/50 p-3">
                     <div className="text-xs uppercase tracking-[0.18em] text-subtle">Period</div>
                     <div className="mt-1 text-xl font-semibold text-foreground">
-                      {watchlistResult.years ?? parseInt(watchlistYears, 10) || 1} year{(watchlistResult.years ?? parseInt(watchlistYears, 10) || 1) > 1 ? "s" : ""}
+                      {selectedWatchlistYears} year{selectedWatchlistYears > 1 ? "s" : ""}
                     </div>
                   </div>
                   <div className="rounded-xl border border-border/70 bg-background/50 p-3">
