@@ -649,41 +649,81 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
         )}
       >
         <div className={dense ? "space-y-3" : "space-y-3"}>
-          <div className={cn("grid items-start", dense ? "gap-3" : "gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)_minmax(0,1.15fr)]")}>
+          <div className={cn("grid items-start", dense ? "gap-3" : "gap-3 xl:grid-cols-[minmax(0,1.9fr)_minmax(0,1.15fr)]")}>
             <div className={dense ? "space-y-3" : "space-y-3"}>
-              <SectionCard
-                compact={dense}
-                title="Snapshot"
-                description="Latest quote context and core fundamentals."
-              >
-                <div className="rounded-xl border border-border/60 bg-background/35 p-3 dark:border-white/[0.07] dark:bg-white/[0.02]">
-                  <DetailFieldGrid
-                    compact={dense}
-                    columns={2}
-                    items={[
-                      { label: "Beta", value: stock.beta != null ? formatDecimal(stock.beta) : "—" },
-                      { label: "Market cap", value: stock.marketCap != null ? formatCompactCurrency(stock.marketCap) : "—" },
-                      { label: "PEG ratio", value: stock.peg != null ? formatDecimal(stock.peg) : "—" },
-                      {
-                        label: "Analyst avg",
-                        value: stock.analystAvg?.trim() || "—",
-                        valueClassName: analystRatingTone(stock.analystAvg),
-                      },
-                      {
-                        label: "Analyst target",
-                        value: stock.analystTarget != null ? formatCurrency(stock.analystTarget) : "—",
-                        detail: formatUpsidePct(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)),
-                        valueClassName: valueTone(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)),
-                      },
-                      {
-                        label: `SMA(${stock.shortSMA})`,
-                        value: smaForSnapshot != null ? formatCurrency(smaForSnapshot) : "—",
-                        detail: stock.isETF ? "ETF" : "Stock",
-                      },
-                    ]}
-                  />
-                </div>
-              </SectionCard>
+              <div className={cn(dense ? "space-y-3" : "grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)]")}>
+                <SectionCard
+                  compact={dense}
+                  title="Snapshot"
+                  description="Latest quote context and core fundamentals."
+                >
+                  <div className="rounded-xl border border-border/60 bg-background/35 p-3 dark:border-white/[0.07] dark:bg-white/[0.02]">
+                    <DetailFieldGrid
+                      compact={dense}
+                      columns={2}
+                      items={[
+                        { label: "Beta", value: stock.beta != null ? formatDecimal(stock.beta) : "—" },
+                        { label: "Market cap", value: stock.marketCap != null ? formatCompactCurrency(stock.marketCap) : "—" },
+                        { label: "PEG ratio", value: stock.peg != null ? formatDecimal(stock.peg) : "—" },
+                        {
+                          label: "Analyst avg",
+                          value: stock.analystAvg?.trim() || "—",
+                          valueClassName: analystRatingTone(stock.analystAvg),
+                        },
+                        {
+                          label: "Analyst target",
+                          value: stock.analystTarget != null ? formatCurrency(stock.analystTarget) : "—",
+                          detail: formatUpsidePct(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)),
+                          valueClassName: valueTone(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)),
+                        },
+                        {
+                          label: `SMA(${stock.shortSMA})`,
+                          value: smaForSnapshot != null ? formatCurrency(smaForSnapshot) : "—",
+                          detail: stock.isETF ? "ETF" : "Stock",
+                        },
+                      ]}
+                    />
+                  </div>
+                </SectionCard>
+
+                <SectionCard
+                  compact={dense}
+                  title={
+                    <span className="flex items-center justify-between gap-3">
+                      <span>Score</span>
+                      <span className={cn("tabular-nums", dense ? "text-sm" : "text-base", scoreTone(stock.score))}>
+                        {formatScoreDisplay(stock.score)}
+                      </span>
+                    </span>
+                  }
+                >
+                  <div className={dense ? "space-y-3" : "space-y-3"}>
+                    <div>
+                      <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Score inputs</p>
+                      {scoreRows ? (
+                        <div className={dense ? "mt-3 space-y-2" : "mt-3 space-y-2"}>
+                          <SnapshotRow
+                            compact={dense}
+                            label="Analyst rating"
+                            value={scoreRows.analystLine}
+                            hint={scoreRows.analystPoints}
+                            valueClassName={analystRatingTone(stock.analystAvg)}
+                          />
+                          <SnapshotRow
+                            compact={dense}
+                            label="Potential Upside to target"
+                            value={scoreRows.upsideLine}
+                            hint={scoreRows.upsidePoints}
+                            valueClassName={valueTone(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget))}
+                          />
+                          <SnapshotRow compact={dense} label="Market cap" value={scoreRows.capLine} hint={scoreRows.capPoints} />
+                          <SnapshotRow compact={dense} label="PEG ratio" value={scoreRows.pegLine} hint={scoreRows.pegPoints} />
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </SectionCard>
+              </div>
 
               <SectionCard
                 compact={dense}
@@ -771,44 +811,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                 )}
               </SectionCard>
             </div>
-
-            <SectionCard
-              compact={dense}
-              title={
-                <span className="flex items-center justify-between gap-3">
-                  <span>Score</span>
-                  <span className={cn("tabular-nums", dense ? "text-sm" : "text-base", scoreTone(stock.score))}>
-                    {formatScoreDisplay(stock.score)}
-                  </span>
-                </span>
-              }
-            >
-              <div className={dense ? "space-y-3" : "space-y-3"}>
-                <div>
-                  <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Score inputs</p>
-                  {scoreRows ? (
-                    <div className={dense ? "mt-3 space-y-2" : "mt-3 space-y-2"}>
-                      <SnapshotRow
-                        compact={dense}
-                        label="Analyst rating"
-                        value={scoreRows.analystLine}
-                        hint={scoreRows.analystPoints}
-                        valueClassName={analystRatingTone(stock.analystAvg)}
-                      />
-                      <SnapshotRow
-                        compact={dense}
-                        label="Potential Upside to target"
-                        value={scoreRows.upsideLine}
-                        hint={scoreRows.upsidePoints}
-                        valueClassName={valueTone(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget))}
-                      />
-                      <SnapshotRow compact={dense} label="Market cap" value={scoreRows.capLine} hint={scoreRows.capPoints} />
-                      <SnapshotRow compact={dense} label="PEG ratio" value={scoreRows.pegLine} hint={scoreRows.pegPoints} />
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            </SectionCard>
 
             <SectionCard
               compact={dense}
