@@ -72,8 +72,8 @@ function actionableFilterClass(active: boolean) {
   const base =
     "rounded-full border px-2.5 py-1 text-[10px] font-semibold normal-case tracking-normal transition-colors";
   return active
-    ? `${base} border-emerald-500/35 bg-emerald-500/16 text-emerald-800 dark:border-emerald-400/35 dark:bg-emerald-400/16 dark:text-emerald-200`
-    : `${base} border-border/80 bg-background/70 text-subtle hover:border-emerald-500/25 hover:text-emerald-700 dark:border-white/[0.08] dark:bg-white/[0.04] dark:hover:text-emerald-200`;
+    ? `${base} border-[#c79400]/45 bg-[#f3c74a]/42 text-[#6b4b00] dark:border-[#f3c74a]/45 dark:bg-[#f3c74a]/24 dark:text-[#f6d97d]`
+    : `${base} border-[#d8b44a]/35 bg-[#f3c74a]/20 text-[#8a6500] hover:border-[#c79400]/35 hover:bg-[#f3c74a]/28 dark:border-[#f3c74a]/20 dark:bg-[#f3c74a]/14 dark:text-[#e7cb72] dark:hover:bg-[#f3c74a]/20`;
 }
 
 function PortfolioSummaryTiles({
