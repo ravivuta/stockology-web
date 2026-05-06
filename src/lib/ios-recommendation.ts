@@ -39,6 +39,7 @@ export type IosStockInput = {
   isShortlisted?: boolean;
   isInWatchlistSize?: boolean;
   suppressTradeActions?: boolean;
+  excludeFromShortlist?: boolean;
   enableRSIReversalGate?: boolean;
   rsiPeriod?: number;
   rsiOversoldThreshold?: number;
