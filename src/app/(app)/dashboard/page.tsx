@@ -588,8 +588,20 @@ function GainerLoserBars({
                 >
                   <span className="text-[9px] font-bold tabular-nums text-[color:var(--dashboard-chart-loss)]">{fmtShort(loss)}</span>
                   <div className="flex w-9 flex-col justify-end overflow-hidden rounded-md shadow-sm" style={{ height: barH }}>
-                    <div className="w-full bg-battleship/70 dark:bg-battleship/55" style={{ height: lossH }} />
-                    <div className="w-full bg-muted" style={{ height: curH }} />
+                    <div
+                      className="w-full transition-all duration-500"
+                      style={{
+                        height: lossH,
+                        backgroundColor: "color-mix(in srgb, var(--dashboard-chart-loss) 82%, var(--theme-surface-elevated))",
+                      }}
+                    />
+                    <div
+                      className="w-full"
+                      style={{
+                        height: curH,
+                        backgroundColor: "color-mix(in srgb, var(--dashboard-chart-holdings) 72%, var(--theme-surface-elevated))",
+                      }}
+                    />
                   </div>
                   <span className="text-[8px] font-medium tabular-nums text-subtle">{fmtShort(costBasis)}</span>
                   <span className="text-[8px] font-semibold text-foreground">{l.symbol}</span>
