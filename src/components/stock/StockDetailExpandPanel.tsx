@@ -289,6 +289,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const useAISentimentForRecommendations = usePortfolioStore((s) => s.useAISentimentForRecommendations);
   const useRSIGatingForRecommendations = usePortfolioStore((s) => s.useRSIGatingForRecommendations);
   const sellOnlyLongTermQualified = usePortfolioStore((s) => s.sellOnlyLongTermQualified);
+  const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
 
   const stock = useMemo(() => stocks.find((s) => s.symbol === symbol), [stocks, symbol]);
@@ -394,29 +395,71 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       closes,
     });
   }, [closes, rec, sellOnlyLongTermQualified, stock, useAISentimentForRecommendations, useRSIGatingForRecommendations]);
-  const recommendationStatusFactors = useMemo(() => {
+  const recommendationActionFactors = useMemo(
+    () =>
+      recommendationFactors.filter(
+        (factor) =>
+          factor.label !== "Shortlisted" &&
+          factor.label !== "User override: Excluded from Shortlist"
+      ),
+    [recommendationFactors]
+  );
+  const shortlistFactors = useMemo(() => {
     if (!stock) return [];
-    if (recommendationFactors.length > 0) return recommendationFactors;
 
-    const isShortlisted = stock.isShortlisted ?? (stock.quantity > 0 || stock.isETF === true);
-    const factors = [
+    if (stock.isETF === true && stock.quantity <= 0) {
+      return [
+        {
+          label: "ETF handling",
+          detail: "ETFs are always included for recommendations regardless of filters",
+          passes: true,
+        },
+      ];
+    }
+
+    const rows = [
       {
-        label: "Shortlisted",
-        detail: isShortlisted ? "Yes" : "Not in top watchlist",
-        passes: isShortlisted,
+        label: "Current holding",
+        detail: stock.quantity > 0 ? "Yes" : "No",
+        passes: stock.quantity > 0,
+      },
+      {
+        label: "Risk appetite filter",
+        detail: stock.isVisibleInRisk ? "Passes" : "Filtered",
+        passes: stock.isVisibleInRisk === true,
+      },
+      {
+        label: "Within top watchlist size",
+        detail: limitWatchlistSize ? (stock.isInWatchlistSize ? "Included" : "Beyond limit") : "Limit disabled",
+        passes: limitWatchlistSize ? stock.isInWatchlistSize === true : true,
       },
     ];
 
     if (stock.excludeFromShortlist === true) {
-      factors.push({
-        label: "User override: Excluded from Shortlist",
+      rows.push({
+        label: "User override: Excluded from shortlist",
         detail: "You excluded this stock — no recommendations generated",
         passes: false,
       });
     }
 
-    return factors;
-  }, [recommendationFactors, stock]);
+    return rows;
+  }, [limitWatchlistSize, stock]);
+  const shortlistReasons = useMemo(() => {
+    if (!stock || isShortlistedForPortfolio) return [];
+
+    const reasons: string[] = [];
+    if (stock.excludeFromShortlist === true) {
+      reasons.push("Excluded by your per-stock shortlist override.");
+    }
+    if (stock.isVisibleInRisk === false) {
+      reasons.push("Does not meet the current risk appetite criteria.");
+    }
+    if (limitWatchlistSize && stock.isInWatchlistSize === false) {
+      reasons.push("Ranked beyond the recommended watchlist size limit.");
+    }
+    return reasons;
+  }, [isShortlistedForPortfolio, limitWatchlistSize, stock]);
   const scoreRows = useMemo(() => (stock ? scoreBreakdownRows(stock) : null), [stock]);
   const dense = Boolean(embedded);
   const stockSymbol = stock?.symbol ?? null;
@@ -426,6 +469,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const suppressTradeActions = stock?.suppressTradeActions ?? false;
   const excludeFromShortlist = stock?.excludeFromShortlist ?? false;
   const canToggleShortlistExclusion = (stock?.quantity ?? 0) <= 0 || excludeFromShortlist;
+  const isShortlistedForPortfolio = stock?.isShortlisted ?? ((stock?.quantity ?? 0) > 0 || stock?.isETF === true);
 
   useEffect(() => {
     if (!stockSymbol || stockIsEtf) {
@@ -1052,25 +1096,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                       </span>
                     </label>
                   ) : null}
-                  {canToggleShortlistExclusion ? (
-                    <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-background/50 px-3 py-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
-                      <input
-                        type="checkbox"
-                        checked={excludeFromShortlist}
-                        onChange={(e) => handleExcludeFromShortlistChange(e.target.checked)}
-                        className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
-                        aria-label="Exclude from shortlist"
-                      />
-                      <span>
-                        <span className={cn("block font-medium text-foreground", dense ? "text-[11px]" : "text-xs")}>
-                          Exclude from shortlist
-                        </span>
-                        <span className="mt-0.5 block text-[11px] text-subtle">
-                          Remove this stock from shortlisting and recommendations.
-                        </span>
-                      </span>
-                    </label>
-                  ) : null}
                 </div>
                 {rec ? (
                   <>
@@ -1083,17 +1108,56 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                       : "No recommendation yet — refresh quotes from Portfolio or Dashboard."}
                   </p>
                 )}
-                <div className={cn("border-t border-border/60 dark:border-white/[0.06]", dense ? "pt-3" : "pt-3")}>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Factors considered</p>
+                {recommendationActionFactors.length > 0 ? (
+                  <div className={cn("border-t border-border/60 dark:border-white/[0.06]", dense ? "pt-3" : "pt-3")}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Factors considered</p>
+                      </div>
+                      <span className={cn("font-medium text-subtle", dense ? "text-[10px]" : "text-xs")}>
+                        {recommendationActionFactors.filter((factor) => factor.passes).length}/{recommendationActionFactors.length} passed
+                      </span>
                     </div>
-                    <span className={cn("font-medium text-subtle", dense ? "text-[10px]" : "text-xs")}>
-                      {recommendationStatusFactors.filter((factor) => factor.passes).length}/{recommendationStatusFactors.length} passed
-                    </span>
+                    <div className={cn(dense ? "mt-3 space-y-1.5" : "mt-3 space-y-1.5")}>
+                      {recommendationActionFactors.map((factor) => (
+                        <FactorFlagRow
+                          key={`${factor.label}-${factor.detail}`}
+                          compact={dense}
+                          label={factor.label}
+                          detail={factor.detail}
+                          passes={factor.passes}
+                        />
+                      ))}
+                    </div>
                   </div>
+                ) : null}
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              compact={dense}
+              title={
+                <span className="flex items-center justify-between gap-3">
+                  <span>Shortlisted</span>
+                  <span
+                    className={cn(
+                      "inline-flex rounded-lg border px-2.5 py-1 font-semibold tracking-tight",
+                      isShortlistedForPortfolio
+                        ? "border-emerald-500/30 bg-emerald-500/14 text-emerald-700 dark:text-emerald-300"
+                        : "border-red-500/30 bg-red-500/14 text-red-700 dark:text-red-200",
+                      dense ? "text-[10px]" : "text-xs"
+                    )}
+                  >
+                    {isShortlistedForPortfolio ? "YES" : "NO"}
+                  </span>
+                </span>
+              }
+            >
+              <div className={dense ? "space-y-3" : "space-y-3"}>
+                <div>
+                  <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Status reasons</p>
                   <div className={cn(dense ? "mt-3 space-y-1.5" : "mt-3 space-y-1.5")}>
-                    {recommendationStatusFactors.map((factor) => (
+                    {shortlistFactors.map((factor) => (
                       <FactorFlagRow
                         key={`${factor.label}-${factor.detail}`}
                         compact={dense}
@@ -1104,6 +1168,34 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                     ))}
                   </div>
                 </div>
+                {shortlistReasons.length > 0 ? (
+                  <div className="rounded-xl border border-border/70 bg-background/45 px-3 py-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                    {shortlistReasons.map((reason) => (
+                      <p key={reason} className={cn("text-subtle", dense ? "text-[11px]" : "text-xs")}>
+                        {reason}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+                {canToggleShortlistExclusion ? (
+                  <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-background/50 px-3 py-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                    <input
+                      type="checkbox"
+                      checked={excludeFromShortlist}
+                      onChange={(e) => handleExcludeFromShortlistChange(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
+                      aria-label="Exclude from shortlist"
+                    />
+                    <span>
+                      <span className={cn("block font-medium text-foreground", dense ? "text-[11px]" : "text-xs")}>
+                        Exclude from shortlist
+                      </span>
+                      <span className="mt-0.5 block text-[11px] text-subtle">
+                        Remove this stock from shortlisting and recommendations.
+                      </span>
+                    </span>
+                  </label>
+                ) : null}
               </div>
             </SectionCard>
           </div>
