@@ -12,7 +12,7 @@ import { fetchHistoricalPricePoints } from "@/lib/supabase-stock-history";
 import { usePortfolioStore } from "@/store/portfolioStore";
 
 const INITIAL_REFRESH_DELAY_MS = 800;
-const AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+const AUTO_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
 const FOCUS_REFRESH_MIN_STALE_MS = 3 * 60 * 1000;
 const SNAPSHOT_MUTATION_GUARD_MS = 2 * 60 * 1000;
 const AUTO_OPTIMIZE_COOLDOWN_MS = 30 * 60 * 1000;

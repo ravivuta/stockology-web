@@ -192,7 +192,7 @@ export function DashboardReturnComparison() {
     if (typeof window !== "undefined") {
       intervalId = window.setInterval(() => {
         void run();
-      }, 5 * 60 * 1000);
+      }, 60 * 60 * 1000);
     }
 
     return () => {
