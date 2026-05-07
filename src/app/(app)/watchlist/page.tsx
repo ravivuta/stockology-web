@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { ArrowRight, LineChart, Sparkles } from "lucide-react";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
-import { runRefreshPipeline } from "@/lib/refresh";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
 import { formatCurrency, formatDecimal, formatPercent } from "@/lib/numberFormat";
+import { recommendationActionDisplay } from "@/lib/recommendation";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
 import { SymbolTradeCombobox } from "@/components/portfolio/SymbolTradeCombobox";
 import { StockDetailModal } from "@/components/stock/StockDetailModal";
@@ -25,6 +26,15 @@ const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
   score: "desc",
   signal: "asc",
 };
+
+function recBadgeClass(action: string): string {
+  const u = action.toUpperCase();
+  if (u === "SELL")
+    return "bg-error/15 text-error dark:bg-error/25 dark:text-[color-mix(in_srgb,var(--palette-alice)_88%,white)]";
+  if (u === "REDUCE") return "bg-amber-500/15 text-amber-800 dark:bg-amber-400/20 dark:text-amber-200";
+  if (u.startsWith("WAIT")) return "bg-muted/80 text-subtle dark:bg-white/[0.08]";
+  return "bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary";
+}
 
 function scoreTextClass(score: number | null | undefined): string {
   if (score == null || !Number.isFinite(score)) return "text-subtle";
@@ -76,7 +86,6 @@ export default function WatchlistPage() {
   const addStock = usePortfolioStore((s) => s.addStock);
   const [query, setQuery] = useState("");
   const [newSymbol, setNewSymbol] = useState("");
-  const [refreshing, setRefreshing] = useState(false);
   const [showShortlisted, setShowShortlisted] = useState(false);
   const [showActionable, setShowActionable] = useState(false);
   const [sort, setSort] = useState<SortKey>("symbol");
@@ -164,16 +173,6 @@ export default function WatchlistPage() {
   const hasActiveFilters = showShortlisted || showActionable || query.trim().length > 0;
   const watchlistCountText = hasActiveFilters ? `Showing ${rows.length} of ${totalTrackedCount}` : `Total: ${totalTrackedCount}`;
 
-  async function refresh() {
-    if (stocks.length === 0) return;
-    setRefreshing(true);
-    try {
-      await runRefreshPipeline(stocks.map((s) => s.symbol), { includeSnapshot: true });
-    } finally {
-      setRefreshing(false);
-    }
-  }
-
   function addWatchlistSymbol() {
     const sym = newSymbol.trim().toUpperCase().replace(/[^A-Z0-9.-]/g, "");
     if (!sym) return;
@@ -184,26 +183,74 @@ export default function WatchlistPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap justify-end gap-2">
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <button
-            type="button"
-            disabled={refreshing || stocks.length === 0}
-            onClick={refresh}
-            className={appCtaButton("ui-hover-spotlight px-4 py-2 text-sm disabled:opacity-50")}
-          >
-            {refreshing ? "Refreshing…" : "Refresh quotes"}
-          </button>
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_auto] lg:items-start">
+        <Link
+          href="/simulation#watchlist-simulation"
+          className="group relative overflow-hidden rounded-[1.35rem] border border-primary/20 bg-[linear-gradient(135deg,rgba(182,153,62,0.16),rgba(255,255,255,0.88)_42%,rgba(244,211,94,0.16))] p-4 shadow-sm transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md dark:border-primary/25 dark:bg-[linear-gradient(135deg,rgba(182,153,62,0.22),rgba(18,24,38,0.95)_40%,rgba(244,211,94,0.12))]"
+        >
+          <div
+            className="pointer-events-none absolute inset-y-0 right-0 w-[42%] opacity-80"
+            aria-hidden
+            style={{
+              background:
+                "radial-gradient(circle at 35% 40%, color-mix(in srgb, var(--theme-primary) 30%, transparent), transparent 52%), radial-gradient(circle at 70% 70%, color-mix(in srgb, #f3c74a 22%, transparent), transparent 58%)",
+            }}
+          />
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary dark:border-primary/25 dark:bg-primary/14">
+                <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                Simulation
+              </div>
+              <div className="mt-3">
+                <p className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">Simulate (App Strategy)</p>
+                <p className="mt-1 max-w-xl text-sm leading-relaxed text-subtle">
+                  Run the watchlist through the same app strategy logic and inspect which names the shortlist would favor.
+                </p>
+              </div>
+              <div className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                Open simulator
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
+              </div>
+            </div>
+            <div className="relative flex h-28 w-full max-w-[16rem] items-end justify-between overflow-hidden rounded-2xl border border-border/70 bg-background/70 px-3 py-3 shadow-inner dark:border-white/[0.08] dark:bg-white/[0.04] sm:h-32 sm:w-[15rem]">
+              <div className="absolute inset-x-3 bottom-3 top-3">
+                <div className="absolute inset-0 rounded-xl bg-[linear-gradient(180deg,transparent,rgba(243,199,74,0.08))]" />
+                <div className="absolute inset-x-0 bottom-3 border-t border-dashed border-primary/20" />
+              </div>
+              <div className="relative flex w-full items-end justify-between gap-2">
+                {[
+                  "h-[32%]",
+                  "h-[46%]",
+                  "h-[38%]",
+                  "h-[62%]",
+                  "h-[78%]",
+                ].map((height, index) => (
+                  <div
+                    key={index}
+                    className={`flex-1 rounded-t-full bg-[linear-gradient(180deg,rgba(243,199,74,0.92),rgba(183,150,63,0.42))] ${height}`}
+                  />
+                ))}
+              </div>
+              <div className="absolute left-3 right-3 top-3 flex items-center justify-between">
+                <div className="rounded-full border border-primary/20 bg-background/85 p-2 text-primary shadow-sm dark:bg-slate-950/75">
+                  <LineChart className="h-4 w-4" aria-hidden />
+                </div>
+                <div className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
+                  App
+                </div>
+              </div>
+            </div>
+          </div>
+        </Link>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
           <Link
-            href="/simulation#watchlist-simulation"
-            className={appCtaButton("ui-hover-spotlight px-4 py-2 text-sm")}
+            href="/csv-help"
+            className="ui-hover-text text-sm text-primary underline-offset-2 hover:underline lg:order-2"
           >
-            Simulate watchlist
-          </Link>
-          <CsvImportExportBar exportFilename="stocks-pm-watchlist.csv" importMode="watchlist" />
-          <Link href="/csv-help" className="ui-hover-text text-sm text-primary underline-offset-2 hover:underline">
             CSV help
           </Link>
+          <CsvImportExportBar exportFilename="stocks-pm-watchlist.csv" importMode="watchlist" />
         </div>
       </div>
 
@@ -380,9 +427,16 @@ export default function WatchlistPage() {
                       <span className="block truncate">{s.score != null ? formatDecimal(s.score) : "—"}</span>
                     </td>
                     <td className="min-w-0 px-2 py-3 text-center text-xs text-subtle sm:px-3">
-                      <span className="block truncate" title={s.recommendation?.action ?? undefined}>
-                        {s.recommendation?.action ?? "—"}
-                      </span>
+                      {s.recommendation ? (
+                        <span
+                          className={`inline-flex max-w-full items-center justify-center truncate rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${recBadgeClass(s.recommendation.action)}`}
+                          title={s.recommendation.comments || s.recommendation.action}
+                        >
+                          {recommendationActionDisplay(s.recommendation.action)}
+                        </span>
+                      ) : (
+                        <span className="block truncate">—</span>
+                      )}
                     </td>
                     <td className="px-2 py-3 text-center sm:px-3">
                       <button

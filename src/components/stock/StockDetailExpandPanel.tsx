@@ -216,7 +216,7 @@ function SectionCard({
   return (
     <section
       className={cn(
-        "border border-border/80 bg-elevated shadow-sm dark:border-white/[0.08]",
+        "border border-border/80 bg-background/70 shadow-sm backdrop-blur-[1px] dark:border-white/[0.08] dark:bg-white/[0.04]",
         compact ? "rounded-xl p-3" : "rounded-[1.15rem] p-3"
       )}
     >
@@ -795,7 +795,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               </div>
             </div>
           </div>
-          <div className="rounded-xl border border-border/70 bg-background/40 p-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
+          <div className="rounded-xl border border-border/70 bg-background/72 p-2 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.04]">
               <div className="mb-1 flex items-center justify-between gap-3">
                 <div>
                   <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>Price chart</p>

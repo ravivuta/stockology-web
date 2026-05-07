@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Check, Pencil, X } from "lucide-react";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
-import { runRefreshPipeline } from "@/lib/refresh";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
 import { PortfolioAllocationChart } from "@/components/portfolio/PortfolioAllocationChart";
@@ -220,7 +219,6 @@ export default function PortfolioPage() {
   const [newAverageCost, setNewAverageCost] = useState("");
   const [cashInput, setCashInput] = useState(String(cash));
   const [isCashEditing, setIsCashEditing] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
 
@@ -317,16 +315,6 @@ export default function PortfolioPage() {
     return { assetsValue: assets, holdingsCostBasis, totalGainLoss, totalGainLossPct, netWorth: net, portfolioTodayChange };
   }, [stocks, cash]);
 
-  async function refresh() {
-    if (stocks.length === 0) return;
-    setRefreshing(true);
-    try {
-      await runRefreshPipeline(stocks.map((s) => s.symbol), { includeSnapshot: true });
-    } finally {
-      setRefreshing(false);
-    }
-  }
-
   function saveCash() {
     const n = parseFloat(cashInput.replace(/,/g, "")) || 0;
     setCash(n);
@@ -381,14 +369,6 @@ export default function PortfolioPage() {
     <div className="space-y-8">
       <div className="flex flex-wrap justify-end gap-2">
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={refreshing || stocks.length === 0}
-            onClick={refresh}
-            className={appCtaButton("ui-hover-spotlight px-4 py-2 text-sm disabled:opacity-50")}
-          >
-            {refreshing ? "Refreshing…" : "Refresh"}
-          </button>
           <CsvImportExportBar exportFilename="stocks-pm-portfolio.csv" compact importMode="portfolio" />
           <Link href="/csv-help" className="ui-hover-pop rounded-lg border border-primary/30 px-3 py-2 text-sm text-foreground dark:border-primary/25">
             CSV help

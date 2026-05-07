@@ -1,11 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, Loader2, Newspaper, RefreshCw, Search, Sparkles } from "lucide-react";
+import { ArrowUpRight, Loader2, Newspaper, Search, Sparkles } from "lucide-react";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
-import { runRefreshPipeline } from "@/lib/refresh";
-import { APP_CTA_FILL, appCtaButton } from "@/lib/appCtaClasses";
+import { APP_CTA_FILL } from "@/lib/appCtaClasses";
 import { cn } from "@/lib/utils";
 import {
   fetchNewsFeedFromSupabase,
@@ -110,8 +109,7 @@ export default function NewsPage() {
   const [feedFilter, setFeedFilter] = useState<FeedFilter>("all");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [spyHistoryRefreshKey, setSpyHistoryRefreshKey] = useState(0);
+  const spyHistoryRefreshKey = 0;
   const { points: spyPoints, loading: spyLoading, error: spyError } = useSupabaseStockHistory("SPY", 2000, spyHistoryRefreshKey);
   const load = useCallback(async () => {
     if (!hasSupabaseConfig()) {
@@ -156,22 +154,7 @@ export default function NewsPage() {
 
   const latestSpyPoint = useMemo(() => spyPoints?.[spyPoints.length - 1] ?? null, [spyPoints]);
 
-  async function onRefresh() {
-    if (!hasSupabaseConfig()) return;
-    setRefreshing(true);
-    try {
-      const syms = [...new Set([...stocks.map((s) => s.symbol), "SPY"].filter(Boolean))];
-      if (syms.length > 0) {
-        await runRefreshPipeline(syms, { includeSnapshot: true });
-      }
-      await load();
-      setSpyHistoryRefreshKey((value) => value + 1);
-    } finally {
-      setRefreshing(false);
-    }
-  }
-
-  const showEmpty = !loading && !refreshing && filtered.length === 0;
+  const showEmpty = !loading && filtered.length === 0;
   const noConfig = !hasSupabaseConfig();
 
   const filterTabs: { id: FeedFilter; label: string; count: number }[] = [
@@ -194,21 +177,6 @@ export default function NewsPage() {
             </div>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => void onRefresh()}
-          disabled={refreshing || noConfig}
-          className={appCtaButton(
-            "ui-hover-spotlight shrink-0 gap-2 px-5 py-3 text-sm shadow-sm disabled:opacity-50"
-          )}
-        >
-          {refreshing ? (
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          ) : (
-            <RefreshCw className="h-4 w-4" aria-hidden />
-          )}
-          Refresh feed
-        </button>
       </div>
 
       {!noConfig && (
@@ -275,27 +243,12 @@ export default function NewsPage() {
             </div>
           )}
 
-          {refreshing && !loading && (
-            <p className="mb-4 flex items-center gap-2 text-sm text-subtle">
-              <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden />
-              Refreshing…
-            </p>
-          )}
-
           {showEmpty && !noConfig && (
             <div className="rounded-2xl border border-border/80 bg-gradient-to-b from-elevated to-muted/10 px-6 py-16 text-center dark:border-white/[0.08]">
               <p className="text-lg font-semibold text-foreground">No articles match</p>
               <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-subtle">
                 Try another filter or search. New stories appear after sentiment runs for your symbols, plus macro picks when available.
               </p>
-              <button
-                type="button"
-                onClick={() => void onRefresh()}
-                disabled={refreshing}
-                className={appCtaButton("mt-8 px-5 py-2.5 text-sm disabled:opacity-50")}
-              >
-                Refresh feed
-              </button>
             </div>
           )}
 

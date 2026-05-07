@@ -3,7 +3,7 @@
 import { routeBusy, Sk } from "@/components/route-loading/page-skeletons/_common";
 
 /**
- * Mirrors `app/(app)/news/page.tsx`: bordered header with icon + title + Refresh,
+ * Mirrors `app/(app)/news/page.tsx`: bordered header with icon + title,
  * xl 12-column grid (main article grid sm:2, sticky aside with View tabs, Search, Symbol detail).
  */
 export function NewsPageSkeleton() {
@@ -21,7 +21,6 @@ export function NewsPageSkeleton() {
           <Sk className="mt-4 hidden h-3 w-full max-w-2xl rounded-md sm:block" />
           <Sk className="mt-2 hidden h-3 w-full max-w-xl rounded-md sm:block" />
         </div>
-        <Sk className="h-12 w-44 shrink-0 rounded-full" />
       </div>
 
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-12 xl:gap-10">

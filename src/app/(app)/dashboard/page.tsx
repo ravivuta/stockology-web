@@ -3,11 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Loader2, TrendingDown, TrendingUp } from "lucide-react";
+import { TrendingDown, TrendingUp } from "lucide-react";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
-import { runRefreshPipeline } from "@/lib/refresh";
-import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import { PortfolioDonut } from "@/components/dashboard/PortfolioDonut";
 import { StockDetailExpandPanel } from "@/components/stock/StockDetailExpandPanel";
 import { RecommendedActionsWidget } from "@/components/dashboard/RecommendedActionsWidget";
@@ -34,13 +32,9 @@ export default function DashboardPage() {
   const reduceMotion = useReducedMotion();
   const stocks = usePortfolioStore((s) => s.stocks);
   const cash = usePortfolioStore((s) => s.cashBalance);
-  const recalc = usePortfolioStore((s) => s.recalcMetrics);
   const [bars, setBars] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [dashStockDetail, setDashStockDetail] = useState<string | null>(null);
   const [cloudHistory, setCloudHistory] = useState<NetWorthPoint[] | null>(null);
-
-  const debouncedRecalc = useDebouncedCallback(() => recalc(), 300);
 
   const held = useMemo(() => stocks.filter((s) => s.quantity > 0), [stocks]);
   const holdingsValue = useMemo(() => held.reduce((a, s) => a + s.quantity * (s.lastPrice ?? 0), 0), [held]);
@@ -135,18 +129,8 @@ export default function DashboardPage() {
     };
   }, []);
 
-  async function manualRefresh() {
-    setRefreshing(true);
-    try {
-      await runRefreshPipeline(stocks.map((s) => s.symbol), { includeSnapshot: true });
-      debouncedRecalc();
-    } finally {
-      setRefreshing(false);
-    }
-  }
-
   return (
-    <div className={`space-y-5 ${refreshing ? "dashboard-refresh-pulse" : ""}`}>
+    <div className="space-y-5">
       <motion.div
         className="flex flex-wrap items-center justify-between gap-3"
         initial={reduceMotion ? false : { opacity: 0, y: 8 }}
@@ -170,17 +154,6 @@ export default function DashboardPage() {
               </span>
             </Link>
           )}
-          <button
-            type="button"
-            disabled={refreshing}
-            onClick={manualRefresh}
-            className={appCtaButton(
-              "ui-hover-spotlight min-w-[9.5rem] gap-2 px-4 py-2 text-sm shadow-sm disabled:opacity-55"
-            )}
-          >
-            {refreshing ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden /> : null}
-            <span>{refreshing ? "Refreshing…" : "Refresh data"}</span>
-          </button>
           <Link
             href="/settings"
             className="ui-hover-pop rounded-lg border border-border bg-elevated/95 px-3 py-2 text-sm font-medium text-foreground shadow-sm backdrop-blur-sm dark:border-border dark:bg-white/5"
