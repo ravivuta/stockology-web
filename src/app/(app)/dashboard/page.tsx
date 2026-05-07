@@ -78,16 +78,14 @@ export default function DashboardPage() {
     () =>
       [...held]
         .filter((s) => s.lastPrice && s.lastPrice > s.averageCost)
-        .sort((a, b) => (b.lastPrice! - b.averageCost) * b.quantity - (a.lastPrice! - a.averageCost) * a.quantity)
-        .slice(0, 8),
+        .sort((a, b) => (b.lastPrice! - b.averageCost) * b.quantity - (a.lastPrice! - a.averageCost) * a.quantity),
     [held]
   );
   const losers = useMemo(
     () =>
       [...held]
         .filter((s) => s.lastPrice && s.lastPrice < s.averageCost)
-        .sort((a, b) => (a.lastPrice! - a.averageCost) * a.quantity - (b.lastPrice! - b.averageCost) * b.quantity)
-        .slice(0, 8),
+        .sort((a, b) => (a.lastPrice! - a.averageCost) * a.quantity - (b.lastPrice! - b.averageCost) * b.quantity),
     [held]
   );
 
