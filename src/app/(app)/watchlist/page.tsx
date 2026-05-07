@@ -217,43 +217,38 @@ export default function WatchlistPage() {
                 />
                 <span className="relative text-primary/90 drop-shadow-[0_4px_12px_rgba(182,153,62,0.24)]" aria-hidden>
                   <svg viewBox="0 0 176 44" className="h-11 w-44" fill="none">
-                    <rect x="15" y="22" width="8" height="8" rx="2.5" fill="currentColor" fillOpacity="0.75" />
-                    <rect x="27" y="17" width="8" height="13" rx="2.5" fill="currentColor" fillOpacity="0.8" />
-                    <rect x="39" y="12" width="8" height="18" rx="2.5" fill="currentColor" />
+                    <rect x="12" y="22" width="7" height="8" rx="2.5" fill="currentColor" fillOpacity="0.72" />
+                    <rect x="22" y="17" width="7" height="13" rx="2.5" fill="currentColor" fillOpacity="0.84" />
+                    <rect x="32" y="12" width="7" height="18" rx="2.5" fill="currentColor" />
                     <path
-                      d="M24 13.5H55.5"
+                      d="M20 13.5H47"
                       stroke="currentColor"
                       strokeOpacity="0.22"
                       strokeWidth="1.4"
                       strokeLinecap="round"
                     />
                     <path
-                      d="M59 27C70 20 80 18 90 18C102 18 113 22 124 14"
+                      d="M50 27C58 21 67 18.5 75 18.5C83.5 18.5 90.5 20.5 97 15"
                       stroke="currentColor"
-                      strokeWidth="2.6"
+                      strokeWidth="2.3"
                       strokeLinecap="round"
                     />
-                    <circle cx="59" cy="27" r="2.2" fill="currentColor" />
-                    <circle cx="90" cy="18" r="2.2" fill="currentColor" />
-                    <circle cx="124" cy="14" r="2.2" fill="currentColor" />
+                    <circle cx="50" cy="27" r="2" fill="currentColor" />
+                    <circle cx="75" cy="18.5" r="2" fill="currentColor" />
+                    <circle cx="97" cy="15" r="2" fill="currentColor" />
                     <path
-                      d="M66 12.5L73.5 19.8L84.5 9.8"
+                      d="M56 13L62.5 19.2L71.5 10.5"
                       stroke="currentColor"
-                      strokeWidth="2.4"
+                      strokeWidth="2.1"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
-                    <circle cx="143" cy="22" r="11" stroke="currentColor" strokeOpacity="0.2" strokeWidth="1.6" />
+                    <text x="106" y="18" fill="currentColor" fontSize="8.2" fontWeight="700" letterSpacing="1.1">SIMULATE</text>
+                    <text x="106" y="29" fill="currentColor" fillOpacity="0.9" fontSize="6.2" fontWeight="600" letterSpacing="0.9">APP STRATEGY</text>
+                    <circle cx="156" cy="22" r="9.5" stroke="currentColor" strokeOpacity="0.2" strokeWidth="1.6" />
                     <path
-                      d="M139 15.8L149 22L139 28.2V15.8Z"
+                      d="M152.5 16.8L161 22L152.5 27.2V16.8Z"
                       fill="currentColor"
-                    />
-                    <path
-                      d="M103 31H126"
-                      stroke="currentColor"
-                      strokeOpacity="0.18"
-                      strokeWidth="1.4"
-                      strokeLinecap="round"
                     />
                   </svg>
                 </span>
