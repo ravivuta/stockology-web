@@ -23,6 +23,7 @@ import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-clien
 import { isPaidSubscriptionTier } from "@/lib/subscription-state";
 import { APP_MANAGED_TRIAL_LABEL } from "@/lib/trial-config";
 import { cn } from "@/lib/utils";
+import { withAppBasePath } from "@/lib/base-path";
 
 const SECTIONS = [
   { id: "appearance", label: "Appearance", icon: Palette },
@@ -137,7 +138,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (billingState === "success" && !loading && !allowed) {
-      router.replace("/billing/refresh?next=/dashboard");
+      router.replace(withAppBasePath("/billing/refresh?next=/dashboard"));
     }
   }, [allowed, billingState, loading, router]);
 
@@ -389,7 +390,7 @@ export default function SettingsPage() {
                   <div className="flex flex-wrap gap-2 pt-1">
                     {!hasPaidPlan && !hasBillingExempt ? (
                       <Link
-                        href="/billing/start?next=/settings"
+                        href={withAppBasePath("/billing/start?next=/settings")}
                         className={appCtaButton("ui-hover-spotlight px-3 py-2 text-sm")}
                       >
                         Subscribe now
@@ -397,7 +398,7 @@ export default function SettingsPage() {
                     ) : null}
                     {hasPaidPlan && !hasBillingExempt ? (
                       <Link
-                        href="/billing/refresh?next=/settings"
+                        href={withAppBasePath("/billing/refresh?next=/settings")}
                         className="ui-hover-pop rounded-lg border border-border px-3 py-2 text-sm text-foreground"
                       >
                         Refresh billing status
@@ -405,7 +406,7 @@ export default function SettingsPage() {
                     ) : null}
                     {hasPaidPlan && !hasBillingExempt ? (
                       <Link
-                        href="/billing/portal"
+                        href={withAppBasePath("/billing/portal")}
                         className="ui-hover-pop rounded-lg border border-border px-3 py-2 text-sm text-foreground"
                       >
                         Manage billing

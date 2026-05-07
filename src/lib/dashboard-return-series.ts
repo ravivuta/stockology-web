@@ -64,6 +64,7 @@ export function adjustNetWorthPointsForExternalCashFlows(
 }
 
 export type ComparisonBaseRow = { dateMs: number; portfolioValue: number; spyClose: number };
+export type SpyLiveQuote = { lastPrice: number };
 
 export function mergePortfolioWithSpy(
   portfolioPoints: NetWorthPoint[],
@@ -130,6 +131,40 @@ export function mergePortfolioWithSpyDaily(
   }
 
   return out;
+}
+
+export function appendOrReplaceLiveSpyComparisonRow(
+  rows: ComparisonBaseRow[],
+  portfolioPoints: NetWorthPoint[],
+  spyLiveQuote: SpyLiveQuote | null,
+  nowMs = Date.now()
+): ComparisonBaseRow[] {
+  if (rows.length === 0 || portfolioPoints.length === 0 || !spyLiveQuote) return rows;
+  if (!Number.isFinite(spyLiveQuote.lastPrice) || spyLiveQuote.lastPrice <= 0) return rows;
+
+  const livePortfolioPoint = [...portfolioPoints].sort((a, b) => a.t - b.t).at(-1);
+  if (!livePortfolioPoint || !Number.isFinite(livePortfolioPoint.value) || livePortfolioPoint.value <= 0) return rows;
+
+  const todayYmd = etYmdFromMs(nowMs);
+  if (etYmdFromMs(livePortfolioPoint.t) !== todayYmd) return rows;
+
+  const next = [...rows];
+  const liveRow: ComparisonBaseRow = {
+    dateMs: nowMs,
+    portfolioValue: livePortfolioPoint.value,
+    spyClose: spyLiveQuote.lastPrice,
+  };
+
+  const lastRow = next.at(-1);
+  if (!lastRow) return [liveRow];
+
+  if (etYmdFromMs(lastRow.dateMs) === todayYmd) {
+    next[next.length - 1] = liveRow;
+  } else {
+    next.push(liveRow);
+  }
+
+  return next;
 }
 
 export type ComparisonChartRow = {

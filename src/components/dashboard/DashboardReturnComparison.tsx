@@ -8,6 +8,7 @@ import { usePortfolioStore } from "@/store/portfolioStore";
 import { useDashboardChartTheme } from "@/hooks/useDashboardChartTheme";
 import { hasSupabaseConfig, createClient } from "@/lib/supabase/client";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
+import { fetchTickerHydrationFromTables } from "@/lib/ticker-direct-hydration";
 import {
   computeLivePortfolioTotal,
   fetchCloudNetWorthHistory,
@@ -27,12 +28,15 @@ import { formatCompactCurrency, formatCurrency, formatPercent } from "@/lib/numb
 import { cn } from "@/lib/utils";
 import {
   adjustNetWorthPointsForExternalCashFlows,
+  appendOrReplaceLiveSpyComparisonRow,
   mergePortfolioWithSpyDaily,
   toCumulativePercentRows,
   type ComparisonChartRow,
   type ExternalCashFlowPoint,
+  type SpyLiveQuote,
   type SpyDaily,
 } from "@/lib/dashboard-return-series";
+import { isUsMarketExtendedHoursOpen } from "@/lib/market-hours";
 import { fetchHistoricalPricePoints } from "@/lib/supabase-stock-history";
 
 const PALETTE = {
@@ -77,6 +81,7 @@ export function DashboardReturnComparison() {
   const [cloudPts, setCloudPts] = useState<NetWorthPoint[] | null>(null);
   const [externalCashFlows, setExternalCashFlows] = useState<ExternalCashFlowPoint[] | null>(null);
   const [spySeries, setSpySeries] = useState<SpyDaily[] | null>(null);
+  const [spyLiveQuote, setSpyLiveQuote] = useState<SpyLiveQuote | null>(null);
 
   const liveTotal = useMemo(() => computeLivePortfolioTotal(stocks, cash), [stocks, cash]);
 
@@ -162,6 +167,40 @@ export function DashboardReturnComparison() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    let intervalId: number | null = null;
+    setSpyLiveQuote(null);
+
+    async function run() {
+      if (!hasSupabaseConfig()) {
+        if (!cancelled) setSpyLiveQuote(null);
+        return;
+      }
+      try {
+        const supabase = createClient();
+        const { prices } = await fetchTickerHydrationFromTables(supabase, ["SPY"]);
+        if (cancelled) return;
+        const lastPrice = Number(prices.SPY?.last_price);
+        setSpyLiveQuote(Number.isFinite(lastPrice) && lastPrice > 0 ? { lastPrice } : null);
+      } catch {
+        if (!cancelled) setSpyLiveQuote(null);
+      }
+    }
+
+    void run();
+    if (typeof window !== "undefined") {
+      intervalId = window.setInterval(() => {
+        void run();
+      }, 5 * 60 * 1000);
+    }
+
+    return () => {
+      cancelled = true;
+      if (intervalId != null) window.clearInterval(intervalId);
+    };
+  }, []);
+
   const meta = useMemo(() => {
     if (cloudPts === null) return null;
     return finalizeNetWorthSeries(cloudPts, tradeJournal, liveTotal);
@@ -187,10 +226,16 @@ export function DashboardReturnComparison() {
       const tMin = pts[0].t;
       const tMax = pts[pts.length - 1].t;
       let narrowed = mergePortfolioWithSpyDaily(flowAdjustedPortfolioPts, spySeries!, tMin, tMax);
+      if (isUsMarketExtendedHoursOpen()) {
+        narrowed = appendOrReplaceLiveSpyComparisonRow(narrowed, pts, spyLiveQuote);
+      }
       let extraFb = false;
       if (narrowed.length === 0 && flowAdjustedPortfolioPts.length > 0) {
         const fp = flowAdjustedPortfolioPts;
         narrowed = mergePortfolioWithSpyDaily(flowAdjustedPortfolioPts, spySeries!, fp[0].t, fp[fp.length - 1].t);
+        if (isUsMarketExtendedHoursOpen()) {
+          narrowed = appendOrReplaceLiveSpyComparisonRow(narrowed, fp, spyLiveQuote);
+        }
         extraFb = true;
       }
       return {
@@ -208,7 +253,7 @@ export function DashboardReturnComparison() {
       usedFullHistoryFallback: fb,
       spyAligned: false,
     };
-  }, [flowAdjustedPortfolioPts, spySeries, range, spyLoadedOk]);
+  }, [flowAdjustedPortfolioPts, spySeries, range, spyLoadedOk, spyLiveQuote]);
 
   const valueModeData = useMemo(() => {
     const ptT = fullPortfolioPts.map((p) => ({ ...p, t: p.t }));

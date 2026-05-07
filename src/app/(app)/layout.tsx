@@ -5,6 +5,7 @@ import { PortfolioCloudBridge } from "@/components/PortfolioCloudBridge";
 import { snapshotIndicatesExistingAccount } from "@/lib/cloud-portfolio";
 import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
 import { getSubscriptionRowForUser } from "@/lib/subscription-admin";
+import { ensureUserHasWebTrial } from "@/lib/billing";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   let user = null;
@@ -19,6 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!user) redirect("/login");
 
   const dataUserId = await syncStocksPmAuthUser(supabase, user.id);
+  await ensureUserHasWebTrial(dataUserId);
 
   const [subRow, snapRes] = await Promise.all([
     getSubscriptionRowForUser(dataUserId),
