@@ -183,70 +183,66 @@ export default function WatchlistPage() {
 
   return (
     <div className="space-y-6">
-      <div className="grid items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
-        <div className="flex justify-center sm:justify-start">
-          <CsvImportExportBar exportFilename="stocks-pm-watchlist.csv" importMode="watchlist" />
-        </div>
-        <div className="flex justify-center">
-          <Link
-            href="/simulation#watchlist-simulation"
-            aria-label="Simulate (App Strategy)"
-            title="Simulate (App Strategy)"
-            className="group flex flex-col items-center gap-1"
-          >
-            <span className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-primary/20 bg-[linear-gradient(135deg,rgba(182,153,62,0.18),rgba(255,255,255,0.94)_44%,rgba(244,211,94,0.18))] shadow-sm transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md dark:border-primary/25 dark:bg-[linear-gradient(135deg,rgba(182,153,62,0.24),rgba(18,24,38,0.96)_44%,rgba(244,211,94,0.14))]">
-              <span
-                className="pointer-events-none absolute inset-0 opacity-80"
-                aria-hidden
-                style={{
-                  background:
-                    "radial-gradient(circle at 35% 32%, color-mix(in srgb, var(--theme-primary) 24%, transparent), transparent 52%), radial-gradient(circle at 74% 72%, color-mix(in srgb, #f3c74a 20%, transparent), transparent 56%)",
-                }}
-              />
-              <span className="relative text-primary/90 drop-shadow-[0_4px_12px_rgba(182,153,62,0.24)]" aria-hidden>
-                <svg viewBox="0 0 40 40" className="h-7 w-7" fill="none">
-                  <path
-                    d="M8.5 24.5C12 19.8 16.3 17.3 20.4 17.3C24.1 17.3 27.2 18.8 31 22"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d="M10 13.3L15.6 18.9L21.8 12.6L29.5 20.2"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <circle cx="10" cy="13.3" r="2" fill="currentColor" />
-                  <circle cx="21.8" cy="12.6" r="2" fill="currentColor" />
-                  <circle cx="31" cy="22" r="2" fill="currentColor" />
-                </svg>
-              </span>
-              <span className="absolute right-1.5 top-1.5 rounded-full border border-primary/20 bg-primary/10 p-1 text-primary dark:border-primary/25 dark:bg-primary/14">
-                <Sparkles className="h-2.5 w-2.5" aria-hidden />
-              </span>
-            </span>
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-subtle">Simulate</span>
-          </Link>
-        </div>
-        <div className="flex justify-center sm:justify-end">
-          <Link
-            href="/csv-help"
-            className="ui-hover-text text-sm text-primary underline-offset-2 hover:underline"
-          >
-            CSV help
-          </Link>
-        </div>
+      <div className="flex flex-wrap justify-end gap-3">
+        <CsvImportExportBar exportFilename="stocks-pm-watchlist.csv" importMode="watchlist" />
+        <Link
+          href="/csv-help"
+          className="ui-hover-text self-center text-sm text-primary underline-offset-2 hover:underline"
+        >
+          CSV help
+        </Link>
       </div>
 
       <div className="ui-hover-lift rounded-2xl border border-border bg-elevated p-3">
-        <div className="flex flex-wrap items-end gap-2">
+        <div className="grid items-end gap-3 lg:grid-cols-[minmax(12rem,1fr)_auto_minmax(14rem,1fr)]">
           <div className="min-w-[12rem] flex-1">
             <p className="text-lg font-semibold text-foreground">Watchlist</p>
             <p className="mt-1 text-xs text-subtle">{watchlistCountText}</p>
           </div>
-          <div className="ml-auto flex flex-wrap items-end gap-2">
+          <div className="flex justify-center">
+            <Link
+              href="/simulation#watchlist-simulation"
+              aria-label="Simulate (App Strategy)"
+              title="Simulate (App Strategy)"
+              className="group flex flex-col items-center gap-1"
+            >
+              <span className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-primary/20 bg-[linear-gradient(135deg,rgba(182,153,62,0.18),rgba(255,255,255,0.94)_44%,rgba(244,211,94,0.18))] shadow-sm transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md dark:border-primary/25 dark:bg-[linear-gradient(135deg,rgba(182,153,62,0.24),rgba(18,24,38,0.96)_44%,rgba(244,211,94,0.14))]">
+                <span
+                  className="pointer-events-none absolute inset-0 opacity-80"
+                  aria-hidden
+                  style={{
+                    background:
+                      "radial-gradient(circle at 35% 32%, color-mix(in srgb, var(--theme-primary) 24%, transparent), transparent 52%), radial-gradient(circle at 74% 72%, color-mix(in srgb, #f3c74a 20%, transparent), transparent 56%)",
+                  }}
+                />
+                <span className="relative text-primary/90 drop-shadow-[0_4px_12px_rgba(182,153,62,0.24)]" aria-hidden>
+                  <svg viewBox="0 0 40 40" className="h-6 w-6" fill="none">
+                    <path
+                      d="M8.5 24.5C12 19.8 16.3 17.3 20.4 17.3C24.1 17.3 27.2 18.8 31 22"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                    />
+                    <path
+                      d="M10 13.3L15.6 18.9L21.8 12.6L29.5 20.2"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <circle cx="10" cy="13.3" r="2" fill="currentColor" />
+                    <circle cx="21.8" cy="12.6" r="2" fill="currentColor" />
+                    <circle cx="31" cy="22" r="2" fill="currentColor" />
+                  </svg>
+                </span>
+                <span className="absolute right-1 top-1 rounded-full border border-primary/20 bg-primary/10 p-0.5 text-primary dark:border-primary/25 dark:bg-primary/14">
+                  <Sparkles className="h-2 w-2" aria-hidden />
+                </span>
+              </span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-subtle">Simulate</span>
+            </Link>
+          </div>
+          <div className="flex flex-wrap items-end justify-end gap-2">
             <label className="flex min-w-[9rem] flex-col gap-1 text-[11px] text-subtle">
               Add Stock
               <SymbolTradeCombobox
