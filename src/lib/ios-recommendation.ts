@@ -630,7 +630,7 @@ export function computeRecommendationFactors(
         } else if (rsiCurrentValue > overboughtThreshold) {
           statusLabel = `Blocking: Overbought, reversal pending | RSI ${rsiValueText}`;
         } else {
-          statusLabel = `Blocking: Reversal not confirmed | RSI ${rsiValueText}`;
+          statusLabel = `Blocking: Wait for Reversal trend | RSI ${rsiValueText}`;
         }
         passesStatus = false;
       } else if (buyReversalDetected || sellReversalDetected) {

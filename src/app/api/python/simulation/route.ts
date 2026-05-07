@@ -18,6 +18,18 @@ type TradeRecord = {
   profit: number | null;
 };
 
+type SellTargetReference =
+  | {
+      source: "Analyst Target" | "Manual Target";
+      value: number;
+      summary: string;
+    }
+  | {
+      source: "Profit Target";
+      percent: number;
+      summary: string;
+    };
+
 function clampNumber(value: unknown, fallback: number, min: number, max: number) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
@@ -26,6 +38,40 @@ function clampNumber(value: unknown, fallback: number, min: number, max: number)
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ ok: false, error: message }, { status });
+}
+
+function resolveSellTargetReference(args: {
+  analystTarget?: number;
+  manualTarget?: number;
+  isETF: boolean;
+  etfProfitTargetPercent: number;
+  stockProfitTargetPercent: number;
+}): SellTargetReference {
+  const analystTarget = args.analystTarget != null && args.analystTarget > 0 ? args.analystTarget : undefined;
+  const manualTarget = args.manualTarget != null && args.manualTarget > 0 ? args.manualTarget : undefined;
+
+  if (analystTarget != null) {
+    return {
+      source: "Analyst Target",
+      value: analystTarget,
+      summary: `$${analystTarget.toFixed(2)}`,
+    };
+  }
+
+  if (manualTarget != null) {
+    return {
+      source: "Manual Target",
+      value: manualTarget,
+      summary: `$${manualTarget.toFixed(2)}`,
+    };
+  }
+
+  const percent = args.isETF ? args.etfProfitTargetPercent : args.stockProfitTargetPercent;
+  return {
+    source: "Profit Target",
+    percent,
+    summary: `${percent.toFixed(0)}% gain (your setting)`,
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -50,6 +96,7 @@ export async function POST(request: NextRequest) {
   const etfProfitTargetPercent = clampNumber(payload.etfProfitTargetPercent ?? 50, 50, 0, 500);
   const stockProfitTargetPercent = clampNumber(payload.stockProfitTargetPercent ?? 50, 50, 0, 500);
   const useRSIGating = payload.useRSIGating == null ? true : Boolean(payload.useRSIGating);
+  const manualTarget = payload.targetPrice != null ? Number(payload.targetPrice) : undefined;
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -108,6 +155,13 @@ export async function POST(request: NextRequest) {
     payload.isETF != null ? Boolean(payload.isETF) : tickerRow?.is_etf != null ? Boolean(tickerRow.is_etf) : false;
   const aiSentimentScore =
     sentimentRow?.sentiment_score != null ? Number(sentimentRow.sentiment_score) : undefined;
+  const sellTargetReference = resolveSellTargetReference({
+    analystTarget,
+    manualTarget,
+    isETF,
+    etfProfitTargetPercent,
+    stockProfitTargetPercent,
+  });
 
   let cash = capital;
   let shares = 0;
@@ -265,6 +319,24 @@ export async function POST(request: NextRequest) {
       stockProfitTargetPercent,
       analystTarget: analystTarget ?? null,
       isETF,
+    },
+    criteriaUsed: {
+      shortSMA,
+      dynamicFactor,
+      stockLimit,
+      transactionLimit,
+      sellTargetReference,
+      considered: [
+        "ETF/Stock profit target settings",
+        "RSI gate on/off setting",
+        "Stock-level strategy parameters (SMA, dynamic factor, limits)",
+      ],
+      notConsidered: [
+        "AI Sentiment (latest news digest)",
+        "Sell-only long-term-qualified toggle",
+        "Wash-sale rule",
+        "Score/no-auto-buy gating",
+      ],
     },
     result: {
       periodDescription: `${years} year${years > 1 ? "s" : ""}`,
