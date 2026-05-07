@@ -269,9 +269,9 @@ export default function SimulationPage() {
             </div>
             <div className="rounded-xl border border-border/70 bg-background/50 p-3 text-sm">
               <div className="text-xs uppercase tracking-[0.18em] text-subtle">Filters</div>
-              <div className="mt-1 font-medium text-foreground">{riskAppetite} risk</div>
+              <div className="mt-1 font-medium text-foreground">{riskAppetite} risk from your saved settings</div>
               <div className="mt-1 text-subtle">
-                Risk filter {enableRiskFilter ? "on" : "off"} • Watchlist limit {limitWatchlistSize ? "on" : "off"}
+                Risk filter {enableRiskFilter ? "on" : "off"} • Watchlist limit {limitWatchlistSize ? "on" : "off"} from your saved settings
               </div>
             </div>
           </div>
