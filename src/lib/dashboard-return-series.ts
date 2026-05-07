@@ -1,6 +1,7 @@
 import type { NetWorthPoint } from "@/lib/portfolio-net-worth-series";
 
 export type SpyDaily = { date: string; close: number };
+export type ExternalCashFlowPoint = { occurredAtMs: number; amount: number };
 
 function etYmdFromMs(ms: number): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(ms));
@@ -24,6 +25,42 @@ export function spyCloseOnOrBefore(sortedAsc: SpyDaily[], ymd: string): number |
   }
   if (ans < 0) return null;
   return sortedAsc[ans].close;
+}
+
+export function adjustNetWorthPointsForExternalCashFlows(
+  points: NetWorthPoint[],
+  flows: ExternalCashFlowPoint[]
+): NetWorthPoint[] {
+  if (points.length === 0 || flows.length === 0) return [...points];
+
+  const sortedPoints = [...points].sort((a, b) => a.t - b.t);
+  const baselineYmd = etYmdFromMs(sortedPoints[0]!.t);
+
+  const flowTotalsByDay = new Map<string, number>();
+  for (const flow of flows) {
+    if (!Number.isFinite(flow.amount) || flow.amount === 0 || !Number.isFinite(flow.occurredAtMs)) continue;
+    const ymd = etYmdFromMs(flow.occurredAtMs);
+    flowTotalsByDay.set(ymd, (flowTotalsByDay.get(ymd) ?? 0) + flow.amount);
+  }
+
+  if (flowTotalsByDay.size === 0) return sortedPoints;
+
+  const sortedFlowDays = [...flowTotalsByDay.entries()].sort(([a], [b]) => a.localeCompare(b));
+  let flowIndex = 0;
+  let cumulativeExternalFlow = 0;
+
+  return sortedPoints.map((point) => {
+    const pointYmd = etYmdFromMs(point.t);
+    while (flowIndex < sortedFlowDays.length && sortedFlowDays[flowIndex]![0] <= pointYmd) {
+      const [flowDay, flowAmount] = sortedFlowDays[flowIndex]!;
+      if (flowDay > baselineYmd) cumulativeExternalFlow += flowAmount;
+      flowIndex += 1;
+    }
+    return {
+      ...point,
+      value: point.value - cumulativeExternalFlow,
+    };
+  });
 }
 
 export type ComparisonBaseRow = { dateMs: number; portfolioValue: number; spyClose: number };

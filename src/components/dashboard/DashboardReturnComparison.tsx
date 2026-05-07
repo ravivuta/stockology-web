@@ -26,9 +26,11 @@ import { APP_CTA_FILL } from "@/lib/appCtaClasses";
 import { formatCompactCurrency, formatCurrency, formatPercent } from "@/lib/numberFormat";
 import { cn } from "@/lib/utils";
 import {
+  adjustNetWorthPointsForExternalCashFlows,
   mergePortfolioWithSpyDaily,
   toCumulativePercentRows,
   type ComparisonChartRow,
+  type ExternalCashFlowPoint,
   type SpyDaily,
 } from "@/lib/dashboard-return-series";
 import { fetchHistoricalPricePoints } from "@/lib/supabase-stock-history";
@@ -73,6 +75,7 @@ export function DashboardReturnComparison() {
   const [vsSpy, setVsSpy] = useState(true);
   const [range, setRange] = useState<ChartRangePreset>("1y");
   const [cloudPts, setCloudPts] = useState<NetWorthPoint[] | null>(null);
+  const [externalCashFlows, setExternalCashFlows] = useState<ExternalCashFlowPoint[] | null>(null);
   const [spySeries, setSpySeries] = useState<SpyDaily[] | null>(null);
 
   const liveTotal = useMemo(() => computeLivePortfolioTotal(stocks, cash), [stocks, cash]);
@@ -80,9 +83,13 @@ export function DashboardReturnComparison() {
   useEffect(() => {
     let cancelled = false;
     setCloudPts(null);
+    setExternalCashFlows(null);
     async function run() {
       if (!hasSupabaseConfig()) {
-        if (!cancelled) setCloudPts([]);
+        if (!cancelled) {
+          setCloudPts([]);
+          setExternalCashFlows([]);
+        }
         return;
       }
       try {
@@ -95,9 +102,31 @@ export function DashboardReturnComparison() {
         }
         const dataUserId = await resolveStocksPmDataUserId(supabase, uid);
         const rows = await fetchCloudNetWorthHistory(supabase, dataUserId);
-        if (!cancelled) setCloudPts(rows);
+        const { data: flowData, error: flowError } = await supabase.rpc("get_external_cash_flows", {
+          p_user_id: dataUserId,
+          p_limit: 2000,
+        });
+
+        const flows = !flowError && Array.isArray(flowData)
+          ? flowData
+              .map((row) => {
+                const amount = Number((row as { amount?: unknown }).amount);
+                const occurredAt = new Date(String((row as { occurred_at?: unknown }).occurred_at ?? "")).getTime();
+                if (!Number.isFinite(amount) || !Number.isFinite(occurredAt)) return null;
+                return { amount, occurredAtMs: occurredAt };
+              })
+              .filter((row): row is ExternalCashFlowPoint => row !== null)
+          : [];
+
+        if (!cancelled) {
+          setCloudPts(rows);
+          setExternalCashFlows(flows);
+        }
       } catch {
-        if (!cancelled) setCloudPts([]);
+        if (!cancelled) {
+          setCloudPts([]);
+          setExternalCashFlows([]);
+        }
       }
     }
     void run();
@@ -139,25 +168,29 @@ export function DashboardReturnComparison() {
   }, [cloudPts, tradeJournal, liveTotal]);
 
   const fullPortfolioPts = useMemo(() => meta?.points ?? EMPTY_NET_WORTH, [meta]);
+  const flowAdjustedPortfolioPts = useMemo(
+    () => (externalCashFlows ? adjustNetWorthPointsForExternalCashFlows(fullPortfolioPts, externalCashFlows) : EMPTY_NET_WORTH),
+    [fullPortfolioPts, externalCashFlows]
+  );
 
   const spyLoadedOk = !!(spySeries && spySeries.length > 0);
 
   const { comparisonRows, usedFullHistoryFallback, spyAligned } = useMemo(() => {
-    if (fullPortfolioPts.length === 0) {
+    if (flowAdjustedPortfolioPts.length === 0) {
       return { comparisonRows: [] as ComparisonChartRow[], usedFullHistoryFallback: false, spyAligned: false };
     }
 
     if (spyLoadedOk) {
-      const withT = fullPortfolioPts.map((p) => ({ ...p, t: p.t }));
+      const withT = flowAdjustedPortfolioPts.map((p) => ({ ...p, t: p.t }));
       const { filtered, usedFullHistoryFallback: fb } = filterDataByRange(withT, range);
-      const pts = filtered.length >= 1 ? filtered : fullPortfolioPts;
+      const pts = filtered.length >= 1 ? filtered : flowAdjustedPortfolioPts;
       const tMin = pts[0].t;
       const tMax = pts[pts.length - 1].t;
-      let narrowed = mergePortfolioWithSpyDaily(fullPortfolioPts, spySeries!, tMin, tMax);
+      let narrowed = mergePortfolioWithSpyDaily(flowAdjustedPortfolioPts, spySeries!, tMin, tMax);
       let extraFb = false;
-      if (narrowed.length === 0 && fullPortfolioPts.length > 0) {
-        const fp = fullPortfolioPts;
-        narrowed = mergePortfolioWithSpyDaily(fullPortfolioPts, spySeries!, fp[0].t, fp[fp.length - 1].t);
+      if (narrowed.length === 0 && flowAdjustedPortfolioPts.length > 0) {
+        const fp = flowAdjustedPortfolioPts;
+        narrowed = mergePortfolioWithSpyDaily(flowAdjustedPortfolioPts, spySeries!, fp[0].t, fp[fp.length - 1].t);
         extraFb = true;
       }
       return {
@@ -167,15 +200,15 @@ export function DashboardReturnComparison() {
       };
     }
 
-    const withT = fullPortfolioPts.map((p) => ({ ...p, t: p.t }));
+    const withT = flowAdjustedPortfolioPts.map((p) => ({ ...p, t: p.t }));
     const { filtered, usedFullHistoryFallback: fb } = filterDataByRange(withT, range);
-    const pts = filtered.length >= 1 ? filtered : fullPortfolioPts;
+    const pts = filtered.length >= 1 ? filtered : flowAdjustedPortfolioPts;
     return {
       comparisonRows: portfolioOnlyPercentRows(pts),
       usedFullHistoryFallback: fb,
       spyAligned: false,
     };
-  }, [fullPortfolioPts, spySeries, range, spyLoadedOk]);
+  }, [flowAdjustedPortfolioPts, spySeries, range, spyLoadedOk]);
 
   const valueModeData = useMemo(() => {
     const ptT = fullPortfolioPts.map((p) => ({ ...p, t: p.t }));
@@ -207,7 +240,7 @@ export function DashboardReturnComparison() {
     );
   }, [valueModeData.rows]);
 
-  const loading = cloudPts === null || meta === null || spySeries === null;
+  const loading = cloudPts === null || meta === null || spySeries === null || externalCashFlows === null;
   const chartAnimate = !reduceMotion && chart.ready;
   const lineData = vsSpy ? comparisonRows : valueModeData.rows;
   const showSpyLine = vsSpy && spyLoadedOk && spyAligned && comparisonRows.length > 0;
@@ -227,7 +260,7 @@ export function DashboardReturnComparison() {
         <div>
           <h2 className="text-base font-semibold tracking-tight">Return comparison</h2>
           <p className="mt-0.5 text-xs text-subtle">
-            {vsSpy ? "Cumulative % vs S&P 500 (SPY), aligned to your portfolio timeline" : "Portfolio value over time"}
+            {vsSpy ? "Cumulative % vs S&P 500 (SPY), adjusted for external cash flows" : "Portfolio value over time"}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
