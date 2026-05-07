@@ -275,6 +275,16 @@ body {
   padding-bottom: calc(var(--app-pad-fluid) + env(safe-area-inset-bottom, 0px));
 }
 
+@media (max-width: 1023px) {
+  .app-shell-main {
+    margin-left: 0;
+    padding-left: calc(var(--app-pad-min) + env(safe-area-inset-left, 0px));
+    padding-right: calc(var(--app-pad-min) + env(safe-area-inset-right, 0px));
+    padding-top: calc(var(--app-pad-min) * 0.9);
+    padding-bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* Avoid transition on every node (Recharts creates hundreds of SVG elements — was causing main-thread jank). */
 .recharts-layer,
 .recharts-surface,

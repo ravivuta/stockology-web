@@ -134,7 +134,7 @@ export default function Sidebar({
 
   return (
     <aside
-      className="fixed left-0 top-0 z-40 flex h-[100dvh] flex-col overflow-hidden border-r border-border bg-surface pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)]"
+      className="fixed left-0 top-0 z-40 hidden h-[100dvh] flex-col overflow-hidden border-r border-border bg-surface pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] lg:flex"
       style={{
         width: isExpanded ? 220 : APP_RAIL_PX,
         transition: "width 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
