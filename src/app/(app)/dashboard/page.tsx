@@ -311,6 +311,7 @@ export default function DashboardPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="grid gap-8 sm:grid-cols-2"
             >
               <GainerLoserBars
                 gainers={gainers}
@@ -491,7 +492,7 @@ function GainerLoserBars({
   const maxCostL = Math.max(...sortedL.map((l) => l.quantity * l.averageCost), 1);
 
   return (
-    <div className="space-y-10">
+    <>
       <div>
         <div className="mb-3 flex flex-wrap items-baseline gap-2">
           <h3 className="text-sm font-semibold text-[color:var(--dashboard-chart-gain)]">Gainers</h3>
@@ -596,6 +597,6 @@ function GainerLoserBars({
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 }
