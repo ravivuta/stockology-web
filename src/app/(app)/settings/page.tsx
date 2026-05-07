@@ -21,6 +21,7 @@ import { recommendedWatchlistSize } from "@/lib/ios-recommendation";
 import { formatCurrency } from "@/lib/numberFormat";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { isPaidSubscriptionTier } from "@/lib/subscription-state";
+import { APP_MANAGED_TRIAL_LABEL } from "@/lib/trial-config";
 import { cn } from "@/lib/utils";
 
 const SECTIONS = [
@@ -413,7 +414,7 @@ export default function SettingsPage() {
                   </div>
                   {!hasBillingExempt ? (
                     <p className="text-[10px] leading-snug text-subtle">
-                      Website signup now grants a 3-month app-managed trial with no credit card required. Stripe Checkout is only used when you choose to start a paid subscription.
+                      Website signup now grants a {APP_MANAGED_TRIAL_LABEL} app-managed trial with no credit card required. Stripe Checkout is only used when you choose to start a paid subscription.
                     </p>
                   ) : null}
                 </div>

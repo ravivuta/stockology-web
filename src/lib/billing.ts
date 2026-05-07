@@ -1,5 +1,6 @@
 import type Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { APP_MANAGED_TRIAL_MONTHS } from "@/lib/trial-config";
 
 export type BillingSubState = {
   subscription_tier: string;
@@ -8,6 +9,12 @@ export type BillingSubState = {
   subscription_expires_at: string | null;
   is_active: boolean;
 };
+
+function addMonths(date: Date, months: number) {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + months);
+  return next;
+}
 
 function unixToIso(value: number | null): string | null {
   return typeof value === "number" && Number.isFinite(value) ? new Date(value * 1000).toISOString() : null;
@@ -88,20 +95,49 @@ export async function clearUserSubscriptionState(userId: string) {
   });
 }
 
-export async function ensureUserHasWebTrial(userId: string, trialMonths = 3) {
+export async function ensureUserHasWebTrial(userId: string, trialMonths = APP_MANAGED_TRIAL_MONTHS) {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("user_subscriptions")
-    .select("user_id")
+    .select("user_id, subscription_tier, trial_started_at, trial_expires_at, subscription_expires_at, is_active, billing_exempt")
     .eq("user_id", userId)
     .maybeSingle();
 
   if (error) throw error;
-  if (data?.user_id) return false;
+
+  if (data?.billing_exempt === true) return false;
+
+  if (data?.user_id) {
+    const tier = String(data.subscription_tier ?? "").trim().toLowerCase();
+    const startedAt = data.trial_started_at ? new Date(data.trial_started_at) : null;
+    const expiresAt = data.trial_expires_at ? new Date(data.trial_expires_at) : null;
+    const hasPaidSubscription = Boolean(data.subscription_expires_at);
+    const normalizedStartAt =
+      startedAt != null && Number.isFinite(startedAt.getTime()) ? startedAt : new Date();
+    const targetTrialExpiresAt = addMonths(normalizedStartAt, trialMonths);
+    const shouldNormalizeTrial =
+      tier === "trial" &&
+      !hasPaidSubscription &&
+      (expiresAt == null ||
+        !Number.isFinite(expiresAt.getTime()) ||
+        expiresAt.getTime() < targetTrialExpiresAt.getTime());
+
+    if (shouldNormalizeTrial) {
+      await upsertUserSubscriptionState(userId, {
+        subscription_tier: "trial",
+        trial_started_at: normalizedStartAt.toISOString(),
+        trial_expires_at: targetTrialExpiresAt.toISOString(),
+        subscription_expires_at: null,
+        is_active: true,
+      });
+      return true;
+    }
+
+    return false;
+  }
 
   const trialStartedAt = new Date();
-  const trialExpiresAt = new Date(trialStartedAt);
-  trialExpiresAt.setMonth(trialExpiresAt.getMonth() + trialMonths);
+  const trialExpiresAt = addMonths(trialStartedAt, trialMonths);
 
   await upsertUserSubscriptionState(userId, {
     subscription_tier: "trial",

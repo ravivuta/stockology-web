@@ -12,6 +12,7 @@ import { Sparkles } from "lucide-react";
 import { AuthSignupPageSkeleton } from "@/components/route-loading/skeletons";
 import { useShellRouteTransition } from "@/components/LandingViewTransition";
 import { safeQueryMessage } from "@/lib/safe-query-message";
+import { APP_MANAGED_TRIAL_LABEL } from "@/lib/trial-config";
 
 function SignupInner() {
   const { replaceWithTransition } = useShellRouteTransition();
@@ -100,7 +101,7 @@ function SignupInner() {
         <div className="mt-6 flex items-start gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3.5 py-3">
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400/75" strokeWidth={1.75} aria-hidden />
           <p className="text-xs leading-relaxed text-zinc-500">
-            Start with a 3-month free trial. No credit card is required during signup. Subscribe later from Settings whenever you are ready.
+            Start with a {APP_MANAGED_TRIAL_LABEL} free trial. No credit card is required during signup. Subscribe later from Settings whenever you are ready.
           </p>
         </div>
 

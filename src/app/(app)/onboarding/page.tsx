@@ -5,11 +5,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { runRefreshPipeline } from "@/lib/refresh";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { STOCKS_PM_ONBOARDING_USER_META_KEY } from "@/lib/onboarding-meta";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
-
-const FALLBACK_STARTER_SYMBOLS = ["AAPL", "MSFT", "SPY"];
 
 const steps = [
   { title: "Strategy", body: "Practice emotionless rules: buy near moving averages, scale in, take profits at targets." },
@@ -35,16 +34,16 @@ export default function OnboardingPage() {
       const supabase = createClient();
       const { data, error } = await supabase.rpc("get_top_recommended_stocks");
       if (error) throw error;
-      if (!Array.isArray(data)) return FALLBACK_STARTER_SYMBOLS;
+      if (!Array.isArray(data)) return [];
 
       const symbols = data
         .map((row) => (typeof row?.symbol === "string" ? row.symbol.trim().toUpperCase() : ""))
         .filter(Boolean);
 
-      return symbols.length > 0 ? [...new Set(symbols)] : FALLBACK_STARTER_SYMBOLS;
+      return symbols.length > 0 ? [...new Set(symbols)] : [];
     } catch (error) {
       console.warn("[onboarding starter symbols]", error);
-      return FALLBACK_STARTER_SYMBOLS;
+      return [];
     }
   }
 
@@ -59,10 +58,22 @@ export default function OnboardingPage() {
       setCashStore(v);
       setSettings({ riskAppetite: risk });
 
+      let seededSymbols: string[] = [];
       if (usePortfolioStore.getState().stocks.length === 0) {
         starterSymbols.forEach((sym) => {
-          addStock({ symbol: sym, quantity: 0, averageCost: 0, lastPrice: 100 + Math.random() * 50, pendingOptimization: true });
+          addStock({ symbol: sym, quantity: 0, averageCost: 0, lastPrice: 0, pendingOptimization: true });
         });
+        seededSymbols = starterSymbols;
+      }
+
+      if (seededSymbols.length > 0) {
+        const refreshResult = await runRefreshPipeline(seededSymbols, {
+          optimizePending: true,
+          includeSnapshot: false,
+        });
+        if (!refreshResult.ok) {
+          console.warn("[onboarding starter hydration]", refreshResult.message);
+        }
       }
 
       setOnboardingComplete(true);

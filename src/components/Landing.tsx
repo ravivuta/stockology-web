@@ -13,6 +13,7 @@ import { CssMarqueeRibbon } from "@/components/landing/CssMarqueeRibbon";
 import { LandingProductDepth } from "@/components/landing/LandingProductDepth";
 import { LandingTutorialJourney } from "@/components/landing/LandingTutorialJourney";
 import { appCtaButton } from "@/lib/appCtaClasses";
+import { APP_MANAGED_TRIAL_PERIOD } from "@/lib/trial-config";
 
 const LineWaves = dynamic(() => import("@/components/landing/LineWaves"), { ssr: false });
 
@@ -413,11 +414,11 @@ export function Landing({ hasSession }: { hasSession: boolean }) {
             >
               Simple, transparent pricing
             </motion.h2>
-            <p className="mx-auto mb-12 max-w-md text-center text-sm text-zinc-400">Start free for 3 months—no credit card required.</p>
+            <p className="mx-auto mb-12 max-w-md text-center text-sm text-zinc-400">Start free for {APP_MANAGED_TRIAL_PERIOD}—no credit card required.</p>
             <div className="grid gap-6 sm:grid-cols-3">
               {[
                 {
-                  name: "Free Trial", period: "3 months", price: "Free", note: "Full access, no card needed",
+                  name: "Free Trial", period: APP_MANAGED_TRIAL_PERIOD, price: "Free", note: "Full access, no card needed",
                   features: ["Full Dashboard & Portfolio", "Optimization Engine", "Backtesting & Simulation", "Up to 100 stocks", "Real-time market data"],
                   highlight: false,
                 },

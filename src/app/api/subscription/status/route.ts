@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
+import { ensureUserHasWebTrial } from "@/lib/billing";
 import { getSubscriptionRowForUser } from "@/lib/subscription-admin";
 
 export const runtime = "nodejs";
@@ -17,6 +18,7 @@ export async function GET() {
     }
 
     const dataUserId = await syncStocksPmAuthUser(supabase, user.id);
+    await ensureUserHasWebTrial(dataUserId);
     const row = await getSubscriptionRowForUser(dataUserId);
     return NextResponse.json({ row });
   } catch (error) {
