@@ -204,42 +204,63 @@ export default function WatchlistPage() {
               href="/simulation#watchlist-simulation"
               aria-label="Simulate (App Strategy)"
               title="Simulate (App Strategy)"
-              className="group flex flex-col items-center gap-1"
+              className="group flex items-center"
             >
-              <span className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-primary/20 bg-[linear-gradient(135deg,rgba(182,153,62,0.18),rgba(255,255,255,0.94)_44%,rgba(244,211,94,0.18))] shadow-sm transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md dark:border-primary/25 dark:bg-[linear-gradient(135deg,rgba(182,153,62,0.24),rgba(18,24,38,0.96)_44%,rgba(244,211,94,0.14))]">
+              <span className="relative flex h-11 w-44 items-center justify-center overflow-hidden rounded-2xl border border-primary/20 bg-[linear-gradient(135deg,rgba(182,153,62,0.18),rgba(255,255,255,0.94)_44%,rgba(244,211,94,0.18))] shadow-sm transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md dark:border-primary/25 dark:bg-[linear-gradient(135deg,rgba(182,153,62,0.24),rgba(18,24,38,0.96)_44%,rgba(244,211,94,0.14))]">
                 <span
                   className="pointer-events-none absolute inset-0 opacity-80"
                   aria-hidden
                   style={{
                     background:
-                      "radial-gradient(circle at 35% 32%, color-mix(in srgb, var(--theme-primary) 24%, transparent), transparent 52%), radial-gradient(circle at 74% 72%, color-mix(in srgb, #f3c74a 20%, transparent), transparent 56%)",
+                      "radial-gradient(circle at 18% 34%, color-mix(in srgb, var(--theme-primary) 24%, transparent), transparent 46%), radial-gradient(circle at 84% 70%, color-mix(in srgb, #f3c74a 20%, transparent), transparent 54%)",
                   }}
                 />
                 <span className="relative text-primary/90 drop-shadow-[0_4px_12px_rgba(182,153,62,0.24)]" aria-hidden>
-                  <svg viewBox="0 0 40 40" className="h-6 w-6" fill="none">
+                  <svg viewBox="0 0 176 44" className="h-11 w-44" fill="none">
+                    <rect x="15" y="22" width="8" height="8" rx="2.5" fill="currentColor" fillOpacity="0.75" />
+                    <rect x="27" y="17" width="8" height="13" rx="2.5" fill="currentColor" fillOpacity="0.8" />
+                    <rect x="39" y="12" width="8" height="18" rx="2.5" fill="currentColor" />
                     <path
-                      d="M8.5 24.5C12 19.8 16.3 17.3 20.4 17.3C24.1 17.3 27.2 18.8 31 22"
+                      d="M24 13.5H55.5"
                       stroke="currentColor"
-                      strokeWidth="2.5"
+                      strokeOpacity="0.22"
+                      strokeWidth="1.4"
                       strokeLinecap="round"
                     />
                     <path
-                      d="M10 13.3L15.6 18.9L21.8 12.6L29.5 20.2"
+                      d="M59 27C70 20 80 18 90 18C102 18 113 22 124 14"
                       stroke="currentColor"
-                      strokeWidth="2.5"
+                      strokeWidth="2.6"
+                      strokeLinecap="round"
+                    />
+                    <circle cx="59" cy="27" r="2.2" fill="currentColor" />
+                    <circle cx="90" cy="18" r="2.2" fill="currentColor" />
+                    <circle cx="124" cy="14" r="2.2" fill="currentColor" />
+                    <path
+                      d="M66 12.5L73.5 19.8L84.5 9.8"
+                      stroke="currentColor"
+                      strokeWidth="2.4"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
-                    <circle cx="10" cy="13.3" r="2" fill="currentColor" />
-                    <circle cx="21.8" cy="12.6" r="2" fill="currentColor" />
-                    <circle cx="31" cy="22" r="2" fill="currentColor" />
+                    <circle cx="143" cy="22" r="11" stroke="currentColor" strokeOpacity="0.2" strokeWidth="1.6" />
+                    <path
+                      d="M139 15.8L149 22L139 28.2V15.8Z"
+                      fill="currentColor"
+                    />
+                    <path
+                      d="M103 31H126"
+                      stroke="currentColor"
+                      strokeOpacity="0.18"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                    />
                   </svg>
                 </span>
-                <span className="absolute right-1 top-1 rounded-full border border-primary/20 bg-primary/10 p-0.5 text-primary dark:border-primary/25 dark:bg-primary/14">
+                <span className="absolute right-2 top-1.5 rounded-full border border-primary/20 bg-primary/10 p-0.5 text-primary dark:border-primary/25 dark:bg-primary/14">
                   <Sparkles className="h-2 w-2" aria-hidden />
                 </span>
               </span>
-              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-subtle">Simulate</span>
             </Link>
           </div>
           <div className="flex flex-wrap items-end justify-end gap-2">
