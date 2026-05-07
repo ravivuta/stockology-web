@@ -17,3 +17,31 @@ export async function syncStocksPmAuthUser(supabase: SupabaseClient, fallbackAut
 
   return resolveStocksPmDataUserId(supabase, fallbackAuthUserId);
 }
+
+/**
+ * Mirrors the iOS foreground-open touch so web sessions also populate
+ * `public.users.last_app_open_at`.
+ */
+export async function touchStocksPmLastAppOpen(
+  supabase: SupabaseClient,
+  dataUserId: string,
+  appBuildVersion = "web"
+): Promise<void> {
+  if (!dataUserId) return;
+
+  const { error } = await supabase.rpc("touch_last_app_open", {
+    p_user_id: dataUserId,
+    p_app_build_version: appBuildVersion,
+  });
+
+  if (!error) return;
+
+  // Backward-compatible fallback for projects that only have the older 1-arg RPC.
+  const legacy = await supabase.rpc("touch_last_app_open", {
+    p_user_id: dataUserId,
+  });
+
+  if (legacy.error) {
+    console.warn("[touchStocksPmLastAppOpen] RPC failed (run latest Supabase migration?):", legacy.error.message);
+  }
+}

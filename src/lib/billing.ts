@@ -1,6 +1,7 @@
 import type Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { APP_MANAGED_TRIAL_MONTHS } from "@/lib/trial-config";
+import { isPaidSubscriptionTier } from "@/lib/subscription-state";
 
 export type BillingSubState = {
   subscription_tier: string;
@@ -112,21 +113,35 @@ export async function ensureUserHasWebTrial(userId: string, trialMonths = APP_MA
     const startedAt = data.trial_started_at ? new Date(data.trial_started_at) : null;
     const expiresAt = data.trial_expires_at ? new Date(data.trial_expires_at) : null;
     const hasPaidSubscription = Boolean(data.subscription_expires_at);
+    const nowMs = Date.now();
+    const startedAtMs = startedAt != null && Number.isFinite(startedAt.getTime()) ? startedAt.getTime() : 0;
+    const expiresAtMs = expiresAt != null && Number.isFinite(expiresAt.getTime()) ? expiresAt.getTime() : 0;
+    const hasFutureTrial = expiresAtMs > nowMs;
+    const isPaidTier = isPaidSubscriptionTier(tier);
     const normalizedStartAt =
       startedAt != null && Number.isFinite(startedAt.getTime()) ? startedAt : new Date();
     const targetTrialExpiresAt = addMonths(normalizedStartAt, trialMonths);
-    const shouldNormalizeTrial =
-      tier === "trial" &&
+    const shouldProvisionFreshTrial =
       !hasPaidSubscription &&
-      (expiresAt == null ||
-        !Number.isFinite(expiresAt.getTime()) ||
-        expiresAt.getTime() < targetTrialExpiresAt.getTime());
+      !isPaidTier &&
+      startedAtMs <= 0 &&
+      expiresAtMs <= 0;
+    const shouldNormalizeTrial =
+      !hasPaidSubscription &&
+      (
+        (tier === "trial" &&
+          (startedAtMs <= 0 || expiresAtMs <= 0 || data.is_active !== true)) ||
+        (!isPaidTier && hasFutureTrial && data.is_active !== true)
+      );
 
-    if (shouldNormalizeTrial) {
+    if (shouldProvisionFreshTrial || shouldNormalizeTrial) {
       await upsertUserSubscriptionState(userId, {
         subscription_tier: "trial",
         trial_started_at: normalizedStartAt.toISOString(),
-        trial_expires_at: targetTrialExpiresAt.toISOString(),
+        trial_expires_at:
+          shouldProvisionFreshTrial && !hasFutureTrial
+            ? addMonths(new Date(), trialMonths).toISOString()
+            : (hasFutureTrial ? expiresAt! : targetTrialExpiresAt).toISOString(),
         subscription_expires_at: null,
         is_active: true,
       });

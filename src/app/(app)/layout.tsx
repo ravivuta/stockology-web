@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/AppShell";
 import { PortfolioCloudBridge } from "@/components/PortfolioCloudBridge";
 import { snapshotIndicatesExistingAccount } from "@/lib/cloud-portfolio";
-import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
+import { syncStocksPmAuthUser, touchStocksPmLastAppOpen } from "@/lib/stocks-pm-account";
 import { getSubscriptionRowForUser } from "@/lib/subscription-admin";
 import { ensureUserHasWebTrial } from "@/lib/billing";
 
@@ -21,6 +21,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const dataUserId = await syncStocksPmAuthUser(supabase, user.id);
   await ensureUserHasWebTrial(dataUserId);
+  await touchStocksPmLastAppOpen(supabase, dataUserId, "web");
 
   const [subRow, snapRes] = await Promise.all([
     getSubscriptionRowForUser(dataUserId),
