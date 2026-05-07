@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, LineChart, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
@@ -233,8 +233,29 @@ export default function WatchlistPage() {
                 ))}
               </div>
               <div className="absolute left-3 right-3 top-3 flex items-center justify-between">
-                <div className="rounded-full border border-primary/20 bg-background/85 p-2 text-primary shadow-sm dark:bg-slate-950/75">
-                  <LineChart className="h-4 w-4" aria-hidden />
+                <div
+                  className="flex h-9 w-9 items-center justify-center text-primary/90 drop-shadow-[0_4px_14px_rgba(182,153,62,0.28)]"
+                  aria-hidden
+                >
+                  <svg viewBox="0 0 40 40" className="h-9 w-9" fill="none">
+                    <circle cx="20" cy="20" r="16" stroke="currentColor" strokeOpacity="0.2" strokeWidth="1.5" />
+                    <path
+                      d="M10 24.5C13.5 19.5 18 17 22 17C25.2 17 28 18.4 30.5 21"
+                      stroke="currentColor"
+                      strokeWidth="2.4"
+                      strokeLinecap="round"
+                    />
+                    <path
+                      d="M11.5 13.5L16.2 18.2L22.2 12.1L28.5 18.4"
+                      stroke="currentColor"
+                      strokeWidth="2.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <circle cx="11.5" cy="13.5" r="2.2" fill="currentColor" />
+                    <circle cx="22.2" cy="12.1" r="2.2" fill="currentColor" />
+                    <circle cx="30.5" cy="21" r="2.2" fill="currentColor" />
+                  </svg>
                 </div>
                 <div className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
                   App
