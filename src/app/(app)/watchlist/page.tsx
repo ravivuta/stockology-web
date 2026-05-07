@@ -294,9 +294,18 @@ export default function WatchlistPage() {
                   />
                 </div>
               </th>
-              <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
-              <SortableHeaderCell label="Today %" column="change" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
-              <SortableHeaderCell label="Analyst Rating" column="analyst" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
+              <SortableHeaderCell
+                label="Last / Chg"
+                column="lastPrice"
+                activeColumn={sort}
+                direction={sortDirection}
+                onSort={toggleSort}
+                align="center"
+                className="px-2 py-3 md:hidden"
+              />
+              <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 md:table-cell md:px-3" />
+              <SortableHeaderCell label="Today %" column="change" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 md:table-cell md:px-3" />
+              <SortableHeaderCell label="Analyst Rating" column="analyst" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 md:table-cell md:px-3" />
               <th scope="col" className="px-2 py-3 text-center sm:px-3">
                 <div className="flex flex-col items-center gap-2">
                   <span>Shortlisted</span>
@@ -332,7 +341,7 @@ export default function WatchlistPage() {
                   </button>
                 </div>
               </th>
-              <th scope="col" className="px-2 py-3 text-center sm:px-3">
+              <th scope="col" className="hidden px-2 py-3 text-center md:table-cell md:px-3">
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
@@ -340,7 +349,10 @@ export default function WatchlistPage() {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-subtle sm:px-5">
+                <td colSpan={7} className="px-4 py-8 text-center text-subtle md:hidden">
+                  No watchlist symbols yet. Add a symbol in the toolbar above or import a watchlist CSV.
+                </td>
+                <td colSpan={9} className="hidden px-4 py-8 text-center text-subtle md:table-cell sm:px-5">
                   No watchlist symbols yet. Add a symbol in the toolbar above or import a watchlist CSV.
                 </td>
               </tr>
@@ -366,9 +378,27 @@ export default function WatchlistPage() {
                         <span className="min-w-0 truncate">{s.symbol}</span>
                       </button>
                     </td>
-                    <td className="px-2 py-3 text-center tabular-nums text-subtle sm:px-3">{formatCurrency(s.lastPrice ?? 0)}</td>
+                    <td className="px-2 py-3 text-center tabular-nums md:hidden">
+                      <div className="flex min-w-[4.75rem] flex-col items-center leading-tight">
+                        <span className="text-foreground">{formatCurrency(s.lastPrice ?? 0)}</span>
+                        <span
+                          className={
+                            s.dailyChangePercent == null
+                              ? "text-[11px] text-subtle"
+                              : s.dailyChangePercent > 0
+                                ? "text-[11px] font-medium text-emerald-700 dark:text-emerald-400"
+                                : s.dailyChangePercent < 0
+                                  ? "text-[11px] font-medium text-red-700 dark:text-red-400"
+                                  : "text-[11px] text-subtle"
+                          }
+                        >
+                          {s.dailyChangePercent != null ? formatPercent(s.dailyChangePercent, true) : "—"}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="hidden px-2 py-3 text-center tabular-nums text-subtle md:table-cell md:px-3">{formatCurrency(s.lastPrice ?? 0)}</td>
                     <td
-                      className={`px-2 py-3 text-center tabular-nums font-medium sm:px-3 ${
+                      className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${
                         s.dailyChangePercent == null
                           ? "text-subtle"
                           : s.dailyChangePercent > 0
@@ -381,7 +411,7 @@ export default function WatchlistPage() {
                       {s.dailyChangePercent != null ? formatPercent(s.dailyChangePercent, true) : "—"}
                     </td>
                     <td
-                      className={`min-w-0 px-2 py-3 text-center tabular-nums font-medium sm:px-3 ${analystRatingTextClass(rating)}`}
+                      className={`hidden min-w-0 px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${analystRatingTextClass(rating)}`}
                       title="Consensus / average rating when available from data refresh"
                     >
                       <span className="block truncate">{rating && !Number.isNaN(Number.parseFloat(rating)) ? formatDecimal(Number.parseFloat(rating)) : "—"}</span>
@@ -414,7 +444,7 @@ export default function WatchlistPage() {
                         <span className="block truncate">—</span>
                       )}
                     </td>
-                    <td className="px-2 py-3 text-center sm:px-3">
+                    <td className="hidden px-2 py-3 text-center md:table-cell md:px-3">
                       <button
                         type="button"
                         onClick={(event) => {

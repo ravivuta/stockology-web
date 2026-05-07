@@ -521,8 +521,9 @@ export default function PortfolioPage() {
                       />
                     </div>
                   </th>
-                  <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
-                  <SortableHeaderCell label="Chg" column="today" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
+                  <SortableHeaderCell label="Last / Chg" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-4 pb-2 pt-3 md:hidden" />
+                  <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
+                  <SortableHeaderCell label="Chg" column="today" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
                   <SortableHeaderCell label="Qty" column="quantity" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
                   <SortableHeaderCell label="Avg" column="averageCost" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
                   <SortableHeaderCell label="Costbasis" column="costBasis" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
@@ -581,9 +582,27 @@ export default function PortfolioPage() {
                           </button>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center tabular-nums text-foreground">{formatCurrency(s.lastPrice ?? 0)}</td>
+                      <td className="px-4 py-3 text-center tabular-nums md:hidden">
+                        <div className="flex min-w-[5rem] flex-col items-center leading-tight">
+                          <span className="text-foreground">{formatCurrency(s.lastPrice ?? 0)}</span>
+                          <span
+                            className={
+                              d == null
+                                ? "text-[11px] text-subtle"
+                                : d > 0
+                                  ? "text-[11px] font-medium text-emerald-700 dark:text-primary"
+                                  : d < 0
+                                    ? "text-[11px] font-medium text-red-700 dark:text-red-400"
+                                    : "text-[11px] text-subtle"
+                            }
+                          >
+                            {d != null && Number.isFinite(d) ? formatPercent(d, true) : "—"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="hidden px-4 py-3 text-center tabular-nums text-foreground md:table-cell">{formatCurrency(s.lastPrice ?? 0)}</td>
                       <td
-                        className={`px-4 py-3 text-center tabular-nums font-medium ${
+                        className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${
                           d == null ? "text-subtle" : d > 0 ? "text-emerald-700 dark:text-primary" : d < 0 ? "text-red-700 dark:text-red-400" : "text-subtle"
                         }`}
                       >
