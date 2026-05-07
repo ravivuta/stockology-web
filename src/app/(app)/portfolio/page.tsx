@@ -17,6 +17,7 @@ import { recommendationActionDisplay } from "@/lib/recommendation";
 import { computeTodayChangeFromLiveQuotes } from "@/lib/portfolio-net-worth-series";
 import { isUsMarketExtendedHoursOpen } from "@/lib/market-hours";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
+import { recordExternalCashFlow } from "@/lib/external-cash-flows";
 
 type SortKey = "symbol" | "quantity" | "averageCost" | "costBasis" | "lastPrice" | "value" | "gainLoss" | "upside" | "score" | "today" | "signal";
 
@@ -320,11 +321,26 @@ export default function PortfolioPage() {
   const showPortfolioTodayChange = isUsMarketExtendedHoursOpen() && portfolioTodayChange.hasBaseline;
 
   function saveCash() {
+    const previousCash = cash;
     const n = parseFloat(cashInput.replace(/,/g, "")) || 0;
     setCash(n);
     recalc();
     setIsCashEditing(false);
-    void flushCurrentPortfolioSnapshotNow(true);
+    void (async () => {
+      const delta = n - previousCash;
+      if (Math.abs(delta) >= 0.005) {
+        const flowResult = await recordExternalCashFlow({
+          amount: delta,
+          source: "web_portfolio_cash_edit",
+          balanceBefore: previousCash,
+          balanceAfter: n,
+        });
+        if (flowResult.error) {
+          console.warn("[portfolio cash flow]", flowResult.error.message);
+        }
+      }
+      await flushCurrentPortfolioSnapshotNow(true);
+    })();
   }
 
   function startCashEdit() {

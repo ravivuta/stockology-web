@@ -9,6 +9,7 @@ import { runRefreshPipeline } from "@/lib/refresh";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { STOCKS_PM_ONBOARDING_USER_META_KEY } from "@/lib/onboarding-meta";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
+import { recordExternalCashFlow } from "@/lib/external-cash-flows";
 
 const steps = [
   { title: "Strategy", body: "Practice emotionless rules: buy near moving averages, scale in, take profits at targets." },
@@ -56,6 +57,18 @@ export default function OnboardingPage() {
 
     try {
       setCashStore(v);
+      if (v > 0) {
+        const flowResult = await recordExternalCashFlow({
+          amount: v,
+          flowType: "deposit",
+          source: "web_onboarding_initial_cash",
+          balanceBefore: 0,
+          balanceAfter: v,
+        });
+        if (flowResult.error) {
+          console.warn("[onboarding external cash flow]", flowResult.error.message);
+        }
+      }
       setSettings({ riskAppetite: risk });
 
       let seededSymbols: string[] = [];
