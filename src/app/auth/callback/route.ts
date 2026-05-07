@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { withBasePath } from "@/lib/base-path";
 import { safeRelativeRedirectPath } from "@/lib/safe-redirect";
 import { ensureUserHasWebTrial } from "@/lib/billing";
 import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
@@ -17,14 +18,13 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const origin = url.origin;
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   const safeNext = safeRelativeRedirectPath(url.searchParams.get("next"), "/dashboard");
 
   if (!code) {
-    return NextResponse.redirect(`${origin}${basePath}/login?error=${encodeURIComponent("Missing OAuth code")}`);
+    return NextResponse.redirect(`${origin}${withBasePath("/login")}?error=${encodeURIComponent("Missing OAuth code")}`);
   }
 
-  const redirectResponse = NextResponse.redirect(`${origin}${basePath}${safeNext}`);
+  const redirectResponse = NextResponse.redirect(`${origin}${withBasePath(safeNext)}`);
 
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
-    return NextResponse.redirect(`${origin}${basePath}/login?error=${encodeURIComponent(oauthErrorForQuery(error.message))}`);
+    return NextResponse.redirect(`${origin}${withBasePath("/login")}?error=${encodeURIComponent(oauthErrorForQuery(error.message))}`);
   }
 
   const {

@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { NextResponse, type NextRequest } from "next/server";
+import { withBasePath } from "@/lib/base-path";
 import { createClient } from "@/lib/supabase/server";
 import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
 import { getSubscriptionRowForUser } from "@/lib/subscription-admin";
@@ -29,13 +30,13 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.redirect(new URL("/login", request.url));
+      return NextResponse.redirect(new URL(withBasePath("/login"), request.url));
     }
 
     const dataUserId = await syncStocksPmAuthUser(supabase, user.id);
     const currentRow = await getSubscriptionRowForUser(dataUserId);
     if (currentRow?.billing_exempt === true) {
-      return NextResponse.redirect(new URL("/settings?billing=admin_access", request.url));
+      return NextResponse.redirect(new URL(withBasePath("/settings?billing=admin_access"), request.url));
     }
     const hasAppAccess = subscriptionAllowsAccess(currentRow);
     const stripe = getStripe();
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
     const customer = customers.data.find((item) => item.metadata?.user_id === dataUserId) ?? customers.data[0];
 
     if (!customer) {
-      return NextResponse.redirect(new URL(`/settings?billing=${hasAppAccess ? "portal_unavailable" : "missing_customer"}`, request.url));
+      return NextResponse.redirect(new URL(withBasePath(`/settings?billing=${hasAppAccess ? "portal_unavailable" : "missing_customer"}`), request.url));
     }
 
     const subscriptions = await stripe.subscriptions.list({
@@ -59,17 +60,17 @@ export async function GET(request: NextRequest) {
     );
 
     if (!hasStripeSubscription) {
-      return NextResponse.redirect(new URL("/settings?billing=portal_unavailable", request.url));
+      return NextResponse.redirect(new URL(withBasePath("/settings?billing=portal_unavailable"), request.url));
     }
 
     const portal = await stripe.billingPortal.sessions.create({
       customer: customer.id,
-      return_url: `${request.nextUrl.origin}/settings`,
+      return_url: `${request.nextUrl.origin}${withBasePath("/settings")}`,
     });
 
     return NextResponse.redirect(portal.url);
   } catch (error) {
     console.error("[billing/portal] failed", error);
-    return NextResponse.redirect(new URL(`/settings?billing=${portalErrorState(error)}`, request.url));
+    return NextResponse.redirect(new URL(withBasePath(`/settings?billing=${portalErrorState(error)}`), request.url));
   }
 }

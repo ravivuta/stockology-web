@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { withBasePath } from "@/lib/base-path";
 import { subscriptionAllowsAccess, type SubscriptionRow } from "@/lib/subscription-state";
 
 export type SubRow = SubscriptionRow;
@@ -33,7 +34,7 @@ export function useSubscriptionGate(userId: string | undefined, serverRow?: SubR
         setLoading(true);
       }
       try {
-        const response = await fetch("/api/subscription/status", { cache: "no-store" });
+        const response = await fetch(withBasePath("/api/subscription/status"), { cache: "no-store" });
         if (!response.ok) {
           throw new Error(`Subscription status request failed: ${response.status}`);
         }

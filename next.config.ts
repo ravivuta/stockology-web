@@ -11,10 +11,11 @@ const baseSecurityHeaders: { key: string; value: string }[] = [
   },
 ];
 
-const BASE_PATH = "";
+const BASE_PATH = "/stocks-pm";
 
 const nextConfig: NextConfig = {
   // Expose basePath to client & server code for manual fetch() calls and redirects
+  basePath: BASE_PATH,
   env: {
     NEXT_PUBLIC_BASE_PATH: BASE_PATH,
   },

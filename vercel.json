@@ -2,12 +2,12 @@
   "redirects": [
     {
       "source": "/stocksPM",
-      "destination": "/",
+      "destination": "/stocks-pm",
       "permanent": true
     },
     {
       "source": "/stocksPM/:path*",
-      "destination": "/:path*",
+      "destination": "/stocks-pm/:path*",
       "permanent": true
     }
   ]
