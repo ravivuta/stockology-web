@@ -19,7 +19,7 @@ const OPTIONS: { value: AppearanceMode; label: string; hint: string }[] = [
 export function ThemeToggle() {
   const { setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const [mode, setMode] = useState<AppearanceMode>("light");
+  const [mode, setMode] = useState<AppearanceMode>("auto");
 
   useEffect(() => {
     setMounted(true);

@@ -18,7 +18,7 @@ export function resolveAppearanceTheme(mode: AppearanceMode, now: Date = new Dat
 }
 
 export function readStoredAppearanceMode(): AppearanceMode {
-  if (typeof window === "undefined") return "light";
+  if (typeof window === "undefined") return "auto";
 
   try {
     const stored = localStorage.getItem(THEME_MODE_STORAGE);
@@ -33,7 +33,7 @@ export function readStoredAppearanceMode(): AppearanceMode {
     /* storage blocked */
   }
 
-  return "light";
+  return "auto";
 }
 
 export function writeAppearanceMode(mode: AppearanceMode) {
