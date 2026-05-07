@@ -15,6 +15,7 @@ import { isValidTicker } from "@/lib/csvPortfolio";
 import { formatCurrency, formatDecimal, formatNumberMax2, formatPercent, formatSignedCurrency, formatWholeCurrency } from "@/lib/numberFormat";
 import { recommendationActionDisplay } from "@/lib/recommendation";
 import { computeTodayChangeFromLiveQuotes } from "@/lib/portfolio-net-worth-series";
+import { isUsMarketExtendedHoursOpen } from "@/lib/market-hours";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 
 type SortKey = "symbol" | "quantity" | "averageCost" | "costBasis" | "lastPrice" | "value" | "gainLoss" | "upside" | "score" | "today" | "signal";
@@ -88,6 +89,7 @@ function PortfolioSummaryTiles({
   totalGainLoss,
   totalGainLossPct,
   portfolioTodayChange,
+  showPortfolioTodayChange,
 }: {
   cash: number;
   cashInput: string;
@@ -101,6 +103,7 @@ function PortfolioSummaryTiles({
   totalGainLoss: number;
   totalGainLossPct: number | null;
   portfolioTodayChange: { change: number; percent: number; hasBaseline: boolean };
+  showPortfolioTodayChange: boolean;
 }) {
   return (
     <>
@@ -182,7 +185,7 @@ function PortfolioSummaryTiles({
           {totalGainLossPct != null ? ` (${formatPercent(totalGainLossPct, true)})` : ""}
         </p>
         <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Today&apos;s chg</p>
-        {portfolioTodayChange.hasBaseline ? (
+        {showPortfolioTodayChange ? (
           <p
             className={`mt-1 text-sm font-medium tabular-nums ${
               portfolioTodayChange.change > 0
@@ -314,6 +317,7 @@ export default function PortfolioPage() {
     const portfolioTodayChange = computeTodayChangeFromLiveQuotes(stocks, cash);
     return { assetsValue: assets, holdingsCostBasis, totalGainLoss, totalGainLossPct, netWorth: net, portfolioTodayChange };
   }, [stocks, cash]);
+  const showPortfolioTodayChange = isUsMarketExtendedHoursOpen() && portfolioTodayChange.hasBaseline;
 
   function saveCash() {
     const n = parseFloat(cashInput.replace(/,/g, "")) || 0;
@@ -390,6 +394,7 @@ export default function PortfolioPage() {
           totalGainLoss={totalGainLoss}
           totalGainLossPct={totalGainLossPct}
           portfolioTodayChange={portfolioTodayChange}
+          showPortfolioTodayChange={showPortfolioTodayChange}
         />
       </div>
 

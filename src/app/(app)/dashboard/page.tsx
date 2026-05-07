@@ -18,6 +18,7 @@ import {
   fetchCloudNetWorthHistory,
   type NetWorthPoint,
 } from "@/lib/portfolio-net-worth-series";
+import { isUsMarketExtendedHoursOpen } from "@/lib/market-hours";
 import { formatAbsPercent, formatCompactCurrency, formatCurrency, formatPercent } from "@/lib/numberFormat";
 
 const PALETTE = {
@@ -48,8 +49,8 @@ export default function DashboardPage() {
     [cloudHistory, totalBalance]
   );
   const todayQuoteChange = useMemo(() => computeTodayChangeFromLiveQuotes(stocks, cash), [stocks, cash]);
-  const todayChange = todaySnapshotChange.hasBaseline ? todaySnapshotChange : todayQuoteChange;
-  const showTodayChange = todayChange.hasBaseline && Math.abs(todayChange.change) > 0.01;
+  const todayChange = todayQuoteChange.hasBaseline ? todayQuoteChange : todaySnapshotChange;
+  const showTodayChange = isUsMarketExtendedHoursOpen() && todayChange.hasBaseline && Math.abs(todayChange.change) > 0.01;
   const todayValueClassName =
     todayChange.change >= 0
       ? "font-semibold text-[color:var(--dashboard-chart-gain)]"
@@ -252,12 +253,12 @@ export default function DashboardPage() {
         </div>
         <p className="mt-4 text-[11px] leading-relaxed text-subtle">
           {showTodayChange
-            ? todaySnapshotChange.hasBaseline
-              ? "Today compares your live total against the latest saved portfolio snapshot before today in U.S. Eastern time."
-              : "Today is estimated from live quote changes across your current holdings when a prior saved snapshot is not available."
+            ? todayQuoteChange.hasBaseline
+              ? "Today is calculated from live quote changes against each holding's previous close."
+              : "Today falls back to your latest saved portfolio snapshot before today in U.S. Eastern time when live quote deltas are unavailable."
             : todayStatusLoading
-              ? "Loading today change from your saved portfolio snapshots…"
-              : "Today appears once live quote deltas or at least one prior U.S. trading-day portfolio snapshot is available."}
+              ? "Loading quote deltas and portfolio history for today's change…"
+              : "Today appears only during U.S. extended hours (8:00 AM-8:00 PM ET) once live quote deltas or at least one prior U.S. trading-day portfolio snapshot is available."}
         </p>
       </motion.section>
 
