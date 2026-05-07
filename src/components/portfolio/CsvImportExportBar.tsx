@@ -26,6 +26,7 @@ import { AppModal, ModalSection } from "@/components/ui/AppModal";
 import { parseStockPeg } from "@/lib/stock-metric-parse";
 
 const MAX_TRACKED_STOCKS = 200;
+const HIDDEN_MAPPING_FIELDS = new Set<CsvColumnStandard>(["account", "retirementAccount", "name"]);
 
 const CSV_MAPPING_MEMORY_KEY = "stocks-pm-csv-mapping-memory:v1";
 const CSV_MAPPING_PRESETS_KEY = "stocks-pm-csv-mapping-presets:v1";
@@ -160,12 +161,14 @@ function persistSavedMappingPresets(presets: SavedCsvMappingPreset[]) {
   }
 }
 
-function upsertSavedMappingPreset(preset: Omit<SavedCsvMappingPreset, "id" | "updatedAt">): SavedCsvMappingPreset[] {
+function upsertSavedMappingPreset(preset: Omit<SavedCsvMappingPreset, "id" | "updatedAt"> & { id?: string }): SavedCsvMappingPreset[] {
   const trimmedName = preset.name.trim();
   if (!trimmedName) return loadSavedMappingPresets();
   const existing = loadSavedMappingPresets();
   const normalizedName = trimmedName.toLowerCase();
-  const match = existing.find((item) => item.name.trim().toLowerCase() === normalizedName);
+  const match = preset.id
+    ? existing.find((item) => item.id === preset.id)
+    : existing.find((item) => item.name.trim().toLowerCase() === normalizedName);
   const nextPreset: SavedCsvMappingPreset = {
     id: match?.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     name: trimmedName,
@@ -568,7 +571,7 @@ export function CsvImportExportBar({
                 value={pendingMappingImport?.defaultAccountName ?? ""}
                 onChange={(e) => {
                   const value = e.target.value;
-                  setPendingMappingImport((current) => (current ? { ...current, defaultAccountName: value, activePresetId: null } : current));
+                  setPendingMappingImport((current) => (current ? { ...current, defaultAccountName: value } : current));
                 }}
                 placeholder="Brokerage, IRA, Roth, Taxable…"
                 className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
@@ -583,7 +586,7 @@ export function CsvImportExportBar({
                 value={pendingMappingImport?.defaultRetirementAccount ?? "no"}
                 onChange={(e) => {
                   const value = e.target.value as "no" | "yes";
-                  setPendingMappingImport((current) => (current ? { ...current, defaultRetirementAccount: value, activePresetId: null } : current));
+                  setPendingMappingImport((current) => (current ? { ...current, defaultRetirementAccount: value } : current));
                 }}
                 className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
               >
@@ -595,7 +598,7 @@ export function CsvImportExportBar({
               <p className="text-sm font-medium text-foreground">Column Mapping</p>
               <p className="mt-1 text-xs text-subtle">Map your CSV column headers to the standard iOS import fields. `Symbol` is required.</p>
             </div>
-            {CSV_IMPORT_FIELDS.map((field) => (
+            {CSV_IMPORT_FIELDS.filter((field) => !HIDDEN_MAPPING_FIELDS.has(field.key)).map((field) => (
               <div key={field.key} className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
                 <div>
                   <p className="text-sm font-medium text-foreground">
@@ -612,7 +615,6 @@ export function CsvImportExportBar({
                       current
                         ? {
                             ...current,
-                            activePresetId: null,
                             mapping: {
                               ...current.mapping,
                               [field.key]: value,
@@ -654,12 +656,17 @@ export function CsvImportExportBar({
                   const presetName = pendingMappingImport.defaultAccountName.trim();
                   if (presetName) {
                     const next = upsertSavedMappingPreset({
+                      id: pendingMappingImport.activePresetId ?? undefined,
                       name: presetName,
                       mapping: pendingMappingImport.mapping,
                       defaultAccountName: pendingMappingImport.defaultAccountName,
                       defaultRetirementAccount: pendingMappingImport.defaultRetirementAccount,
                     });
                     setSavedPresets(next);
+                    const savedPreset = next.find((preset) => preset.id === (pendingMappingImport.activePresetId ?? next[0]?.id));
+                    if (savedPreset) {
+                      setPendingMappingImport((current) => (current ? { ...current, activePresetId: savedPreset.id } : current));
+                    }
                   }
                   updateImportProgress("Parsing CSV", 36);
                   const res = await parsePortfolioCsv(pendingMappingImport.text, {

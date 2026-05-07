@@ -27,6 +27,8 @@ export const CSV_IMPORT_FIELDS: CsvImportField[] = [
   { key: "name", label: "Name", description: "Optional company name." },
 ];
 
+const CSV_AUTO_DETECT_FIELDS = new Set<CsvColumnStandard>(["symbol", "qty", "price"]);
+
 const CSV_IMPORT_CANDIDATES: Record<CsvColumnStandard, string[]> = {
   symbol: ["symbol", "ticker", "code"],
   qty: ["qty", "quantity", "shares", "share quantity"],
@@ -364,6 +366,7 @@ export function suggestCsvColumnMapping(
 ): CsvColumnMapping {
   const suggestions: CsvColumnMapping = {};
   for (const field of CSV_IMPORT_FIELDS) {
+    if (!CSV_AUTO_DETECT_FIELDS.has(field.key)) continue;
     const remembered = headers.find((header) => saved?.[normKey(header)] === field.key);
     if (remembered) {
       suggestions[field.key] = remembered;
