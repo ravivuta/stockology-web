@@ -22,6 +22,18 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["recharts", "framer-motion", "lucide-react"],
   },
+  async rewrites() {
+    return [
+      {
+        source: "/stocks-pm/brand/:path*",
+        destination: "/brand/:path*",
+      },
+      {
+        source: "/stocks-pm/landing/:path*",
+        destination: "/landing/:path*",
+      },
+    ];
+  },
   async headers() {
     const headers = [...baseSecurityHeaders];
     if (process.env.NODE_ENV === "production") {

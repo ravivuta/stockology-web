@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { withAppBasePath } from "@/lib/base-path";
 import { cn } from "@/lib/utils";
 
 export function AppLogo({
@@ -12,7 +13,7 @@ export function AppLogo({
 }) {
   return (
     <Image
-      src="/brand/stocks-pm-ios-logo.png"
+      src={withAppBasePath("/brand/stocks-pm-ios-logo.png")}
       alt="Stocks PM app logo"
       width={size}
       height={size}

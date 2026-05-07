@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans, Geist_Mono } from "next/font/google";
+import { withAppBasePath } from "@/lib/base-path";
 import "./globals.css";
 import { Providers } from "./providers";
 import { TopBrandBadge } from "@/components/TopBrandBadge";
@@ -17,9 +18,9 @@ export const metadata: Metadata = {
   description:
     "Enter your holdings and cash, see allocation and performance, and get clear rules-based recommendations. Web companion to the Stocks PM iOS app—not financial advice.",
   icons: {
-    icon: "/brand/stocks-pm-ios-logo.png",
-    apple: "/brand/stocks-pm-ios-logo.png",
-    shortcut: "/brand/stocks-pm-ios-logo.png",
+    icon: withAppBasePath("/brand/stocks-pm-ios-logo.png"),
+    apple: withAppBasePath("/brand/stocks-pm-ios-logo.png"),
+    shortcut: withAppBasePath("/brand/stocks-pm-ios-logo.png"),
   },
 };
 
