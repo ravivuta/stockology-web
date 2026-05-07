@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
@@ -183,95 +183,60 @@ export default function WatchlistPage() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_auto] lg:items-start">
-        <Link
-          href="/simulation#watchlist-simulation"
-          className="group relative overflow-hidden rounded-[1.35rem] border border-primary/20 bg-[linear-gradient(135deg,rgba(182,153,62,0.16),rgba(255,255,255,0.88)_42%,rgba(244,211,94,0.16))] p-4 shadow-sm transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md dark:border-primary/25 dark:bg-[linear-gradient(135deg,rgba(182,153,62,0.22),rgba(18,24,38,0.95)_40%,rgba(244,211,94,0.12))]"
-        >
-          <div
-            className="pointer-events-none absolute inset-y-0 right-0 w-[42%] opacity-80"
-            aria-hidden
-            style={{
-              background:
-                "radial-gradient(circle at 35% 40%, color-mix(in srgb, var(--theme-primary) 30%, transparent), transparent 52%), radial-gradient(circle at 70% 70%, color-mix(in srgb, #f3c74a 22%, transparent), transparent 58%)",
-            }}
-          />
-          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary dark:border-primary/25 dark:bg-primary/14">
-                <Sparkles className="h-3.5 w-3.5" aria-hidden />
-                Simulation
-              </div>
-              <div className="mt-3">
-                <p className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">Simulate (App Strategy)</p>
-                <p className="mt-1 max-w-xl text-sm leading-relaxed text-subtle">
-                  Run the watchlist through the same app strategy logic and inspect which names the shortlist would favor.
-                </p>
-              </div>
-              <div className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-foreground">
-                Open simulator
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
-              </div>
-            </div>
-            <div className="relative flex h-28 w-full max-w-[16rem] items-end justify-between overflow-hidden rounded-2xl border border-border/70 bg-background/70 px-3 py-3 shadow-inner dark:border-white/[0.08] dark:bg-white/[0.04] sm:h-32 sm:w-[15rem]">
-              <div className="absolute inset-x-3 bottom-3 top-3">
-                <div className="absolute inset-0 rounded-xl bg-[linear-gradient(180deg,transparent,rgba(243,199,74,0.08))]" />
-                <div className="absolute inset-x-0 bottom-3 border-t border-dashed border-primary/20" />
-              </div>
-              <div className="relative flex w-full items-end justify-between gap-2">
-                {[
-                  "h-[32%]",
-                  "h-[46%]",
-                  "h-[38%]",
-                  "h-[62%]",
-                  "h-[78%]",
-                ].map((height, index) => (
-                  <div
-                    key={index}
-                    className={`flex-1 rounded-t-full bg-[linear-gradient(180deg,rgba(243,199,74,0.92),rgba(183,150,63,0.42))] ${height}`}
+      <div className="grid items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
+        <div className="flex justify-center sm:justify-start">
+          <CsvImportExportBar exportFilename="stocks-pm-watchlist.csv" importMode="watchlist" />
+        </div>
+        <div className="flex justify-center">
+          <Link
+            href="/simulation#watchlist-simulation"
+            aria-label="Simulate (App Strategy)"
+            title="Simulate (App Strategy)"
+            className="group flex flex-col items-center gap-1"
+          >
+            <span className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-primary/20 bg-[linear-gradient(135deg,rgba(182,153,62,0.18),rgba(255,255,255,0.94)_44%,rgba(244,211,94,0.18))] shadow-sm transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md dark:border-primary/25 dark:bg-[linear-gradient(135deg,rgba(182,153,62,0.24),rgba(18,24,38,0.96)_44%,rgba(244,211,94,0.14))]">
+              <span
+                className="pointer-events-none absolute inset-0 opacity-80"
+                aria-hidden
+                style={{
+                  background:
+                    "radial-gradient(circle at 35% 32%, color-mix(in srgb, var(--theme-primary) 24%, transparent), transparent 52%), radial-gradient(circle at 74% 72%, color-mix(in srgb, #f3c74a 20%, transparent), transparent 56%)",
+                }}
+              />
+              <span className="relative text-primary/90 drop-shadow-[0_4px_12px_rgba(182,153,62,0.24)]" aria-hidden>
+                <svg viewBox="0 0 40 40" className="h-7 w-7" fill="none">
+                  <path
+                    d="M8.5 24.5C12 19.8 16.3 17.3 20.4 17.3C24.1 17.3 27.2 18.8 31 22"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
                   />
-                ))}
-              </div>
-              <div className="absolute left-3 right-3 top-3 flex items-center justify-between">
-                <div
-                  className="flex h-9 w-9 items-center justify-center text-primary/90 drop-shadow-[0_4px_14px_rgba(182,153,62,0.28)]"
-                  aria-hidden
-                >
-                  <svg viewBox="0 0 40 40" className="h-9 w-9" fill="none">
-                    <circle cx="20" cy="20" r="16" stroke="currentColor" strokeOpacity="0.2" strokeWidth="1.5" />
-                    <path
-                      d="M10 24.5C13.5 19.5 18 17 22 17C25.2 17 28 18.4 30.5 21"
-                      stroke="currentColor"
-                      strokeWidth="2.4"
-                      strokeLinecap="round"
-                    />
-                    <path
-                      d="M11.5 13.5L16.2 18.2L22.2 12.1L28.5 18.4"
-                      stroke="currentColor"
-                      strokeWidth="2.4"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <circle cx="11.5" cy="13.5" r="2.2" fill="currentColor" />
-                    <circle cx="22.2" cy="12.1" r="2.2" fill="currentColor" />
-                    <circle cx="30.5" cy="21" r="2.2" fill="currentColor" />
-                  </svg>
-                </div>
-                <div className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
-                  App
-                </div>
-              </div>
-            </div>
-          </div>
-        </Link>
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
+                  <path
+                    d="M10 13.3L15.6 18.9L21.8 12.6L29.5 20.2"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <circle cx="10" cy="13.3" r="2" fill="currentColor" />
+                  <circle cx="21.8" cy="12.6" r="2" fill="currentColor" />
+                  <circle cx="31" cy="22" r="2" fill="currentColor" />
+                </svg>
+              </span>
+              <span className="absolute right-1.5 top-1.5 rounded-full border border-primary/20 bg-primary/10 p-1 text-primary dark:border-primary/25 dark:bg-primary/14">
+                <Sparkles className="h-2.5 w-2.5" aria-hidden />
+              </span>
+            </span>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-subtle">Simulate</span>
+          </Link>
+        </div>
+        <div className="flex justify-center sm:justify-end">
           <Link
             href="/csv-help"
-            className="ui-hover-text text-sm text-primary underline-offset-2 hover:underline lg:order-2"
+            className="ui-hover-text text-sm text-primary underline-offset-2 hover:underline"
           >
             CSV help
           </Link>
-          <CsvImportExportBar exportFilename="stocks-pm-watchlist.csv" importMode="watchlist" />
         </div>
       </div>
 

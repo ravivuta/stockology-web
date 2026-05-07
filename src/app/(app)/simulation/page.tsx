@@ -67,6 +67,12 @@ function formatPct(value: number) {
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
 }
 
+const prominentSimulationButtonClass =
+  "ui-hover-spotlight w-full rounded-xl border border-primary/35 bg-primary text-primary-foreground py-3 font-semibold shadow-[0_14px_30px_-16px_color-mix(in_srgb,var(--theme-primary)_60%,transparent)] hover:border-primary/40 hover:bg-primary/92 disabled:opacity-50 dark:bg-primary dark:text-[color-mix(in_srgb,var(--palette-alice)_92%,white)]";
+
+const prominentWatchlistButtonClass =
+  "ui-hover-spotlight rounded-xl border border-primary/35 bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-[0_14px_30px_-16px_color-mix(in_srgb,var(--theme-primary)_60%,transparent)] hover:border-primary/40 hover:bg-primary/92 disabled:opacity-50 dark:bg-primary dark:text-[color-mix(in_srgb,var(--palette-alice)_92%,white)]";
+
 export default function SimulationPage() {
   const [symbol, setSymbol] = useState("AAPL");
   const [capital, setCapital] = useState("10000");
@@ -197,7 +203,7 @@ export default function SimulationPage() {
             type="button"
             disabled={loading}
             onClick={run}
-            className={appCtaButton("ui-hover-spotlight w-full rounded-xl py-3 font-medium disabled:opacity-50")}
+            className={appCtaButton(prominentSimulationButtonClass)}
           >
             {loading ? "Running…" : "Run symbol simulation"}
           </button>
@@ -235,7 +241,7 @@ export default function SimulationPage() {
               type="button"
               disabled={watchlistLoading || watchlistTrackedCount === 0}
               onClick={runWatchlist}
-              className={appCtaButton("ui-hover-spotlight rounded-xl px-4 py-2.5 text-sm font-medium disabled:opacity-50")}
+              className={appCtaButton(prominentWatchlistButtonClass)}
             >
               {watchlistLoading ? "Running…" : "Run watchlist simulation"}
             </button>
