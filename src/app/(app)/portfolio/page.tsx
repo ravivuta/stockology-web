@@ -479,19 +479,20 @@ export default function PortfolioPage() {
         </div>
 
         <div className="ui-hover-lift overflow-x-auto rounded-2xl border border-border bg-elevated">
-            <table className="min-w-[1180px] w-full text-sm">
+            <table className="w-full table-auto text-sm md:min-w-[1180px] md:table-fixed">
               <colgroup>
-                <col style={{ width: "13%" }} />
-                <col style={{ width: "8%" }} />
-                <col style={{ width: "8%" }} />
-                <col style={{ width: "7%" }} />
-                <col style={{ width: "9%" }} />
-                <col style={{ width: "10%" }} />
-                <col style={{ width: "10%" }} />
-                <col style={{ width: "13%" }} />
-                <col style={{ width: "7%" }} />
-                <col style={{ width: "6%" }} />
-                <col style={{ width: "9%" }} />
+                <col className="w-[18%] md:w-[13%]" />
+                <col className="w-[14%] md:hidden" />
+                <col className="hidden md:table-column md:w-[8%]" />
+                <col className="hidden md:table-column md:w-[8%]" />
+                <col className="w-[8%] md:w-[7%]" />
+                <col className="w-[9%] md:w-[9%]" />
+                <col className="w-[11%] md:w-[10%]" />
+                <col className="w-[11%] md:w-[10%]" />
+                <col className="w-[13%] md:w-[13%]" />
+                <col className="w-[8%] md:w-[7%]" />
+                <col className="w-[8%] md:w-[6%]" />
+                <col className="w-[12%] md:w-[9%]" />
               </colgroup>
               <thead className="bg-muted/60 text-subtle dark:bg-white/[0.05]">
                 <tr>
@@ -583,7 +584,7 @@ export default function PortfolioPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-center tabular-nums md:hidden">
-                        <div className="flex min-w-[5rem] flex-col items-center leading-tight">
+                        <div className="flex min-w-[4.25rem] flex-col items-center leading-tight sm:min-w-[5rem]">
                           <span className="text-foreground">{formatCurrency(s.lastPrice ?? 0)}</span>
                           <span
                             className={

@@ -258,17 +258,18 @@ export default function WatchlistPage() {
       </div>
 
       <div className="w-full overflow-x-auto rounded-2xl border border-border bg-elevated">
-        <table className="w-full table-fixed border-collapse text-sm">
+        <table className="w-full table-auto border-collapse text-sm md:table-fixed">
           <colgroup>
-            <col style={{ width: "12%" }} />
-            <col style={{ width: "10%" }} />
-            <col style={{ width: "10%" }} />
-            <col style={{ width: "10%" }} />
-            <col style={{ width: "10%" }} />
-            <col style={{ width: "10%" }} />
-            <col style={{ width: "12%" }} />
-            <col style={{ width: "12%" }} />
-            <col style={{ width: "6%" }} />
+            <col className="w-[22%] md:w-[12%]" />
+            <col className="w-[16%] md:hidden" />
+            <col className="hidden md:table-column md:w-[10%]" />
+            <col className="hidden md:table-column md:w-[10%]" />
+            <col className="hidden md:table-column md:w-[10%]" />
+            <col className="w-[10%] md:w-[10%]" />
+            <col className="w-[14%] md:w-[10%]" />
+            <col className="w-[10%] md:w-[12%]" />
+            <col className="w-[18%] md:w-[12%]" />
+            <col className="hidden md:table-column md:w-[6%]" />
           </colgroup>
           <thead className="bg-muted/60 text-xs font-semibold uppercase tracking-wide text-subtle dark:bg-white/[0.05]">
             <tr>
@@ -349,10 +350,10 @@ export default function WatchlistPage() {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-subtle md:hidden">
+                <td colSpan={6} className="px-4 py-8 text-center text-subtle md:hidden">
                   No watchlist symbols yet. Add a symbol in the toolbar above or import a watchlist CSV.
                 </td>
-                <td colSpan={9} className="hidden px-4 py-8 text-center text-subtle md:table-cell sm:px-5">
+                <td colSpan={10} className="hidden px-4 py-8 text-center text-subtle md:table-cell sm:px-5">
                   No watchlist symbols yet. Add a symbol in the toolbar above or import a watchlist CSV.
                 </td>
               </tr>
@@ -379,7 +380,7 @@ export default function WatchlistPage() {
                       </button>
                     </td>
                     <td className="px-2 py-3 text-center tabular-nums md:hidden">
-                      <div className="flex min-w-[4.75rem] flex-col items-center leading-tight">
+                      <div className="flex min-w-[4.1rem] flex-col items-center leading-tight sm:min-w-[4.75rem]">
                         <span className="text-foreground">{formatCurrency(s.lastPrice ?? 0)}</span>
                         <span
                           className={
