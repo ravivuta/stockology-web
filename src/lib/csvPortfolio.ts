@@ -30,7 +30,7 @@ export const CSV_IMPORT_FIELDS: CsvImportField[] = [
 const CSV_IMPORT_CANDIDATES: Record<CsvColumnStandard, string[]> = {
   symbol: ["symbol", "ticker", "code"],
   qty: ["qty", "quantity", "shares", "share quantity"],
-  price: ["price", "average cost", "averagecost", "avg cost", "cost basis", "average price", "last price", "cost/share"],
+  price: ["price", "average cost", "averagecost", "average cost basis", "avg cost", "cost basis", "average price", "last price", "cost/share"],
   transaction: ["transaction", "type", "side", "action"],
   purchaseDate: ["purchaseDate", "purchase date", "tradeDate", "trade date", "date", "buy date"],
   account: ["account", "acct", "profile", "profileName", "accountName", "portfolio"],
@@ -197,6 +197,64 @@ function splitCsvLine(line: string, delimiter: string): string[] {
   return out;
 }
 
+function stripCsvCell(cell: string): string {
+  return cell.replace(/^"+|"+$/g, "").trim();
+}
+
+function parseCsvRecordsFallback(text: string): Record<string, unknown>[] {
+  const lines = text
+    .replace(/^\uFEFF/, "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) return [];
+
+  const delimiter = detectDelimiter(lines[0] ?? "");
+  const headers = splitCsvLine(lines[0] ?? "", delimiter).map(stripCsvCell);
+  if (headers.length === 0) return [];
+
+  return lines.slice(1).map((line) => {
+    const cells = splitCsvLine(line, delimiter).map(stripCsvCell);
+    const row: Record<string, unknown> = {};
+    headers.forEach((header, index) => {
+      row[header] = cells[index] ?? "";
+    });
+    return row;
+  });
+}
+
+async function parseCsvRecords(text: string): Promise<{ data: Record<string, unknown>[]; error?: string }> {
+  const normalizedText = text.replace(/^\uFEFF/, "");
+  const firstLine = normalizedText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean);
+  const delimiter = detectDelimiter(firstLine ?? "");
+
+  const { default: Papa } = await import("papaparse");
+  const parsed = Papa.parse<Record<string, unknown>>(normalizedText, {
+    header: true,
+    delimiter,
+    skipEmptyLines: "greedy",
+    transformHeader: (h) => h.trim(),
+  });
+
+  if (parsed.errors.length === 0) {
+    return { data: parsed.data };
+  }
+
+  const fieldMismatchOnly = parsed.errors.every((error) => error.code === "TooFewFields" || error.code === "TooManyFields");
+  if (fieldMismatchOnly) {
+    const fallbackData = parseCsvRecordsFallback(normalizedText);
+    if (fallbackData.length > 0) {
+      return { data: fallbackData };
+    }
+  }
+
+  return { data: [], error: parsed.errors[0]?.message ?? "CSV parse error" };
+}
+
 function matchHeader(headers: string[], target: string): string | null {
   const normalizedTarget = normKey(target);
   for (const header of headers) {
@@ -329,6 +387,15 @@ function isBuyTransaction(text: string): boolean {
   return u.includes("BUY") || u.includes("BOUGHT") || u.includes("ADD");
 }
 
+function hasRecognizableTransactionValues(data: Record<string, unknown>[], headerKey: string | null): boolean {
+  if (!headerKey) return false;
+  return data.some((row) => {
+    const value = getCell(row, headerKey);
+    if (!value) return false;
+    return isSellTransaction(value) || isBuyTransaction(value);
+  });
+}
+
 function normalizeImportedDate(raw: string): string | undefined {
   const value = raw.trim();
   if (!value) return undefined;
@@ -374,18 +441,11 @@ export async function parsePortfolioCsv(
   if (symbolOnly) return { ...symbolOnly, trades: [] };
   const mapping = options?.columnMapping;
 
-  const { default: Papa } = await import("papaparse");
-  const parsed = Papa.parse<Record<string, unknown>>(text, {
-    header: true,
-    skipEmptyLines: "greedy",
-    transformHeader: (h) => h.trim(),
-  });
-
-  if (parsed.errors.length > 0) {
+  const parsed = await parseCsvRecords(text);
+  if (parsed.error) {
     const fallback = parseSymbolOnlyText(text);
     if (fallback) return { ...fallback, trades: [] };
-    const msg = parsed.errors[0]?.message ?? "CSV parse error";
-    return { ok: false, error: msg };
+    return { ok: false, error: parsed.error };
   }
 
   const data = parsed.data.filter((row) => Object.values(row).some((v) => v != null && String(v).trim() !== ""));
@@ -499,7 +559,7 @@ export async function parsePortfolioCsv(
   const kQtyLot = resolveMappedHeaderKey(headers, mapping, "qty", ["qty", "Qty", "quantity", "Quantity", "shares"]);
   const kTxnLot = resolveMappedHeaderKey(headers, mapping, "transaction", ["transaction", "Transaction", "side", "action"]);
   /* Lot-style rows (iOS export): symbol + qty + transaction/side so we can skip SELL lines. */
-  const isLot = kSymLot != null && kQtyLot != null && kTxnLot != null;
+  const isLot = kSymLot != null && kQtyLot != null && hasRecognizableTransactionValues(data, kTxnLot);
 
   if (isLot) {
     const kSym = kSymLot;

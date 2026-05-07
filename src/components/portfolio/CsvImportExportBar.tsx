@@ -472,12 +472,6 @@ export function CsvImportExportBar({
           </p>
         </div>
       ) : null}
-      {flash ? (
-        <p className={`${compact ? "text-xs" : "text-sm"} ${flash.kind === "err" ? "text-error" : "text-subtle"}`} role="status">
-          {flash.text}
-        </p>
-      ) : null}
-
       <AppModal
         open={pendingMappingImport != null}
         onClose={() => setPendingMappingImport(null)}
@@ -706,6 +700,38 @@ export function CsvImportExportBar({
             }`}
           >
             {progress.active ? "Importing…" : "Import CSV"}
+          </button>
+        </ModalSection>
+      </AppModal>
+
+      <AppModal
+        open={flash != null}
+        onClose={() => setFlash(null)}
+        size="sm"
+        titleId="csv-import-status-title"
+        describedById="csv-import-status-description"
+      >
+        <ModalSection className="border-b border-border px-5 pb-4 pt-5 dark:border-foreground/10">
+          <h2 id="csv-import-status-title" className="text-lg font-semibold tracking-tight text-foreground">
+            {flash?.kind === "err" ? "CSV error" : "CSV status"}
+          </h2>
+        </ModalSection>
+        <ModalSection className="px-5 py-4">
+          <p
+            id="csv-import-status-description"
+            className={`text-sm leading-relaxed ${flash?.kind === "err" ? "text-error" : "text-subtle"}`}
+            role="status"
+          >
+            {flash?.text}
+          </p>
+        </ModalSection>
+        <ModalSection className="flex justify-end border-t border-border px-4 py-4 dark:border-foreground/10">
+          <button
+            type="button"
+            onClick={() => setFlash(null)}
+            className="ui-hover-spotlight rounded-lg border border-primary/40 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+          >
+            Close
           </button>
         </ModalSection>
       </AppModal>
