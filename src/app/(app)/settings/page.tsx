@@ -510,7 +510,7 @@ export default function SettingsPage() {
                   />
                 </label>
                 <p className="mt-1 text-[10px] leading-snug text-subtle">
-                  Stocks use this only as fallback when no analyst target price is available.
+                  Stocks use this only as fallback when no Analyst Target (Median) price is available.
                 </p>
               </div>
 

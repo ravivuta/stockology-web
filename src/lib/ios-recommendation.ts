@@ -509,7 +509,7 @@ export function computeRecommendationFactors(
     case "SELL":
       if (!rec.comments.includes("RSI overbought reversal") && stock.analystTarget != null && stock.analystTarget > 0) {
         factors.push({
-          label: "Price at/above analyst target",
+          label: "Price at/above Analyst Target (Median)",
           detail: `${formatCurrency(currentPrice)} ≥ ${formatCurrency(stock.analystTarget)}`,
           passes: currentPrice >= stock.analystTarget,
         });

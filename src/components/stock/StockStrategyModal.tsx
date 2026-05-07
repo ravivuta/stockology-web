@@ -47,7 +47,7 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
 
   const sellTarget = (() => {
     if (stock.analystTarget && stock.analystTarget > 0) {
-      return { price: stock.analystTarget, source: "Analyst target" as const };
+      return { price: stock.analystTarget, source: "Analyst Target (Median)" as const };
     }
     if (stock.quantity > 0) {
       const pt = stock.isETF ? etfProfitTarget : stockProfitTarget;

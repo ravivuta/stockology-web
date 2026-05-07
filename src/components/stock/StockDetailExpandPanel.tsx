@@ -861,7 +861,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                           valueClassName: analystRatingTone(stock.analystAvg),
                         },
                         {
-                          label: "Analyst target",
+                          label: "Analyst Target (Median)",
                           value: stock.analystTarget != null ? formatCurrency(stock.analystTarget) : "—",
                           detail: formatUpsidePct(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)),
                           valueClassName: valueTone(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)),
