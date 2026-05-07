@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
@@ -206,54 +205,33 @@ export default function WatchlistPage() {
               title="Simulate (App Strategy)"
               className="group flex items-center"
             >
-              <span className="relative flex h-11 w-44 items-center justify-center overflow-hidden rounded-2xl border border-primary/20 bg-[linear-gradient(135deg,rgba(182,153,62,0.18),rgba(255,255,255,0.94)_44%,rgba(244,211,94,0.18))] shadow-sm transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md dark:border-primary/25 dark:bg-[linear-gradient(135deg,rgba(182,153,62,0.24),rgba(18,24,38,0.96)_44%,rgba(244,211,94,0.14))]">
+              <span className="relative flex h-11 w-44 items-center justify-center overflow-hidden rounded-[1.25rem] border border-primary/20 bg-[linear-gradient(135deg,color-mix(in_srgb,var(--theme-primary)_16%,white),color-mix(in_srgb,var(--theme-primary)_6%,white)_44%,color-mix(in_srgb,var(--theme-primary)_18%,transparent))] shadow-[0_10px_24px_-18px_color-mix(in_srgb,var(--theme-primary)_65%,transparent)] transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 hover:border-primary/32 hover:shadow-[0_16px_28px_-18px_color-mix(in_srgb,var(--theme-primary)_72%,transparent)] dark:border-primary/25 dark:bg-[linear-gradient(135deg,color-mix(in_srgb,var(--theme-primary)_22%,#0f1726),color-mix(in_srgb,var(--theme-primary)_10%,#111827)_46%,color-mix(in_srgb,var(--theme-primary)_20%,#0f1726))]">
                 <span
-                  className="pointer-events-none absolute inset-0 opacity-80"
+                  className="pointer-events-none absolute inset-0 opacity-90"
                   aria-hidden
                   style={{
                     background:
-                      "radial-gradient(circle at 18% 34%, color-mix(in srgb, var(--theme-primary) 24%, transparent), transparent 46%), radial-gradient(circle at 84% 70%, color-mix(in srgb, #f3c74a 20%, transparent), transparent 54%)",
+                      "radial-gradient(circle at 14% 26%, color-mix(in srgb, var(--theme-primary) 24%, transparent), transparent 44%), radial-gradient(circle at 82% 74%, color-mix(in srgb, var(--theme-primary) 18%, transparent), transparent 48%), linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.18) 33%, transparent 60%)",
                   }}
                 />
-                <span className="relative text-primary/90 drop-shadow-[0_4px_12px_rgba(182,153,62,0.24)]" aria-hidden>
+                <span className="relative text-primary/90 drop-shadow-[0_5px_14px_color-mix(in_srgb,var(--theme-primary)_28%,transparent)] dark:text-[color-mix(in_srgb,var(--theme-primary)_78%,white)]" aria-hidden>
                   <svg viewBox="0 0 176 44" className="h-11 w-44" fill="none">
-                    <rect x="12" y="22" width="7" height="8" rx="2.5" fill="currentColor" fillOpacity="0.72" />
-                    <rect x="22" y="17" width="7" height="13" rx="2.5" fill="currentColor" fillOpacity="0.84" />
-                    <rect x="32" y="12" width="7" height="18" rx="2.5" fill="currentColor" />
-                    <path
-                      d="M20 13.5H47"
-                      stroke="currentColor"
-                      strokeOpacity="0.22"
-                      strokeWidth="1.4"
-                      strokeLinecap="round"
-                    />
-                    <path
-                      d="M50 27C58 21 67 18.5 75 18.5C83.5 18.5 90.5 20.5 97 15"
-                      stroke="currentColor"
-                      strokeWidth="2.3"
-                      strokeLinecap="round"
-                    />
-                    <circle cx="50" cy="27" r="2" fill="currentColor" />
-                    <circle cx="75" cy="18.5" r="2" fill="currentColor" />
-                    <circle cx="97" cy="15" r="2" fill="currentColor" />
-                    <path
-                      d="M56 13L62.5 19.2L71.5 10.5"
-                      stroke="currentColor"
-                      strokeWidth="2.1"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <text x="106" y="18" fill="currentColor" fontSize="8.2" fontWeight="700" letterSpacing="1.1">SIMULATE</text>
-                    <text x="106" y="29" fill="currentColor" fillOpacity="0.9" fontSize="6.2" fontWeight="600" letterSpacing="0.9">APP STRATEGY</text>
-                    <circle cx="156" cy="22" r="9.5" stroke="currentColor" strokeOpacity="0.2" strokeWidth="1.6" />
-                    <path
-                      d="M152.5 16.8L161 22L152.5 27.2V16.8Z"
-                      fill="currentColor"
-                    />
+                    <rect x="10" y="8" width="38" height="28" rx="10" fill="currentColor" fillOpacity="0.08" />
+                    <rect x="10" y="8" width="38" height="28" rx="10" stroke="currentColor" strokeOpacity="0.2" strokeWidth="1.4" />
+                    <path d="M17 29L24.5 22L29.5 25.5L38.5 15.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M34.5 15.5H38.5V19.5" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="24.5" cy="22" r="2.1" fill="currentColor" />
+                    <circle cx="29.5" cy="25.5" r="2.1" fill="currentColor" fillOpacity="0.82" />
+                    <circle cx="38.5" cy="15.5" r="2.1" fill="currentColor" />
+                    <path d="M17 15.5H28" stroke="currentColor" strokeOpacity="0.2" strokeWidth="1.4" strokeLinecap="round" />
+                    <path d="M17 19.5H22.5" stroke="currentColor" strokeOpacity="0.16" strokeWidth="1.4" strokeLinecap="round" />
+                    <text x="56" y="18" fill="currentColor" fontSize="8.4" fontWeight="700" letterSpacing="1.25">SIMULATE</text>
+                    <text x="56" y="29.2" fill="currentColor" fillOpacity="0.92" fontSize="6.25" fontWeight="600" letterSpacing="0.9">APP STRATEGY</text>
+                    <rect x="134" y="12" width="28" height="20" rx="10" fill="currentColor" fillOpacity="0.08" />
+                    <rect x="134" y="12" width="28" height="20" rx="10" stroke="currentColor" strokeOpacity="0.18" strokeWidth="1.3" />
+                    <path d="M143 22H153" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+                    <path d="M149 17L154 22L149 27" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                </span>
-                <span className="absolute right-2 top-1.5 rounded-full border border-primary/20 bg-primary/10 p-0.5 text-primary dark:border-primary/25 dark:bg-primary/14">
-                  <Sparkles className="h-2 w-2" aria-hidden />
                 </span>
               </span>
             </Link>

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import {
@@ -32,6 +33,7 @@ type Props = {
   initialRange?: ChartRange;
   hideRangeSelector?: boolean;
   allowedRanges?: ChartRange[];
+  leadingSlot?: ReactNode;
 };
 
 function chartRangeLabel(range: ChartRange): string {
@@ -67,6 +69,7 @@ export function StockHistoricalChart({
   initialRange = "3mo",
   hideRangeSelector = false,
   allowedRanges,
+  leadingSlot,
 }: Props) {
   const chart = useDashboardChartTheme();
   const rangeOptions = useMemo(() => {
@@ -180,61 +183,64 @@ export function StockHistoricalChart({
   return (
     <div className={compact ? "space-y-2" : "space-y-2.5"} aria-label={`Price chart for ${symbol}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        {!hideRangeSelector ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <div
-              className={`flex flex-wrap gap-0.5 rounded-lg border border-border/80 bg-background/90 dark:border-white/10 ${compact ? "p-0.5" : "gap-1 rounded-xl p-1"}`}
-            >
-              {rangeOptions.map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setRange(r)}
-                  className={cn(
-                    "rounded-md font-semibold",
-                    compact ? "px-2 py-1 text-[10px]" : "rounded-lg px-3 py-1.5 text-xs",
-                    range === r ? cn(APP_CTA_FILL, "shadow-sm") : "text-subtle hover:text-foreground"
-                  )}
-                >
-                  {chartRangeLabel(r)}
-                </button>
-              ))}
-            </div>
-            {resolvedSmaOptions.length > 1 ? (
+        {leadingSlot ? <div className="min-w-0 flex-1">{leadingSlot}</div> : null}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {!hideRangeSelector ? (
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <div
                 className={`flex flex-wrap gap-0.5 rounded-lg border border-border/80 bg-background/90 dark:border-white/10 ${compact ? "p-0.5" : "gap-1 rounded-xl p-1"}`}
               >
-                {resolvedSmaOptions.map((period) => (
+                {rangeOptions.map((r) => (
                   <button
-                    key={period}
+                    key={r}
                     type="button"
-                    onClick={() => setSelectedSmaPeriod(period)}
+                    onClick={() => setRange(r)}
                     className={cn(
                       "rounded-md font-semibold",
                       compact ? "px-2 py-1 text-[10px]" : "rounded-lg px-3 py-1.5 text-xs",
-                      selectedSmaPeriod === period ? cn(APP_CTA_FILL, "shadow-sm") : "text-subtle hover:text-foreground"
+                      range === r ? cn(APP_CTA_FILL, "shadow-sm") : "text-subtle hover:text-foreground"
                     )}
                   >
-                    SMA {period}
+                    {chartRangeLabel(r)}
                   </button>
                 ))}
               </div>
-            ) : null}
-          </div>
-        ) : (
-          <div
-            className={`inline-flex items-center rounded-full border border-border/80 bg-background/90 font-semibold uppercase tracking-[0.14em] text-subtle dark:border-white/10 ${compact ? "px-2.5 py-1 text-[10px]" : "px-3 py-1.5 text-[11px]"}`}
-          >
-            {chartRangeLabel(range)}
-          </div>
-        )}
-        {pct != null && (
-          <span
-            className={`font-bold tabular-nums ${compact ? "text-xs" : "text-sm"} ${pct >= 0 ? "text-primary" : "text-error"}`}
-          >
-            {formatPercent(pct, true)}
-          </span>
-        )}
+              {resolvedSmaOptions.length > 1 ? (
+                <div
+                  className={`flex flex-wrap gap-0.5 rounded-lg border border-border/80 bg-background/90 dark:border-white/10 ${compact ? "p-0.5" : "gap-1 rounded-xl p-1"}`}
+                >
+                  {resolvedSmaOptions.map((period) => (
+                    <button
+                      key={period}
+                      type="button"
+                      onClick={() => setSelectedSmaPeriod(period)}
+                      className={cn(
+                        "rounded-md font-semibold",
+                        compact ? "px-2 py-1 text-[10px]" : "rounded-lg px-3 py-1.5 text-xs",
+                        selectedSmaPeriod === period ? cn(APP_CTA_FILL, "shadow-sm") : "text-subtle hover:text-foreground"
+                      )}
+                    >
+                      SMA {period}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div
+              className={`inline-flex items-center rounded-full border border-border/80 bg-background/90 font-semibold uppercase tracking-[0.14em] text-subtle dark:border-white/10 ${compact ? "px-2.5 py-1 text-[10px]" : "px-3 py-1.5 text-[11px]"}`}
+            >
+              {chartRangeLabel(range)}
+            </div>
+          )}
+          {pct != null && (
+            <span
+              className={`font-bold tabular-nums ${compact ? "text-xs" : "text-sm"} ${pct >= 0 ? "text-primary" : "text-error"}`}
+            >
+              {formatPercent(pct, true)}
+            </span>
+          )}
+        </div>
       </div>
 
       {loading && (

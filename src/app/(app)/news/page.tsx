@@ -182,19 +182,8 @@ export default function NewsPage() {
       {!noConfig && (
         <section className="rounded-3xl border border-border/80 bg-elevated p-4 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.03] sm:p-5">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary dark:border-primary/25 dark:bg-primary/15">
-                Historical Data
-              </div>
-              <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-2">
-                <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">SPY</h2>
-                {latestSpyPoint ? (
-                  <p className="text-sm font-medium text-subtle">
-                    Last close: <span className="tabular-nums text-foreground">{formatCurrency(latestSpyPoint.close)}</span>
-                    <span className="ml-2">{latestSpyPoint.date}</span>
-                  </p>
-                ) : null}
-              </div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary dark:border-primary/25 dark:bg-primary/15">
+              Historical Data
             </div>
             <div className="flex items-center gap-2 text-xs text-subtle">
               <ArrowUpRight className="h-3.5 w-3.5 text-primary" aria-hidden />
@@ -211,6 +200,19 @@ export default function NewsPage() {
             error={spyError}
             initialRange="5y"
             allowedRanges={["1w", "1mo", "3mo", "1y", "5y"]}
+            leadingSlot={
+              <div className="min-w-0 pr-2">
+                <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+                  <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">SPY</h2>
+                  {latestSpyPoint ? (
+                    <p className="text-sm font-medium text-subtle">
+                      Last close: <span className="tabular-nums text-foreground">{formatCurrency(latestSpyPoint.close)}</span>
+                      <span className="ml-2">{latestSpyPoint.date}</span>
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            }
           />
         </section>
       )}
