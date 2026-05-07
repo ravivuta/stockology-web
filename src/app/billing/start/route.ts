@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { withBasePath } from "@/lib/base-path";
+import { withAppBasePath } from "@/lib/base-path";
 import { createClient } from "@/lib/supabase/server";
 import { safeRelativeRedirectPath } from "@/lib/safe-redirect";
 import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.redirect(new URL(withBasePath("/login"), request.url));
+      return NextResponse.redirect(new URL(withAppBasePath("/login"), request.url));
     }
 
     const returnTo = safeRelativeRedirectPath(request.nextUrl.searchParams.get("next"), "/dashboard");
@@ -86,13 +86,13 @@ export async function GET(request: NextRequest) {
         .maybeSingle();
 
       if (subRow?.billing_exempt === true) {
-        return NextResponse.redirect(new URL(withBasePath(returnTo), request.url));
+        return NextResponse.redirect(new URL(withAppBasePath(returnTo), request.url));
       }
 
       const hasActivePaidAccess =
         subscriptionAllowsAccess(subRow ?? null) && isPaidSubscriptionTier(subRow?.subscription_tier);
       if (hasActivePaidAccess) {
-        return NextResponse.redirect(new URL(withBasePath(returnTo), request.url));
+        return NextResponse.redirect(new URL(withAppBasePath(returnTo), request.url));
       }
     } catch (error) {
       console.warn("[billing/start] preflight sync failed, continuing with auth user id", error);
@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
         email: user.email ?? "",
       });
       if (stripeState.ok && subscriptionAllowsAccess(stripeState.state)) {
-        return NextResponse.redirect(new URL(withBasePath(returnTo), request.url));
+        return NextResponse.redirect(new URL(withAppBasePath(returnTo), request.url));
       }
     } catch (error) {
       console.warn("[billing/start] stripe sync pre-check failed, continuing to checkout", error);
@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
     });
 
     const stripe = getStripe();
-    const baseOrigin = `${origin}${withBasePath("")}`;
+    const baseOrigin = `${origin}${withAppBasePath("/")}`;
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerId,
@@ -148,13 +148,13 @@ export async function GET(request: NextRequest) {
     });
 
     if (!session.url) {
-      return NextResponse.redirect(new URL(withBasePath("/settings?billing=error"), request.url));
+      return NextResponse.redirect(new URL(withAppBasePath("/settings?billing=error"), request.url));
     }
 
     return NextResponse.redirect(session.url);
   } catch (error) {
     console.error("[billing/start] failed", error);
-    const url = new URL(withBasePath(`/settings?billing=${checkoutErrorState(error)}`), request.url);
+    const url = new URL(withAppBasePath(`/settings?billing=${checkoutErrorState(error)}`), request.url);
     const detail = sanitizedBillingDetail(error);
     if (detail) {
       url.searchParams.set("billing_detail", detail);

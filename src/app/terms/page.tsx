@@ -3,11 +3,11 @@ import type { Metadata } from "next";
 import { withAppBasePath } from "@/lib/base-path";
 
 export const metadata: Metadata = {
-  title: "About — Stocks PM by AppAiTech",
-  description: "Learn about AppAiTech and the Stocks PM portfolio management app.",
+  title: "Terms — Stocks PM by AppAiTech",
+  description: "Terms of use for Stocks PM and AppAiTech web properties.",
 };
 
-export default function AboutPage() {
+export default function TermsPage() {
   return (
     <div className="min-h-screen bg-[#101219] text-zinc-100">
       <header className="border-b border-white/[0.06] bg-[#101219]/90 backdrop-blur-xl">
@@ -25,42 +25,33 @@ export default function AboutPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-20 sm:px-6 sm:py-28">
-        <h1 className="mb-6 text-3xl font-bold tracking-tight text-white sm:text-4xl">About AppAiTech</h1>
+        <h1 className="mb-6 text-3xl font-bold tracking-tight text-white sm:text-4xl">Terms of use</h1>
 
         <div className="space-y-6 text-base leading-relaxed text-zinc-300">
           <p>
-            <strong className="text-white">AppAiTech</strong> builds intelligent tools that help everyday investors manage their portfolios with the precision of professional money managers.
+            Stocks PM is provided for educational, analytical, and simulated portfolio management purposes only. Nothing on this site or in the app is investment, tax, legal, or brokerage advice.
           </p>
           <p>
-            Our flagship product, <strong className="text-white">Stocks PM</strong>, combines rules-based portfolio optimization, backtesting simulation, and real-time market data into one accessible app — available on iOS and now on the web.
+            You are responsible for the accuracy of any holdings, cash balances, watchlists, manual cash adjustments, or imported CSV data that you provide.
           </p>
-
-          <h2 className="pt-4 text-xl font-semibold text-white">Our mission</h2>
           <p>
-            We believe that data-driven investing should be accessible to everyone, not just institutional traders. Stocks PM helps you understand your portfolio, size your positions, and make more informed decisions — without the noise.
+            Market data, analyst targets, news, and recommendation outputs are provided on a best-effort basis. Availability, timeliness, and completeness are not guaranteed.
           </p>
-
-          <h2 className="pt-4 text-xl font-semibold text-white">What we build</h2>
-          <ul className="ml-4 list-disc space-y-2 text-zinc-400 marker:text-emerald-400">
-            <li>Portfolio tracking and allocation analysis</li>
-            <li>Rules-based buy/sell/hold recommendations</li>
-            <li>Backtesting and paper-trading simulation</li>
-            <li>Watchlist management and stock screening</li>
-            <li>S&amp;P 500 benchmark comparison</li>
-          </ul>
-
-          <div className="mt-10 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6">
+          <p>
+            AppAiTech may change, suspend, or remove features at any time. Use of the product is at your own risk.
+          </p>
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6">
             <p className="text-sm text-zinc-400">
-              ⚠️ <strong className="text-zinc-300">Educational &amp; practice trading only.</strong> Stocks PM is designed for learning and simulated portfolio tracking. No real money or actual trades are involved. Nothing on this site constitutes financial advice.
+              This page is a product-facing terms summary and should be replaced with your finalized legal terms before public launch.
             </p>
           </div>
         </div>
 
         <div className="mt-14 flex flex-wrap gap-4 border-t border-white/[0.06] pt-10 text-sm text-zinc-500">
           <Link href="/" className="no-underline transition-colors hover:text-zinc-300">Home</Link>
+          <Link href="/about" className="no-underline transition-colors hover:text-zinc-300">About</Link>
           <Link href="/contact" className="no-underline transition-colors hover:text-zinc-300">Contact</Link>
           <Link href="/privacy" className="no-underline transition-colors hover:text-zinc-300">Privacy</Link>
-          <Link href="/terms" className="no-underline transition-colors hover:text-zinc-300">Terms</Link>
           <span className="ml-auto text-zinc-600">© 2026 AppAiTech</span>
         </div>
       </main>

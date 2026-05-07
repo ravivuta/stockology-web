@@ -6,6 +6,7 @@ import { ThemeProvider, useTheme } from "next-themes";
 import { LandingViewTransition } from "@/components/LandingViewTransition";
 import { NavigationProgress } from "@/components/NavigationProgress";
 import { SiteButtonInteractions } from "@/components/SiteButtonInteractions";
+import { normalizeAppPathname } from "@/lib/base-path";
 import {
   THEME_ACTIVE_STORAGE,
   THEME_MODE_EVENT,
@@ -99,7 +100,7 @@ function ThemeModeSync({ pathname }: { pathname: string }) {
 }
 
 function ThemeBridge({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const pathname = normalizeAppPathname(usePathname());
 
   useEffect(() => {
     try {

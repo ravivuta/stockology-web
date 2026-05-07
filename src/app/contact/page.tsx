@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { withAppBasePath } from "@/lib/base-path";
 
 export const metadata: Metadata = {
   title: "Contact — Stocks PM by AppAiTech",
@@ -17,8 +18,8 @@ export default function ContactPage() {
             </span>
           </Link>
           <nav className="flex items-center gap-4 text-sm text-zinc-400">
-            <Link href="/login" className="no-underline transition-colors hover:text-white">Sign in</Link>
-            <Link href="/signup" className="rounded-full border border-emerald-400/35 px-3.5 py-1.5 text-sm font-semibold text-zinc-100 no-underline transition-colors hover:border-emerald-400/55">Sign up</Link>
+            <Link href={withAppBasePath("/login")} className="no-underline transition-colors hover:text-white">Sign in</Link>
+            <Link href={withAppBasePath("/signup")} className="rounded-full border border-emerald-400/35 px-3.5 py-1.5 text-sm font-semibold text-zinc-100 no-underline transition-colors hover:border-emerald-400/55">Sign up</Link>
           </nav>
         </div>
       </header>

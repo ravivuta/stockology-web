@@ -16,13 +16,14 @@ import {
   useState,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { normalizeAppPathname } from "@/lib/base-path";
 
 const VEIL_BG = "rgba(9, 9, 11, 0.82)";
 const UNCOVER_MS = 420;
 const FAILSAFE_MS = 5500;
 
 function normalizePathname(path: string): string {
-  const base = path.split("?")[0].split("#")[0];
+  const base = normalizeAppPathname(path.split("?")[0].split("#")[0]);
   let p = base;
   if (p.length > 1 && p.endsWith("/")) p = p.slice(0, -1);
   return p || "/";

@@ -1,4 +1,4 @@
-import { withBasePath } from "@/lib/base-path";
+import { withAppBasePath } from "@/lib/base-path";
 
 /**
  * Pass-through to Google’s authorize URL so the account picker always shows.
@@ -6,7 +6,7 @@ import { withBasePath } from "@/lib/base-path";
  * reuses the previous account right after app sign-out.
  */
 export function googleOAuthSignInOptions(origin: string, nextPath?: string) {
-  const redirect = new URL(withBasePath("/auth/callback"), origin);
+  const redirect = new URL(withAppBasePath("/auth/callback"), origin);
   if (nextPath) redirect.searchParams.set("next", nextPath);
   return {
     redirectTo: redirect.toString(),

@@ -13,6 +13,7 @@ import { CssMarqueeRibbon } from "@/components/landing/CssMarqueeRibbon";
 import { LandingProductDepth } from "@/components/landing/LandingProductDepth";
 import { LandingTutorialJourney } from "@/components/landing/LandingTutorialJourney";
 import { appCtaButton } from "@/lib/appCtaClasses";
+import { withAppBasePath } from "@/lib/base-path";
 import { APP_MANAGED_TRIAL_PERIOD } from "@/lib/trial-config";
 
 const LineWaves = dynamic(() => import("@/components/landing/LineWaves"), { ssr: false });
@@ -99,15 +100,15 @@ function LandingMarketingTopChrome({
             <Link href="/about" className={linkQuiet}>About</Link>
             <Link href="/contact" className={linkQuiet + " hidden sm:inline-flex"}>Contact</Link>
             {hasSession ? (
-              <TransitionLink href="/dashboard" prefetch={false} className={pillOutline}>
+              <TransitionLink href={withAppBasePath("/dashboard")} prefetch={false} className={pillOutline}>
                 Dashboard
               </TransitionLink>
             ) : (
               <>
-                <TransitionLink href="/login" prefetch={false} className={linkQuiet}>
+                <TransitionLink href={withAppBasePath("/login")} prefetch={false} className={linkQuiet}>
                   Sign in
                 </TransitionLink>
-                <TransitionLink href="/signup" prefetch={false} className={pillOutline}>
+                <TransitionLink href={withAppBasePath("/signup")} prefetch={false} className={pillOutline}>
                   Sign up
                 </TransitionLink>
               </>
@@ -130,12 +131,12 @@ export function Landing({ hasSession }: { hasSession: boolean }) {
   );
 
   const primaryCta = hasSession ? (
-    <TransitionLink href="/dashboard" prefetch={false} className={heroPrimaryCtaClass}>
+    <TransitionLink href={withAppBasePath("/dashboard")} prefetch={false} className={heroPrimaryCtaClass}>
       Open app
       <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
     </TransitionLink>
   ) : (
-    <TransitionLink href="/signup" prefetch={false} className={heroPrimaryCtaClass}>
+    <TransitionLink href={withAppBasePath("/signup")} prefetch={false} className={heroPrimaryCtaClass}>
       Start free
       <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
     </TransitionLink>
@@ -235,7 +236,7 @@ export function Landing({ hasSession }: { hasSession: boolean }) {
                 {primaryCta}
                 {!hasSession && (
                   <TransitionLink
-                    href="/login"
+                    href={withAppBasePath("/login")}
                     prefetch={false}
                     className="no-ui-hover text-sm font-semibold text-zinc-400 no-underline underline-offset-4 transition-colors hover:text-white"
                   >
@@ -453,7 +454,7 @@ export function Landing({ hasSession }: { hasSession: boolean }) {
                     ))}
                   </ul>
                   <TransitionLink
-                    href="/signup"
+                    href={withAppBasePath("/signup")}
                     prefetch={false}
                     className={`mt-auto rounded-xl px-5 py-2.5 text-center text-sm font-semibold no-underline transition-colors ${plan.highlight ? "bg-emerald-500 text-white hover:bg-emerald-400" : "border border-white/15 bg-white/5 text-white hover:bg-white/10"}`}
                   >
@@ -527,7 +528,7 @@ export function Landing({ hasSession }: { hasSession: boolean }) {
                   >
                     {hasSession ? (
                       <TransitionLink
-                        href="/dashboard"
+                        href={withAppBasePath("/dashboard")}
                         prefetch={false}
                         className={appCtaButton("no-ui-hover gap-2 px-6 py-3 text-sm no-underline")}
                       >
@@ -537,7 +538,7 @@ export function Landing({ hasSession }: { hasSession: boolean }) {
                     ) : (
                       <>
                         <TransitionLink
-                          href="/signup"
+                          href={withAppBasePath("/signup")}
                           prefetch={false}
                           className={appCtaButton("no-ui-hover gap-2 px-6 py-3 text-sm no-underline")}
                         >
@@ -545,7 +546,7 @@ export function Landing({ hasSession }: { hasSession: boolean }) {
                           <ArrowRight className="h-4 w-4" />
                         </TransitionLink>
                         <TransitionLink
-                          href="/login"
+                          href={withAppBasePath("/login")}
                           prefetch={false}
                           className="no-ui-hover rounded-xl border border-white/15 bg-white/5 px-6 py-3 text-sm font-semibold text-white no-underline transition-colors hover:bg-white/10"
                         >

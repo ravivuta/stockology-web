@@ -1,9 +1,50 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { APP_BASE_PATH, normalizeAppPathname, withAppBasePath } from "@/lib/base-path";
 import { getSupabaseEnv, hasValidSupabaseConfig } from "@/lib/supabase/config";
 
+function isLegacyAppPath(pathname: string): boolean {
+  const exact = new Set([
+    "/login",
+    "/signup",
+    "/dashboard",
+    "/portfolio",
+    "/watchlist",
+    "/news",
+    "/settings",
+    "/help",
+    "/simulation",
+    "/optimization",
+    "/onboarding",
+    "/csv-help",
+    "/profile",
+  ]);
+  if (exact.has(pathname)) return true;
+  return (
+    pathname.startsWith("/billing/") ||
+    pathname.startsWith("/auth/") ||
+    pathname.startsWith("/stock/")
+  );
+}
+
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  const pathname = request.nextUrl.pathname;
+
+  if (pathname === APP_BASE_PATH) {
+    return NextResponse.redirect(new URL(withAppBasePath("/dashboard"), request.url));
+  }
+
+  if (isLegacyAppPath(pathname)) {
+    return NextResponse.redirect(new URL(withAppBasePath(pathname), request.url));
+  }
+
+  const rewrittenPathname =
+    pathname.startsWith(`${APP_BASE_PATH}/`) ? normalizeAppPathname(pathname) : null;
+  const rewrittenUrl = rewrittenPathname
+    ? new URL(`${rewrittenPathname}${request.nextUrl.search}`, request.url)
+    : null;
+
+  let response = rewrittenUrl ? NextResponse.rewrite(rewrittenUrl) : NextResponse.next({ request });
   const { url, key } = getSupabaseEnv();
   if (!hasValidSupabaseConfig()) return response;
   const supabase = createServerClient(url, key, {
@@ -13,7 +54,7 @@ export async function middleware(request: NextRequest) {
       },
       setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
+        response = rewrittenUrl ? NextResponse.rewrite(rewrittenUrl) : NextResponse.next({ request });
         cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options as never));
       },
     },
@@ -28,5 +69,5 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   // Skip Flask-proxied API routes — refreshing session on every /api/python/* call added large latency.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/python|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
 };

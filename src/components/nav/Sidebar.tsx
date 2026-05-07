@@ -2,6 +2,7 @@
 
 import { useRef, useCallback, useEffect, useState, type ComponentType } from "react";
 import { APP_RAIL_PX } from "@/lib/app-shell";
+import { normalizeAppPathname } from "@/lib/base-path";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, PieChart, ListOrdered, Newspaper, Settings, HelpCircle, LogOut } from "lucide-react";
@@ -44,7 +45,7 @@ export default function Sidebar({
   planLabel,
   planVariant,
 }: SidebarProps) {
-  const pathname = usePathname();
+  const pathname = normalizeAppPathname(usePathname());
   const router = useRouter();
   const { replaceWithTransition } = useShellRouteTransition();
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);

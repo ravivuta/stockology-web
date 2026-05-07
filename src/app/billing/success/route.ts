@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { withBasePath } from "@/lib/base-path";
+import { withAppBasePath } from "@/lib/base-path";
 import { createClient } from "@/lib/supabase/server";
 import { safeRelativeRedirectPath } from "@/lib/safe-redirect";
 import { getStripe } from "@/lib/stripe/server";
@@ -15,13 +15,13 @@ export async function GET(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.redirect(new URL(withBasePath("/login"), request.url));
+    return NextResponse.redirect(new URL(withAppBasePath("/login"), request.url));
   }
 
   const returnTo = safeRelativeRedirectPath(request.nextUrl.searchParams.get("next"), "/dashboard");
   const sessionId = request.nextUrl.searchParams.get("session_id");
   if (!sessionId) {
-    return NextResponse.redirect(new URL(withBasePath(`/settings?billing=success&return_to=${encodeURIComponent(returnTo)}`), request.url));
+    return NextResponse.redirect(new URL(withAppBasePath(`/settings?billing=success&return_to=${encodeURIComponent(returnTo)}`), request.url));
   }
 
   try {
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const session = await stripe.checkout.sessions.retrieve(sessionId);
 
     if (session.client_reference_id && session.client_reference_id !== dataUserId) {
-      return NextResponse.redirect(new URL(withBasePath("/settings?billing=error"), request.url));
+      return NextResponse.redirect(new URL(withAppBasePath("/settings?billing=error"), request.url));
     }
 
     if (typeof session.subscription === "string") {
@@ -40,9 +40,9 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.redirect(new URL(withBasePath(returnTo), request.url));
+    return NextResponse.redirect(new URL(withAppBasePath(returnTo), request.url));
   } catch (error) {
     console.error("[billing/success] failed", error);
-    return NextResponse.redirect(new URL(withBasePath("/settings?billing=error"), request.url));
+    return NextResponse.redirect(new URL(withAppBasePath("/settings?billing=error"), request.url));
   }
 }

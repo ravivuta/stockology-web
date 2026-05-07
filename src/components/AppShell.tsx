@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { normalizeAppPathname } from "@/lib/base-path";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { useSubscriptionGate, type SubRow } from "@/hooks/useSubscriptionGate";
 import type { User } from "@supabase/supabase-js";
@@ -40,7 +41,7 @@ export function AppShell({
   /** True when Supabase has portfolio snapshots for this user (e.g. synced from iOS) — skip web onboarding. */
   hasCloudPortfolio?: boolean;
 }) {
-  const pathname = usePathname();
+  const pathname = normalizeAppPathname(usePathname());
   const router = useRouter();
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const localOnboardingDone = usePortfolioStore((s) => s.onboardingComplete);
