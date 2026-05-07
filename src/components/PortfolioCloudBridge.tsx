@@ -68,11 +68,9 @@ export function PortfolioCloudBridge({
         Object.keys(state.lotsBySymbol).length > 0;
       const shouldApplySnapshotOnce =
         cloudSnapshot &&
-        (
-          snapshotIndicatesExistingAccount(cloudSnapshot) ||
-          hasLocalState
-        );
-      if (cloudSnapshot && shouldApplySnapshotOnce) {
+        snapshotIndicatesExistingAccount(cloudSnapshot) &&
+        !hasLocalState;
+      if (shouldApplySnapshotOnce) {
         const parsed = parseCloudSnapshotForStore({
           holdings: cloudSnapshot.holdings,
           cash_balance: cloudSnapshot.cash_balance,

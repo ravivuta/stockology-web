@@ -240,6 +240,14 @@ function buildImportedOpenLots(rows: CsvImportRow[]): {
   };
 }
 
+function cloneTradeLot(lot: TradeLot): TradeLot {
+  return { ...lot };
+}
+
+function cloneSoldLot(lot: SoldLot): SoldLot {
+  return { ...lot };
+}
+
 type RecalcContext = {
   etfProfitTarget: number;
   stockProfitTarget: number;
@@ -1115,8 +1123,8 @@ export const usePortfolioStore = create<State>()(
             const lots = st.lotsBySymbol[stock.symbol];
             if (lots) {
               lotsBySymbol[stock.symbol] = {
-                open: lots.open.map((lot) => ({ ...lot })),
-                sold: lots.sold.map((lot) => ({ ...lot })),
+                open: lots.open.map(cloneTradeLot),
+                sold: lots.sold.map(cloneSoldLot),
               };
             }
           }
@@ -1145,13 +1153,41 @@ export const usePortfolioStore = create<State>()(
             }
 
             if (hasImportedHoldings) {
-              lotsBySymbol[symbol] = { open: imported.openLots, sold: [] };
+              const preservedOpenLots = existingLots?.open.map(cloneTradeLot) ?? [];
+              const preservedSoldLots = existingLots?.sold.map(cloneSoldLot) ?? [];
+              const mergedOpenLots =
+                preservedOpenLots.length > 0
+                  ? [...preservedOpenLots, ...imported.openLots.map(cloneTradeLot)]
+                  : (existing?.quantity ?? 0) > 0
+                    ? [
+                        {
+                          id: uid(),
+                          quantity: existing?.quantity ?? 0,
+                          costBasis: existing?.averageCost ?? 0,
+                          purchaseDate: defaultImportPurchaseDate(),
+                          account: "",
+                          isRetirementAccount: null,
+                          status: "open" as const,
+                        },
+                        ...imported.openLots.map(cloneTradeLot),
+                      ]
+                    : imported.openLots.map(cloneTradeLot);
+              mergedOpenLots.sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate));
+
+              const mergedTotalQty = mergedOpenLots.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0);
+              const mergedTotalBasis = mergedOpenLots.reduce((sum, lot) => sum + Math.max(0, lot.quantity) * Math.max(0, lot.costBasis), 0);
+              const mergedAverageCost = mergedTotalQty > 0 ? mergedTotalBasis / mergedTotalQty : 0;
+
+              lotsBySymbol[symbol] = {
+                open: mergedOpenLots,
+                sold: preservedSoldLots,
+              };
               stockMap.set(
                 symbol,
                 defaultStock({
                   symbol,
-                  quantity: imported.totalQty,
-                  averageCost: imported.averageCost,
+                  quantity: mergedTotalQty,
+                  averageCost: mergedAverageCost,
                   lastPrice:
                     existing?.lastPrice && existing.lastPrice > 0
                       ? existing.lastPrice
