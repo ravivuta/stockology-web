@@ -6,6 +6,7 @@ import { buildRecommendation } from "@/lib/recommendation";
 import type { CsvImportRow, CsvImportTrade } from "@/lib/csvPortfolio";
 import { buildTradeJournalFromLots } from "@/lib/trade-journal-from-lots";
 import { analystTargetUpsidePct } from "@/lib/marketFormat";
+import { loadHistoricalPayloadForSymbol } from "@/lib/historical-price-client";
 
 export type LotStatus = "open" | "partiallySold" | "fullySold" | "washSaleRestricted";
 
@@ -274,11 +275,13 @@ async function requestOptimizedStrategy(
   >
 ): Promise<OptimizedStrategyPayload> {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+  const history = await loadHistoricalPayloadForSymbol(stock.symbol, 252 * 5 + 280);
   const response = await fetch(`${basePath}/api/python/optimization`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       symbol: stock.symbol,
+      history,
       quantity: stock.quantity,
       averageCost: stock.averageCost,
       analystTarget: stock.analystTarget,

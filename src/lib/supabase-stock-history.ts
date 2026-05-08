@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getCachedHistoricalPricePoints, setCachedHistoricalPricePoints } from "@/lib/historical-price-cache";
 import type { PricePoint } from "@/lib/stock-chart";
 
 type RpcRow = {
@@ -11,6 +12,7 @@ type RpcRow = {
 };
 
 const MAX_DAYS = 2000;
+const MASTER_CACHE_DAYS = MAX_DAYS;
 
 /**
  * Loads daily closes from `historical_prices` via `get_historical_prices` RPC.
@@ -29,13 +31,25 @@ export async function fetchHistoricalPricePoints(
   if (!sym) return { points: [], error: "Missing symbol" };
 
   const n = Math.min(Math.max(Math.floor(days), 1), MAX_DAYS);
+  const cached = getCachedHistoricalPricePoints(sym, n);
+  if (cached?.isFresh) {
+    return { points: cached.points, error: null };
+  }
+
+  // Web uses one master per-symbol history cache. Fetch the full stored horizon once,
+  // then serve shorter ranges locally for charts, recommendations, and simulations.
+  const requestDays = MASTER_CACHE_DAYS;
+
   // Single DB signature (text, int). Named args must not be split across two overloads.
   const { data, error } = await supabase.rpc("get_historical_prices", {
     p_symbol: sym,
-    p_days: n,
+    p_days: requestDays,
   });
 
   if (error) {
+    if (cached) {
+      return { points: cached.points, error: null };
+    }
     return { points: [], error: error.message };
   }
 
@@ -53,6 +67,8 @@ export async function fetchHistoricalPricePoints(
     })
     .filter((p) => p.date.length >= 10 && Number.isFinite(p.close))
     .sort((a, b) => a.date.localeCompare(b.date));
+
+  setCachedHistoricalPricePoints(sym, points);
 
   return { points, error: null };
 }

@@ -7,6 +7,7 @@ import {
   stockPassesRiskFilter,
   type IosStockInput,
 } from "@/lib/ios-recommendation";
+import { sanitizeProvidedHistoryMap } from "@/lib/historical-price-server";
 import type { StockHolding } from "@/store/portfolioStore";
 
 type HistoryRow = {
@@ -186,10 +187,16 @@ export async function POST(request: NextRequest) {
   const maxSMA = Math.max(...universe.map((stock) => Math.max(2, Math.trunc(stock.shortSMA || 50))), 50);
   const historyDays = years * 252 + maxSMA + 80;
   const symbols = universe.map((stock) => stock.symbol);
+  const providedHistories = sanitizeProvidedHistoryMap(payload.histories);
+  const symbolsNeedingFetch = symbols.filter((symbol) => {
+    const stock = universe.find((candidate) => candidate.symbol === symbol);
+    const provided = providedHistories[symbol];
+    return !stock || !provided || provided.length <= Math.max(2, Math.trunc(stock.shortSMA || 50));
+  });
 
   const [historyResults, { data: tickerRows, error: tickerError }] = await Promise.all([
     Promise.all(
-      symbols.map(async (symbol) => {
+      symbolsNeedingFetch.map(async (symbol) => {
         const { data, error } = await supabase.rpc("get_historical_prices", {
           p_symbol: symbol,
           p_days: historyDays,
@@ -224,6 +231,13 @@ export async function POST(request: NextRequest) {
   const histories = new Map<string, { date: string; close: number }[]>();
   const insufficientSymbols: string[] = [];
   const unavailableSymbols: string[] = [];
+
+  for (const stock of universe) {
+    const provided = providedHistories[stock.symbol];
+    if (!provided?.length) continue;
+    if (provided.length <= Math.max(2, Math.trunc(stock.shortSMA || 50))) continue;
+    histories.set(stock.symbol, provided);
+  }
 
   for (const result of historyResults) {
     if (result.error) {

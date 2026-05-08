@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { appCtaButton } from "@/lib/appCtaClasses";
+import { loadHistoricalPayloadBySymbol, loadHistoricalPayloadForSymbol } from "@/lib/historical-price-client";
 import { formatCurrency } from "@/lib/numberFormat";
 import { usePortfolioStore } from "@/store/portfolioStore";
 
@@ -131,13 +132,20 @@ export default function SimulationPage() {
     setResult(null);
     const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
     try {
+      const requestedYears = parseInt(symbolYears, 10) || 1;
+      const requestedSMA = trackedStock?.shortSMA ?? 50;
+      const history = await loadHistoricalPayloadForSymbol(
+        symbol.trim().toUpperCase(),
+        requestedYears * 252 + requestedSMA + 80
+      );
       const res = await fetch(`${basePath}/api/python/simulation`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           symbol: symbol.trim().toUpperCase(),
+          history,
           capital: parseFloat(capital) || 0,
-          years: parseInt(symbolYears, 10) || 1,
+          years: requestedYears,
           shortSMA: trackedStock?.shortSMA,
           dynamicFactor: trackedStock?.dynamicFactor,
           stockLimit: trackedStock?.stockLimit,
@@ -172,11 +180,15 @@ export default function SimulationPage() {
     setWatchlistResult(null);
     const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
     try {
+      const requestedYears = parseInt(watchlistYears, 10) || 1;
+      const maxSMA = Math.max(...stocks.map((stock) => Math.max(2, Math.trunc(stock.shortSMA || 50))), 50);
+      const histories = await loadHistoricalPayloadBySymbol(stocks.map((stock) => stock.symbol), requestedYears * 252 + maxSMA + 80);
       const res = await fetch(`${basePath}/api/python/watchlist-simulation`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          years: parseInt(watchlistYears, 10) || 1,
+          years: requestedYears,
+          histories,
           portfolioSize,
           riskAppetite,
           enableRiskFilter,

@@ -6,6 +6,7 @@ import {
   computeRiskReturnScore,
   type IosStockInput,
 } from "@/lib/ios-recommendation";
+import { sanitizeProvidedHistory } from "@/lib/historical-price-server";
 
 type HistoryRow = {
   date: string;
@@ -187,8 +188,11 @@ export async function POST(request: NextRequest) {
   });
 
   const historyDays = 252 * 5 + 280;
+  const providedHistory = sanitizeProvidedHistory(payload.history);
   const [{ data: historyData, error: historyError }, { data: tickerRow }, { data: sentimentRow }] = await Promise.all([
-    supabase.rpc("get_historical_prices", { p_symbol: symbol, p_days: historyDays }),
+    providedHistory.length > 0
+      ? Promise.resolve({ data: providedHistory, error: null })
+      : supabase.rpc("get_historical_prices", { p_symbol: symbol, p_days: historyDays }),
     supabase
       .from("ticker_data")
       .select("symbol, analyst_average, market_cap, peg_ratio, analyst_target, is_etf")
