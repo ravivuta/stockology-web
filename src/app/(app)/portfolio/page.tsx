@@ -328,7 +328,9 @@ export default function PortfolioPage() {
     setIsCashEditing(false);
     void (async () => {
       const delta = n - previousCash;
+      console.log("[portfolio cash] Update: previous=$" + previousCash.toFixed(2) + ", new=$" + n.toFixed(2) + ", delta=$" + delta.toFixed(2));
       if (Math.abs(delta) >= 0.005) {
+        console.log("[portfolio cash] Recording external cash flow...");
         const flowResult = await recordExternalCashFlow({
           amount: delta,
           source: "web_portfolio_cash_edit",
@@ -336,14 +338,22 @@ export default function PortfolioPage() {
           balanceAfter: n,
         });
         if (flowResult.error) {
-          console.warn("[portfolio cash flow]", flowResult.error.message);
+          console.error("[portfolio cash flow] ❌ Failed:", flowResult.error.message);
+        } else if (flowResult.id) {
+          console.log("[portfolio cash flow] ✅ Recorded flow ID:", flowResult.id);
+        } else {
+          console.warn("[portfolio cash flow] ⚠️ No error but no ID returned");
         }
+      } else {
+        console.log("[portfolio cash] Delta too small (< $0.005), skipping flow record");
       }
       const snapshotResult = await flushCurrentPortfolioSnapshotNow(true, {
         allowEmptyHoldings: true,
       });
       if (snapshotResult.error) {
-        console.warn("[portfolio cash snapshot]", snapshotResult.error.message);
+        console.error("[portfolio cash snapshot] ❌ Failed:", snapshotResult.error.message);
+      } else {
+        console.log("[portfolio cash snapshot] ✅ Flushed");
       }
     })();
   }

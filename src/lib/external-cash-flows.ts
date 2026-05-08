@@ -56,8 +56,17 @@ export async function recordExternalCashFlow(input: {
 
   const dataUserId = await resolveActiveDataUserId();
   if (!dataUserId) {
-    return { error: new Error("No active Stocks PM user id available for external cash flow logging."), id: null };
+    const err = new Error("No active Stocks PM user id available for external cash flow logging.");
+    console.error("[recordExternalCashFlow] ERROR:", err.message);
+    return { error: err, id: null };
   }
+
+  console.log("[recordExternalCashFlow] Logging flow:", {
+    amount,
+    flowType: input.flowType ?? (amount > 0 ? "deposit" : "withdrawal"),
+    source: input.source,
+    dataUserId: dataUserId.substring(0, 8) + "...",
+  });
 
   const supabase = createClient();
   const flowType: ExternalCashFlowType =
@@ -74,10 +83,14 @@ export async function recordExternalCashFlow(input: {
   });
 
   if (error) {
+    console.error("[recordExternalCashFlow] RPC error:", error.message);
     return { error: new Error(error.message), id: null };
   }
 
   const id = typeof data === "number" ? data : Number(data);
+  if (Number.isFinite(id)) {
+    console.log("[recordExternalCashFlow] ✅ Logged flow ID:", id);
+  }
   return { error: null, id: Number.isFinite(id) ? id : null };
 }
 
