@@ -13,7 +13,7 @@ import {
   readPortfolioDraftForUser,
   saveCurrentPortfolioDraftForUser,
 } from "@/lib/clear-portfolio-client-state";
-import { pushPortfolioSnapshotSlice } from "@/lib/portfolio-snapshot-client";
+import { flushCurrentPortfolioSnapshotNow, pushPortfolioSnapshotSlice } from "@/lib/portfolio-snapshot-client";
 import { usePortfolioStore } from "@/store/portfolioStore";
 
 export type CloudSnapshotHydrationProps = {
@@ -35,9 +35,24 @@ export function PortfolioCloudBridge({
   cloudSnapshot: CloudSnapshotHydrationProps;
 }) {
   const [syncReady, setSyncReady] = useState(false);
+  const [storeHydrated, setStoreHydrated] = useState(() => usePortfolioStore.persist.hasHydrated());
+
+  useEffect(() => {
+    if (usePortfolioStore.persist.hasHydrated()) {
+      setStoreHydrated(true);
+      return;
+    }
+    const unsub = usePortfolioStore.persist.onFinishHydration(() => {
+      setStoreHydrated(true);
+    });
+    return () => {
+      unsub();
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (!storeHydrated) return;
     // Bump suffix when client-side identity or restore logic changes so clients re-apply once.
     const key = `stocks-pm-cloud-hydrated:v3:${dataUserId}`;
     try {
@@ -71,14 +86,31 @@ export function PortfolioCloudBridge({
         snapshotIndicatesExistingAccount(cloudSnapshot) &&
         !hasLocalState;
       if (shouldApplySnapshotOnce) {
-        const parsed = parseCloudSnapshotForStore({
+        const parsedCloud = parseCloudSnapshotForStore({
           holdings: cloudSnapshot.holdings,
           cash_balance: cloudSnapshot.cash_balance,
         });
-        usePortfolioStore.getState().replaceFromCloudSync({
-          ...parsed,
-          onboardingComplete: true,
-        });
+        const draft = readPortfolioDraftForUser(dataUserId);
+
+        const cloudLotCount = Object.values(parsedCloud.lotsBySymbol).reduce(
+          (sum, bundle) => sum + bundle.open.length + bundle.sold.length,
+          0
+        );
+        const draftLotCount = draft
+          ? Object.values(draft.lotsBySymbol).reduce(
+              (sum, bundle) => sum + bundle.open.length + bundle.sold.length,
+              0
+            )
+          : 0;
+
+        if (draft && draftLotCount > cloudLotCount) {
+          usePortfolioStore.getState().replaceFromCloudSync(draft);
+        } else {
+          usePortfolioStore.getState().replaceFromCloudSync({
+            ...parsedCloud,
+            onboardingComplete: true,
+          });
+        }
         sessionStorage.setItem(key, "1");
         return;
       }
@@ -93,7 +125,7 @@ export function PortfolioCloudBridge({
     } finally {
       setSyncReady(true);
     }
-  }, [authUserId, dataUserId, cloudSnapshot]);
+  }, [authUserId, dataUserId, cloudSnapshot, storeHydrated]);
 
   useEffect(() => {
     if (!syncReady || !dataUserId) return;
@@ -110,6 +142,19 @@ export function PortfolioCloudBridge({
       }, debounceMs);
     };
 
+    const flushNow = () => {
+      void flushCurrentPortfolioSnapshotNow(true);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        flushNow();
+      }
+    };
+
+    window.addEventListener("pagehide", flushNow);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     const unsub = usePortfolioStore.subscribe((state, prev) => {
       const a = portfolioSyncFingerprint({ cashBalance: prev.cashBalance, stocks: prev.stocks, lotsBySymbol: prev.lotsBySymbol });
       const b = portfolioSyncFingerprint({ cashBalance: state.cashBalance, stocks: state.stocks, lotsBySymbol: state.lotsBySymbol });
@@ -119,6 +164,8 @@ export function PortfolioCloudBridge({
 
     return () => {
       if (timer) clearTimeout(timer);
+      window.removeEventListener("pagehide", flushNow);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       unsub();
     };
   }, [syncReady, dataUserId]);
