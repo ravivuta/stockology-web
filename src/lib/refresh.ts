@@ -114,10 +114,26 @@ export async function runRefreshPipeline(
       (!dataUserId || lastAppliedSnapshotByUser.get(dataUserId) !== snapshotUpdatedAt)
     ) {
       const parsed = parseCloudSnapshotForStore(data.snapshot);
-      usePortfolioStore.getState().replaceFromCloudSync({
-        ...parsed,
-        onboardingComplete: true,
-      });
+      const currentLotsBySymbol = usePortfolioStore.getState().lotsBySymbol;
+      const localLotCount = Object.values(currentLotsBySymbol).reduce(
+        (sum, bundle) => sum + bundle.open.length + bundle.sold.length,
+        0
+      );
+      const cloudLotCount = Object.values(parsed.lotsBySymbol).reduce(
+        (sum, bundle) => sum + bundle.open.length + bundle.sold.length,
+        0
+      );
+
+      if (cloudLotCount >= localLotCount || localLotCount === 0) {
+        usePortfolioStore.getState().replaceFromCloudSync({
+          ...parsed,
+          onboardingComplete: true,
+        });
+      } else {
+        console.warn(
+          `[refresh] Skipping snapshot apply: local lots (${localLotCount}) > cloud lots (${cloudLotCount})`
+        );
+      }
       if (dataUserId) {
         if (snapshotUpdatedAt) lastAppliedSnapshotByUser.set(dataUserId, snapshotUpdatedAt);
         markLastPushedPortfolioFingerprint(

@@ -224,6 +224,20 @@ function parseRawHolding(raw: unknown): { stock: StockHolding; lots: { open: Tra
     }
   }
 
+  // Backward/stale snapshot safety: synthesize a single open lot from holding-level quantity/cost.
+  // This prevents position lots from disappearing when lotHistory is missing in the snapshot payload.
+  if (open.length === 0 && quantity > 0 && averageCost > 0) {
+    open.push({
+      id: `${symbol}_fallback_${Math.round(averageCost * 100)}_${Math.round(quantity * 1000)}`,
+      quantity,
+      costBasis: averageCost,
+      purchaseDate: new Date().toISOString(),
+      account: "",
+      isRetirementAccount: null,
+      status: "open",
+    });
+  }
+
   stock.score = stock.isETF ? undefined : computeRiskReturnScore(stock);
 
   return { stock, lots: { open, sold } };
