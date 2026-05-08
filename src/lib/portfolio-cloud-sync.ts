@@ -7,6 +7,16 @@ export type PortfolioSlice = {
   lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }>;
 };
 
+function snapshotValuationPrice(stock: StockHolding): number {
+  if (Number.isFinite(stock.lastPrice) && (stock.lastPrice ?? 0) > 0) {
+    return stock.lastPrice as number;
+  }
+  if (Number.isFinite(stock.averageCost) && stock.averageCost > 0) {
+    return stock.averageCost;
+  }
+  return 0;
+}
+
 function etCalendarDateString(d = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(d);
 }
@@ -34,7 +44,7 @@ function holdingPayload(s: StockHolding, lots: { open: TradeLot[]; sold: SoldLot
     symbol: s.symbol,
     quantity: s.quantity,
     averageCost: s.averageCost,
-    lastPrice: s.lastPrice ?? s.averageCost,
+    lastPrice: snapshotValuationPrice(s),
     shortSMA: optimized ? s.shortSMA : null,
     dynamicFactor: optimized ? s.dynamicFactor : null,
     stockLimit: optimized ? s.stockLimit : null,
@@ -65,7 +75,7 @@ function totals(state: PortfolioSlice) {
   for (const s of state.stocks) {
     if (s.quantity <= 0) continue;
     cost += s.quantity * s.averageCost;
-    value += s.quantity * (s.lastPrice ?? s.averageCost);
+    value += s.quantity * snapshotValuationPrice(s);
   }
   const unrealized = value - cost;
   const totalPortfolio = value + state.cashBalance;

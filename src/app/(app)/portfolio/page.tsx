@@ -339,7 +339,12 @@ export default function PortfolioPage() {
           console.warn("[portfolio cash flow]", flowResult.error.message);
         }
       }
-      await flushCurrentPortfolioSnapshotNow(true);
+      const snapshotResult = await flushCurrentPortfolioSnapshotNow(true, {
+        allowEmptyHoldings: true,
+      });
+      if (snapshotResult.error) {
+        console.warn("[portfolio cash snapshot]", snapshotResult.error.message);
+      }
     })();
   }
 
