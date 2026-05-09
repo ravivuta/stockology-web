@@ -10,6 +10,9 @@ import {
 import { usePortfolioStore } from "@/store/portfolioStore";
 
 const lastPushedFingerprintByUser = new Map<string, string>();
+const DURABLE_PENDING_KEY = "stocks-pm-pending-portfolio-snapshots:v1";
+const durableRetryTimersByUser = new Map<string, number>();
+
 type SnapshotPushOptions = {
   force?: boolean;
   allowEmptyHoldings?: boolean;
@@ -31,16 +34,6 @@ type SnapshotPushQueueState = {
 
 const snapshotPushQueueByUser = new Map<string, SnapshotPushQueueState>();
 
-function snapshotValuationPrice(stock: PortfolioSlice["stocks"][number]): number {
-  if (Number.isFinite(stock.lastPrice) && (stock.lastPrice ?? 0) > 0) {
-    return stock.lastPrice as number;
-  }
-  if (Number.isFinite(stock.averageCost) && stock.averageCost > 0) {
-    return stock.averageCost;
-  }
-  return 0;
-}
-
 function validateSnapshotSlice(
   slice: PortfolioSlice,
   options?: { allowEmptyHoldings?: boolean }
@@ -50,36 +43,111 @@ function validateSnapshotSlice(
     return { error: null, skipped: true };
   }
 
-  let costBasis = 0;
-  let holdingsValue = 0;
-  for (const stock of slice.stocks) {
-    if (stock.quantity <= 0) continue;
-    costBasis += stock.quantity * stock.averageCost;
-    holdingsValue += stock.quantity * snapshotValuationPrice(stock);
-  }
-
-  const totalPortfolioValue = holdingsValue + slice.cashBalance;
-  if (totalPortfolioValue < 0) {
-    return { error: new Error("Skipping snapshot save because total portfolio value is negative."), skipped: true };
-  }
-
-  if (slice.cashBalance < -100) {
-    return { error: new Error("Skipping snapshot save because cash balance is materially negative."), skipped: true };
-  }
-
-  if (slice.stocks.some((stock) => stock.stockLimit < -100 || stock.transactionLimit < -100)) {
-    return { error: new Error("Skipping snapshot save because one or more trading limits are negative."), skipped: true };
-  }
-
-  const hasPositions = slice.stocks.some((stock) => stock.quantity > 0);
-  if (hasPositions && costBasis > 0 && holdingsValue < 100) {
-    return {
-      error: new Error("Skipping snapshot save because holdings exist but prices appear to be missing."),
-      skipped: true,
-    };
-  }
-
   return { error: null, skipped: false };
+}
+
+type DurablePendingSnapshot = {
+  slice: PortfolioSlice;
+  allowEmptyHoldings: boolean;
+  fingerprint: string;
+  updatedAt: string;
+  retryCount: number;
+  notified?: boolean;
+};
+
+function readDurablePendingSnapshots(): Record<string, DurablePendingSnapshot> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(DURABLE_PENDING_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, DurablePendingSnapshot>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeDurablePendingSnapshots(pending: Record<string, DurablePendingSnapshot>): void {
+  if (typeof window === "undefined") return;
+  try {
+    const keys = Object.keys(pending);
+    if (keys.length === 0) {
+      window.localStorage.removeItem(DURABLE_PENDING_KEY);
+      return;
+    }
+    window.localStorage.setItem(DURABLE_PENDING_KEY, JSON.stringify(pending));
+  } catch {
+    // Ignore storage failures; the in-memory queue still handles active-tab saves.
+  }
+}
+
+function rememberDurablePendingSnapshot(
+  dataUserId: string,
+  slice: PortfolioSlice,
+  options: SnapshotPushOptions | undefined,
+  fingerprint: string,
+  retryCount: number,
+  notified = false
+): void {
+  const pending = readDurablePendingSnapshots();
+  pending[dataUserId] = {
+    slice,
+    allowEmptyHoldings: !!options?.allowEmptyHoldings,
+    fingerprint,
+    updatedAt: new Date().toISOString(),
+    retryCount,
+    notified,
+  };
+  writeDurablePendingSnapshots(pending);
+}
+
+function clearDurablePendingSnapshot(dataUserId: string, fingerprint: string): void {
+  const pending = readDurablePendingSnapshots();
+  if (pending[dataUserId]?.fingerprint !== fingerprint) return;
+  delete pending[dataUserId];
+  writeDurablePendingSnapshots(pending);
+}
+
+function scheduleDurableRetry(dataUserId: string, delayMs = 5000): void {
+  if (typeof window === "undefined") return;
+  if (durableRetryTimersByUser.has(dataUserId)) return;
+
+  const timer = window.setTimeout(() => {
+    durableRetryTimersByUser.delete(dataUserId);
+    const pending = readDurablePendingSnapshots()[dataUserId];
+    if (!pending) return;
+    void pushPortfolioSnapshotSlice(dataUserId, pending.slice, {
+      force: true,
+      allowEmptyHoldings: pending.allowEmptyHoldings,
+    });
+  }, delayMs);
+
+  durableRetryTimersByUser.set(dataUserId, timer);
+}
+
+export function retryPendingPortfolioSnapshot(dataUserId: string): void {
+  const pending = readDurablePendingSnapshots()[dataUserId];
+  if (!pending) return;
+  void pushPortfolioSnapshotSlice(dataUserId, pending.slice, {
+    force: true,
+    allowEmptyHoldings: pending.allowEmptyHoldings,
+  });
+}
+
+function notifySnapshotSaveFailure(dataUserId: string, message: string): void {
+  if (typeof window === "undefined") return;
+
+  console.error("[pushPortfolioSnapshotSlice] Snapshot save failed after retries.", {
+    dataUserId,
+    message,
+  });
+
+  window.alert(
+    "Portfolio save failed after 2 retries. Your latest changes are still queued in this browser and will retry when you reopen the app, but they are not saved to Supabase yet.\n\n" +
+      message
+  );
 }
 
 export function getLastPushedPortfolioFingerprint(dataUserId: string): string {
@@ -88,6 +156,28 @@ export function getLastPushedPortfolioFingerprint(dataUserId: string): string {
 
 export function markLastPushedPortfolioFingerprint(dataUserId: string, fingerprint: string): void {
   lastPushedFingerprintByUser.set(dataUserId, fingerprint);
+}
+
+async function savePortfolioSnapshotViaServer(
+  dataUserId: string,
+  slice: PortfolioSlice
+): Promise<{ error: Error | null }> {
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+  try {
+    const response = await fetch(`${basePath}/api/portfolio/snapshot`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataUserId, slice }),
+      credentials: "same-origin",
+    });
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    if (!response.ok) {
+      return { error: new Error(payload?.error || `Snapshot save failed with HTTP ${response.status}.`) };
+    }
+    return { error: null };
+  } catch (error) {
+    return { error: error instanceof Error ? error : new Error("Snapshot save failed.") };
+  }
 }
 
 async function executePortfolioSnapshotSlice(
@@ -111,9 +201,31 @@ async function executePortfolioSnapshotSlice(
   }
 
   const supabase = options?.supabase ?? createClient();
-  const { error } = await upsertPortfolioSnapshotForCloudUser(supabase, dataUserId, slice);
+  let { error } = await upsertPortfolioSnapshotForCloudUser(supabase, dataUserId, slice);
+
+  if (error) {
+    console.warn("[pushPortfolioSnapshotSlice] Direct Supabase save failed; retrying through server.", error.message);
+    const fallback = await savePortfolioSnapshotViaServer(dataUserId, slice);
+    error = fallback.error;
+  }
+
   if (!error) {
     markLastPushedPortfolioFingerprint(dataUserId, fingerprint);
+    clearDurablePendingSnapshot(dataUserId, fingerprint);
+  } else {
+    const pending = readDurablePendingSnapshots()[dataUserId];
+    const previousRetryCount = pending?.fingerprint === fingerprint ? pending.retryCount ?? 0 : 0;
+    const alreadyNotified = pending?.fingerprint === fingerprint ? pending.notified === true : false;
+
+    if (previousRetryCount >= 2) {
+      rememberDurablePendingSnapshot(dataUserId, slice, options, fingerprint, previousRetryCount, true);
+      if (!alreadyNotified) {
+        notifySnapshotSaveFailure(dataUserId, error.message);
+      }
+    } else {
+      rememberDurablePendingSnapshot(dataUserId, slice, options, fingerprint, previousRetryCount + 1);
+      scheduleDurableRetry(dataUserId);
+    }
   }
   return { error, skipped: false, fingerprint };
 }

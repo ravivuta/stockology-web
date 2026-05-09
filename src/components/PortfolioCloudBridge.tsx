@@ -12,7 +12,11 @@ import {
   readPortfolioDraftForUser,
   saveCurrentPortfolioDraftForUser,
 } from "@/lib/clear-portfolio-client-state";
-import { flushCurrentPortfolioSnapshotNow, pushPortfolioSnapshotSlice } from "@/lib/portfolio-snapshot-client";
+import {
+  flushCurrentPortfolioSnapshotNow,
+  pushPortfolioSnapshotSlice,
+  retryPendingPortfolioSnapshot,
+} from "@/lib/portfolio-snapshot-client";
 import { usePortfolioStore } from "@/store/portfolioStore";
 
 export type CloudSnapshotHydrationProps = {
@@ -119,6 +123,8 @@ export function PortfolioCloudBridge({
   useEffect(() => {
     if (!syncReady || !dataUserId) return;
 
+    retryPendingPortfolioSnapshot(dataUserId);
+
     const pushCurrentSnapshot = () => {
       const state = usePortfolioStore.getState();
       const slice = { cashBalance: state.cashBalance, stocks: state.stocks, lotsBySymbol: state.lotsBySymbol };
@@ -129,12 +135,19 @@ export function PortfolioCloudBridge({
       void flushCurrentPortfolioSnapshotNow(true);
     };
 
+    const handleOnline = () => {
+      retryPendingPortfolioSnapshot(dataUserId);
+    };
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
         flushNow();
+      } else {
+        retryPendingPortfolioSnapshot(dataUserId);
       }
     };
 
+    window.addEventListener("online", handleOnline);
     window.addEventListener("pagehide", flushNow);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
@@ -156,6 +169,7 @@ export function PortfolioCloudBridge({
     });
 
     return () => {
+      window.removeEventListener("online", handleOnline);
       window.removeEventListener("pagehide", flushNow);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       unsub();
