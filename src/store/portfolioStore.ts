@@ -1139,6 +1139,15 @@ export const usePortfolioStore = create<State>()(
             const imported = buildImportedOpenLots(symbolRows);
             const hasImportedHoldings = imported.totalQty > 0;
 
+            const preferredAccount =
+              symbolRows
+                .map((row) => row.account?.trim() ?? "")
+                .find((value) => value.length > 0) ?? "";
+            const preferredRetirement =
+              symbolRows
+                .map((row) => row.isRetirementAccount)
+                .find((value): value is boolean => value != null) ?? null;
+
             if (mode === "watchlist") {
               if (existing) continue;
               addedCount += 1;
@@ -1156,7 +1165,14 @@ export const usePortfolioStore = create<State>()(
             }
 
             if (hasImportedHoldings) {
-              const preservedOpenLots = existingLots?.open.map(cloneTradeLot) ?? [];
+              const preservedOpenLots =
+                existingLots?.open.map((lot) => ({
+                  ...cloneTradeLot(lot),
+                  // Backfill metadata on existing lots when the import provides mapping/defaults.
+                  account: lot.account?.trim() || preferredAccount,
+                  isRetirementAccount:
+                    lot.isRetirementAccount == null ? preferredRetirement : lot.isRetirementAccount,
+                })) ?? [];
               const preservedSoldLots = existingLots?.sold.map(cloneSoldLot) ?? [];
               const mergedOpenLots =
                 preservedOpenLots.length > 0
@@ -1168,8 +1184,8 @@ export const usePortfolioStore = create<State>()(
                           quantity: existing?.quantity ?? 0,
                           costBasis: existing?.averageCost ?? 0,
                           purchaseDate: defaultImportPurchaseDate(),
-                          account: "",
-                          isRetirementAccount: null,
+                          account: preferredAccount,
+                          isRetirementAccount: preferredRetirement,
                           status: "open" as const,
                         },
                         ...imported.openLots.map(cloneTradeLot),

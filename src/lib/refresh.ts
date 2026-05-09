@@ -39,19 +39,6 @@ export type RefreshPipelineResult = {
   staleSymbols: string[];
 };
 
-const lastAppliedSnapshotByUser = new Map<string, string>();
-
-function canSafelyApplySnapshot(
-  startedMutationAt: string | null,
-  currentMutationAt: string | null,
-  guardMs: number
-) {
-  if (currentMutationAt && currentMutationAt !== startedMutationAt) return false;
-  if (!currentMutationAt) return true;
-  const ageMs = Date.now() - Date.parse(currentMutationAt);
-  return !Number.isFinite(ageMs) || ageMs >= guardMs;
-}
-
 function sanitizeSymbols(symbols: string[]): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
@@ -73,11 +60,9 @@ export async function runRefreshPipeline(
   options?: {
     optimizePending?: boolean;
     includeSnapshot?: boolean;
-    snapshotLocalMutationGuardMs?: number;
   }
 ): Promise<RefreshPipelineResult> {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-  const startedMutationAt = usePortfolioStore.getState().lastLocalMutationAt;
 
   try {
     const clean = sanitizeSymbols(symbols);
@@ -101,41 +86,18 @@ export async function runRefreshPipeline(
       };
     }
 
-    const snapshotGuardMs = options?.snapshotLocalMutationGuardMs ?? 2 * 60 * 1000;
     const dataUserId = data.data_user_id?.trim() ?? "";
-    const snapshotUpdatedAt =
-      typeof data.snapshot?.updated_at === "string" ? data.snapshot.updated_at : "";
-    const currentMutationAt = usePortfolioStore.getState().lastLocalMutationAt;
 
     if (
       options?.includeSnapshot === true &&
-      data.snapshot &&
-      canSafelyApplySnapshot(startedMutationAt, currentMutationAt, snapshotGuardMs) &&
-      (!dataUserId || lastAppliedSnapshotByUser.get(dataUserId) !== snapshotUpdatedAt)
+      data.snapshot
     ) {
       const parsed = parseCloudSnapshotForStore(data.snapshot);
-      const currentLotsBySymbol = usePortfolioStore.getState().lotsBySymbol;
-      const localLotCount = Object.values(currentLotsBySymbol).reduce(
-        (sum, bundle) => sum + bundle.open.length + bundle.sold.length,
-        0
-      );
-      const cloudLotCount = Object.values(parsed.lotsBySymbol).reduce(
-        (sum, bundle) => sum + bundle.open.length + bundle.sold.length,
-        0
-      );
-
-      if (cloudLotCount >= localLotCount || localLotCount === 0) {
-        usePortfolioStore.getState().replaceFromCloudSync({
-          ...parsed,
-          onboardingComplete: true,
-        });
-      } else {
-        console.warn(
-          `[refresh] Skipping snapshot apply: local lots (${localLotCount}) > cloud lots (${cloudLotCount})`
-        );
-      }
+      usePortfolioStore.getState().replaceFromCloudSync({
+        ...parsed,
+        onboardingComplete: true,
+      });
       if (dataUserId) {
-        if (snapshotUpdatedAt) lastAppliedSnapshotByUser.set(dataUserId, snapshotUpdatedAt);
         markLastPushedPortfolioFingerprint(
           dataUserId,
           portfolioSyncFingerprint({

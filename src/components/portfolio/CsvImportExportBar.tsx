@@ -26,7 +26,7 @@ import { AppModal, ModalSection } from "@/components/ui/AppModal";
 import { parseStockPeg } from "@/lib/stock-metric-parse";
 
 const MAX_TRACKED_STOCKS = 200;
-const HIDDEN_MAPPING_FIELDS = new Set<CsvColumnStandard>(["account", "retirementAccount", "name"]);
+const HIDDEN_MAPPING_FIELDS = new Set<CsvColumnStandard>(["name"]);
 
 const CSV_MAPPING_MEMORY_KEY = "stocks-pm-csv-mapping-memory:v1";
 const CSV_MAPPING_PRESETS_KEY = "stocks-pm-csv-mapping-presets:v1";

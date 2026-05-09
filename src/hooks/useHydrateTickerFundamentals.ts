@@ -14,7 +14,6 @@ import { usePortfolioStore } from "@/store/portfolioStore";
 const INITIAL_REFRESH_DELAY_MS = 800;
 const AUTO_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
 const FOCUS_REFRESH_MIN_STALE_MS = 3 * 60 * 1000;
-const SNAPSHOT_MUTATION_GUARD_MS = 2 * 60 * 1000;
 const AUTO_OPTIMIZE_COOLDOWN_MS = 30 * 60 * 1000;
 const HISTORY_DAYS = 400;
 const HISTORY_FETCH_BATCH = 6;
@@ -80,7 +79,6 @@ export function useHydrateTickerFundamentals(options?: { enabled?: boolean }) {
         const result = await runRefreshPipeline(symbols, {
           optimizePending,
           includeSnapshot: true,
-          snapshotLocalMutationGuardMs: SNAPSHOT_MUTATION_GUARD_MS,
         });
         if (result.ok && optimizePending) {
           lastAutoOptimizeAtRef.current = Date.now();

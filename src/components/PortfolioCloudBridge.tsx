@@ -71,7 +71,6 @@ export function PortfolioCloudBridge({
       sessionStorage.setItem(ACTIVE_DATA_USER_KEY, dataUserId);
       sessionStorage.setItem(ACTIVE_AUTH_USER_KEY, authUserId);
 
-      const alreadyHydrated = sessionStorage.getItem(key) === "1";
       const state = usePortfolioStore.getState();
       const hasLocalState =
         state.cashBalance > 0 ||
@@ -79,52 +78,15 @@ export function PortfolioCloudBridge({
         state.onboardingComplete ||
         Object.keys(state.lotsBySymbol).length > 0;
       
-      // Always apply snapshot if it's newer/better, even if local state exists
-      // This prevents stale snapshots from overwriting fresh lots during page refresh
       if (cloudSnapshot && snapshotIndicatesExistingAccount(cloudSnapshot)) {
         const parsedCloud = parseCloudSnapshotForStore({
           holdings: cloudSnapshot.holdings,
           cash_balance: cloudSnapshot.cash_balance,
         });
-        
-        // Compare lot counts: prefer snapshot with MORE lots (more recent/complete)
-        const cloudLotCount = Object.values(parsedCloud.lotsBySymbol).reduce(
-          (sum, bundle) => sum + bundle.open.length + bundle.sold.length,
-          0
-        );
-        const localLotCount = Object.values(state.lotsBySymbol).reduce(
-          (sum, bundle) => sum + bundle.open.length + bundle.sold.length,
-          0
-        );
-        
-        // If cloud has more lots, it's fresher - apply it
-        // If local has more or equal lots, keep local (prefer local richness)
-        if (cloudLotCount > localLotCount) {
-          console.log(`[PortfolioCloudBridge] ✅ Cloud snapshot has more lots (${cloudLotCount} vs ${localLotCount}), applying cloud snapshot`);
-          usePortfolioStore.getState().replaceFromCloudSync({
-            ...parsedCloud,
-            onboardingComplete: true,
-          });
-        } else if (!alreadyHydrated && cloudLotCount === localLotCount && cloudLotCount > 0) {
-          // First hydrate of this session: allow equivalent lot-count cloud apply to sync non-lot fields.
-          usePortfolioStore.getState().replaceFromCloudSync({
-            ...parsedCloud,
-            onboardingComplete: true,
-          });
-        } else if (cloudLotCount > 0 && localLotCount === 0) {
-          console.log(`[PortfolioCloudBridge] ✅ Cloud has lots (${cloudLotCount}), local is empty, applying cloud snapshot`);
-          usePortfolioStore.getState().replaceFromCloudSync({
-            ...parsedCloud,
-            onboardingComplete: true,
-          });
-        } else if (localLotCount > 0 && cloudLotCount === 0) {
-          console.warn(`[PortfolioCloudBridge] ⚠️ WARNING: Cloud snapshot is EMPTY (0 lots) but local has ${localLotCount} lots`);
-          console.warn(`   This may indicate a stale/incomplete snapshot was saved to Supabase`);
-          console.warn(`   PRESERVING LOCAL LOTS to prevent data loss`);
-        } else if (localLotCount > cloudLotCount && localLotCount > 0) {
-          console.log(`[PortfolioCloudBridge] ✅ Local has more lots (${localLotCount} vs ${cloudLotCount}), keeping local`);
-        }
-        
+        usePortfolioStore.getState().replaceFromCloudSync({
+          ...parsedCloud,
+          onboardingComplete: true,
+        });
         sessionStorage.setItem(key, "1");
         setSyncReady(true);
         return;
@@ -146,16 +108,10 @@ export function PortfolioCloudBridge({
   useEffect(() => {
     if (!syncReady || !dataUserId) return;
 
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const debounceMs = 4500;
-
-    const schedulePush = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(async () => {
-        const state = usePortfolioStore.getState();
-        const slice = { cashBalance: state.cashBalance, stocks: state.stocks, lotsBySymbol: state.lotsBySymbol };
-        await pushPortfolioSnapshotSlice(dataUserId, slice);
-      }, debounceMs);
+    const pushCurrentSnapshot = () => {
+      const state = usePortfolioStore.getState();
+      const slice = { cashBalance: state.cashBalance, stocks: state.stocks, lotsBySymbol: state.lotsBySymbol };
+      void pushPortfolioSnapshotSlice(dataUserId, slice);
     };
 
     const flushNow = () => {
@@ -175,11 +131,10 @@ export function PortfolioCloudBridge({
       const a = portfolioSyncFingerprint({ cashBalance: prev.cashBalance, stocks: prev.stocks, lotsBySymbol: prev.lotsBySymbol });
       const b = portfolioSyncFingerprint({ cashBalance: state.cashBalance, stocks: state.stocks, lotsBySymbol: state.lotsBySymbol });
       if (a === b) return;
-      schedulePush();
+      pushCurrentSnapshot();
     });
 
     return () => {
-      if (timer) clearTimeout(timer);
       window.removeEventListener("pagehide", flushNow);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       unsub();

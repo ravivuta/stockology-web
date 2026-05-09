@@ -421,10 +421,21 @@ function normalizeImportedDate(raw: string): string | undefined {
 function parseRetirementAccountFlag(raw: string): boolean | undefined {
   const value = raw.trim().toLowerCase();
   if (!value) return undefined;
-  if (["yes", "y", "true", "1", "retirement", "ira", "roth", "401k", "tax-exempt", "tax exempt"].includes(value)) {
+  if (
+    ["yes", "y", "true", "1", "retirement", "ira", "roth", "401k", "tax-exempt", "tax exempt"].includes(value) ||
+    value.includes("ira") ||
+    value.includes("roth") ||
+    value.includes("401k") ||
+    value.includes("retirement") ||
+    value.includes("tax-exempt")
+  ) {
     return true;
   }
-  if (["no", "n", "false", "0", "taxable", "brokerage"].includes(value)) {
+  if (
+    ["no", "n", "false", "0", "taxable", "brokerage"].includes(value) ||
+    value.includes("taxable") ||
+    value.includes("brokerage")
+  ) {
     return false;
   }
   return undefined;
