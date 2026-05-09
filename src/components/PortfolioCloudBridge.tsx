@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { snapshotIndicatesExistingAccount } from "@/lib/cloud-portfolio";
 import { parseCloudSnapshotForStore } from "@/lib/cloud-snapshot-hydration";
 import {
   portfolioSyncFingerprint,
@@ -21,6 +20,18 @@ export type CloudSnapshotHydrationProps = {
   cash_balance: unknown;
   total_portfolio_value: unknown;
 } | null;
+
+function sliceIsEmpty(slice: {
+  cashBalance: number;
+  stocks: unknown[];
+  lotsBySymbol: Record<string, unknown>;
+}) {
+  return (
+    Math.abs(slice.cashBalance) < 0.005 &&
+    slice.stocks.length === 0 &&
+    Object.keys(slice.lotsBySymbol).length === 0
+  );
+}
 
 /**
  * One-time hydrate from Supabase snapshot into the persisted Zustand store, and debounced push-back for iOS.
@@ -78,14 +89,14 @@ export function PortfolioCloudBridge({
         state.onboardingComplete ||
         Object.keys(state.lotsBySymbol).length > 0;
       
-      if (cloudSnapshot && snapshotIndicatesExistingAccount(cloudSnapshot)) {
+      if (cloudSnapshot) {
         const parsedCloud = parseCloudSnapshotForStore({
           holdings: cloudSnapshot.holdings,
           cash_balance: cloudSnapshot.cash_balance,
         });
         usePortfolioStore.getState().replaceFromCloudSync({
           ...parsedCloud,
-          onboardingComplete: true,
+          onboardingComplete: parsedCloud.cashBalance > 0 || parsedCloud.stocks.length > 0,
         });
         sessionStorage.setItem(key, "1");
         setSyncReady(true);
@@ -128,9 +139,19 @@ export function PortfolioCloudBridge({
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     const unsub = usePortfolioStore.subscribe((state, prev) => {
-      const a = portfolioSyncFingerprint({ cashBalance: prev.cashBalance, stocks: prev.stocks, lotsBySymbol: prev.lotsBySymbol });
-      const b = portfolioSyncFingerprint({ cashBalance: state.cashBalance, stocks: state.stocks, lotsBySymbol: state.lotsBySymbol });
+      const prevSlice = { cashBalance: prev.cashBalance, stocks: prev.stocks, lotsBySymbol: prev.lotsBySymbol };
+      const nextSlice = { cashBalance: state.cashBalance, stocks: state.stocks, lotsBySymbol: state.lotsBySymbol };
+      const a = portfolioSyncFingerprint(prevSlice);
+      const b = portfolioSyncFingerprint(nextSlice);
       if (a === b) return;
+      const intentionalClear = !sliceIsEmpty(prevSlice) && sliceIsEmpty(nextSlice);
+      if (intentionalClear) {
+        void pushPortfolioSnapshotSlice(dataUserId, nextSlice, {
+          force: true,
+          allowEmptyHoldings: true,
+        });
+        return;
+      }
       pushCurrentSnapshot();
     });
 
