@@ -178,6 +178,13 @@ type OptimizedStrategyPayload = {
   pendingOptimization: boolean;
 };
 
+function countValidHistoricalCloses(history: { close?: number | null }[]): number {
+  return history.reduce((count, point) => {
+    const close = Number(point.close);
+    return Number.isFinite(close) && close > 0 ? count + 1 : count;
+  }, 0);
+}
+
 function preserveImportedMetadata(existing: StockHolding | undefined) {
   if (!existing) return {};
   return {
@@ -276,6 +283,10 @@ async function requestOptimizedStrategy(
 ): Promise<OptimizedStrategyPayload> {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   const history = await loadHistoricalPayloadForSymbol(stock.symbol, 252 * 5 + 280);
+  if (countValidHistoricalCloses(history) < 252) {
+    throw new Error(`Insufficient historical data for ${stock.symbol}. Need about 1 year of daily closes.`);
+  }
+
   const response = await fetch(`${basePath}/api/python/optimization`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
