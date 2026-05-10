@@ -555,7 +555,13 @@ export const usePortfolioStore = create<State>()(
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
             lotsBySymbol: st.lotsBySymbol,
           };
-          const derived = derivePortfolioState(st.stocks, n, recalcCtx, st);
+          const currentPortfolioSize = st.stocks.reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) + st.cashBalance;
+          const newPortfolioSize = st.stocks.reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) + n;
+          const drift = currentPortfolioSize > 0 ? Math.abs(newPortfolioSize - currentPortfolioSize) / currentPortfolioSize : 0;
+          const derived = derivePortfolioState(st.stocks, n, recalcCtx, st, {
+            shouldRecalculateLimits: true,
+            forceRecalculateAllHoldingLimits: drift > 0.10,
+          });
           return {
             cashBalance: n,
             stocks: derived.stocks,
