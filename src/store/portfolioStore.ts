@@ -185,6 +185,10 @@ function countValidHistoricalCloses(history: { close?: number | null }[]): numbe
   }, 0);
 }
 
+// Incremented whenever an import starts, causing any in-flight optimizePendingStocks
+// loop to abort after its current in-progress fetch completes.
+let optimizationGeneration = 0;
+
 function preserveImportedMetadata(existing: StockHolding | undefined) {
   if (!existing) return {};
   return {
@@ -1056,9 +1060,12 @@ export const usePortfolioStore = create<State>()(
           .map((stock) => stock.symbol);
         if (pendingSymbols.length === 0) return;
 
+        const myGeneration = optimizationGeneration;
         get().setOptimizing(true);
         try {
           for (const symbol of pendingSymbols) {
+            // Abort if a new import has started since this run began.
+            if (optimizationGeneration !== myGeneration) break;
             const latest = get();
             const stock = latest.stocks.find((item) => item.symbol === symbol);
             if (!stock || !stock.pendingOptimization) continue;
@@ -1104,6 +1111,8 @@ export const usePortfolioStore = create<State>()(
         }
       },
       importCsvRows: (rows, mode, trades = []) => {
+        // Cancel any in-flight optimizePendingStocks loop from a previous import.
+        optimizationGeneration += 1;
         const grouped = new Map<string, CsvImportRow[]>();
         for (const row of rows) {
           const symbol = row.symbol.toUpperCase();

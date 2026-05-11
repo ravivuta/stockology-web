@@ -224,11 +224,13 @@ export function CsvImportExportBar({
   const updateStock = usePortfolioStore((s) => s.updateStock);
   const storeStocks = usePortfolioStore((s) => s.stocks);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
+  const optimizing = usePortfolioStore((s) => s.optimizing);
   const toExport = exportStocks ?? storeStocks;
   const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [pendingMappingImport, setPendingMappingImport] = useState<PendingMappingImport | null>(null);
   const [progress, setProgress] = useState<ImportProgress>({ active: false, label: "", value: 0 });
   const [savedPresets, setSavedPresets] = useState<SavedCsvMappingPreset[]>([]);
+  const importBusy = progress.active || optimizing;
 
   function beginImportProgress(label: string, value: number) {
     setProgress({ active: true, label, value });
@@ -444,25 +446,25 @@ export function CsvImportExportBar({
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          disabled={progress.active}
+          disabled={importBusy}
           className={`ui-hover-pop rounded-lg border border-primary/40 bg-background font-medium text-foreground dark:border-primary/30 ${
             compact ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm"
-          } ${progress.active ? "cursor-wait opacity-60" : ""}`}
+          } ${importBusy ? "cursor-wait opacity-60" : ""}`}
         >
           Import CSV
         </button>
         <button
           type="button"
           onClick={onExport}
-          disabled={progress.active}
+          disabled={importBusy}
           className={`ui-hover-pop rounded-lg border border-primary/40 bg-background font-medium text-foreground dark:border-primary/30 ${
             compact ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm"
-          } ${progress.active ? "cursor-wait opacity-60" : ""}`}
+          } ${importBusy ? "cursor-wait opacity-60" : ""}`}
         >
           Export CSV
         </button>
       </div>
-      {progress.active ? (
+      {importBusy ? (
         <div className="min-w-[14rem] flex-1">
           <div className="h-2 overflow-hidden rounded-full bg-border/80 dark:bg-white/[0.08]">
             <div

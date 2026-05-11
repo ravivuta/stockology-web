@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -27,6 +27,7 @@ import { APP_MANAGED_TRIAL_LABEL } from "@/lib/trial-config";
 import { cn } from "@/lib/utils";
 import { withAppBasePath } from "@/lib/base-path";
 import { parseCloudSnapshotForStore } from "@/lib/cloud-snapshot-hydration";
+import { SettingsPageSkeleton } from "@/components/route-loading/page-skeletons/settings";
 
 const SECTIONS = [
   { id: "appearance", label: "Appearance", icon: Palette },
@@ -81,7 +82,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   return <span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-[0.12em] text-subtle">{children}</span>;
 }
 
-export default function SettingsPage() {
+function SettingsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [userId, setUserId] = useState<string | undefined>();
@@ -778,5 +779,13 @@ export default function SettingsPage() {
         variant="danger"
       />
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<SettingsPageSkeleton />}>
+      <SettingsInner />
+    </Suspense>
   );
 }
