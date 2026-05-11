@@ -33,7 +33,7 @@ export default function DashboardPage() {
   const reduceMotion = useReducedMotion();
   const stocks = usePortfolioStore((s) => s.stocks);
   const cash = usePortfolioStore((s) => s.cashBalance);
-  const [bars, setBars] = useState(false);
+  const [bars, setBars] = useState(true);
   const [dashStockDetail, setDashStockDetail] = useState<string | null>(null);
   const [cloudHistory, setCloudHistory] = useState<NetWorthPoint[] | null>(null);
 
