@@ -761,7 +761,7 @@ export default function SettingsPage() {
               )}
             </div>
             <div className="border-t border-border/60 px-4 py-3 text-[10px] text-subtle dark:border-white/[0.07]">
-              Restoring replaces your current local portfolio and saves the selected snapshot as today's version.
+              Restoring replaces your current local portfolio and saves the selected snapshot as today&apos;s version.
             </div>
           </div>
         </div>
