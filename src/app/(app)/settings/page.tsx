@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Briefcase,
   CreditCard,
+  History,
+  Loader2,
   Palette,
   RefreshCw,
   Sparkles,
@@ -24,6 +26,7 @@ import { isPaidSubscriptionTier } from "@/lib/subscription-state";
 import { APP_MANAGED_TRIAL_LABEL } from "@/lib/trial-config";
 import { cn } from "@/lib/utils";
 import { withAppBasePath } from "@/lib/base-path";
+import { parseCloudSnapshotForStore } from "@/lib/cloud-snapshot-hydration";
 
 const SECTIONS = [
   { id: "appearance", label: "Appearance", icon: Palette },
@@ -102,6 +105,22 @@ export default function SettingsPage() {
 
   const [activeSection, setActiveSection] = useState<string>(SECTIONS[0].id);
   const [resetOpen, setResetOpen] = useState(false);
+  const [restoreOpen, setRestoreOpen] = useState(false);
+  const [snapshots, setSnapshots] = useState<Array<{
+    id: number;
+    et_calendar_date: string | null;
+    holdings: unknown;
+    cash_balance: number;
+    total_portfolio_value: number;
+    total_cost_basis: number | null;
+    total_unrealized_gain: number | null;
+  }>>([]);
+  const [snapshotsLoading, setSnapshotsLoading] = useState(false);
+  const [restoreTarget, setRestoreTarget] = useState<typeof snapshots[0] | null>(null);
+  const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const replaceFromCloudSync = usePortfolioStore((s) => s.replaceFromCloudSync);
+  const supabaseRef = useRef(createClient());
   const billingState = searchParams.get("billing");
   const billingDetail = searchParams.get("billing_detail");
   const idealWatchlistSize = recommendedWatchlistSize(portfolioSize);
@@ -119,6 +138,68 @@ export default function SettingsPage() {
     resetAll();
     await flushCurrentPortfolioSnapshotNow(true, { allowEmptyHoldings: true });
     setResetOpen(false);
+  }
+
+  async function handleOpenRestore() {
+    setSnapshotsLoading(true);
+    setRestoreOpen(true);
+    try {
+      const supabase = supabaseRef.current;
+      const { data } = await supabase.auth.getUser();
+      const uid = data.user?.id;
+      if (!uid) return;
+      const resolved = await syncStocksPmAuthUser(supabase, uid);
+      if (!resolved) return;
+      // Fetch last 30 days, take latest 7
+      const since = new Date();
+      since.setDate(since.getDate() - 30);
+      const { data: rows } = await supabase.rpc("get_portfolio_snapshots", {
+        p_user_id: resolved,
+        p_start_et_date: since.toISOString().slice(0, 10),
+      });
+      const all = Array.isArray(rows) ? rows : [];
+      // Sort newest-first and take 7
+      const sorted = [...all]
+        .sort((a, b) => (b.et_calendar_date ?? "").localeCompare(a.et_calendar_date ?? ""))
+        .slice(0, 7);
+      setSnapshots(sorted);
+    } finally {
+      setSnapshotsLoading(false);
+    }
+  }
+
+  async function handleRestoreConfirm() {
+    if (!restoreTarget) return;
+    setRestoring(true);
+    try {
+      const parsed = parseCloudSnapshotForStore({
+        holdings: restoreTarget.holdings,
+        cash_balance: restoreTarget.cash_balance,
+      });
+      replaceFromCloudSync({
+        ...parsed,
+        onboardingComplete: parsed.cashBalance > 0 || parsed.stocks.length > 0,
+      });
+      // Push restored state as today's snapshot so other devices sync
+      await flushCurrentPortfolioSnapshotNow(true);
+    } finally {
+      setRestoring(false);
+      setRestoreConfirmOpen(false);
+      setRestoreTarget(null);
+      setRestoreOpen(false);
+    }
+  }
+
+  function formatSnapshotDate(etDate: string | null): string {
+    if (!etDate) return "Unknown date";
+    const d = new Date(etDate + "T12:00:00-05:00");
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+    const fmt = (dt: Date) => dt.toISOString().slice(0, 10);
+    if (etDate === fmt(today)) return "Today";
+    if (etDate === fmt(yesterday)) return "Yesterday";
+    return d.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
   }
 
   useEffect(() => {
@@ -596,8 +677,16 @@ export default function SettingsPage() {
                 </p>
                 <button
                   type="button"
+                  onClick={() => void handleOpenRestore()}
+                  className="ui-hover-surface mt-2 w-full rounded-md border border-primary/35 bg-background/90 px-2.5 py-1.5 text-xs font-semibold text-foreground dark:border-primary/28 dark:bg-yale/40 inline-flex items-center justify-center gap-1.5"
+                >
+                  <History className="h-3.5 w-3.5 opacity-70" aria-hidden />
+                  Restore from backup
+                </button>
+                <button
+                  type="button"
                   onClick={() => setResetOpen(true)}
-                  className="ui-hover-surface mt-2 w-full rounded-md border border-error/45 bg-background/90 px-2.5 py-1.5 text-xs font-semibold text-error dark:border-error/40 dark:bg-yale/40"
+                  className="ui-hover-surface mt-1.5 w-full rounded-md border border-error/45 bg-background/90 px-2.5 py-1.5 text-xs font-semibold text-error dark:border-error/40 dark:bg-yale/40"
                 >
                   Reset local portfolio
                 </button>
@@ -615,6 +704,76 @@ export default function SettingsPage() {
         title="Reset local portfolio?"
         description="This removes tracked symbols, trades, and local preferences in this browser. Sign in again or import CSV to rebuild."
         confirmLabel="Reset"
+        cancelLabel="Cancel"
+        variant="danger"
+      />
+
+      {/* Restore from backup modal */}
+      {restoreOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !restoring && setRestoreOpen(false)} />
+          <div className="relative z-10 w-full max-w-md rounded-t-2xl border border-border bg-elevated shadow-2xl sm:rounded-2xl dark:border-white/[0.1]">
+            <div className="flex items-center justify-between border-b border-border/60 px-4 py-3 dark:border-white/[0.07]">
+              <h3 className="text-sm font-semibold text-foreground">Restore Portfolio</h3>
+              <button
+                onClick={() => !restoring && setRestoreOpen(false)}
+                className="rounded-md p-1 text-subtle hover:bg-surface-hover"
+                aria-label="Close"
+              >✕</button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto px-4 py-3">
+              {snapshotsLoading ? (
+                <div className="flex items-center justify-center py-8 gap-2 text-subtle text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading snapshots…
+                </div>
+              ) : snapshots.length === 0 ? (
+                <p className="py-8 text-center text-sm text-subtle">No saved snapshots found in the last 30 days.</p>
+              ) : (
+                <ul className="divide-y divide-border/50 dark:divide-white/[0.06]">
+                  {snapshots.map((s) => (
+                    <li key={s.id} className="py-3">
+                      <button
+                        type="button"
+                        disabled={restoring}
+                        onClick={() => { setRestoreTarget(s); setRestoreConfirmOpen(true); }}
+                        className="w-full text-left"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">{formatSnapshotDate(s.et_calendar_date)}</p>
+                            <p className="mt-0.5 text-[11px] text-subtle">
+                              {s.holdings && Array.isArray(s.holdings)
+                                ? `${(s.holdings as Array<{quantity?: number}>).filter(h => (h.quantity ?? 0) > 0).length} positions · ${(s.holdings as Array<{quantity?: number}>).filter(h => (h.quantity ?? 0) === 0).length} watchlist`
+                                : "—"}
+                              {" · "}{formatCurrency(s.cash_balance)} cash
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-semibold text-foreground tabular-nums">{formatCurrency(s.total_portfolio_value)}</p>
+                            <p className="text-[10px] text-subtle">total value</p>
+                          </div>
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="border-t border-border/60 px-4 py-3 text-[10px] text-subtle dark:border-white/[0.07]">
+              Restoring replaces your current local portfolio and saves the selected snapshot as today's version.
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmModal
+        open={restoreConfirmOpen}
+        onClose={() => { setRestoreConfirmOpen(false); setRestoreTarget(null); }}
+        onConfirm={() => void handleRestoreConfirm()}
+        title={`Restore ${formatSnapshotDate(restoreTarget?.et_calendar_date ?? null)} snapshot?`}
+        description="Your current portfolio will be replaced by the selected snapshot. This will also sync to your iOS app."
+        confirmLabel={restoring ? "Restoring…" : "Restore"}
         cancelLabel="Cancel"
         variant="danger"
       />
