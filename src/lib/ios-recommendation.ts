@@ -851,7 +851,24 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
     }
   }
 
-  if (numStock > 0 && targetPrice != null && currentPrice >= targetPrice && passesLongTermCheckForSell) {
+  // Guard: for non-ETF stocks, only trigger SELL when a real analyst target exists.
+  // The fallback profit-% target drives expectedReturnPct display only, not a SELL signal,
+  // to prevent false SELL flashes when analystTarget is temporarily missing during a refresh.
+  const hasDefinitiveTarget = (stock.analystTarget != null && stock.analystTarget > 0) || stock.isETF === true;
+  if (numStock > 0 && targetPrice != null && currentPrice >= targetPrice && passesLongTermCheckForSell && hasDefinitiveTarget) {
+    // RSI gate: if overbought right now, defer SELL until RSI reverses
+    if (rsiGateEnabled) {
+      const currentRSI = rsiSeries(closes, rsiPeriod).at(-1) ?? 0;
+      if (currentRSI > rsiOverboughtThreshold) {
+        return {
+          action: "WAIT_ADD" as const,
+          comments: `Target reached but RSI is overbought (${currentRSI.toFixed(0)}/100) — holding for RSI reversal confirmation before selling to avoid selling at momentum peak.`,
+          nextBuyPrice,
+          movingAvg,
+          expectedReturnPct,
+        };
+      }
+    }
     return {
       action: "SELL",
       comments: generateSellComment(stock, targetPrice),
