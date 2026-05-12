@@ -23,6 +23,7 @@ import { recommendedWatchlistSize } from "@/lib/ios-recommendation";
 import { formatCurrency } from "@/lib/numberFormat";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { deleteAllExternalCashFlows } from "@/lib/external-cash-flows";
+import { saveGlobalSettingsForUser, loadGlobalSettingsForUser } from "@/lib/portfolio-cloud-sync";
 import { isPaidSubscriptionTier } from "@/lib/subscription-state";
 import { APP_MANAGED_TRIAL_LABEL } from "@/lib/trial-config";
 import { cn } from "@/lib/utils";
@@ -134,6 +135,22 @@ function SettingsInner() {
   ) {
     setSettings(patch);
     void flushCurrentPortfolioSnapshotNow(true);
+    if (userId) {
+      const supabase = supabaseRef.current;
+      const store = usePortfolioStore.getState();
+      void saveGlobalSettingsForUser(supabase, userId, {
+        etfProfitTarget: "etfProfitTarget" in patch ? patch.etfProfitTarget : store.etfProfitTarget,
+        stockProfitTarget: "stockProfitTarget" in patch ? patch.stockProfitTarget : store.stockProfitTarget,
+        riskAppetite: "riskAppetite" in patch ? patch.riskAppetite : store.riskAppetite,
+        enableRiskFilter: "enableRiskFilter" in patch ? patch.enableRiskFilter : store.enableRiskFilter,
+        useAISentiment: "useAISentimentForRecommendations" in patch ? patch.useAISentimentForRecommendations : store.useAISentimentForRecommendations,
+        useRSIGating: "useRSIGatingForRecommendations" in patch ? patch.useRSIGatingForRecommendations : store.useRSIGatingForRecommendations,
+        sellOnlyLongTerm: "sellOnlyLongTermQualified" in patch ? patch.sellOnlyLongTermQualified : store.sellOnlyLongTermQualified,
+        limitWatchlistSize: "limitWatchlistSize" in patch ? patch.limitWatchlistSize : store.limitWatchlistSize,
+        timezone: "timezone" in patch ? patch.timezone : store.timezone,
+        region: "region" in patch ? patch.region : store.region,
+      });
+    }
   }
 
   async function handleResetConfirm() {
@@ -216,10 +233,28 @@ function SettingsInner() {
       if (!uid || cancelled) return;
       const resolved = await syncStocksPmAuthUser(supabase, uid);
       if (!cancelled) setUserId(resolved);
+      if (!resolved || cancelled) return;
+      // Load cloud settings and apply to store on page open
+      const cloudSettings = await loadGlobalSettingsForUser(supabase, resolved);
+      if (cloudSettings && !cancelled) {
+        setSettings({
+          ...(cloudSettings.etfProfitTarget != null && cloudSettings.etfProfitTarget > 0 ? { etfProfitTarget: cloudSettings.etfProfitTarget } : {}),
+          ...(cloudSettings.stockProfitTarget != null && cloudSettings.stockProfitTarget > 0 ? { stockProfitTarget: cloudSettings.stockProfitTarget } : {}),
+          ...(cloudSettings.riskAppetite != null ? { riskAppetite: cloudSettings.riskAppetite } : {}),
+          ...(cloudSettings.enableRiskFilter != null ? { enableRiskFilter: cloudSettings.enableRiskFilter } : {}),
+          ...(cloudSettings.useAISentiment != null ? { useAISentimentForRecommendations: cloudSettings.useAISentiment } : {}),
+          ...(cloudSettings.useRSIGating != null ? { useRSIGatingForRecommendations: cloudSettings.useRSIGating } : {}),
+          ...(cloudSettings.sellOnlyLongTerm != null ? { sellOnlyLongTermQualified: cloudSettings.sellOnlyLongTerm } : {}),
+          ...(cloudSettings.limitWatchlistSize != null ? { limitWatchlistSize: cloudSettings.limitWatchlistSize } : {}),
+          ...(cloudSettings.timezone ? { timezone: cloudSettings.timezone } : {}),
+          ...(cloudSettings.region ? { region: cloudSettings.region } : {}),
+        });
+      }
     })();
     return () => {
       cancelled = true;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -650,14 +685,14 @@ function SettingsInner() {
               <div>
                 <label className="block">
                   <FieldLabel>Timezone</FieldLabel>
-                  <input value={timezone} onChange={(e) => setSettings({ timezone: e.target.value })} className={inputClass} placeholder="e.g. America/New_York" />
+                  <input value={timezone} onChange={(e) => persistSettingsPatch({ timezone: e.target.value })} className={inputClass} placeholder="e.g. America/New_York" />
                 </label>
               </div>
 
               <div>
                 <label className="block">
                   <FieldLabel>Region</FieldLabel>
-                  <input value={region} onChange={(e) => setSettings({ region: e.target.value })} className={inputClass} placeholder="e.g. US" />
+                  <input value={region} onChange={(e) => persistSettingsPatch({ region: e.target.value })} className={inputClass} placeholder="e.g. US" />
                 </label>
               </div>
 

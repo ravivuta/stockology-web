@@ -146,3 +146,53 @@ export async function upsertPortfolioSnapshotForCloudUser(
   }
   return { error: null };
 }
+
+export type GlobalSettings = {
+  etfProfitTarget?: number;
+  stockProfitTarget?: number;
+  riskAppetite?: "Low" | "Medium" | "High";
+  enableRiskFilter?: boolean;
+  useAISentiment?: boolean;
+  useRSIGating?: boolean;
+  sellOnlyLongTerm?: boolean;
+  limitWatchlistSize?: boolean;
+  timezone?: string;
+  region?: string;
+};
+
+/**
+ * Writes the current global settings to `users.global_settings` for the authenticated user.
+ */
+export async function saveGlobalSettingsForUser(
+  supabase: SupabaseClient,
+  userId: string,
+  settings: GlobalSettings
+): Promise<void> {
+  const { error } = await supabase
+    .from("users")
+    .update({ global_settings: settings })
+    .eq("id", userId);
+  if (error) {
+    console.warn("[saveGlobalSettings]", error.message);
+  }
+}
+
+/**
+ * Fetches `users.global_settings` for the authenticated user.
+ * Returns null when no settings are stored yet.
+ */
+export async function loadGlobalSettingsForUser(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<GlobalSettings | null> {
+  const { data, error } = await supabase
+    .from("users")
+    .select("global_settings")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) {
+    console.warn("[loadGlobalSettings]", error.message);
+    return null;
+  }
+  return (data?.global_settings as GlobalSettings | null) ?? null;
+}
