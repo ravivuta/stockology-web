@@ -315,16 +315,12 @@ function estimateReduceQty(
   costBasis: number,
   stockLimit: number,
   transactionLimit: number,
-  unrealizedGain: number,
-  analystTarget: number | undefined,
-  avgPrice: number
+  unrealizedGain: number
 ): number {
   const moneyToFree = costBasis - stockLimit;
-  const threshold = analystTarget != null && analystTarget > 0 ? 0.75 * analystTarget : 1.25 * avgPrice;
   if (
     moneyToFree > transactionLimit &&
-    unrealizedGain > moneyToFree / 2 &&
-    currentPrice > threshold
+    unrealizedGain > moneyToFree / 2
   ) {
     return Math.round(unrealizedGain / Math.max(currentPrice, 0.0001));
   }
@@ -796,9 +792,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
     costBasis,
     stockLimit,
     transactionLimit,
-    unrealizedGain,
-    stock.analystTarget,
-    avgPrice
+    unrealizedGain
   );
 
   const metricScore = stock.score ?? 0;
