@@ -295,6 +295,17 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const stock = useMemo(() => stocks.find((s) => s.symbol === symbol), [stocks, symbol]);
   const { points, loading: histLoading, error: histError } = useSupabaseStockHistory(stock ? symbol : null);
 
+  // Append today's live price as the last data point when it differs from the last historical close
+  const pointsWithToday = useMemo(() => {
+    if (!points || points.length === 0) return points;
+    const livePrice = stock?.lastPrice ?? 0;
+    if (livePrice <= 0) return points;
+    const lastClose = points[points.length - 1]!.close;
+    if (Math.abs(livePrice - lastClose) <= 0.001) return points;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    return [...points, { date: todayStr, close: livePrice }];
+  }, [points, stock?.lastPrice]);
+
   const [strategyOpen, setStrategyOpen] = useState(false);
   const [tradeModalOpen, setTradeModalOpen] = useState(false);
   const [lotsModalOpen, setLotsModalOpen] = useState(false);
@@ -808,7 +819,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                 symbol={stock.symbol}
                 smaPeriod={stock.shortSMA}
                 averageCost={hasPosition && stock.averageCost > 0 ? stock.averageCost : null}
-                points={points}
+                points={pointsWithToday}
                 loading={histLoading}
                 error={histError}
                 compact
