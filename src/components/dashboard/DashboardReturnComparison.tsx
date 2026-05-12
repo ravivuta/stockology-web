@@ -84,6 +84,10 @@ export function DashboardReturnComparison() {
   const [spyLiveQuote, setSpyLiveQuote] = useState<SpyLiveQuote | null>(null);
 
   const liveTotal = useMemo(() => computeLivePortfolioTotal(stocks, cash), [stocks, cash]);
+  const pricesReady = useMemo(() => {
+    const pos = stocks.filter((s) => s.quantity > 0);
+    return pos.length === 0 || pos.some((s) => (s.lastPrice ?? 0) > 0);
+  }, [stocks]);
 
   useEffect(() => {
     let cancelled = false;
@@ -203,8 +207,8 @@ export function DashboardReturnComparison() {
 
   const meta = useMemo(() => {
     if (cloudPts === null) return null;
-    return finalizeNetWorthSeries(cloudPts, tradeJournal, liveTotal);
-  }, [cloudPts, tradeJournal, liveTotal]);
+    return finalizeNetWorthSeries(cloudPts, tradeJournal, liveTotal, pricesReady);
+  }, [cloudPts, tradeJournal, liveTotal, pricesReady]);
 
   const fullPortfolioPts = useMemo(() => meta?.points ?? EMPTY_NET_WORTH, [meta]);
   const flowAdjustedPortfolioPts = useMemo(

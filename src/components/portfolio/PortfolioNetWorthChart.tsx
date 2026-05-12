@@ -52,6 +52,10 @@ export function PortfolioNetWorthChart({ stocks, cash, tradeJournal }: Props) {
   const reduceMotion = useReducedMotion();
   const chart = useDashboardChartTheme();
   const liveTotal = useMemo(() => computeLivePortfolioTotal(stocks, cash), [stocks, cash]);
+  const pricesReady = useMemo(() => {
+    const pos = stocks.filter((s) => s.quantity > 0);
+    return pos.length === 0 || pos.some((s) => (s.lastPrice ?? 0) > 0);
+  }, [stocks]);
   const [range, setRange] = useState<NetWorthRangePreset>("1y");
 
   const [cloudPts, setCloudPts] = useState<NetWorthPoint[] | null>(null);
@@ -89,8 +93,8 @@ export function PortfolioNetWorthChart({ stocks, cash, tradeJournal }: Props) {
 
   const meta = useMemo(() => {
     if (cloudPts === null) return null;
-    return finalizeNetWorthSeries(cloudPts, tradeJournal, liveTotal);
-  }, [cloudPts, tradeJournal, liveTotal]);
+    return finalizeNetWorthSeries(cloudPts, tradeJournal, liveTotal, pricesReady);
+  }, [cloudPts, tradeJournal, liveTotal, pricesReady]);
 
   const chartData = useMemo(() => {
     const pts = meta?.points ?? [];

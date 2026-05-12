@@ -108,3 +108,20 @@ export async function fetchExternalCashFlows(limit = 500): Promise<ExternalCashF
   if (error || !Array.isArray(data)) return [];
   return data as ExternalCashFlowEvent[];
 }
+
+export async function deleteAllExternalCashFlows(): Promise<void> {
+  if (!hasSupabaseConfig()) return;
+  const dataUserId = await resolveActiveDataUserId();
+  if (!dataUserId) return;
+
+  const supabase = createClient();
+  const { error } = await supabase.rpc("delete_external_cash_flows", {
+    p_user_id: dataUserId,
+  });
+
+  if (error) {
+    console.error("[deleteAllExternalCashFlows] RPC error:", error.message);
+  } else {
+    console.log("[deleteAllExternalCashFlows] ✅ Deleted all cash flow records");
+  }
+}

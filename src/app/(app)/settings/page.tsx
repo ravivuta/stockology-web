@@ -22,6 +22,7 @@ import { appCtaButton } from "@/lib/appCtaClasses";
 import { recommendedWatchlistSize } from "@/lib/ios-recommendation";
 import { formatCurrency } from "@/lib/numberFormat";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
+import { deleteAllExternalCashFlows } from "@/lib/external-cash-flows";
 import { isPaidSubscriptionTier } from "@/lib/subscription-state";
 import { APP_MANAGED_TRIAL_LABEL } from "@/lib/trial-config";
 import { cn } from "@/lib/utils";
@@ -138,6 +139,9 @@ function SettingsInner() {
   async function handleResetConfirm() {
     resetAll();
     await flushCurrentPortfolioSnapshotNow(true, { allowEmptyHoldings: true });
+    // Clear all cash flow records so subsequent cash edits after reimport don't
+    // get counted as external deposits and skew the flow-adjusted SPY comparison chart.
+    await deleteAllExternalCashFlows();
     setResetOpen(false);
   }
 

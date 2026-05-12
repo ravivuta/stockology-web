@@ -245,18 +245,21 @@ function appendLiveToday(points: NetWorthPoint[], liveTotal: number): NetWorthPo
 export function finalizeNetWorthSeries(
   cloudHistory: NetWorthPoint[],
   journal: TradeJournalEntry[],
-  liveTotal: number
+  liveTotal: number,
+  /** Pass false when position stocks exist but prices haven't loaded yet, so a near-zero
+   *  liveTotal doesn't overwrite today's cloud snapshot and produce a spurious cliff. */
+  pricesReady: boolean = true
 ): NetWorthSeriesMeta {
   const cloud = cloudHistory;
 
   if (cloud.length >= 1) {
-    const withLive = appendLiveToday(cloud, liveTotal);
+    const withLive = pricesReady ? appendLiveToday(cloud, liveTotal) : cloud;
     return { points: mergeSortedPoints(withLive), source: "cloud" };
   }
 
   const journalPts = netWorthPointsFromJournal(journal);
   if (journalPts.length > 0) {
-    const withLive = appendLiveToday(journalPts, liveTotal);
+    const withLive = pricesReady ? appendLiveToday(journalPts, liveTotal) : journalPts;
     return { points: mergeSortedPoints(withLive), source: "journal" };
   }
 
