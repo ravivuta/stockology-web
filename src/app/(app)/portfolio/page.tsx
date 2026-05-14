@@ -15,7 +15,7 @@ import { isValidTicker } from "@/lib/csvPortfolio";
 import { formatCurrency, formatDecimal, formatNumberMax2, formatPercent, formatSignedCurrency, formatWholeCurrency } from "@/lib/numberFormat";
 import { recommendationActionDisplay } from "@/lib/recommendation";
 import { computeTodayChangeFromLiveQuotes } from "@/lib/portfolio-net-worth-series";
-import { isUsMarketExtendedHoursOpen } from "@/lib/market-hours";
+import { isUsMarketExtendedHoursOpen, isUsMarketTradingDay } from "@/lib/market-hours";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { recordExternalCashFlow } from "@/lib/external-cash-flows";
 
@@ -318,7 +318,7 @@ export default function PortfolioPage() {
     const portfolioTodayChange = computeTodayChangeFromLiveQuotes(stocks, cash);
     return { assetsValue: assets, holdingsCostBasis, totalGainLoss, totalGainLossPct, netWorth: net, portfolioTodayChange };
   }, [stocks, cash]);
-  const showPortfolioTodayChange = isUsMarketExtendedHoursOpen() && portfolioTodayChange.hasBaseline;
+  const showPortfolioTodayChange = isUsMarketTradingDay() && portfolioTodayChange.hasBaseline;
 
   function saveCash() {
     const previousCash = cash;

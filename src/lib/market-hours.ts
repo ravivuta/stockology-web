@@ -76,6 +76,15 @@ export function isUsMarketHoliday(date = new Date()): boolean {
   return false;
 }
 
+/** True on a US trading day (not weekend, not holiday) after extended-hours open (8 AM ET).
+ * No upper cutoff — used to keep the "Today" change row visible until midnight. */
+export function isUsMarketTradingDay(date = new Date()): boolean {
+  const { weekday, hour, minute } = easternParts(date);
+  if (weekday === 1 || weekday === 7) return false;
+  if (isUsMarketHoliday(date)) return false;
+  return hour * 60 + minute >= 8 * 60;
+}
+
 export function isUsMarketExtendedHoursOpen(date = new Date()): boolean {
   const { weekday, hour, minute } = easternParts(date);
 

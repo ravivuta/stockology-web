@@ -108,6 +108,18 @@ export default function DashboardPage() {
       }
       try {
         const supabase = createClient();
+        // Fast path: PortfolioCloudBridge writes dataUserId to sessionStorage on every mount.
+        // Use it directly to skip the auth.getUser() + resolveStocksPmDataUserId() round-trips.
+        const cachedDataUserId =
+          typeof sessionStorage !== "undefined"
+            ? sessionStorage.getItem("stocks-pm-active-data-user-id")
+            : null;
+        if (cachedDataUserId) {
+          const rows = await fetchCloudNetWorthHistory(supabase, cachedDataUserId);
+          if (!cancelled) setCloudHistory(rows);
+          return;
+        }
+        // Fallback: full auth waterfall (first page load before PortfolioCloudBridge has run)
         const { data: auth } = await supabase.auth.getUser();
         const uid = auth.user?.id;
         if (!uid) {
