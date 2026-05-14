@@ -18,7 +18,7 @@ import {
   fetchCloudNetWorthHistory,
   type NetWorthPoint,
 } from "@/lib/portfolio-net-worth-series";
-import { isUsMarketExtendedHoursOpen } from "@/lib/market-hours";
+import { isUsMarketTradingDay } from "@/lib/market-hours";
 import { formatAbsPercent, formatCompactCurrency, formatCurrency, formatPercent } from "@/lib/numberFormat";
 
 const PALETTE = {
@@ -50,7 +50,7 @@ export default function DashboardPage() {
   );
   const todayQuoteChange = useMemo(() => computeTodayChangeFromLiveQuotes(stocks, cash), [stocks, cash]);
   const todayChange = todayQuoteChange.hasBaseline ? todayQuoteChange : todaySnapshotChange;
-  const showTodayChange = isUsMarketExtendedHoursOpen() && todayChange.hasBaseline && Math.abs(todayChange.change) > 0.01;
+  const showTodayChange = isUsMarketTradingDay() && todayChange.hasBaseline && Math.abs(todayChange.change) > 0.01;
   const todayValueClassName =
     todayChange.change >= 0
       ? "font-semibold text-[color:var(--dashboard-chart-gain)]"
