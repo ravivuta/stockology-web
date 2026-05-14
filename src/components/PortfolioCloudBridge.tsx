@@ -202,6 +202,13 @@ export function PortfolioCloudBridge({
         ...(settings.timezone ? { timezone: settings.timezone } : {}),
         ...(settings.region ? { region: settings.region } : {}),
       });
+      // Recompute recommendations so the UI immediately reflects the loaded settings.
+      // stocks[].recommendation is stored in the Zustand store (not computed on-the-fly),
+      // so setState alone leaves stale recommendations until the next user interaction.
+      // recalcMetrics reruns derivePortfolioState with the new settings.
+      // The fingerprint subscriber only pushes to Supabase if shortlist/movingAvg
+      // actually changed — a legitimate write, not a loop.
+      usePortfolioStore.getState().recalcMetrics();
     });
   }, [syncReady, dataUserId]);
 
