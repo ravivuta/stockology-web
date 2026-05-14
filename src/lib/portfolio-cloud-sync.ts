@@ -161,38 +161,40 @@ export type GlobalSettings = {
 };
 
 /**
- * Writes the current global settings to `users.global_settings` for the authenticated user.
+ * Writes the current global settings via SECURITY DEFINER RPC.
+ * Using an RPC bypasses the RLS SELECT policy that blocks direct table writes
+ * for users whose `users.id` (Google OAuth numeric sub) differs from `auth.uid()`.
  */
 export async function saveGlobalSettingsForUser(
   supabase: SupabaseClient,
   userId: string,
   settings: GlobalSettings
 ): Promise<void> {
-  const { error } = await supabase
-    .from("users")
-    .update({ global_settings: settings })
-    .eq("id", userId);
+  const { error } = await supabase.rpc("set_global_settings", {
+    p_user_id: userId,
+    p_settings: settings,
+  });
   if (error) {
     console.warn("[saveGlobalSettings]", error.message);
   }
 }
 
 /**
- * Fetches `users.global_settings` for the authenticated user.
+ * Fetches `users.global_settings` via SECURITY DEFINER RPC.
+ * Using an RPC bypasses the RLS SELECT policy that blocks direct table reads
+ * for users whose `users.id` (Google OAuth numeric sub) differs from `auth.uid()`.
  * Returns null when no settings are stored yet.
  */
 export async function loadGlobalSettingsForUser(
   supabase: SupabaseClient,
   userId: string
 ): Promise<GlobalSettings | null> {
-  const { data, error } = await supabase
-    .from("users")
-    .select("global_settings")
-    .eq("id", userId)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("get_global_settings", {
+    p_user_id: userId,
+  });
   if (error) {
     console.warn("[loadGlobalSettings]", error.message);
     return null;
   }
-  return (data?.global_settings as GlobalSettings | null) ?? null;
+  return (data as GlobalSettings | null) ?? null;
 }
