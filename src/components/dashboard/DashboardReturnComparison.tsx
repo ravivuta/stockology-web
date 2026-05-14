@@ -167,7 +167,7 @@ export function DashboardReturnComparison() {
     return () => {
       cancelled = true;
     };
-  }, [];
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
