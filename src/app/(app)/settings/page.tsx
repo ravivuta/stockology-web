@@ -134,7 +134,9 @@ function SettingsInner() {
     patch: Parameters<typeof setSettings>[0]
   ) {
     setSettings(patch);
-    void flushCurrentPortfolioSnapshotNow(true);
+    // No explicit snapshot flush here — setSettings recalculates stocks (isShortlisted,
+    // movingAvg, etc.), which the PortfolioCloudBridge fingerprint subscriber picks up
+    // and pushes automatically when the derived stocks array actually changes.
     if (userId) {
       const supabase = supabaseRef.current;
       const store = usePortfolioStore.getState();

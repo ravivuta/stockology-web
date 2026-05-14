@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { parseCloudSnapshotForStore } from "@/lib/cloud-snapshot-hydration";
 import {
   portfolioSyncFingerprint,
+  loadGlobalSettingsForUser,
 } from "@/lib/portfolio-cloud-sync";
+import { createClient } from "@/lib/supabase/client";
 import {
   ACTIVE_AUTH_USER_KEY,
   ACTIVE_DATA_USER_KEY,
@@ -174,6 +176,33 @@ export function PortfolioCloudBridge({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       unsub();
     };
+  }, [syncReady, dataUserId]);
+
+  // Load cloud settings on every app mount so recommendation filter settings
+  // (RSI gating, AI sentiment, etc.) stay in sync across iOS and web.
+  // IMPORTANT: Use usePortfolioStore.setState() directly (not setSettings()) so that
+  // only the primitive settings fields are written. setSettings() runs derivePortfolioState
+  // which updates the stocks array, changing the fingerprint and triggering a Supabase push
+  // — creating a circular Supabase-read → Supabase-write loop. Direct setState() sets
+  // settings in the persisted store without touching stocks, so no push fires.
+  useEffect(() => {
+    if (!syncReady || !dataUserId) return;
+    const supabase = createClient();
+    loadGlobalSettingsForUser(supabase, dataUserId).then((settings) => {
+      if (!settings) return;
+      usePortfolioStore.setState({
+        ...(settings.etfProfitTarget != null && settings.etfProfitTarget > 0 ? { etfProfitTarget: settings.etfProfitTarget } : {}),
+        ...(settings.stockProfitTarget != null && settings.stockProfitTarget > 0 ? { stockProfitTarget: settings.stockProfitTarget } : {}),
+        ...(settings.riskAppetite != null ? { riskAppetite: settings.riskAppetite } : {}),
+        ...(settings.enableRiskFilter != null ? { enableRiskFilter: settings.enableRiskFilter } : {}),
+        ...(settings.useAISentiment != null ? { useAISentimentForRecommendations: settings.useAISentiment } : {}),
+        ...(settings.useRSIGating != null ? { useRSIGatingForRecommendations: settings.useRSIGating } : {}),
+        ...(settings.sellOnlyLongTerm != null ? { sellOnlyLongTermQualified: settings.sellOnlyLongTerm } : {}),
+        ...(settings.limitWatchlistSize != null ? { limitWatchlistSize: settings.limitWatchlistSize } : {}),
+        ...(settings.timezone ? { timezone: settings.timezone } : {}),
+        ...(settings.region ? { region: settings.region } : {}),
+      });
+    });
   }, [syncReady, dataUserId]);
 
   return null;
