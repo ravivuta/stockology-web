@@ -14,8 +14,10 @@ import { SortableHeaderCell, type SortDirection } from "@/components/ui/Sortable
 import { isValidTicker } from "@/lib/csvPortfolio";
 import { formatCurrency, formatDecimal, formatNumberMax2, formatPercent, formatSignedCurrency, formatWholeCurrency } from "@/lib/numberFormat";
 import { recommendationActionDisplay } from "@/lib/recommendation";
-import { computeTodayChangeFromLiveQuotes } from "@/lib/portfolio-net-worth-series";
+import { computeTodayChangeFromHistory, computeTodayChangeFromLiveQuotes, fetchCloudNetWorthHistory, type NetWorthPoint } from "@/lib/portfolio-net-worth-series";
 import { isUsMarketExtendedHoursOpen, isUsMarketTradingDay } from "@/lib/market-hours";
+import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { recordExternalCashFlow } from "@/lib/external-cash-flows";
 
@@ -218,6 +220,32 @@ export default function PortfolioPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION.symbol);
   const [query, setQuery] = useState("");
   const [showActionable, setShowActionable] = useState(false);
+  const [cloudHistory, setCloudHistory] = useState<NetWorthPoint[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      if (!hasSupabaseConfig()) { if (!cancelled) setCloudHistory([]); return; }
+      try {
+        const supabase = createClient();
+        const cachedDataUserId = typeof sessionStorage !== "undefined"
+          ? sessionStorage.getItem("stocks-pm-active-data-user-id") : null;
+        if (cachedDataUserId) {
+          const rows = await fetchCloudNetWorthHistory(supabase, cachedDataUserId);
+          if (!cancelled) setCloudHistory(rows);
+          return;
+        }
+        const { data: auth } = await supabase.auth.getUser();
+        const uid = auth.user?.id;
+        if (!uid) { if (!cancelled) setCloudHistory([]); return; }
+        const dataUserId = await resolveStocksPmDataUserId(supabase, uid);
+        const rows = await fetchCloudNetWorthHistory(supabase, dataUserId);
+        if (!cancelled) setCloudHistory(rows);
+      } catch { if (!cancelled) setCloudHistory([]); }
+    }
+    void run();
+    return () => { cancelled = true; };
+  }, []);
   const [newSymbol, setNewSymbol] = useState("");
   const [newQuantity, setNewQuantity] = useState("1");
   const [newAverageCost, setNewAverageCost] = useState("");
@@ -315,10 +343,17 @@ export default function PortfolioPage() {
     const totalGainLoss = assets - holdingsCostBasis;
     const totalGainLossPct = holdingsCostBasis > 0 ? (totalGainLoss / holdingsCostBasis) * 100 : null;
     const net = assets + cash;
-    const portfolioTodayChange = computeTodayChangeFromLiveQuotes(stocks, cash);
+    const liveQuoteChange = computeTodayChangeFromLiveQuotes(stocks, cash);
+    // Prefer live-quote delta when non-trivial; fall back to snapshot when dailyChangePercent is
+    // still at its default 0 (not yet refreshed) so Today shows as soon as cloud history loads.
+    const snapshotChange = computeTodayChangeFromHistory(cloudHistory ?? [], net);
+    const portfolioTodayChange =
+      liveQuoteChange.hasBaseline && Math.abs(liveQuoteChange.change) > 0.01
+        ? liveQuoteChange
+        : snapshotChange;
     return { assetsValue: assets, holdingsCostBasis, totalGainLoss, totalGainLossPct, netWorth: net, portfolioTodayChange };
-  }, [stocks, cash]);
-  const showPortfolioTodayChange = isUsMarketTradingDay() && portfolioTodayChange.hasBaseline;
+  }, [stocks, cash, cloudHistory]);
+  const showPortfolioTodayChange = isUsMarketTradingDay() && portfolioTodayChange.hasBaseline && Math.abs(portfolioTodayChange.change) > 0.01;
 
   function saveCash() {
     const previousCash = cash;

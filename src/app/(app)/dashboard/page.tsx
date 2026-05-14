@@ -49,7 +49,12 @@ export default function DashboardPage() {
     [cloudHistory, totalBalance]
   );
   const todayQuoteChange = useMemo(() => computeTodayChangeFromLiveQuotes(stocks, cash), [stocks, cash]);
-  const todayChange = todayQuoteChange.hasBaseline ? todayQuoteChange : todaySnapshotChange;
+  // Prefer live-quote delta only when it's non-trivial (avoids using defaulted dailyChangePercent:0
+  // blocking the snapshot fallback — stocks default to 0% until a real price refresh arrives).
+  const todayChange =
+    todayQuoteChange.hasBaseline && Math.abs(todayQuoteChange.change) > 0.01
+      ? todayQuoteChange
+      : todaySnapshotChange;
   const showTodayChange = isUsMarketTradingDay() && todayChange.hasBaseline && Math.abs(todayChange.change) > 0.01;
   const todayValueClassName =
     todayChange.change >= 0
@@ -268,7 +273,7 @@ export default function DashboardPage() {
               : "Today falls back to your latest saved portfolio snapshot before today in U.S. Eastern time when live quote deltas are unavailable."
             : todayStatusLoading
               ? "Loading quote deltas and portfolio history for today's change…"
-              : "Today appears only during U.S. extended hours (8:00 AM-8:00 PM ET) once live quote deltas or at least one prior U.S. trading-day portfolio snapshot is available."}
+              : "Today is shown on U.S. trading days from 8:00 AM ET once live quote deltas or a prior portfolio snapshot is available."}
         </p>
       </motion.section>
 
