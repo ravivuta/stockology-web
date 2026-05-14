@@ -86,7 +86,7 @@ export function SymbolTradeCombobox({
       } finally {
         setLoading(false);
       }
-    }, 280);
+    }, 1000);
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
