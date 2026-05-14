@@ -35,7 +35,15 @@ export default function DashboardPage() {
   const cash = usePortfolioStore((s) => s.cashBalance);
   const [bars, setBars] = useState(true);
   const [dashStockDetail, setDashStockDetail] = useState<string | null>(null);
-  const [cloudHistory, setCloudHistory] = useState<NetWorthPoint[] | null>(null);
+  // Pre-seed from the same cache used by DashboardReturnComparison for instant today-value display
+  const [cloudHistory, setCloudHistory] = useState<NetWorthPoint[] | null>(() => {
+    try {
+      const raw = typeof localStorage !== "undefined" ? localStorage.getItem("dash_chart_cloudPts") : null;
+      return raw ? (JSON.parse(raw) as NetWorthPoint[]) : null;
+    } catch {
+      return null;
+    }
+  });
 
   const held = useMemo(() => stocks.filter((s) => s.quantity > 0), [stocks]);
   const holdingsValue = useMemo(() => held.reduce((a, s) => a + s.quantity * (s.lastPrice ?? 0), 0), [held]);
@@ -104,7 +112,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setCloudHistory(null);
+    // Don't null-reset — cached state keeps today's change visible while refreshing
 
     async function run() {
       if (!hasSupabaseConfig()) {
@@ -121,7 +129,10 @@ export default function DashboardPage() {
             : null;
         if (cachedDataUserId) {
           const rows = await fetchCloudNetWorthHistory(supabase, cachedDataUserId);
-          if (!cancelled) setCloudHistory(rows);
+          if (!cancelled) {
+            setCloudHistory(rows);
+            try { localStorage.setItem("dash_chart_cloudPts", JSON.stringify(rows)); } catch { /* quota */ }
+          }
           return;
         }
         // Fallback: full auth waterfall (first page load before PortfolioCloudBridge has run)
@@ -133,9 +144,12 @@ export default function DashboardPage() {
         }
         const dataUserId = await resolveStocksPmDataUserId(supabase, uid);
         const rows = await fetchCloudNetWorthHistory(supabase, dataUserId);
-        if (!cancelled) setCloudHistory(rows);
+        if (!cancelled) {
+          setCloudHistory(rows);
+          try { localStorage.setItem("dash_chart_cloudPts", JSON.stringify(rows)); } catch { /* quota */ }
+        }
       } catch {
-        if (!cancelled) setCloudHistory([]);
+        // Keep cached data on error — don't blank today's change
       }
     }
 

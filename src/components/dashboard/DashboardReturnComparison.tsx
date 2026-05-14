@@ -69,6 +69,26 @@ function portfolioOnlyPercentRows(points: NetWorthPoint[]): ComparisonChartRow[]
   }));
 }
 
+// ── localStorage cache helpers ───────────────────────────────────────────────
+const LS_CLOUD_PTS = "dash_chart_cloudPts";
+const LS_SPY_SERIES = "dash_chart_spySeries";
+const LS_EXT_FLOWS = "dash_chart_extFlows";
+
+function lsGet<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+function lsSet(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch { /* quota exceeded – silent */ }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function DashboardReturnComparison() {
   const reduceMotion = useReducedMotion();
   const chart = useDashboardChartTheme();
@@ -78,9 +98,16 @@ export function DashboardReturnComparison() {
 
   const [vsSpy, setVsSpy] = useState(true);
   const [range, setRange] = useState<ChartRangePreset>("1y");
-  const [cloudPts, setCloudPts] = useState<NetWorthPoint[] | null>(null);
-  const [externalCashFlows, setExternalCashFlows] = useState<ExternalCashFlowPoint[] | null>(null);
-  const [spySeries, setSpySeries] = useState<SpyDaily[] | null>(null);
+  // Pre-seed from cache so the chart renders immediately on mount
+  const [cloudPts, setCloudPts] = useState<NetWorthPoint[] | null>(
+    () => lsGet<NetWorthPoint[]>(LS_CLOUD_PTS)
+  );
+  const [externalCashFlows, setExternalCashFlows] = useState<ExternalCashFlowPoint[] | null>(
+    () => lsGet<ExternalCashFlowPoint[]>(LS_EXT_FLOWS)
+  );
+  const [spySeries, setSpySeries] = useState<SpyDaily[] | null>(
+    () => lsGet<SpyDaily[]>(LS_SPY_SERIES)
+  );
   const [spyLiveQuote, setSpyLiveQuote] = useState<SpyLiveQuote | null>(null);
 
   const liveTotal = useMemo(() => computeLivePortfolioTotal(stocks, cash), [stocks, cash]);
@@ -91,8 +118,7 @@ export function DashboardReturnComparison() {
 
   useEffect(() => {
     let cancelled = false;
-    setCloudPts(null);
-    setExternalCashFlows(null);
+    // Don't null-reset — cached state stays visible while fresh data loads
     async function run() {
       if (!hasSupabaseConfig()) {
         if (!cancelled) {
@@ -130,23 +156,22 @@ export function DashboardReturnComparison() {
         if (!cancelled) {
           setCloudPts(rows);
           setExternalCashFlows(flows);
+          lsSet(LS_CLOUD_PTS, rows);
+          lsSet(LS_EXT_FLOWS, flows);
         }
       } catch {
-        if (!cancelled) {
-          setCloudPts([]);
-          setExternalCashFlows([]);
-        }
+        // Keep cached data on error — don't blank the chart
       }
     }
     void run();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [];
 
   useEffect(() => {
     let cancelled = false;
-    setSpySeries(null);
+    // Don't null-reset — cached state stays visible while fresh data loads
     (async () => {
       if (!hasSupabaseConfig()) {
         if (!cancelled) setSpySeries([]);
@@ -157,13 +182,15 @@ export function DashboardReturnComparison() {
         const { points, error } = await fetchHistoricalPricePoints(supabase, "SPY", 1400);
         if (cancelled) return;
         if (error || points.length === 0) {
-          setSpySeries([]);
+          // Only blank it out when there's no cached data to show
+          setSpySeries((prev) => prev ?? []);
           return;
         }
         const series: SpyDaily[] = points.map((p) => ({ date: p.date, close: p.close }));
         setSpySeries(series);
+        lsSet(LS_SPY_SERIES, series);
       } catch {
-        if (!cancelled) setSpySeries([]);
+        // Keep cached data on error
       }
     })();
     return () => {
