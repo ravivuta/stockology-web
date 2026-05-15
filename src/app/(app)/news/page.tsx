@@ -17,6 +17,7 @@ import { safeHttpUrlForHref } from "@/lib/safe-external-url";
 import { useSupabaseStockHistory } from "@/hooks/useSupabaseStockHistory";
 import { StockHistoricalChart } from "@/components/stock/StockHistoricalChart";
 import { formatCurrency } from "@/lib/numberFormat";
+import type { PricePoint } from "@/lib/stock-chart";
 
 type FeedFilter = "all" | "macro" | "portfolio";
 
@@ -109,8 +110,38 @@ export default function NewsPage() {
   const [feedFilter, setFeedFilter] = useState<FeedFilter>("all");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [spyLivePrice, setSpyLivePrice] = useState<number | null>(null);
   const spyHistoryRefreshKey = 0;
   const { points: spyPoints, loading: spyLoading, error: spyError } = useSupabaseStockHistory("SPY", 2000, spyHistoryRefreshKey);
+
+  // Fetch current SPY price to append to the historical chart
+  useEffect(() => {
+    if (!hasSupabaseConfig()) return;
+    (async () => {
+      try {
+        const supabase = createClient();
+        const { data } = await supabase
+          .from("ticker_prices")
+          .select("last_price")
+          .eq("symbol", "SPY")
+          .gt("last_price", 0)
+          .single();
+        if (data?.last_price) setSpyLivePrice(data.last_price as number);
+      } catch {
+        // non-critical
+      }
+    })();
+  }, []);
+
+  const spyPointsWithToday = useMemo<PricePoint[] | null>(() => {
+    if (!spyPoints) return null;
+    if (!spyLivePrice) return spyPoints;
+    const today = new Date().toISOString().slice(0, 10);
+    // Only append if today's point is not already in the history
+    const lastPoint = spyPoints[spyPoints.length - 1];
+    if (lastPoint?.date === today) return spyPoints;
+    return [...spyPoints, { date: today, close: spyLivePrice }];
+  }, [spyPoints, spyLivePrice]);
   const load = useCallback(async () => {
     if (!hasSupabaseConfig()) {
       setItems([]);
@@ -152,7 +183,7 @@ export default function NewsPage() {
     return { total: items.length, macro, portfolio: port };
   }, [items, portfolioSymbols]);
 
-  const latestSpyPoint = useMemo(() => spyPoints?.[spyPoints.length - 1] ?? null, [spyPoints]);
+  const latestSpyPoint = useMemo(() => spyPointsWithToday?.[spyPointsWithToday.length - 1] ?? null, [spyPointsWithToday]);
 
   const showEmpty = !loading && filtered.length === 0;
   const noConfig = !hasSupabaseConfig();
@@ -195,7 +226,7 @@ export default function NewsPage() {
             smaPeriod={200}
             smaOptions={[50, 200]}
             smaStorageKey="stocks-pm:news:spy-sma-period"
-            points={spyPoints}
+            points={spyPointsWithToday}
             loading={spyLoading}
             error={spyError}
             initialRange="5y"
@@ -206,7 +237,8 @@ export default function NewsPage() {
                   <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">SPY</h2>
                   {latestSpyPoint ? (
                     <p className="text-sm font-medium text-subtle">
-                      Last close: <span className="tabular-nums text-foreground">{formatCurrency(latestSpyPoint.close)}</span>
+                      {latestSpyPoint.date === new Date().toISOString().slice(0, 10) ? "Current" : "Last close"}:{" "}
+                      <span className="tabular-nums text-foreground">{formatCurrency(latestSpyPoint.close)}</span>
                       <span className="ml-2">{latestSpyPoint.date}</span>
                     </p>
                   ) : null}
