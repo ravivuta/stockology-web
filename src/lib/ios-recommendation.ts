@@ -510,6 +510,17 @@ export function computeRecommendationFactors(
           passes: currentPrice >= stock.analystTarget,
         });
       }
+      if (useAISentiment && !isETF) {
+        const aiPass = aiScore == null || !(aiScore > 0) || aiScore < 65;
+        factors.push({
+          label: "AI sentiment not blocking sell (< 65)",
+          detail:
+            aiScore != null && aiScore > 0
+              ? `${aiScore.toFixed(0)}/100 — ${sentimentLabelForScore(aiScore)}`
+              : "N/A — not blocking",
+          passes: aiPass,
+        });
+      }
       break;
     case "REDUCE":
     case "WAIT_REDUCE": {
@@ -857,6 +868,21 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
         return {
           action: "WAIT_ADD" as const,
           comments: `Target reached but RSI is overbought (${currentRSI.toFixed(0)}/100) — holding for RSI reversal confirmation before selling to avoid selling at momentum peak.`,
+          nextBuyPrice,
+          movingAvg,
+          expectedReturnPct,
+        };
+      }
+    }
+    // AI Sentiment bullish gate — if sentiment is bullish (≥65) for a non-ETF, hold off selling;
+    // recent positive news suggests potential upside beyond the current analyst target.
+    if (shouldApplyAISentimentGate) {
+      const ai = stock.aiSentimentScore;
+      if (ai != null && ai >= 65) {
+        const label = ai >= 70 ? "Bullish" : "Mildly Bullish";
+        return {
+          action: "WAIT_ADD" as const,
+          comments: `AI Sentiment is ${label} (${ai.toFixed(0)}/100) — holding position as recent news suggests potential upside beyond analyst target.`,
           nextBuyPrice,
           movingAvg,
           expectedReturnPct,
