@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CheckCircle2, Pencil, PlusCircle, Settings, X, XCircle } from "lucide-react";
 import {
   computeRecommendationFactors,
+  recommendedWatchlistSize,
   scoreBreakdownRows,
   sentimentLabelForScore,
 } from "@/lib/ios-recommendation";
@@ -290,6 +291,8 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const useRSIGatingForRecommendations = usePortfolioStore((s) => s.useRSIGatingForRecommendations);
   const sellOnlyLongTermQualified = usePortfolioStore((s) => s.sellOnlyLongTermQualified);
   const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
+  const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
+  const portfolioSize = usePortfolioStore((s) => s.portfolioSize);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
 
   const stock = useMemo(() => stocks.find((s) => s.symbol === symbol), [stocks, symbol]);
@@ -436,12 +439,12 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
         passes: stock.quantity > 0,
       },
       {
-        label: "Risk appetite filter",
+        label: `${riskAppetite} Risk Appetite Filter`,
         detail: stock.isVisibleInRisk ? "Passes" : "Filtered",
         passes: stock.isVisibleInRisk === true,
       },
       {
-        label: "Within top watchlist size",
+        label: `Score-Driven Top ${recommendedWatchlistSize(portfolioSize)} Watchlist`,
         detail: limitWatchlistSize ? (stock.isInWatchlistSize ? "Included" : "Beyond limit") : "Limit disabled",
         passes: limitWatchlistSize ? stock.isInWatchlistSize === true : true,
       },
@@ -456,7 +459,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     }
 
     return rows;
-  }, [limitWatchlistSize, stock]);
+  }, [limitWatchlistSize, portfolioSize, riskAppetite, stock]);
   const shortlistReasons = useMemo(() => {
     if (!stock || isShortlistedForPortfolio) return [];
 
@@ -468,10 +471,10 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       reasons.push("Does not meet the current risk appetite criteria.");
     }
     if (limitWatchlistSize && stock.isInWatchlistSize === false) {
-      reasons.push("Ranked beyond the recommended watchlist size limit.");
+      reasons.push(`Score ranks below the top ${recommendedWatchlistSize(portfolioSize)} watchlist limit.`);
     }
     return reasons;
-  }, [isShortlistedForPortfolio, limitWatchlistSize, stock]);
+  }, [isShortlistedForPortfolio, limitWatchlistSize, portfolioSize, stock]);
   const scoreRows = useMemo(() => (stock ? scoreBreakdownRows(stock) : null), [stock]);
   const dense = Boolean(embedded);
   const stockSymbol = stock?.symbol ?? null;
