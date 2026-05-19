@@ -94,8 +94,8 @@ export function SymbolTradeCombobox({
   }, [value]);
 
   useEffect(() => {
-    setHighlight((h) => (merged.length === 0 ? 0 : Math.min(h, merged.length - 1)));
-  }, [merged.length]);
+    setHighlight((h) => (displayList.length === 0 ? 0 : Math.min(h, displayList.length - 1)));
+  }, [displayList.length]);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -113,7 +113,14 @@ export function SymbolTradeCombobox({
     [onChange]
   );
 
-  const showList = open && (merged.length > 0 || loading);
+  const directFallback: Suggestion | null =
+    value.trim().length >= 1 && !loading && remote.length === 0 && portfolioSuggestions.length === 0
+      ? { symbol: value.trim().toUpperCase(), company_name: "Add directly by symbol" }
+      : null;
+
+  const displayList: Suggestion[] = directFallback ? [...merged, directFallback] : merged;
+
+  const showList = open && (displayList.length > 0 || loading);
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
@@ -141,13 +148,13 @@ export function SymbolTradeCombobox({
           if (!showList || merged.length === 0) return;
           if (e.key === "ArrowDown") {
             e.preventDefault();
-            setHighlight((h) => (h + 1) % merged.length);
+            setHighlight((h) => (h + 1) % displayList.length);
           } else if (e.key === "ArrowUp") {
             e.preventDefault();
-            setHighlight((h) => (h - 1 + merged.length) % merged.length);
+            setHighlight((h) => (h - 1 + displayList.length) % displayList.length);
           } else if (e.key === "Enter") {
             e.preventDefault();
-            const row = merged[highlight];
+            const row = displayList[highlight];
             if (row) pick(row.symbol);
           }
         }}
@@ -162,11 +169,11 @@ export function SymbolTradeCombobox({
           role="listbox"
           className="absolute z-50 mt-1 max-h-56 w-full min-w-[16rem] overflow-auto rounded-lg border border-border bg-elevated py-1 shadow-lg dark:border-white/[0.08]"
         >
-          {loading && merged.length === 0 ? (
+          {loading && displayList.length === 0 ? (
             <li className="px-3 py-2 text-xs text-subtle">Searching…</li>
           ) : null}
-          {merged.map((row, i) => (
-            <li key={row.symbol} role="presentation">
+          {displayList.map((row, i) => (
+            <li key={row.symbol + (row.company_name === "Add directly by symbol" ? "__direct" : "")} role="presentation">
               <button
                 type="button"
                 role="option"
@@ -187,7 +194,9 @@ export function SymbolTradeCombobox({
                   ) : null}
                 </span>
                 {row.company_name ? (
-                  <span className="line-clamp-2 text-xs text-subtle">{row.company_name}</span>
+                  <span className={`line-clamp-2 text-xs ${
+                    row.company_name === "Add directly by symbol" ? "text-theme-primary" : "text-subtle"
+                  }`}>{row.company_name}</span>
                 ) : null}
               </button>
             </li>
