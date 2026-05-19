@@ -284,10 +284,11 @@ export function StockHistoricalChart({
                 cursor={{ stroke: chart.referenceStroke, strokeWidth: 1, strokeDasharray: "4 4", opacity: 0.55 }}
                 isAnimationActive={false}
                 contentStyle={{
-                  background: chart.tooltipBg,
-                  border: `1px solid ${chart.tooltipBorder}`,
+                  background: "transparent",
+                  border: "none",
                   borderRadius: 8,
                   fontSize: 11,
+                  padding: "2px 6px",
                 }}
                 labelStyle={{ color: chart.tooltipLabelColor, fontSize: 11 }}
                 formatter={(value: number) => [formatCurrency(value), "Close"]}
@@ -297,7 +298,26 @@ export function StockHistoricalChart({
                 }}
               />
               {averageCost != null && averageCost > 0 && (
-                <ReferenceLine y={averageCost} stroke="var(--theme-primary)" strokeDasharray="3 3" />
+                <ReferenceLine
+                  y={averageCost}
+                  stroke="var(--theme-primary)"
+                  strokeDasharray="3 3"
+                  label={(props: { viewBox?: { x?: number; y?: number; width?: number } }) => {
+                    const { x = 0, y = 0, width = 0 } = props.viewBox ?? {};
+                    return (
+                      <text
+                        x={x + width - 2}
+                        y={y - 4}
+                        textAnchor="end"
+                        fill="var(--theme-primary)"
+                        fontSize={10}
+                        fontWeight={500}
+                      >
+                        {`Avg $${averageCost.toFixed(2)}`}
+                      </text>
+                    );
+                  }}
+                />
               )}
               {smaValue != null && smaValue > 0 && (
                 <Line
@@ -335,11 +355,7 @@ export function StockHistoricalChart({
             SMA ({selectedSmaPeriod})
           </span>
         )}
-        {averageCost != null && averageCost > 0 && (
-          <span className="flex items-center gap-2">
-            <span className="h-1 w-5 shrink-0 rounded-full bg-primary" /> Avg cost
-          </span>
-        )}
+
       </div>
     </div>
   );
