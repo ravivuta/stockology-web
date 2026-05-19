@@ -60,6 +60,13 @@ export function SymbolTradeCombobox({
     return [...portfolioSuggestions, ...rest] as Suggestion[];
   }, [portfolioSuggestions, remote]);
 
+  const directFallback: Suggestion | null =
+    value.trim().length >= 1 && !loading && remote.length === 0 && portfolioSuggestions.length === 0
+      ? { symbol: value.trim().toUpperCase(), company_name: "Add directly by symbol" }
+      : null;
+
+  const displayList: Suggestion[] = directFallback ? [...merged, directFallback] : merged;
+
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     const q = value.trim();
@@ -112,13 +119,6 @@ export function SymbolTradeCombobox({
     },
     [onChange]
   );
-
-  const directFallback: Suggestion | null =
-    value.trim().length >= 1 && !loading && remote.length === 0 && portfolioSuggestions.length === 0
-      ? { symbol: value.trim().toUpperCase(), company_name: "Add directly by symbol" }
-      : null;
-
-  const displayList: Suggestion[] = directFallback ? [...merged, directFallback] : merged;
 
   const showList = open && (displayList.length > 0 || loading);
 
