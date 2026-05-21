@@ -20,8 +20,11 @@ interface MSTicker {
   exchange_mic?: string;
 }
 
-function isUSListing(ticker: MSTicker): boolean {
+function isUSListing(ticker: MSTicker, query?: string): boolean {
   const ex = ticker.stock_exchange;
+  // Exact bare-symbol match: if the user typed this exact ticker and Marketstack
+  // returns it (no dot), always include it regardless of exchange metadata.
+  if (query && ticker.symbol.toUpperCase() === query.toUpperCase().trim() && !ticker.symbol.includes(".")) return true;
   // No exchange metadata — let it through rather than silently dropping valid tickers.
   // Guard: only bare symbols (no dot suffix). Dotted symbols like RKLB.NZ are
   // foreign-exchange listings; bare symbols are always USD on Marketstack.
@@ -64,7 +67,7 @@ export async function GET(req: NextRequest) {
     const tickers: MSTicker[] = json?.data ?? [];
     console.log(`[search-tickers] raw results for "${query}":`, tickers.map(t => `${t.symbol} mic=${t.exchange_mic ?? t.stock_exchange?.mic ?? "nil"} country=${t.stock_exchange?.country_code ?? t.stock_exchange?.country ?? "nil"}`));
     const usResults = tickers
-      .filter(isUSListing)
+      .filter(t => isUSListing(t, query))
       .map((t) => ({
         symbol: t.symbol,
         company_name: t.name ?? null,

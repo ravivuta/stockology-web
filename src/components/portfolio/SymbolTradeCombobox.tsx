@@ -34,7 +34,7 @@ export function SymbolTradeCombobox({
     const seen = new Set<string>();
     const out: Suggestion[] = [];
     for (const s of portfolioStocks) {
-      if (!s.symbol.toUpperCase().includes(q)) continue;
+      if (!s.symbol.toUpperCase().includes(q) && !(s.name ?? "").toUpperCase().includes(q)) continue;
       const sym = s.symbol.toUpperCase();
       if (seen.has(sym)) continue;
       seen.add(sym);
