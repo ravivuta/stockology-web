@@ -985,16 +985,33 @@ export const usePortfolioStore = create<State>()(
         }),
       resetAll: () => {
         get().clearCachesOnReset();
+        // Bump generation so any in-flight optimizePendingStocks loop aborts immediately.
+        optimizationGeneration += 1;
         const mutationAt = new Date().toISOString();
+        // Preserve watchlist-only stocks (quantity === 0, no open lots) — the user
+        // only wants to clear actual holdings, not their watch list.
+        const currentState = get();
+        const watchlistStocks = currentState.stocks.filter((s) => {
+          if (s.quantity > 0) return false;
+          const lots = currentState.lotsBySymbol[s.symbol];
+          return !lots || lots.open.length === 0;
+        });
+        // Keep lot entries only for preserved watchlist symbols (should be empty,
+        // but guard against orphaned entries).
+        const watchlistSymbolSet = new Set(watchlistStocks.map((s) => s.symbol));
+        const remainingLots = Object.fromEntries(
+          Object.entries(currentState.lotsBySymbol).filter(([sym]) => watchlistSymbolSet.has(sym))
+        );
         set({
           cashBalance: 0,
           portfolioSize: 0,
-          stocks: [],
-          lotsBySymbol: {},
+          stocks: watchlistStocks,
+          lotsBySymbol: remainingLots,
           tradeJournal: [],
-          onboardingComplete: false,
+          onboardingComplete: watchlistStocks.length > 0,
           lastRefreshAt: null,
           lastLocalMutationAt: mutationAt,
+          optimizing: false,
         });
       },
       setOptimizing: (v) => set({ optimizing: v }),
@@ -1353,6 +1370,10 @@ export const usePortfolioStore = create<State>()(
           ...current,
           ...p,
           tradeJournal: Array.isArray(p?.tradeJournal) ? p.tradeJournal : current.tradeJournal,
+          // Reset transient runtime flags — these should never survive a page reload.
+          // If optimizing/importing was in-flight when the page was closed, the job
+          // is dead; persisting true permanently locks the Import CSV button.
+          optimizing: false,
         };
       },
     }

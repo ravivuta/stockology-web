@@ -744,7 +744,7 @@ function SettingsInner() {
         onClose={() => setResetOpen(false)}
         onConfirm={handleResetConfirm}
         title="Reset local portfolio?"
-        description="This removes tracked symbols, trades, and local preferences in this browser. Sign in again or import CSV to rebuild."
+        description="This clears all holdings, lots, and trade history. Watchlist-only symbols are preserved. Sign in again or import CSV to rebuild holdings."
         confirmLabel="Reset"
         cancelLabel="Cancel"
         variant="danger"
