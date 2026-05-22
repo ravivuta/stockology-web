@@ -174,9 +174,7 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
                           <span className="text-subtle">
                             {stock.isETF
                               ? <>ETF → <strong>10×</strong></>
-                              : (stock.score ?? 0) >= 50
-                                ? <>Score {(stock.score ?? 0).toFixed(0)} ≥ 50 → <strong>1×</strong></>
-                                : <>Score {(stock.score ?? 0).toFixed(0)} &lt; 50 → <strong>0.5× penalty</strong></>}
+                              : <><strong>1×</strong> (standard)</>}
                           </span>
                         </span>
                       </span>

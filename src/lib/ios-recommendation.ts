@@ -415,8 +415,6 @@ export function calculateTradingLimits(
   let riskMultiplier = 1;
   if (isETF === true) {
     riskMultiplier = 10;
-  } else if ((score ?? 0) < 50) {
-    riskMultiplier = 0.5;
   }
 
   const stockLimit = baseStockLimit * riskMultiplier;
