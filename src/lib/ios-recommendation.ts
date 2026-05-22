@@ -535,6 +535,13 @@ export function computeRecommendationFactors(
         detail: `Gain ${formatCurrency(unrealizedGain)} vs needed ${formatCurrency(moneyToFree / 2)}`,
         passes: unrealizedGain > moneyToFree / 2,
       });
+      if (rec.movingAvg > 0) {
+        factors.push({
+          label: `Price above ${stock.shortSMA}-day SMA`,
+          detail: `${formatCurrency(currentPrice)} vs ${formatCurrency(rec.movingAvg)}`,
+          passes: currentPrice > rec.movingAvg,
+        });
+      }
       break;
     }
     default:
@@ -1031,8 +1038,8 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
 
   if (costBasis >= maxAccumulationLimit) {
     return {
-      action: "WAIT_ADD",
-      comments: "Current exposure has reached the 2x Stock Limit averaging-down cap. Wait to reduce position on strength before adding more.",
+      action: "WAIT_REDUCE",
+      comments: `Position at 2× Stock Limit cap — no more adding. Reduce triggers when price rises above ${actualSmaPeriod.toFixed(0)}-day SMA (${formatCurrency(movingAvg)}) AND unrealized gains exceed the over-limit exposure.`,
       nextBuyPrice,
       movingAvg,
       expectedReturnPct,
