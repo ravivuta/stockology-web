@@ -15,6 +15,7 @@ import {
   normalizeCsvHeader,
   extractCsvHeaders,
   exportPortfolioCsv,
+  exportWatchlistCsv,
   downloadCsv,
   type CsvColumnMapping,
   type CsvColumnStandard,
@@ -426,12 +427,24 @@ export function CsvImportExportBar({
   }
 
   function onExport() {
-    if (toExport.length === 0) {
-      setFlash({ kind: "err", text: "Nothing to export yet." });
+    const holdings = toExport.filter((s) => s.quantity > 0 || (lotsBySymbol[s.symbol]?.open.length ?? 0) > 0);
+    if (holdings.length === 0) {
+      setFlash({ kind: "err", text: "No holdings to export yet." });
       return;
     }
-    downloadCsv(exportFilename, exportPortfolioCsv(toExport, lotsBySymbol));
-    setFlash({ kind: "ok", text: "CSV downloaded." });
+    downloadCsv(exportFilename, exportPortfolioCsv(holdings, lotsBySymbol));
+    setFlash({ kind: "ok", text: "Holdings CSV downloaded." });
+  }
+
+  function onExportWatchlist() {
+    const watchlist = toExport.filter((s) => s.quantity === 0 && (lotsBySymbol[s.symbol]?.open.length ?? 0) === 0);
+    if (watchlist.length === 0) {
+      setFlash({ kind: "err", text: "No watchlist-only symbols to export." });
+      return;
+    }
+    const base = exportFilename.replace(/\.csv$/i, "");
+    downloadCsv(`${base}_watchlist.csv`, exportWatchlistCsv(watchlist));
+    setFlash({ kind: "ok", text: "Watchlist CSV downloaded." });
   }
 
   return (
@@ -463,7 +476,17 @@ export function CsvImportExportBar({
             compact ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm"
           } ${importBusy ? "cursor-wait opacity-60" : ""}`}
         >
-          Export CSV
+          Export Holdings
+        </button>
+        <button
+          type="button"
+          onClick={onExportWatchlist}
+          disabled={importBusy}
+          className={`ui-hover-pop rounded-lg border border-border bg-background font-medium text-foreground dark:border-white/10 ${
+            compact ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm"
+          } ${importBusy ? "cursor-wait opacity-60" : ""}`}
+        >
+          Export Watchlist
         </button>
       </div>
       {importBusy ? (

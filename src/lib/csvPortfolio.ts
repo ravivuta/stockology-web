@@ -750,6 +750,20 @@ export async function parsePortfolioCsv(
 }
 
 /** Matches iOS `PortfolioPageView.generateCSV`, including account metadata. */
+export function exportWatchlistCsv(stocks: CsvExportStock[]): string {
+  const header = "symbol";
+  const esc = (f: string) => {
+    if (f.includes(",") || f.includes('"') || f.includes("\n")) return `"${f.replace(/"/g, '""')}"`;
+    return f;
+  };
+  // Only export watchlist-only symbols (no holdings); or export all if caller passes filtered list
+  const lines = [header];
+  for (const s of stocks) {
+    if (s.symbol.trim()) lines.push(esc(s.symbol.trim()));
+  }
+  return lines.join("\n");
+}
+
 export function exportPortfolioCsv(
   stocks: CsvExportStock[],
   lotsBySymbol?: Record<string, { open: Array<{ quantity: number; costBasis: number; purchaseDate: string; account?: string; isRetirementAccount?: boolean | null }>; sold: unknown[] }>
