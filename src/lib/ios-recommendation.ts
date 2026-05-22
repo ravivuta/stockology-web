@@ -530,10 +530,12 @@ export function computeRecommendationFactors(
         detail: `${formatCurrency(costBasis)} > ${formatCurrency(stockLimit)}`,
         passes: costBasis > stockLimit,
       });
+      const gainNeeded = moneyToFree / 2;
+      const gainTriggerPrice = quantity > 0 ? avgPrice + gainNeeded / quantity : 0;
       factors.push({
         label: "Unrealized gain sufficient to reduce",
-        detail: `Gain ${formatCurrency(unrealizedGain)} vs needed ${formatCurrency(moneyToFree / 2)}`,
-        passes: unrealizedGain > moneyToFree / 2,
+        detail: `Gain ${formatCurrency(unrealizedGain)} vs needed ${formatCurrency(gainNeeded)}${gainTriggerPrice > 0 ? ` (triggers at ${formatCurrency(gainTriggerPrice)})` : ""}`,
+        passes: unrealizedGain > gainNeeded,
       });
       if (rec.movingAvg > 0) {
         factors.push({
