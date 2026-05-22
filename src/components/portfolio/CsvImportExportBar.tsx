@@ -224,13 +224,15 @@ export function CsvImportExportBar({
   const updateStock = usePortfolioStore((s) => s.updateStock);
   const storeStocks = usePortfolioStore((s) => s.stocks);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
-  const optimizing = usePortfolioStore((s) => s.optimizing);
   const toExport = exportStocks ?? storeStocks;
   const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [pendingMappingImport, setPendingMappingImport] = useState<PendingMappingImport | null>(null);
   const [progress, setProgress] = useState<ImportProgress>({ active: false, label: "", value: 0 });
   const [savedPresets, setSavedPresets] = useState<SavedCsvMappingPreset[]>([]);
-  const importBusy = progress.active || optimizing;
+  // importBusy tracks only the import's own progress — not background optimization.
+  // importCsvRows already cancels any in-flight optimizePendingStocks via optimizationGeneration,
+  // so blocking import on `optimizing` just locks the button during normal post-load auto-optimize.
+  const importBusy = progress.active;
 
   function beginImportProgress(label: string, value: number) {
     setProgress({ active: true, label, value });
