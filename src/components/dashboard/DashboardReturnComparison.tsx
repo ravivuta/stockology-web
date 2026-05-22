@@ -320,6 +320,9 @@ export function DashboardReturnComparison() {
   const chartAnimate = !reduceMotion && chart.ready;
   const lineData = vsSpy ? comparisonRows : valueModeData.rows;
   const showSpyLine = vsSpy && spyLoadedOk && spyAligned && comparisonRows.length > 0;
+  // When data count changes significantly (e.g., post-reset from multi-month to 1 point),
+  // remount the chart to prevent Recharts animation leaving stale lines outside the new domain.
+  const chartKey = `${comparisonRows.length}-${valueModeData.rows.length}`;
 
   const xTickMs = useMemo(() => {
     if (lineData.length === 0) return [];
@@ -416,7 +419,7 @@ export function DashboardReturnComparison() {
               Not enough history to compare yet. Record a few trades or check back after your portfolio has saved history.
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer key={chartKey} width="100%" height="100%">
               {vsSpy ? (
                 <LineChart data={lineData} margin={{ top: 6, right: 10, left: 2, bottom: 22 }}>
                   <XAxis

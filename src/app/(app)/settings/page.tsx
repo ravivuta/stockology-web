@@ -157,6 +157,13 @@ function SettingsInner() {
 
   async function handleResetConfirm() {
     resetAll();
+    // Clear dashboard chart localStorage caches so the home chart doesn't render
+    // stale pre-reset data (which would cause SPY line to appear outside the new domain).
+    try {
+      localStorage.removeItem("dash_chart_cloudPts");
+      localStorage.removeItem("dash_chart_spySeries");
+      localStorage.removeItem("dash_chart_extFlows");
+    } catch { /* ignore */ }
     // Delete snapshot history first so the chart starts fresh, then push the
     // new empty snapshot as the single starting point.
     await deleteAllPortfolioSnapshots();

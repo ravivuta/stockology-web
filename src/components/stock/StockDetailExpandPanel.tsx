@@ -1541,6 +1541,12 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
         stock={stock}
         etfProfitTarget={etfProfitTarget}
         stockProfitTarget={stockProfitTarget}
+        portfolioSize={portfolioSize}
+        limitWatchlistSize={limitWatchlistSize}
+        activeStockCount={Math.max(
+          stocks.filter((s) => s.excludeFromShortlist !== true && (s.quantity > 0 || s.isETF === true || true)).length,
+          1
+        )}
         onSave={(patch) => {
           updateStock(symbol, patch);
           void flushCurrentPortfolioSnapshotNow(true);

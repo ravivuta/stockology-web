@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, Info, X } from "lucide-react";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { formatCurrency } from "@/lib/numberFormat";
 import { AppModal, ModalSection } from "@/components/ui/AppModal";
@@ -13,10 +13,13 @@ type Props = {
   stock: StockHolding;
   etfProfitTarget: number;
   stockProfitTarget: number;
+  portfolioSize: number;
+  limitWatchlistSize: boolean;
+  activeStockCount: number;
   onSave: (patch: Partial<StockHolding>) => void;
 };
 
-export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stockProfitTarget, onSave }: Props) {
+export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stockProfitTarget, portfolioSize, limitWatchlistSize, activeStockCount, onSave }: Props) {
   const [shortSMA, setShortSMA] = useState(String(stock.shortSMA));
   const [dynamicFactor, setDynamicFactor] = useState(String(stock.dynamicFactor));
   const [stockLimit, setStockLimit] = useState(String(stock.stockLimit));
@@ -144,7 +147,47 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
               />
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-foreground">Stock limit ($)</span>
+              <span className="flex items-center gap-1 text-xs font-medium text-foreground">
+                Stock limit ($)
+                <span className="group relative inline-flex items-center">
+                  <Info className="h-3.5 w-3.5 cursor-help text-subtle" />
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-80 -translate-x-1/2 rounded-lg border border-border bg-elevated px-3 py-2.5 text-xs text-foreground opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                    <span className="block font-semibold text-foreground mb-1.5">How Stock Limit is calculated</span>
+                    <span className="flex flex-col gap-1">
+                      <span className="flex items-start gap-1.5">
+                        <span className="mt-0.5 shrink-0 font-mono font-bold text-subtle">1.</span>
+                        <span>
+                          <span className="font-medium">Base = Portfolio ÷ Watchlist size</span><br />
+                          <span className="text-subtle">
+                            {formatCurrency(portfolioSize)} ÷{" "}
+                            {limitWatchlistSize
+                              ? <>recommended <strong>{Math.max(7, Math.min(75, Math.round(7 + ((Math.max(10000, Math.min(1000000, portfolioSize)) - 10000) / 990000) * 68)))}</strong> (setting ON)</>
+                              : <>actual active <strong>{activeStockCount}</strong> stocks (setting OFF)</>}
+                            {" "} = <strong>{formatCurrency(portfolioSize / (limitWatchlistSize ? Math.max(7, Math.min(75, Math.round(7 + ((Math.max(10000, Math.min(1000000, portfolioSize)) - 10000) / 990000) * 68))) : Math.max(activeStockCount, 1)))}</strong>
+                          </span>
+                        </span>
+                      </span>
+                      <span className="flex items-start gap-1.5">
+                        <span className="mt-0.5 shrink-0 font-mono font-bold text-subtle">2.</span>
+                        <span>
+                          <span className="font-medium">× Risk multiplier</span><br />
+                          <span className="text-subtle">
+                            {stock.isETF
+                              ? <>ETF → <strong>10×</strong></>
+                              : (stock.score ?? 0) >= 50
+                                ? <>Score {(stock.score ?? 0).toFixed(0)} ≥ 50 → <strong>1×</strong></>
+                                : <>Score {(stock.score ?? 0).toFixed(0)} &lt; 50 → <strong>0.5× penalty</strong></>}
+                          </span>
+                        </span>
+                      </span>
+                      <span className="flex items-start gap-1.5 border-t border-border/60 pt-1 mt-0.5">
+                        <span className="mt-0.5 shrink-0 font-mono font-bold text-subtle">=</span>
+                        <span><span className="font-medium">Stock Limit: </span><strong>{formatCurrency(stock.stockLimit)}</strong></span>
+                      </span>
+                    </span>
+                  </span>
+                </span>
+              </span>
               <input
                 type="number"
                 min={0}
