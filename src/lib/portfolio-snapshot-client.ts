@@ -320,3 +320,30 @@ export async function flushCurrentPortfolioSnapshotNow(
   });
   return { error: result.error, skipped: result.skipped };
 }
+
+/**
+ * Deletes all portfolio snapshot history for the active user.
+ * Called on portfolio reset so the home chart starts fresh.
+ */
+export async function deleteAllPortfolioSnapshots(): Promise<void> {
+  if (typeof window === "undefined" || !hasSupabaseConfig()) return;
+
+  let dataUserId = "";
+  try {
+    dataUserId = sessionStorage.getItem(ACTIVE_DATA_USER_KEY) ?? "";
+  } catch {
+    dataUserId = "";
+  }
+  if (!dataUserId) return;
+
+  const supabase = createClient();
+  const { error } = await supabase.rpc("delete_portfolio_snapshots", {
+    p_user_id: dataUserId,
+  });
+
+  if (error) {
+    console.error("[deleteAllPortfolioSnapshots] RPC error:", error.message);
+  } else {
+    console.log("[deleteAllPortfolioSnapshots] ✅ Deleted all portfolio snapshot history");
+  }
+}

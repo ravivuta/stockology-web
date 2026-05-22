@@ -21,7 +21,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { recommendedWatchlistSize } from "@/lib/ios-recommendation";
 import { formatCurrency } from "@/lib/numberFormat";
-import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
+import { flushCurrentPortfolioSnapshotNow, deleteAllPortfolioSnapshots } from "@/lib/portfolio-snapshot-client";
 import { deleteAllExternalCashFlows } from "@/lib/external-cash-flows";
 import { saveGlobalSettingsForUser, loadGlobalSettingsForUser } from "@/lib/portfolio-cloud-sync";
 import { isPaidSubscriptionTier } from "@/lib/subscription-state";
@@ -157,6 +157,9 @@ function SettingsInner() {
 
   async function handleResetConfirm() {
     resetAll();
+    // Delete snapshot history first so the chart starts fresh, then push the
+    // new empty snapshot as the single starting point.
+    await deleteAllPortfolioSnapshots();
     await flushCurrentPortfolioSnapshotNow(true, { allowEmptyHoldings: true });
     // Clear all cash flow records so subsequent cash edits after reimport don't
     // get counted as external deposits and skew the flow-adjusted SPY comparison chart.
