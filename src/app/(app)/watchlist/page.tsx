@@ -91,6 +91,7 @@ export default function WatchlistPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION.symbol);
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
+  const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
   const watchlistStocks = useMemo(() => stocks.filter((s) => s.quantity <= 0), [stocks]);
 
   function isActionable(action: string | undefined): boolean {
@@ -193,12 +194,26 @@ export default function WatchlistPage() {
       </div>
 
       <div className="ui-hover-lift rounded-2xl border border-border bg-elevated p-3">
-        <div className="grid items-end gap-3 lg:grid-cols-[minmax(12rem,1fr)_auto_minmax(14rem,1fr)]">
-          <div className="min-w-[12rem] flex-1">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-[12rem]">
             <p className="text-lg font-semibold text-foreground">Watchlist</p>
             <p className="mt-1 text-xs text-subtle">{watchlistCountText}</p>
           </div>
-          <div className="flex justify-center">
+          <div className="md:hidden">
+            <button
+              type="button"
+              aria-expanded={mobileControlsOpen}
+              aria-controls="watchlist-mobile-controls"
+              onClick={() => setMobileControlsOpen((open) => !open)}
+              className="rounded-xl border border-border bg-background px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
+            >
+              {mobileControlsOpen ? "Hide add stock" : "Show add stock"}
+            </button>
+          </div>
+          <div
+            id="watchlist-mobile-controls"
+            className={`${mobileControlsOpen ? "mt-2 flex w-full" : "hidden"} flex-wrap items-end justify-between gap-3 md:mt-0 md:ml-auto md:flex md:w-auto`}
+          >
             <Link
               href="/simulation#watchlist-simulation"
               aria-label="Simulate (App Strategy)"
@@ -235,24 +250,24 @@ export default function WatchlistPage() {
                 </span>
               </span>
             </Link>
-          </div>
-          <div className="flex flex-wrap items-end justify-end gap-2">
-            <label className="flex min-w-[9rem] flex-col gap-1 text-[11px] text-subtle">
-              Add Stock
-              <SymbolTradeCombobox
-                id="watchlist-add-symbol"
-                value={newSymbol}
-                onChange={setNewSymbol}
-                portfolioStocks={stocks}
-              />
-            </label>
-            <button
-              type="button"
-              onClick={addWatchlistSymbol}
-              className={appCtaButton("ui-hover-pop px-3 py-2 text-sm")}
-            >
-              Add
-            </button>
+            <div className="flex flex-wrap items-end justify-end gap-2">
+              <label className="flex min-w-[9rem] flex-col gap-1 text-[11px] text-subtle">
+                Add Stock
+                <SymbolTradeCombobox
+                  id="watchlist-add-symbol"
+                  value={newSymbol}
+                  onChange={setNewSymbol}
+                  portfolioStocks={stocks}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={addWatchlistSymbol}
+                className={appCtaButton("ui-hover-pop px-3 py-2 text-sm")}
+              >
+                Add
+              </button>
+            </div>
           </div>
         </div>
       </div>
