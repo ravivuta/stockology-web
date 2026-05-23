@@ -39,6 +39,20 @@ function sliceIsEmpty(slice: {
   );
 }
 
+function hasMeaningfulSlice(slice: {
+  cashBalance: number;
+  stocks: unknown[];
+  lotsBySymbol: Record<string, unknown>;
+  onboardingComplete?: boolean;
+}) {
+  return (
+    Math.abs(slice.cashBalance) >= 0.005 ||
+    slice.stocks.length > 0 ||
+    Object.keys(slice.lotsBySymbol).length > 0 ||
+    slice.onboardingComplete === true
+  );
+}
+
 /**
  * One-time hydrate from Supabase snapshot into the persisted Zustand store, and debounced push-back for iOS.
  */
@@ -71,7 +85,7 @@ export function PortfolioCloudBridge({
     if (typeof window === "undefined") return;
     if (!storeHydrated) return;
     // Bump suffix when client-side identity or restore logic changes so clients re-apply once.
-    const key = `stocks-pm-cloud-hydrated:v3:${dataUserId}`;
+    const key = `stocks-pm-cloud-hydrated:v4:${dataUserId}`;
     try {
       const prevActive = sessionStorage.getItem(ACTIVE_DATA_USER_KEY);
       const prevAuthUserId = sessionStorage.getItem(ACTIVE_AUTH_USER_KEY);
@@ -94,12 +108,33 @@ export function PortfolioCloudBridge({
         state.stocks.length > 0 ||
         state.onboardingComplete ||
         Object.keys(state.lotsBySymbol).length > 0;
+
+      const draftForDataUser = readPortfolioDraftForUser(dataUserId);
+      const draftForAuthUser = authUserId !== dataUserId ? readPortfolioDraftForUser(authUserId) : null;
+      const preferredDraft = draftForDataUser ?? draftForAuthUser;
       
       if (cloudSnapshot) {
         const parsedCloud = parseCloudSnapshotForStore({
           holdings: cloudSnapshot.holdings,
           cash_balance: cloudSnapshot.cash_balance,
         });
+
+        const cloudSlice = {
+          cashBalance: parsedCloud.cashBalance,
+          stocks: parsedCloud.stocks,
+          lotsBySymbol: parsedCloud.lotsBySymbol,
+        };
+        const cloudLooksEmpty = !hasMeaningfulSlice(cloudSlice);
+
+        if (cloudLooksEmpty && preferredDraft && hasMeaningfulSlice(preferredDraft)) {
+          // Safety: if cloud payload is empty but we have a meaningful local draft for
+          // this signed-in identity, restore the draft instead of wiping the portfolio.
+          usePortfolioStore.getState().replaceFromCloudSync(preferredDraft);
+          sessionStorage.setItem(key, "1");
+          setSyncReady(true);
+          return;
+        }
+
         usePortfolioStore.getState().replaceFromCloudSync({
           ...parsedCloud,
           onboardingComplete: parsedCloud.cashBalance > 0 || parsedCloud.stocks.length > 0,
@@ -111,7 +146,7 @@ export function PortfolioCloudBridge({
       
       // Only apply draft if no cloud snapshot
       if (!hasLocalState) {
-        const draft = readPortfolioDraftForUser(dataUserId);
+        const draft = preferredDraft;
         if (draft) {
           usePortfolioStore.getState().replaceFromCloudSync(draft);
           sessionStorage.setItem(key, "1");

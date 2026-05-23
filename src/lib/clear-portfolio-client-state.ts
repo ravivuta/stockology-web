@@ -45,7 +45,10 @@ export function saveCurrentPortfolioDraftForUser(dataUserId?: string): void {
   let resolvedUserId = dataUserId ?? "";
   try {
     if (!resolvedUserId) {
-      resolvedUserId = sessionStorage.getItem(ACTIVE_DATA_USER_KEY) ?? "";
+      resolvedUserId =
+        sessionStorage.getItem(ACTIVE_DATA_USER_KEY) ??
+        sessionStorage.getItem(ACTIVE_AUTH_USER_KEY) ??
+        "";
     }
   } catch {
     resolvedUserId = dataUserId ?? "";

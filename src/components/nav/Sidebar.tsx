@@ -7,7 +7,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, PieChart, ListOrdered, Newspaper, Settings, HelpCircle, LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { clearPortfolioClientState } from "@/lib/clear-portfolio-client-state";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { useShellRouteTransition } from "@/components/LandingViewTransition";
 import { AppLogo } from "@/components/AppLogo";
@@ -210,8 +209,7 @@ export default function Sidebar({
                   // Best effort; continue sign-out even if network save fails.
                 }
                 const supabase = createClient();
-                const { error } = await supabase.auth.signOut();
-                if (!error) clearPortfolioClientState();
+                await supabase.auth.signOut();
                 router.refresh();
                 replaceWithTransition("/");
               })();
