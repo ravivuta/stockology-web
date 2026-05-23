@@ -273,22 +273,22 @@ export default function WatchlistPage() {
       </div>
 
       <div className="w-full overflow-x-auto rounded-2xl border border-border bg-elevated">
-        <table className="w-full table-auto border-collapse text-sm md:table-fixed">
+        <table className="w-full table-auto border-collapse text-xs sm:text-sm md:table-fixed">
           <colgroup>
-            <col className="w-[22%] md:w-[12%]" />
-            <col className="w-[16%] md:hidden" />
+            <col className="w-[24%] md:w-[12%]" />
+            <col className="w-[20%] md:hidden" />
             <col className="hidden md:table-column md:w-[10%]" />
             <col className="hidden md:table-column md:w-[10%]" />
             <col className="hidden md:table-column md:w-[10%]" />
-            <col className="w-[10%] md:w-[10%]" />
-            <col className="w-[14%] md:w-[10%]" />
-            <col className="w-[10%] md:w-[12%]" />
-            <col className="w-[18%] md:w-[12%]" />
+            <col className="hidden sm:table-column sm:w-[10%] md:w-[10%]" />
+            <col className="w-[22%] md:w-[10%]" />
+            <col className="hidden sm:table-column sm:w-[12%] md:w-[12%]" />
+            <col className="w-[34%] sm:w-[18%] md:w-[12%]" />
             <col className="hidden md:table-column md:w-[6%]" />
           </colgroup>
           <thead className="border-b border-zinc-400/70 bg-zinc-300/95 text-xs font-semibold uppercase tracking-wide text-subtle dark:border-zinc-600 dark:bg-zinc-700/85">
             <tr>
-              <th scope="col" aria-sort={sort === "symbol" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className="px-2 py-3 text-center sm:px-3">
+              <th scope="col" aria-sort={sort === "symbol" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className="px-1.5 py-2.5 text-center sm:px-3 sm:py-3">
                 <div className="flex flex-col items-center gap-2">
                   <button
                     type="button"
@@ -317,12 +317,12 @@ export default function WatchlistPage() {
                 direction={sortDirection}
                 onSort={toggleSort}
                 align="center"
-                className="px-2 py-3 md:hidden"
+                className="px-1.5 py-2.5 md:hidden"
               />
               <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 md:table-cell md:px-3" />
               <SortableHeaderCell label="Today %" column="change" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 md:table-cell md:px-3" />
               <SortableHeaderCell label="Analyst Rating" column="analyst" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 md:table-cell md:px-3" />
-              <th scope="col" className="px-2 py-3 text-center sm:px-3">
+              <th scope="col" className="hidden px-2 py-3 text-center sm:table-cell sm:px-3">
                 <div className="flex flex-col items-center gap-2">
                   <span>Shortlisted</span>
                   <button
@@ -334,16 +334,17 @@ export default function WatchlistPage() {
                   </button>
                 </div>
               </th>
-              <SortableHeaderCell label="Potential Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
-              <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 py-3 sm:px-3" />
-              <th scope="col" aria-sort={sort === "signal" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className="min-w-0 px-2 py-3 text-center sm:px-3">
+              <SortableHeaderCell label="Potential Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-1.5 py-2.5 sm:px-3 sm:py-3" />
+              <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 sm:table-cell sm:px-3" />
+              <th scope="col" aria-sort={sort === "signal" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className="min-w-0 px-1.5 py-2.5 text-center sm:px-3 sm:py-3">
                 <div className="flex flex-col items-center gap-2">
                   <button
                     type="button"
                     onClick={() => toggleSort("signal")}
                     className="inline-flex items-center justify-center gap-1 transition-colors hover:text-foreground"
                   >
-                    <span>Recommendation</span>
+                    <span className="sm:hidden">Rec</span>
+                    <span className="hidden sm:inline">Recommendation</span>
                     <span aria-hidden="true" className={`text-[10px] ${sort === "signal" ? "text-foreground" : "text-subtle/70"}`}>
                       {sort === "signal" ? (sortDirection === "asc" ? "▲" : "▼") : "↕"}
                     </span>
@@ -351,7 +352,7 @@ export default function WatchlistPage() {
                   <button
                     type="button"
                     onClick={() => setShowActionable((value) => !value)}
-                    className={columnFilterClass(showActionable, "emerald")}
+                    className={`${columnFilterClass(showActionable, "emerald")} hidden sm:inline-flex`}
                   >
                     {showActionable ? "Showing actionable" : "Filter actionable"}
                   </button>
@@ -382,7 +383,7 @@ export default function WatchlistPage() {
                     className="cursor-pointer transition-colors duration-150 hover:bg-muted/50 dark:hover:bg-white/[0.04]"
                     onClick={() => setDetailSymbol(s.symbol)}
                   >
-                    <td className="min-w-0 px-2 py-3 align-middle font-medium text-foreground sm:px-3">
+                    <td className="min-w-0 px-1.5 py-2.5 align-middle font-medium text-foreground sm:px-3 sm:py-3">
                       <button
                         type="button"
                         onClick={(event) => {
@@ -394,7 +395,7 @@ export default function WatchlistPage() {
                         <span className="min-w-0 truncate">{s.symbol}</span>
                       </button>
                     </td>
-                    <td className="px-2 py-3 text-center tabular-nums md:hidden">
+                    <td className="px-1.5 py-2.5 text-center tabular-nums md:hidden">
                       <div className="flex min-w-[4.1rem] flex-col items-center leading-tight sm:min-w-[4.75rem]">
                         <span className="text-foreground">{formatCurrency(s.lastPrice ?? 0)}</span>
                         <span
@@ -432,11 +433,11 @@ export default function WatchlistPage() {
                     >
                       <span className="block truncate">{rating && !Number.isNaN(Number.parseFloat(rating)) ? formatDecimal(Number.parseFloat(rating)) : "—"}</span>
                     </td>
-                    <td className="px-2 py-3 text-center font-medium text-subtle sm:px-3">
+                    <td className="hidden px-2 py-3 text-center font-medium text-subtle sm:table-cell sm:px-3">
                       {s.isShortlisted ? "Yes" : "No"}
                     </td>
                     <td
-                      className={`min-w-0 px-2 py-3 text-center tabular-nums font-medium sm:px-3 ${upsideTextClass(upside)}`}
+                      className={`min-w-0 px-1.5 py-2.5 text-center tabular-nums font-medium sm:px-3 sm:py-3 ${upsideTextClass(upside)}`}
                       title={
                         s.analystTarget != null && s.lastPrice
                           ? `Target ${formatCurrency(s.analystTarget)} vs last ${formatCurrency(s.lastPrice)}`
@@ -445,13 +446,13 @@ export default function WatchlistPage() {
                     >
                       <span className="block truncate">{formatUpsidePct(upside)}</span>
                     </td>
-                    <td className={`min-w-0 px-2 py-3 text-center tabular-nums font-medium sm:px-3 ${scoreTextClass(s.score)}`}>
+                    <td className={`hidden min-w-0 px-2 py-3 text-center tabular-nums font-medium sm:table-cell sm:px-3 ${scoreTextClass(s.score)}`}>
                       <span className="block truncate">{s.score != null ? formatDecimal(s.score) : "—"}</span>
                     </td>
-                    <td className="min-w-0 px-2 py-3 text-center text-xs text-subtle sm:px-3">
+                    <td className="min-w-0 px-1.5 py-2.5 text-center text-xs text-subtle sm:px-3 sm:py-3">
                       {s.recommendation ? (
                         <span
-                          className={`inline-flex max-w-full items-center justify-center truncate rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${recBadgeClass(s.recommendation.action)}`}
+                          className={`inline-flex max-w-full items-center justify-center truncate rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide sm:px-2 sm:text-[11px] ${recBadgeClass(s.recommendation.action)}`}
                           title={s.recommendation.comments || s.recommendation.action}
                         >
                           {recommendationActionDisplay(s.recommendation.action)}

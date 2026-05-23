@@ -529,27 +529,27 @@ export default function PortfolioPage() {
         </div>
 
         <div className="ui-hover-lift overflow-x-auto rounded-2xl border border-border bg-elevated">
-            <table className="w-full table-auto text-sm md:min-w-[1180px] md:table-fixed">
+            <table className="w-full table-auto text-xs sm:text-sm md:min-w-[1180px] md:table-fixed">
               <colgroup>
-                <col className="w-[18%] md:w-[13%]" />
-                <col className="w-[14%] md:hidden" />
+                <col className="w-[22%] md:w-[13%]" />
+                <col className="w-[20%] md:hidden" />
                 <col className="hidden md:table-column md:w-[8%]" />
                 <col className="hidden md:table-column md:w-[8%]" />
-                <col className="w-[8%] md:w-[7%]" />
-                <col className="w-[9%] md:w-[9%]" />
-                <col className="w-[11%] md:w-[10%]" />
-                <col className="w-[11%] md:w-[10%]" />
-                <col className="w-[13%] md:w-[13%]" />
-                <col className="w-[8%] md:w-[7%]" />
-                <col className="w-[8%] md:w-[6%]" />
-                <col className="w-[12%] md:w-[9%]" />
+                <col className="w-[12%] md:w-[7%]" />
+                <col className="hidden sm:table-column sm:w-[9%] md:w-[9%]" />
+                <col className="hidden md:table-column md:w-[10%]" />
+                <col className="w-[18%] md:w-[10%]" />
+                <col className="w-[14%] md:w-[13%]" />
+                <col className="hidden md:table-column md:w-[7%]" />
+                <col className="hidden md:table-column md:w-[6%]" />
+                <col className="w-[24%] md:w-[9%]" />
               </colgroup>
               <thead className="border-b border-zinc-400/70 bg-zinc-300/95 text-subtle dark:border-zinc-600 dark:bg-zinc-700/85">
                 <tr>
                   <th
                     scope="col"
                     aria-sort={sort === "symbol" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
-                    className="px-4 pb-2 pt-3 text-center text-xs font-semibold tracking-wide"
+                    className="px-2 pb-2 pt-2.5 text-center text-xs font-semibold tracking-wide md:px-4 md:pt-3"
                   >
                     <div className="flex flex-col items-center gap-2">
                       <button
@@ -572,24 +572,25 @@ export default function PortfolioPage() {
                       />
                     </div>
                   </th>
-                  <SortableHeaderCell label="Last / Chg" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-4 pb-2 pt-3 md:hidden" />
+                  <SortableHeaderCell label="Last / Chg" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 md:hidden" />
                   <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
                   <SortableHeaderCell label="Chg" column="today" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
-                  <SortableHeaderCell label="Qty" column="quantity" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
-                  <SortableHeaderCell label="Avg" column="averageCost" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
-                  <SortableHeaderCell label="Costbasis" column="costBasis" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
-                  <SortableHeaderCell label="Current Value" column="value" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
-                  <SortableHeaderCell label="P/L" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
-                  <SortableHeaderCell label="Potential Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
-                  <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" />
-                  <th scope="col" aria-sort={sort === "signal" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className="px-4 pb-2 pt-3 text-center text-xs font-semibold tracking-wide">
+                  <SortableHeaderCell label="Qty" column="quantity" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 md:px-4 md:pt-3" />
+                  <SortableHeaderCell label="Avg" column="averageCost" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-3 pb-2 pt-2.5 sm:table-cell md:px-4 md:pt-3" />
+                  <SortableHeaderCell label="Costbasis" column="costBasis" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
+                  <SortableHeaderCell label="Current Value" column="value" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 md:px-4 md:pt-3" />
+                  <SortableHeaderCell label="P/L" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 md:px-4 md:pt-3" />
+                  <SortableHeaderCell label="Potential Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
+                  <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
+                  <th scope="col" aria-sort={sort === "signal" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className="px-2 pb-2 pt-2.5 text-center text-xs font-semibold tracking-wide md:px-4 md:pt-3">
                     <div className="flex flex-col items-center gap-2">
                       <button
                         type="button"
                         onClick={() => toggleSort("signal")}
                         className="inline-flex items-center justify-center gap-1 transition-colors hover:text-foreground"
                       >
-                        <span>Recommendation</span>
+                        <span className="sm:hidden">Rec</span>
+                        <span className="hidden sm:inline">Recommendation</span>
                         <span aria-hidden="true" className={`text-[10px] ${sort === "signal" ? "text-foreground" : "text-subtle/70"}`}>
                           {sort === "signal" ? (sortDirection === "asc" ? "▲" : "▼") : "↕"}
                         </span>
@@ -597,7 +598,7 @@ export default function PortfolioPage() {
                       <button
                         type="button"
                         onClick={() => setShowActionable((value) => !value)}
-                        className={actionableFilterClass(showActionable)}
+                        className={`${actionableFilterClass(showActionable)} hidden sm:inline-flex`}
                       >
                         {showActionable ? "Showing actionable" : "Filter actionable"}
                       </button>
@@ -619,7 +620,7 @@ export default function PortfolioPage() {
                       className="cursor-pointer transition-colors duration-150 hover:bg-muted/50 dark:hover:bg-white/[0.04]"
                       onClick={() => setDetailSymbol(s.symbol)}
                     >
-                      <td className="px-4 py-3 align-middle text-center">
+                      <td className="px-2 py-2.5 align-middle text-center md:px-4 md:py-3">
                         <div className="min-w-0">
                           <button
                             type="button"
@@ -633,7 +634,7 @@ export default function PortfolioPage() {
                           </button>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center tabular-nums md:hidden">
+                      <td className="px-2 py-2.5 text-center tabular-nums md:hidden">
                         <div className="flex min-w-[4.25rem] flex-col items-center leading-tight sm:min-w-[5rem]">
                           <span className="text-foreground">{formatCurrency(s.lastPrice ?? 0)}</span>
                           <span
@@ -659,12 +660,12 @@ export default function PortfolioPage() {
                       >
                         {d != null && Number.isFinite(d) ? formatPercent(d, true) : "—"}
                       </td>
-                      <td className="px-4 py-3 text-center tabular-nums text-foreground">{formatNumberMax2(s.quantity)}</td>
-                      <td className="px-4 py-3 text-center tabular-nums text-foreground">{formatCurrency(s.averageCost)}</td>
-                      <td className="px-4 py-3 text-center tabular-nums text-foreground">{formatWholeCurrency(costBasis)}</td>
-                      <td className="px-4 py-3 text-center tabular-nums text-foreground">{formatWholeCurrency(value)}</td>
+                      <td className="px-2 py-2.5 text-center tabular-nums text-foreground md:px-4 md:py-3">{formatNumberMax2(s.quantity)}</td>
+                      <td className="hidden px-3 py-2.5 text-center tabular-nums text-foreground sm:table-cell md:px-4 md:py-3">{formatCurrency(s.averageCost)}</td>
+                      <td className="hidden px-4 py-3 text-center tabular-nums text-foreground md:table-cell">{formatWholeCurrency(costBasis)}</td>
+                      <td className="px-2 py-2.5 text-center tabular-nums text-foreground md:px-4 md:py-3">{formatWholeCurrency(value)}</td>
                       <td
-                        className={`px-4 py-3 text-center tabular-nums font-medium ${
+                        className={`px-2 py-2.5 text-center tabular-nums font-medium md:px-4 md:py-3 ${
                           gainLoss > 0
                             ? "text-emerald-700 dark:text-primary"
                             : gainLoss < 0
@@ -675,14 +676,14 @@ export default function PortfolioPage() {
                         {formatWholeCurrency(Math.abs(gainLoss))}
                         {gainLossPct != null ? ` (${formatPercent(gainLossPct, true)})` : ""}
                       </td>
-                      <td className={`px-4 py-3 text-center tabular-nums font-medium ${upsideTextClass(upside)}`}>
+                      <td className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${upsideTextClass(upside)}`}>
                         {formatUpsidePct(upside)}
                       </td>
-                      <td className={`px-4 py-3 text-center tabular-nums font-medium ${scoreTextClass(s.score)}`}>{s.score != null ? formatDecimal(s.score) : "—"}</td>
-                      <td className="px-4 py-3 align-middle text-center">
+                      <td className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${scoreTextClass(s.score)}`}>{s.score != null ? formatDecimal(s.score) : "—"}</td>
+                      <td className="px-2 py-2.5 align-middle text-center md:px-4 md:py-3">
                         {s.recommendation ? (
                           <span
-                            className={`inline-flex max-w-full items-center justify-center truncate rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${recBadgeClass(s.recommendation.action)}`}
+                            className={`inline-flex max-w-full items-center justify-center truncate rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide sm:px-2 sm:text-[11px] ${recBadgeClass(s.recommendation.action)}`}
                             title={s.recommendation.comments || s.recommendation.action}
                           >
                             {recommendationActionDisplay(s.recommendation.action)}
