@@ -8,6 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, PieChart, ListOrdered, Newspaper, Settings, HelpCircle, LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { clearPortfolioClientState } from "@/lib/clear-portfolio-client-state";
+import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { useShellRouteTransition } from "@/components/LandingViewTransition";
 import { AppLogo } from "@/components/AppLogo";
 
@@ -201,6 +202,13 @@ export default function Sidebar({
             type="button"
             onClick={() => {
               void (async () => {
+                // Force one last cloud snapshot before sign-out clears local state.
+                // This avoids losing latest edits if debounced sync hasn't flushed yet.
+                try {
+                  await flushCurrentPortfolioSnapshotNow(true);
+                } catch {
+                  // Best effort; continue sign-out even if network save fails.
+                }
                 const supabase = createClient();
                 const { error } = await supabase.auth.signOut();
                 if (!error) clearPortfolioClientState();

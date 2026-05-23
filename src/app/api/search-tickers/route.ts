@@ -50,24 +50,52 @@ export async function GET(req: NextRequest) {
   const apiKey = process.env.MARKETSTACK_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "Search unavailable" }, { status: 503 });
 
-  const url = new URL(MARKETSTACK_BASE);
-  url.searchParams.set("access_key", apiKey);
-  url.searchParams.set("search", query);
-  url.searchParams.set("limit", "20");
+  // For short ticker-like queries (1-5 chars, no spaces, all uppercase),
+  // run a direct ticker lookup in parallel with the name search so exact
+  // symbol matches (e.g. RDY, DXYZ) always appear at the top.
+  const looksLikeTicker = query.length <= 5 && !query.includes(" ") && query === query.toUpperCase();
+
+  const nameUrl = new URL(MARKETSTACK_BASE);
+  nameUrl.searchParams.set("access_key", apiKey);
+  nameUrl.searchParams.set("search", query);
+  nameUrl.searchParams.set("limit", "20");
 
   try {
-    const res = await fetch(url.toString(), {
-      headers: { Accept: "application/json" },
-      next: { revalidate: 60 },
-    });
-    if (!res.ok) return NextResponse.json([], { status: 200 });
-    const json = await res.json();
-    if (json?.error) return NextResponse.json([], { status: 200 });
+    const fetches: Promise<MSTicker | null | MSTicker[]>[] = [
+      fetch(nameUrl.toString(), { headers: { Accept: "application/json" }, next: { revalidate: 60 } })
+        .then(r => r.ok ? r.json() : null)
+        .then(json => (json?.data ?? []) as MSTicker[])
+        .catch(() => [] as MSTicker[]),
+    ];
 
-    const tickers: MSTicker[] = json?.data ?? [];
-    console.log(`[search-tickers] raw results for "${query}":`, tickers.map(t => `${t.symbol} mic=${t.exchange_mic ?? t.stock_exchange?.mic ?? "nil"} country=${t.stock_exchange?.country_code ?? t.stock_exchange?.country ?? "nil"}`));
-    const usResults = tickers
+    if (looksLikeTicker) {
+      const directUrl = new URL(`${MARKETSTACK_BASE}/${encodeURIComponent(query.toUpperCase())}`);
+      directUrl.searchParams.set("access_key", apiKey);
+      fetches.push(
+        fetch(directUrl.toString(), { headers: { Accept: "application/json" }, next: { revalidate: 60 } })
+          .then(r => r.ok ? r.json() : null)
+          .then((json): MSTicker | null => json?.symbol ? (json as MSTicker) : null)
+          .catch(() => null)
+      );
+    }
+
+    const [nameResults, directResult] = await Promise.all(fetches) as [MSTicker[], MSTicker | null | undefined];
+
+    const allTickers: MSTicker[] = [];
+    if (directResult && typeof directResult === "object" && "symbol" in directResult) {
+      allTickers.push(directResult as MSTicker);
+    }
+    for (const t of (nameResults as MSTicker[])) {
+      if (!allTickers.some(x => x.symbol.toUpperCase() === t.symbol.toUpperCase())) {
+        allTickers.push(t);
+      }
+    }
+
+    console.log(`[search-tickers] raw results for "${query}":`, allTickers.map(t => `${t.symbol} mic=${t.exchange_mic ?? t.stock_exchange?.mic ?? "nil"} country=${t.stock_exchange?.country_code ?? t.stock_exchange?.country ?? "nil"}`));
+
+    const usResults = allTickers
       .filter(t => isUSListing(t, query))
+      .slice(0, 20)
       .map((t) => ({
         symbol: t.symbol,
         company_name: t.name ?? null,
