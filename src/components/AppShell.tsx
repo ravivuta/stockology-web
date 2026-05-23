@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { HelpCircle, LayoutDashboard, ListOrdered, Newspaper, Settings, PieChart } from "lucide-react";
@@ -115,11 +115,11 @@ export function AppShell({
 }) {
   const pathname = normalizeAppPathname(usePathname());
   const router = useRouter();
-  const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const sidebarExpanded = true;
   const localOnboardingDone = usePortfolioStore((s) => s.onboardingComplete);
   const { row, allowed, loading } = useSubscriptionGate(dataUserId, serverSubscription);
-  const onExpand = useCallback(() => setSidebarExpanded(true), []);
-  const onCollapse = useCallback(() => setSidebarExpanded(false), []);
+  const onExpand = () => {};
+  const onCollapse = () => {};
 
   const serverOnboardingDone = user.user_metadata?.[STOCKS_PM_ONBOARDING_USER_META_KEY] === true;
   const onboardingDone = serverOnboardingDone || localOnboardingDone || hasCloudPortfolio;

@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  /* Collapsed left rail width — match `src/lib/app-shell.ts` APP_RAIL_PX */
-  --app-rail: 4rem;
+  /* Desktop authenticated shell inset width (matches expanded sidebar width 220px). */
+  --app-rail: 13.75rem;
   --app-pad-min: 1rem;
   --app-pad-fluid: clamp(1rem, 2.5vw, 2rem);
 
