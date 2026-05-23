@@ -544,7 +544,7 @@ export default function PortfolioPage() {
                 <col className="w-[8%] md:w-[6%]" />
                 <col className="w-[12%] md:w-[9%]" />
               </colgroup>
-              <thead className="bg-zinc-200/90 text-subtle dark:bg-zinc-800/80">
+              <thead className="border-b border-zinc-400/70 bg-zinc-300/95 text-subtle dark:border-zinc-600 dark:bg-zinc-700/85">
                 <tr>
                   <th
                     scope="col"
