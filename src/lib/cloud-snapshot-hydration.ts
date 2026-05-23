@@ -6,14 +6,19 @@ import type { LotStatus, SoldLot, StockHolding, TradeLot } from "@/store/portfol
 type RawHolding = {
   symbol?: string;
   quantity?: number;
+  qty?: number;
   averageCost?: number;
+  average_cost?: number;
   lastPrice?: number;
+  last_price?: number;
   currentPrice?: number;
+  current_price?: number;
   shortSMA?: number | null;
   dynamicFactor?: number | null;
   stockLimit?: number | null;
   transactionLimit?: number | null;
   targetPrice?: number | null;
+  target_price?: number | null;
   isShortlisted?: boolean | null;
   moving_avg?: number | null;
   noAutoBuy?: boolean | null;
@@ -134,9 +139,9 @@ function parseRawHolding(raw: unknown): { stock: StockHolding; lots: { open: Tra
   const symbol = typeof h.symbol === "string" ? h.symbol.trim().toUpperCase() : "";
   if (!symbol) return null;
 
-  const quantity = Number(h.quantity) || 0;
-  const averageCost = Number(h.averageCost) || 0;
-  const lastPrice = Number(h.lastPrice ?? h.currentPrice) || averageCost || 0;
+  const quantity = Number(h.quantity ?? h.qty) || 0;
+  const averageCost = Number(h.averageCost ?? h.average_cost) || 0;
+  const lastPrice = Number(h.lastPrice ?? h.last_price ?? h.currentPrice ?? h.current_price) || averageCost || 0;
 
   const hasStrategy =
     h.shortSMA != null &&
@@ -149,7 +154,8 @@ function parseRawHolding(raw: unknown): { stock: StockHolding; lots: { open: Tra
   const stockLimit = h.stockLimit != null && Number.isFinite(Number(h.stockLimit)) ? Number(h.stockLimit) : 10000;
   const transactionLimit =
     h.transactionLimit != null && Number.isFinite(Number(h.transactionLimit)) ? Number(h.transactionLimit) : 2500;
-  const targetPrice = h.targetPrice != null && Number.isFinite(Number(h.targetPrice)) ? Number(h.targetPrice) : undefined;
+  const targetRaw = h.targetPrice ?? h.target_price;
+  const targetPrice = targetRaw != null && Number.isFinite(Number(targetRaw)) ? Number(targetRaw) : undefined;
 
   const stock: StockHolding = {
     symbol,
