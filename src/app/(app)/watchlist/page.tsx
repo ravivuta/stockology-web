@@ -271,7 +271,7 @@ export default function WatchlistPage() {
             <col className="w-[18%] md:w-[12%]" />
             <col className="hidden md:table-column md:w-[6%]" />
           </colgroup>
-          <thead className="bg-muted/75 text-xs font-semibold uppercase tracking-wide text-subtle dark:bg-white/[0.08]">
+          <thead className="bg-zinc-200/90 text-xs font-semibold uppercase tracking-wide text-subtle dark:bg-zinc-800/80">
             <tr>
               <th scope="col" aria-sort={sort === "symbol" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className="px-2 py-3 text-center sm:px-3">
                 <div className="flex flex-col items-center gap-2">
