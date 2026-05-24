@@ -31,11 +31,11 @@ const PALETTE = {
 
 const ACCOUNT_COLORS = [
   "#eab308",
-  "#3f4650",
+  "#0f9aa7",
   "#f7c948",
-  "#4b5563",
+  "#138a96",
   "#d99a00",
-  "#374151",
+  "#0b7285",
   "#f8d66a",
 ] as const;
 
