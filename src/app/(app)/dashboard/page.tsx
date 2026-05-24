@@ -102,22 +102,38 @@ export default function DashboardPage() {
     const bySymbol = new Map(stocks.map((stock) => [stock.symbol, stock]));
     const accountMap = new Map<string, { account: string; value: number; costBasis: number }>();
 
+    const addToAccount = (account: string, value: number, costBasis: number) => {
+      if (value <= 0 && costBasis <= 0) return;
+      const existing = accountMap.get(account) ?? { account, value: 0, costBasis: 0 };
+      existing.value += value;
+      existing.costBasis += costBasis;
+      accountMap.set(account, existing);
+    };
+
     for (const [symbol, lots] of Object.entries(lotsBySymbol)) {
       const stock = bySymbol.get(symbol);
       if (!stock || stock.quantity <= 0) continue;
 
       const price = stock.lastPrice ?? 0;
+      const averageCost = Number(stock.averageCost) || 0;
+      let remainingQty = Number(stock.quantity) || 0;
+
       for (const lot of lots.open ?? []) {
+        if (remainingQty <= 1e-6) break;
+
         const account = lot.account?.trim() || "Unassigned";
-        const lotQty = Number(lot.quantity) || 0;
+        const rawLotQty = Number(lot.quantity) || 0;
         const lotCost = Number(lot.costBasis) || 0;
-        if (lotQty <= 0 && lotCost <= 0) continue;
+        const lotQty = Math.min(rawLotQty, remainingQty);
+        if (lotQty <= 1e-6) continue;
 
         const currentValue = lotQty * price;
-        const existing = accountMap.get(account) ?? { account, value: 0, costBasis: 0 };
-        existing.value += currentValue;
-        existing.costBasis += lotCost;
-        accountMap.set(account, existing);
+        addToAccount(account, currentValue, lotQty * lotCost);
+        remainingQty -= lotQty;
+      }
+
+      if (remainingQty > 1e-6) {
+        addToAccount("Unassigned", remainingQty * price, remainingQty * averageCost);
       }
     }
 
@@ -362,6 +378,9 @@ export default function DashboardPage() {
           transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: reduceMotion ? 0 : 0.08 }}
         >
           <h2 className="text-base font-semibold tracking-tight">Allocation by account</h2>
+          <p className="mt-1 text-[11px] leading-relaxed text-subtle">
+            Current holdings grouped by lot account. Cash is excluded from this chart.
+          </p>
           <div className="mt-4 flex flex-col gap-7 sm:flex-row sm:items-center sm:justify-between">
             <ul className="min-w-0 flex-1 space-y-2.5 text-left" aria-label="Account allocation breakdown">
               {accountBreakdown.rows.map((row, index) => {
@@ -390,7 +409,7 @@ export default function DashboardPage() {
             </ul>
             <PortfolioDonut
               segments={accountBreakdown.segments}
-              totalLabel="Accounts"
+              totalLabel="Holdings"
               totalValue={formatCurrency(accountBreakdown.total)}
               totalLabelClassName="text-[color:var(--dashboard-chart-center-text)]"
               totalValueClassName="text-[color:var(--dashboard-chart-center-text)]"
