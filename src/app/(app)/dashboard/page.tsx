@@ -30,13 +30,13 @@ const PALETTE = {
 } as const;
 
 const ACCOUNT_COLORS = [
-  "#7c3aed",
-  "#d42f82",
-  "#ea580c",
-  "#0c7686",
-  "#be8a0a",
-  "#be123a",
-  "#52576a",
+  "#5d27b2",
+  "#8e31b6",
+  "#b1438e",
+  "#834e30",
+  "#6e3944",
+  "#5b4359",
+  "#362b42",
 ] as const;
 
 export default function DashboardPage() {
