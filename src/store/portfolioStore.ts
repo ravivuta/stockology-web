@@ -418,9 +418,6 @@ function derivePortfolioState(
         );
 
     stocksWithLimits = stocksWithLimits.map((stock) => {
-      if (stock.pendingOptimization === false && !forceRecalculateAllHoldingLimits) {
-        return stock;
-      }
       const limits = calculateTradingLimits(portfolioSize, stock.isETF, stock.score, recommendedWatchlistSizeForLimits);
       return {
         ...stock,
