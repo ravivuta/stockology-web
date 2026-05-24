@@ -229,6 +229,7 @@ export function CsvImportExportBar({
   const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [portfolioSyncMode, setPortfolioSyncMode] = useState<"merge" | "replace">("merge");
   const [pendingMappingImport, setPendingMappingImport] = useState<PendingMappingImport | null>(null);
+  const [presetPendingDelete, setPresetPendingDelete] = useState<SavedCsvMappingPreset | null>(null);
   const [progress, setProgress] = useState<ImportProgress>({ active: false, label: "", value: 0 });
   const [savedPresets, setSavedPresets] = useState<SavedCsvMappingPreset[]>([]);
   // importBusy tracks only the import's own progress — not background optimization.
@@ -641,6 +642,23 @@ export function CsvImportExportBar({
                 <option value="yes">Retirement</option>
               </select>
             </div>
+            <div className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
+              <div>
+                <p className="text-sm font-medium text-foreground">Import Mode</p>
+                <p className="mt-1 text-xs text-subtle">Choose how this CSV syncs with current holdings.</p>
+              </div>
+              <select
+                value={portfolioSyncMode}
+                onChange={(e) => setPortfolioSyncMode(e.target.value as "merge" | "replace")}
+                className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
+              >
+                <option value="merge">Merge</option>
+                <option value="replace">Replace</option>
+              </select>
+            </div>
+            <p className="rounded-xl border border-border/70 bg-background/50 px-3 py-2 text-xs text-subtle">
+              Merge keeps existing holdings and updates matching account-symbol positions. Replace clears existing holdings first and then imports holdings from this CSV.
+            </p>
             <div className="rounded-xl border border-border/80 bg-background/60 p-3">
               <p className="text-sm font-medium text-foreground">Column Mapping</p>
               <p className="mt-1 text-xs text-subtle">Map your CSV column headers to the standard iOS import fields. `Symbol` is required.</p>
@@ -649,18 +667,7 @@ export function CsvImportExportBar({
               <div key={field.key} className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
                 <div>
                   <p className="text-sm font-medium text-foreground">
-                    {field.label}
-                    {field.required ? " *" : ""}
-                  </p>
-                  <p className="mt-1 text-xs text-subtle">{field.description}</p>
-                </div>
-                <select
-                  value={pendingMappingImport?.mapping[field.key] ?? "none"}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setPendingMappingImport((current) =>
-                      current
-                        ? {
+                              onClick={() => setPresetPendingDelete(preset)}
                             ...current,
                             mapping: {
                               ...current.mapping,
@@ -786,6 +793,56 @@ export function CsvImportExportBar({
             className="ui-hover-spotlight rounded-lg border border-primary/40 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
           >
             Close
+          </button>
+        </ModalSection>
+      </AppModal>
+
+      <AppModal
+        open={presetPendingDelete != null}
+        onClose={() => setPresetPendingDelete(null)}
+        size="sm"
+        titleId="csv-delete-preset-title"
+        describedById="csv-delete-preset-description"
+      >
+        <ModalSection className="border-b border-border px-5 pb-4 pt-5 dark:border-foreground/10">
+          <h2 id="csv-delete-preset-title" className="text-lg font-semibold tracking-tight text-foreground">
+            Delete saved mapping?
+          </h2>
+        </ModalSection>
+        <ModalSection className="px-5 py-4">
+          <p id="csv-delete-preset-description" className="text-sm leading-relaxed text-subtle">
+            {presetPendingDelete
+              ? `This will permanently remove “${presetPendingDelete.name}”.`
+              : "This will permanently remove the selected mapping preset."}
+          </p>
+        </ModalSection>
+        <ModalSection className="flex justify-end gap-2 border-t border-border px-4 py-4 dark:border-foreground/10">
+          <button
+            type="button"
+            onClick={() => setPresetPendingDelete(null)}
+            className="ui-hover-pop rounded-lg border border-border px-4 py-2 text-sm text-foreground"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!presetPendingDelete) return;
+              const next = removeSavedMappingPreset(presetPendingDelete.id);
+              setSavedPresets(next);
+              setPendingMappingImport((current) =>
+                current && current.activePresetId === presetPendingDelete.id
+                  ? {
+                      ...current,
+                      activePresetId: null,
+                    }
+                  : current
+              );
+              setPresetPendingDelete(null);
+            }}
+            className="ui-hover-spotlight rounded-lg border border-error/45 bg-error-bg px-4 py-2 text-sm font-semibold text-error"
+          >
+            Delete
           </button>
         </ModalSection>
       </AppModal>

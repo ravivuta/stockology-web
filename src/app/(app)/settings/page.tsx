@@ -156,6 +156,12 @@ function SettingsInner() {
   }
 
   async function handleResetConfirm() {
+    // Preserve CSV mapping presets/memory so reset only clears portfolio state.
+    const mappingPresetsKey = "stocks-pm-csv-mapping-presets:v1";
+    const mappingMemoryKey = "stocks-pm-csv-mapping-memory:v1";
+    const preservedMappingPresets = typeof window !== "undefined" ? localStorage.getItem(mappingPresetsKey) : null;
+    const preservedMappingMemory = typeof window !== "undefined" ? localStorage.getItem(mappingMemoryKey) : null;
+
     const stateBeforeReset = usePortfolioStore.getState();
     const watchlistBeforeReset = stateBeforeReset.stocks.filter((s) => s.quantity === 0);
     console.log(`🔄 Resetting portfolio... Preserving ${watchlistBeforeReset.length} watchlist-only stocks`);
@@ -182,6 +188,15 @@ function SettingsInner() {
     // Clear all cash flow records so subsequent cash edits after reimport don't
     // get counted as external deposits and skew the flow-adjusted SPY comparison chart.
     await deleteAllExternalCashFlows();
+
+    // Restore preserved CSV mapping presets/memory after reset.
+    try {
+      if (preservedMappingPresets != null) localStorage.setItem(mappingPresetsKey, preservedMappingPresets);
+      if (preservedMappingMemory != null) localStorage.setItem(mappingMemoryKey, preservedMappingMemory);
+    } catch {
+      // ignore storage failures
+    }
+
     setResetOpen(false);
   }
 

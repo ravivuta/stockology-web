@@ -381,44 +381,51 @@ export default function DashboardPage() {
           <p className="mt-1 text-[11px] leading-relaxed text-subtle">
             Current holdings grouped by lot account. Cash is excluded from this chart.
           </p>
-          <div className="mt-4 flex flex-col gap-7 sm:flex-row sm:items-center sm:justify-between">
-            <ul className="min-w-0 flex-1 space-y-2.5 text-left" aria-label="Account allocation breakdown">
-              {accountBreakdown.rows.map((row, index) => {
-                const pct = (row.value / Math.max(accountBreakdown.total, 0.0001)) * 100;
-                const pnl = row.value - row.costBasis;
-                const pnlClass = pnl >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]";
-                const pctLabel = pct < 0.5 && pct > 0 ? "<1%" : `${Math.round(pct)}%`;
-                return (
-                  <li key={`${row.account}-${index}`} className="text-sm">
-                    <div className="flex items-center gap-2.5">
-                      <span
-                        className="h-2.5 w-2.5 shrink-0 rounded-sm ring-1 ring-inset ring-foreground/12 dark:ring-white/15"
-                        style={{ backgroundColor: accountBreakdown.segments[index]?.color }}
-                        aria-hidden
-                      />
-                      <span
-                        className="min-w-0 flex-1 truncate font-medium"
-                        style={{ color: accountBreakdown.segments[index]?.color }}
-                      >
-                        {row.account}
-                      </span>
-                      <span className="shrink-0 tabular-nums font-bold text-foreground">{formatCompactCurrency(row.value)}</span>
-                      <span className="shrink-0 tabular-nums font-bold text-subtle">{pctLabel}</span>
-                    </div>
-                    <div className="ml-5 mt-0.5 text-[11px] tabular-nums text-subtle">
-                      <span className="font-bold text-[color:var(--dashboard-chart-cost-basis)]">Cost {formatCompactCurrency(row.costBasis)}</span> · <span className={`${pnlClass} font-bold`}>P/L {formatCompactCurrency(pnl)}</span>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-            <PortfolioDonut
-              segments={accountBreakdown.segments}
-              totalLabel="Holdings"
-              totalValue={formatCurrency(accountBreakdown.total)}
-              totalLabelClassName="text-[color:var(--dashboard-chart-center-text)]"
-              totalValueClassName="text-[color:var(--dashboard-chart-center-text)]"
-            />
+          <div className="mt-4 space-y-3.5" aria-label="Account allocation breakdown">
+            {accountBreakdown.rows.map((row, index) => {
+              const pct = (row.value / Math.max(accountBreakdown.total, 0.0001)) * 100;
+              const pctLabel = pct < 0.5 && pct > 0 ? "<1%" : `${Math.round(pct)}%`;
+              const pnl = row.value - row.costBasis;
+              const pnlClass = pnl >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]";
+              const color = accountBreakdown.segments[index]?.color;
+              const maxRowValue = Math.max(...accountBreakdown.rows.map((item) => item.value), 0.0001);
+              const widthPct = Math.max(4, (row.value / maxRowValue) * 100);
+
+              return (
+                <div key={`${row.account}-${index}`} className="text-sm">
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-sm ring-1 ring-inset ring-foreground/12 dark:ring-white/15"
+                      style={{ backgroundColor: color }}
+                      aria-hidden
+                    />
+                    <span className="min-w-0 flex-1 truncate font-medium" style={{ color }}>
+                      {row.account}
+                    </span>
+                    <span className="shrink-0 tabular-nums font-bold text-foreground">{formatCompactCurrency(row.value)}</span>
+                    <span className="shrink-0 tabular-nums font-bold text-subtle">{pctLabel}</span>
+                  </div>
+
+                  <div className="mt-1 h-2 overflow-hidden rounded-full bg-border/75 dark:bg-white/[0.08]">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${Math.min(100, widthPct)}%`, backgroundColor: color }}
+                    />
+                  </div>
+
+                  <div className="mt-1.5 text-[11px] tabular-nums text-subtle">
+                    <span className="font-bold text-[color:var(--dashboard-chart-cost-basis)]">Cost {formatCompactCurrency(row.costBasis)}</span> · <span className={`${pnlClass} font-bold`}>P/L {formatCompactCurrency(pnl)}</span>
+                  </div>
+
+                  {index < accountBreakdown.rows.length - 1 ? <div className="mt-2 border-t border-border/70 dark:border-white/10" /> : null}
+                </div>
+              );
+            })}
+
+            <div className="flex items-center justify-between border-t border-border/80 pt-2 text-xs dark:border-white/10">
+              <span className="text-subtle">Total holdings</span>
+              <span className="tabular-nums font-semibold text-[color:var(--dashboard-chart-center-text)]">{formatCurrency(accountBreakdown.total)}</span>
+            </div>
           </div>
         </motion.section>
       ) : null}
