@@ -478,6 +478,15 @@ export async function parsePortfolioCsv(
   const headers = Object.keys(data[0] ?? {});
   const keySet = new Set(headers.map(normKey));
 
+  const resolveExplicitOptionalHeader = (
+    standard: CsvColumnStandard,
+    fallback: string[]
+  ): string | null => {
+    const configured = mapping?.[standard];
+    if (!configured || configured.toLowerCase() === "none") return null;
+    return resolveMappedHeaderKey(headers, mapping, standard, fallback);
+  };
+
   const skipped: string[] = [];
   const out: CsvImportRow[] = [];
   const trades: CsvImportTrade[] = [];
@@ -501,8 +510,8 @@ export async function parsePortfolioCsv(
     const kTp = findHeaderKey(headers, ["TargetPrice", "target price"]);
     const kName = resolveMappedHeaderKey(headers, mapping, "name", ["Name", "name"]);
     const kDate = resolveMappedHeaderKey(headers, mapping, "purchaseDate", ["purchaseDate", "purchase date", "tradeDate", "trade date"]);
-    const kAccount = resolveMappedHeaderKey(headers, mapping, "account", ["account", "Account", "profile", "profileName", "accountName"]);
-    const kRetirement = resolveMappedHeaderKey(headers, mapping, "retirementAccount", ["retirementAccount", "retirement account", "accountType", "account type"]);
+    const kAccount = resolveExplicitOptionalHeader("account", ["account", "Account", "profile", "profileName", "accountName"]);
+    const kRetirement = resolveExplicitOptionalHeader("retirementAccount", ["retirementAccount", "retirement account", "accountType", "account type"]);
     if (!kSymbol || !kQty || !kAvg) {
       return { ok: false, error: "Extended CSV is missing Symbol, Quantity, or AverageCost." };
     }
@@ -589,8 +598,8 @@ export async function parsePortfolioCsv(
     const kPrice = resolveMappedHeaderKey(headers, mapping, "price", ["price", "Price", "average cost", "AverageCost", "cost"]);
     const kTxn = kTxnLot;
     const kDate = resolveMappedHeaderKey(headers, mapping, "purchaseDate", ["purchaseDate", "purchase date", "tradeDate", "trade date"]);
-    const kAccount = resolveMappedHeaderKey(headers, mapping, "account", ["account", "Account", "profile", "profileName", "accountName"]);
-    const kRetirement = resolveMappedHeaderKey(headers, mapping, "retirementAccount", ["retirementAccount", "retirement account", "accountType", "account type"]);
+    const kAccount = resolveExplicitOptionalHeader("account", ["account", "Account", "profile", "profileName", "accountName"]);
+    const kRetirement = resolveExplicitOptionalHeader("retirementAccount", ["retirementAccount", "retirement account", "accountType", "account type"]);
 
     for (const row of data) {
       const sym = getCell(row, kSym).toUpperCase();
@@ -682,8 +691,8 @@ export async function parsePortfolioCsv(
     "last price",
   ]);
   const kDate = resolveMappedHeaderKey(headers, mapping, "purchaseDate", ["purchaseDate", "purchase date", "tradeDate", "trade date"]);
-  const kAccount = resolveMappedHeaderKey(headers, mapping, "account", ["account", "Account", "profile", "profileName", "accountName"]);
-  const kRetirement = resolveMappedHeaderKey(headers, mapping, "retirementAccount", ["retirementAccount", "retirement account", "accountType", "account type"]);
+  const kAccount = resolveExplicitOptionalHeader("account", ["account", "Account", "profile", "profileName", "accountName"]);
+  const kRetirement = resolveExplicitOptionalHeader("retirementAccount", ["retirementAccount", "retirement account", "accountType", "account type"]);
 
   for (const row of data) {
     const sym = getCell(row, kSym).toUpperCase();

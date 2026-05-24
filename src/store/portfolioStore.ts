@@ -145,13 +145,21 @@ type State = {
   setOnboardingComplete: (v: boolean) => void;
   optimizeStock: (symbol: string) => Promise<{ ok: boolean; error?: string }>;
   optimizePendingStocks: () => Promise<void>;
-  importCsvRows: (rows: CsvImportRow[], mode: "portfolio" | "watchlist", trades?: CsvImportTrade[]) => {
+  importCsvRows: (
+    rows: CsvImportRow[],
+    mode: "portfolio" | "watchlist",
+    trades?: CsvImportTrade[],
+    options?: { portfolioSyncMode?: "merge" | "replace" }
+  ) => {
     importType: "holdings" | "watchlist";
     importedSymbols: string[];
     importedCount: number;
     addedCount: number;
     prunedWatchlistCount: number;
     importedTradeCount: number;
+    mergedUpdatedCombos: number;
+    mergedDeletedCombos: number;
+    mergedSoldCombos: number;
   };
   /** Replace local portfolio from a cloud snapshot (e.g. mobile sync). Recomputes recommendations. */
   replaceFromCloudSync: (payload: {
@@ -354,6 +362,10 @@ function summarizeOpenLots(openLots: TradeLot[]) {
     quantity: totalQty,
     averageCost: totalQty > 0 ? totalBasis / totalQty : 0,
   };
+}
+
+function normalizeAccountKey(value: string | undefined | null): string {
+  return (value ?? "").trim().toLowerCase();
 }
 
 /** Risk–return score + iOS-aligned recommendation (same as `RecommendationEngine` + `calculateScore`). */
@@ -1124,7 +1136,8 @@ export const usePortfolioStore = create<State>()(
           get().setOptimizing(false);
         }
       },
-      importCsvRows: (rows, mode, trades = []) => {
+      importCsvRows: (rows, mode, trades = [], options) => {
+        const portfolioSyncMode = options?.portfolioSyncMode ?? "merge";
         // Cancel any in-flight optimizePendingStocks loop from a previous import.
         optimizationGeneration += 1;
         const grouped = new Map<string, CsvImportRow[]>();
@@ -1148,12 +1161,17 @@ export const usePortfolioStore = create<State>()(
         let addedCount = 0;
         let prunedWatchlistCount = 0;
         let importedTradeCount = 0;
+        let mergedUpdatedCombos = 0;
+        let mergedDeletedCombos = 0;
+        let mergedSoldCombos = 0;
 
         set((st) => {
           const mutationAt = new Date().toISOString();
           const keepExisting =
             mode === "watchlist"
               ? st.stocks
+              : portfolioSyncMode === "replace"
+                ? st.stocks.filter((stock) => importedSymbolSet.has(stock.symbol))
               : st.stocks.filter((stock) => {
                   const shouldKeep = stock.quantity > 0 || importedSymbolSet.has(stock.symbol);
                   if (!shouldKeep && stock.quantity <= 0) prunedWatchlistCount += 1;
@@ -1208,29 +1226,74 @@ export const usePortfolioStore = create<State>()(
               const preservedOpenLots =
                 existingLots?.open.map((lot) => ({
                   ...cloneTradeLot(lot),
-                  // Backfill metadata on existing lots when the import provides mapping/defaults.
                   account: lot.account?.trim() || preferredAccount,
                   isRetirementAccount:
                     lot.isRetirementAccount == null ? preferredRetirement : lot.isRetirementAccount,
                 })) ?? [];
               const preservedSoldLots = existingLots?.sold.map(cloneSoldLot) ?? [];
-              const mergedOpenLots =
-                preservedOpenLots.length > 0
-                  ? [...preservedOpenLots, ...imported.openLots.map(cloneTradeLot)]
-                  : (existing?.quantity ?? 0) > 0
-                    ? [
-                        {
-                          id: uid(),
-                          quantity: existing?.quantity ?? 0,
-                          costBasis: existing?.averageCost ?? 0,
-                          purchaseDate: defaultImportPurchaseDate(),
-                          account: preferredAccount,
-                          isRetirementAccount: preferredRetirement,
-                          status: "open" as const,
-                        },
-                        ...imported.openLots.map(cloneTradeLot),
-                      ]
-                    : imported.openLots.map(cloneTradeLot);
+              let mergedOpenLots: TradeLot[] = [];
+              let mergedSoldLots: SoldLot[] = [...preservedSoldLots];
+
+              if (portfolioSyncMode === "replace") {
+                mergedOpenLots = imported.openLots.map(cloneTradeLot);
+              } else {
+                const importedByAccount = new Map<string, TradeLot[]>();
+                for (const lot of imported.openLots.map(cloneTradeLot)) {
+                  const key = normalizeAccountKey(lot.account);
+                  const list = importedByAccount.get(key);
+                  if (list) list.push(lot);
+                  else importedByAccount.set(key, [lot]);
+                }
+
+                const existingByAccount = new Map<string, TradeLot[]>();
+                for (const lot of preservedOpenLots) {
+                  const key = normalizeAccountKey(lot.account);
+                  const list = existingByAccount.get(key);
+                  if (list) list.push(lot);
+                  else existingByAccount.set(key, [lot]);
+                }
+
+                // Keep existing accounts unless this account+symbol combo is explicitly included in import.
+                mergedOpenLots = preservedOpenLots.filter(
+                  (lot) => !importedByAccount.has(normalizeAccountKey(lot.account))
+                );
+
+                for (const [accountKey, importedLots] of importedByAccount.entries()) {
+                  const existingLotsForAccount = existingByAccount.get(accountKey) ?? [];
+                  const existingSummary = summarizeOpenLots(existingLotsForAccount);
+                  const importedSummary = summarizeOpenLots(importedLots);
+
+                  if (existingLotsForAccount.length > 0 && importedSummary.quantity <= 1e-6) {
+                    mergedDeletedCombos += 1;
+                    mergedSoldCombos += 1;
+                    const salePrice = importedSummary.averageCost > 0
+                      ? importedSummary.averageCost
+                      : Math.max(0, existing?.lastPrice ?? 0);
+                    if (existingSummary.quantity > 0) {
+                      mergedSoldLots.unshift({
+                        saleDate: defaultImportPurchaseDate(),
+                        quantity: existingSummary.quantity,
+                        salePrice,
+                        realizedGainLoss: (salePrice - existingSummary.averageCost) * existingSummary.quantity,
+                      });
+                    }
+                    continue;
+                  }
+
+                  if (existingLotsForAccount.length > 0) {
+                    const qtyChanged = Math.abs(existingSummary.quantity - importedSummary.quantity) > 1e-6;
+                    const basisChanged = Math.abs(existingSummary.averageCost - importedSummary.averageCost) > 1e-6;
+                    if (qtyChanged || basisChanged) {
+                      mergedUpdatedCombos += 1;
+                    }
+                  }
+
+                  if (importedLots.length > 0) {
+                    mergedOpenLots.push(...importedLots);
+                  }
+                }
+              }
+
               mergedOpenLots.sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate));
 
               const mergedTotalQty = mergedOpenLots.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0);
@@ -1239,7 +1302,7 @@ export const usePortfolioStore = create<State>()(
 
               lotsBySymbol[symbol] = {
                 open: mergedOpenLots,
-                sold: preservedSoldLots,
+                sold: mergedSoldLots,
               };
               stockMap.set(
                 symbol,
@@ -1333,6 +1396,9 @@ export const usePortfolioStore = create<State>()(
           addedCount,
           prunedWatchlistCount,
           importedTradeCount,
+          mergedUpdatedCombos,
+          mergedDeletedCombos,
+          mergedSoldCombos,
         };
       },
       replaceFromCloudSync: (payload) =>
