@@ -33,6 +33,7 @@ export default function DashboardPage() {
   const reduceMotion = useReducedMotion();
   const stocks = usePortfolioStore((s) => s.stocks);
   const cash = usePortfolioStore((s) => s.cashBalance);
+  const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
   const [bars, setBars] = useState(true);
   const [dashStockDetail, setDashStockDetail] = useState<string | null>(null);
   // Pre-seed from the same cache used by DashboardReturnComparison for instant today-value display
@@ -86,6 +87,59 @@ export default function DashboardPage() {
       { name: "Loss", value: Math.abs(holdingsPnL) / ref, color: PALETTE.loss },
     ];
   }, [cash, holdingsValue, holdingsCostBasis, holdingsPnL, isProfitable, totalBalance]);
+
+  const accountBreakdown = useMemo(() => {
+    const bySymbol = new Map(stocks.map((stock) => [stock.symbol, stock]));
+    const accountMap = new Map<string, { account: string; value: number; costBasis: number }>();
+
+    for (const [symbol, lots] of Object.entries(lotsBySymbol)) {
+      const stock = bySymbol.get(symbol);
+      if (!stock || stock.quantity <= 0) continue;
+
+      const price = stock.lastPrice ?? 0;
+      for (const lot of lots.open ?? []) {
+        const account = lot.account?.trim() || "Unassigned";
+        const lotQty = Number(lot.quantity) || 0;
+        const lotCost = Number(lot.costBasis) || 0;
+        if (lotQty <= 0 && lotCost <= 0) continue;
+
+        const currentValue = lotQty * price;
+        const existing = accountMap.get(account) ?? { account, value: 0, costBasis: 0 };
+        existing.value += currentValue;
+        existing.costBasis += lotCost;
+        accountMap.set(account, existing);
+      }
+    }
+
+    const allRows = Array.from(accountMap.values())
+      .filter((item) => item.value > 0 || item.costBasis > 0)
+      .sort((a, b) => b.value - a.value);
+
+    const total = allRows.reduce((sum, row) => sum + row.value, 0);
+    if (allRows.length < 2 || total <= 0) {
+      return null;
+    }
+
+    const topRows = allRows.slice(0, 5);
+    const remaining = allRows.slice(5);
+    const otherValue = remaining.reduce((sum, row) => sum + row.value, 0);
+    const otherCost = remaining.reduce((sum, row) => sum + row.costBasis, 0);
+
+    const rows = otherValue > 0
+      ? [...topRows, { account: "Other", value: otherValue, costBasis: otherCost }]
+      : topRows;
+
+    const segments = rows.map((row, index) => {
+      const mix = 86 - Math.min(index, 6) * 8;
+      return {
+        name: row.account,
+        value: row.value,
+        color: `color-mix(in srgb, var(--dashboard-chart-holdings) ${mix}%, white)`,
+      };
+    });
+
+    return { rows, segments, total };
+  }, [lotsBySymbol, stocks]);
 
   const gainers = useMemo(
     () =>
@@ -290,6 +344,51 @@ export default function DashboardPage() {
               : "Today is shown on U.S. trading days from 8:00 AM ET once live quote deltas or a prior portfolio snapshot is available."}
         </p>
       </motion.section>
+
+      {accountBreakdown ? (
+        <motion.section
+          className="dashboard-panel p-5 text-foreground sm:p-6"
+          initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: reduceMotion ? 0 : 0.08 }}
+        >
+          <h2 className="text-base font-semibold tracking-tight">Allocation by account</h2>
+          <div className="mt-4 flex flex-col gap-7 sm:flex-row sm:items-center sm:justify-between">
+            <PortfolioDonut
+              segments={accountBreakdown.segments}
+              totalLabel="Accounts"
+              totalValue={formatCurrency(accountBreakdown.total)}
+              totalLabelClassName="text-[color:var(--dashboard-chart-center-text)]"
+              totalValueClassName="text-[color:var(--dashboard-chart-center-text)]"
+            />
+            <ul className="min-w-0 flex-1 space-y-2.5 text-left" aria-label="Account allocation breakdown">
+              {accountBreakdown.rows.map((row, index) => {
+                const pct = (row.value / Math.max(accountBreakdown.total, 0.0001)) * 100;
+                const pnl = row.value - row.costBasis;
+                const pnlClass = pnl >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]";
+                const pctLabel = pct < 0.5 && pct > 0 ? "<1%" : `${Math.round(pct)}%`;
+                return (
+                  <li key={`${row.account}-${index}`} className="text-sm">
+                    <div className="flex items-center gap-2.5">
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-sm ring-1 ring-inset ring-foreground/12 dark:ring-white/15"
+                        style={{ backgroundColor: accountBreakdown.segments[index]?.color }}
+                        aria-hidden
+                      />
+                      <span className="min-w-0 flex-1 truncate font-medium text-foreground">{row.account}</span>
+                      <span className="shrink-0 tabular-nums text-foreground">{formatCompactCurrency(row.value)}</span>
+                      <span className="shrink-0 tabular-nums text-subtle">{pctLabel}</span>
+                    </div>
+                    <div className="ml-5 mt-0.5 text-[11px] tabular-nums text-subtle">
+                      Cost {formatCompactCurrency(row.costBasis)} · <span className={pnlClass}>P/L {formatCompactCurrency(pnl)}</span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </motion.section>
+      ) : null}
 
       <RecommendedActionsWidget stocks={stocks} />
 
