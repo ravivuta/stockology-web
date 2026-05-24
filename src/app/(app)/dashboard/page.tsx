@@ -29,6 +29,16 @@ const PALETTE = {
   loss: "var(--dashboard-chart-loss)",
 } as const;
 
+const ACCOUNT_COLORS = [
+  "#2563eb",
+  "#16a34a",
+  "#f59e0b",
+  "#8b5cf6",
+  "#06b6d4",
+  "#ef4444",
+  "#84cc16",
+] as const;
+
 export default function DashboardPage() {
   const reduceMotion = useReducedMotion();
   const stocks = usePortfolioStore((s) => s.stocks);
@@ -130,11 +140,10 @@ export default function DashboardPage() {
       : topRows;
 
     const segments = rows.map((row, index) => {
-      const mix = 86 - Math.min(index, 6) * 8;
       return {
         name: row.account,
         value: row.value,
-        color: `color-mix(in srgb, var(--dashboard-chart-holdings) ${mix}%, white)`,
+        color: ACCOUNT_COLORS[index % ACCOUNT_COLORS.length],
       };
     });
 
@@ -354,13 +363,6 @@ export default function DashboardPage() {
         >
           <h2 className="text-base font-semibold tracking-tight">Allocation by account</h2>
           <div className="mt-4 flex flex-col gap-7 sm:flex-row sm:items-center sm:justify-between">
-            <PortfolioDonut
-              segments={accountBreakdown.segments}
-              totalLabel="Accounts"
-              totalValue={formatCurrency(accountBreakdown.total)}
-              totalLabelClassName="text-[color:var(--dashboard-chart-center-text)]"
-              totalValueClassName="text-[color:var(--dashboard-chart-center-text)]"
-            />
             <ul className="min-w-0 flex-1 space-y-2.5 text-left" aria-label="Account allocation breakdown">
               {accountBreakdown.rows.map((row, index) => {
                 const pct = (row.value / Math.max(accountBreakdown.total, 0.0001)) * 100;
@@ -386,6 +388,13 @@ export default function DashboardPage() {
                 );
               })}
             </ul>
+            <PortfolioDonut
+              segments={accountBreakdown.segments}
+              totalLabel="Accounts"
+              totalValue={formatCurrency(accountBreakdown.total)}
+              totalLabelClassName="text-[color:var(--dashboard-chart-center-text)]"
+              totalValueClassName="text-[color:var(--dashboard-chart-center-text)]"
+            />
           </div>
         </motion.section>
       ) : null}
