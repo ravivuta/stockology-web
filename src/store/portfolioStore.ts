@@ -1232,7 +1232,7 @@ export const usePortfolioStore = create<State>()(
                 })) ?? [];
               const preservedSoldLots = existingLots?.sold.map(cloneSoldLot) ?? [];
               let mergedOpenLots: TradeLot[] = [];
-              let mergedSoldLots: SoldLot[] = [...preservedSoldLots];
+              const mergedSoldLots: SoldLot[] = [...preservedSoldLots];
 
               if (portfolioSyncMode === "replace") {
                 mergedOpenLots = imported.openLots.map(cloneTradeLot);
