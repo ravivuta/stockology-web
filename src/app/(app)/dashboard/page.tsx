@@ -32,11 +32,11 @@ const PALETTE = {
 const ACCOUNT_COLORS = [
   "#3b82f6",
   "#5b82fb",
-  "#7c5cff",
+  "#4c1d95",
   "#38bdf8",
-  "#8b6dff",
+  "#5b21b6",
   "#2fb4eb",
-  "#a76df2",
+  "#6d28d9",
 ] as const;
 
 export default function DashboardPage() {
@@ -396,7 +396,12 @@ export default function DashboardPage() {
                         style={{ backgroundColor: accountBreakdown.segments[index]?.color }}
                         aria-hidden
                       />
-                      <span className="min-w-0 flex-1 truncate font-medium text-foreground">{row.account}</span>
+                      <span
+                        className="min-w-0 flex-1 truncate font-medium"
+                        style={{ color: accountBreakdown.segments[index]?.color }}
+                      >
+                        {row.account}
+                      </span>
                       <span className="shrink-0 tabular-nums font-bold text-foreground">{formatCompactCurrency(row.value)}</span>
                       <span className="shrink-0 tabular-nums font-bold text-subtle">{pctLabel}</span>
                     </div>
