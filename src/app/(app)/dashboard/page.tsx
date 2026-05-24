@@ -376,11 +376,11 @@ export default function DashboardPage() {
                         aria-hidden
                       />
                       <span className="min-w-0 flex-1 truncate font-medium text-foreground">{row.account}</span>
-                      <span className="shrink-0 tabular-nums text-foreground">{formatCompactCurrency(row.value)}</span>
-                      <span className="shrink-0 tabular-nums text-subtle">{pctLabel}</span>
+                      <span className="shrink-0 tabular-nums font-bold text-foreground">{formatCompactCurrency(row.value)}</span>
+                      <span className="shrink-0 tabular-nums font-bold text-subtle">{pctLabel}</span>
                     </div>
                     <div className="ml-5 mt-0.5 text-[11px] tabular-nums text-subtle">
-                      Cost {formatCompactCurrency(row.costBasis)} · <span className={pnlClass}>P/L {formatCompactCurrency(pnl)}</span>
+                      <span className="font-bold">Cost {formatCompactCurrency(row.costBasis)}</span> · <span className={`${pnlClass} font-bold`}>P/L {formatCompactCurrency(pnl)}</span>
                     </div>
                   </li>
                 );
