@@ -30,13 +30,13 @@ const PALETTE = {
 } as const;
 
 const ACCOUNT_COLORS = [
-  "#1f2937",
-  "#334155",
-  "#475569",
-  "#64748b",
-  "#3d475f",
-  "#4f3d64",
-  "#6b7280",
+  "#3b82f6",
+  "#5b82fb",
+  "#7c5cff",
+  "#38bdf8",
+  "#8b6dff",
+  "#2fb4eb",
+  "#a76df2",
 ] as const;
 
 export default function DashboardPage() {
@@ -401,7 +401,7 @@ export default function DashboardPage() {
                       <span className="shrink-0 tabular-nums font-bold text-subtle">{pctLabel}</span>
                     </div>
                     <div className="ml-5 mt-0.5 text-[11px] tabular-nums text-subtle">
-                      <span className="font-bold">Cost {formatCompactCurrency(row.costBasis)}</span> · <span className={`${pnlClass} font-bold`}>P/L {formatCompactCurrency(pnl)}</span>
+                      <span className="font-bold text-[color:var(--dashboard-chart-cost-basis)]">Cost {formatCompactCurrency(row.costBasis)}</span> · <span className={`${pnlClass} font-bold`}>P/L {formatCompactCurrency(pnl)}</span>
                     </div>
                   </li>
                 );
