@@ -119,10 +119,30 @@ export function PortfolioCloudBridge({
           cash_balance: cloudSnapshot.cash_balance,
         });
 
+        // Preserve local watchlist-only stocks (quantity === 0, no open lots) when merging
+        // cloud snapshot, since cloud snapshot might not include metadata for all watchlist items.
+        const localState = usePortfolioStore.getState();
+        const cloudSymbolSet = new Set(parsedCloud.stocks.map((s) => s.symbol));
+        const preservedWatchlistStocks = localState.stocks.filter((s) => {
+          if (cloudSymbolSet.has(s.symbol)) return false; // Cloud has this symbol
+          if (s.quantity > 0) return false; // Only preserve watchlist (qty === 0)
+          const lots = localState.lotsBySymbol[s.symbol];
+          return !lots || lots.open.length === 0; // Only if no open lots
+        });
+
+        // Merge watchlist back in with cloud payload
+        const mergedStocks = [...parsedCloud.stocks, ...preservedWatchlistStocks];
+        const mergedLots = {
+          ...parsedCloud.lotsBySymbol,
+          ...Object.fromEntries(
+            preservedWatchlistStocks.map((s) => [s.symbol, localState.lotsBySymbol[s.symbol] ?? { open: [], sold: [] }])
+          ),
+        };
+
         const cloudSlice = {
           cashBalance: parsedCloud.cashBalance,
-          stocks: parsedCloud.stocks,
-          lotsBySymbol: parsedCloud.lotsBySymbol,
+          stocks: mergedStocks,
+          lotsBySymbol: mergedLots,
         };
         const cloudLooksEmpty = !hasMeaningfulSlice(cloudSlice);
 
@@ -136,8 +156,10 @@ export function PortfolioCloudBridge({
         }
 
         usePortfolioStore.getState().replaceFromCloudSync({
-          ...parsedCloud,
-          onboardingComplete: parsedCloud.cashBalance > 0 || parsedCloud.stocks.length > 0,
+          cashBalance: cloudSlice.cashBalance,
+          stocks: mergedStocks,
+          lotsBySymbol: mergedLots,
+          onboardingComplete: parsedCloud.cashBalance > 0 || mergedStocks.length > 0,
         });
         sessionStorage.setItem(key, "1");
         setSyncReady(true);

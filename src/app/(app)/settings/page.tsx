@@ -156,7 +156,17 @@ function SettingsInner() {
   }
 
   async function handleResetConfirm() {
+    const stateBeforeReset = usePortfolioStore.getState();
+    const watchlistBeforeReset = stateBeforeReset.stocks.filter((s) => s.quantity === 0);
+    console.log(`🔄 Resetting portfolio... Preserving ${watchlistBeforeReset.length} watchlist-only stocks`);
+    
     resetAll();
+    
+    // Verify watchlist was preserved
+    const stateAfterReset = usePortfolioStore.getState();
+    const watchlistAfterReset = stateAfterReset.stocks.filter((s) => s.quantity === 0);
+    console.log(`✅ Reset complete. Watchlist preserved: ${watchlistAfterReset.map((s) => s.symbol).join(", ") || "none"}`);
+    
     // Clear dashboard chart localStorage caches so the home chart doesn't render
     // stale pre-reset data (which would cause SPY line to appear outside the new domain).
     try {
@@ -165,7 +175,8 @@ function SettingsInner() {
       localStorage.removeItem("dash_chart_extFlows");
     } catch { /* ignore */ }
     // Delete snapshot history first so the chart starts fresh, then push the
-    // new empty snapshot as the single starting point.
+    // new snapshot as the single starting point. Watchlist will be preserved
+    // since resetAll() only clears holdings (quantity > 0), not watchlist (quantity === 0).
     await deleteAllPortfolioSnapshots();
     await flushCurrentPortfolioSnapshotNow(true, { allowEmptyHoldings: true });
     // Clear all cash flow records so subsequent cash edits after reimport don't
