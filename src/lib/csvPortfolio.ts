@@ -134,6 +134,14 @@ function validateImportedAccountName(symbol: string, account: string): string | 
   return null;
 }
 
+function normalizeImportedAccountName(raw: string | undefined): string | undefined {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed) return undefined;
+  const normalized = trimmed.replace(/[^A-Za-z0-9 _-]/g, "").trim();
+  if (!normalized) return undefined;
+  return normalized.slice(0, 50);
+}
+
 function validateImportedDate(symbol: string, raw: string | undefined): string | null {
   const value = raw?.trim();
   if (!value) return null;
@@ -515,7 +523,7 @@ export async function parsePortfolioCsv(
       const targetPrice = parseNumber(getCell(row, kTp ?? "")) ?? undefined;
       const nameRaw = getCell(row, kName ?? "");
       const purchaseDate = normalizeImportedDate(getCell(row, kDate ?? ""));
-      const account = getCell(row, kAccount ?? "") || undefined;
+      const account = normalizeImportedAccountName(getCell(row, kAccount ?? ""));
       const isRetirementAccount = parseRetirementAccountFlag(getCell(row, kRetirement ?? ""));
       const accountError = account ? validateImportedAccountName(sym, account) : null;
       if (accountError) {
@@ -562,10 +570,10 @@ export async function parsePortfolioCsv(
       });
     }
     if (out.length === 0) {
+      if (trades.length > 0) return { ok: true, rows: [], trades, skipped };
       if (validationErrors.length > 0) return { ok: false, error: validationErrors.join(" ") };
       return { ok: false, error: "No valid symbol rows in extended CSV." };
     }
-    if (validationErrors.length > 0) return { ok: false, error: validationErrors.join(" ") };
     return { ok: true, rows: out, trades, skipped };
   }
 
@@ -600,16 +608,16 @@ export async function parsePortfolioCsv(
       const hasQty = rawQty.length > 0;
       const hasPrice = rawPrice.length > 0;
       if (hasQty !== hasPrice) {
-        return {
-          ok: false,
-          error: `Row for ${sym} is missing ${hasQty ? "price" : "quantity"}. Leave both blank for watchlist-only, or provide both for holdings.`,
-        };
+        validationErrors.push(
+          `Row for ${sym} is missing ${hasQty ? "price" : "quantity"}. Leave both blank for watchlist-only, or provide both for holdings.`
+        );
+        continue;
       }
 
       const qty = hasQty ? parseNumber(rawQty) ?? 0 : 0;
       const price = hasPrice ? parseNumber(rawPrice) ?? 0 : 0;
       const purchaseDate = normalizeImportedDate(getCell(row, kDate ?? ""));
-      const account = getCell(row, kAccount ?? "") || undefined;
+      const account = normalizeImportedAccountName(getCell(row, kAccount ?? ""));
       const isRetirementAccount = parseRetirementAccountFlag(getCell(row, kRetirement ?? ""));
       const accountError = account ? validateImportedAccountName(sym, account) : null;
       if (accountError) {
@@ -654,7 +662,6 @@ export async function parsePortfolioCsv(
       if (validationErrors.length > 0) return { ok: false, error: validationErrors.join(" ") };
       return { ok: false, error: "No importable rows (all SELL, invalid symbols, or empty)." };
     }
-    if (validationErrors.length > 0) return { ok: false, error: validationErrors.join(" ") };
     return { ok: true, rows: out, trades, skipped };
   }
 
@@ -690,16 +697,16 @@ export async function parsePortfolioCsv(
     const hasQty = rawQty.length > 0;
     const hasPrice = rawPrice.length > 0;
     if (hasQty !== hasPrice) {
-      return {
-        ok: false,
-        error: `Row for ${sym} is missing ${hasQty ? "price" : "quantity"}. Leave both blank for watchlist-only, or provide both for holdings.`,
-      };
+      validationErrors.push(
+        `Row for ${sym} is missing ${hasQty ? "price" : "quantity"}. Leave both blank for watchlist-only, or provide both for holdings.`
+      );
+      continue;
     }
 
     const qty = hasQty ? parseNumber(rawQty) ?? 0 : 0;
     const price = hasPrice ? parseNumber(rawPrice) ?? 0 : 0;
     const purchaseDate = normalizeImportedDate(getCell(row, kDate ?? ""));
-    const account = getCell(row, kAccount ?? "") || undefined;
+    const account = normalizeImportedAccountName(getCell(row, kAccount ?? ""));
     const isRetirementAccount = parseRetirementAccountFlag(getCell(row, kRetirement ?? ""));
     const accountError = account ? validateImportedAccountName(sym, account) : null;
     if (accountError) {
@@ -745,7 +752,6 @@ export async function parsePortfolioCsv(
     if (validationErrors.length > 0) return { ok: false, error: validationErrors.join(" ") };
     return { ok: false, error: "No valid symbol rows found." };
   }
-  if (validationErrors.length > 0) return { ok: false, error: validationErrors.join(" ") };
   return { ok: true, rows: out, trades, skipped };
 }
 
