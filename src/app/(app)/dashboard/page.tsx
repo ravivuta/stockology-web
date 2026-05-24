@@ -387,30 +387,51 @@ export default function DashboardPage() {
               const pctLabel = pct < 0.5 && pct > 0 ? "<1%" : `${Math.round(pct)}%`;
               const pnl = row.value - row.costBasis;
               const pnlClass = pnl >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]";
-              const color = accountBreakdown.segments[index]?.color;
-              const maxRowValue = Math.max(...accountBreakdown.rows.map((item) => item.value), 0.0001);
-              const widthPct = Math.max(4, (row.value / maxRowValue) * 100);
+              const maxReference = Math.max(...accountBreakdown.rows.map((item) => Math.max(item.value, item.costBasis)), 0.0001);
+              const valueWidthPct = Math.max(4, (row.value / maxReference) * 100);
+              const costWidthPct = Math.max(0, (Math.min(row.costBasis, row.value) / maxReference) * 100);
+              const profitWidthPct = pnl > 0 ? (pnl / maxReference) * 100 : 0;
+              const lossWidthPct = pnl < 0 ? (Math.abs(pnl) / maxReference) * 100 : 0;
 
               return (
                 <div key={`${row.account}-${index}`} className="text-sm">
                   <div className="flex items-center gap-2.5">
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-sm ring-1 ring-inset ring-foreground/12 dark:ring-white/15"
-                      style={{ backgroundColor: color }}
-                      aria-hidden
-                    />
-                    <span className="min-w-0 flex-1 truncate font-medium" style={{ color }}>
+                    <span className="min-w-0 flex-1 truncate font-medium text-foreground">
                       {row.account}
                     </span>
                     <span className="shrink-0 tabular-nums font-bold text-foreground">{formatCompactCurrency(row.value)}</span>
                     <span className="shrink-0 tabular-nums font-bold text-subtle">{pctLabel}</span>
                   </div>
 
-                  <div className="mt-1 h-2 overflow-hidden rounded-full bg-border/75 dark:bg-white/[0.08]">
+                  <div className="relative mt-1 h-2 overflow-hidden rounded-full bg-border/75 dark:bg-white/[0.08]">
                     <div
                       className="h-full rounded-full"
-                      style={{ width: `${Math.min(100, widthPct)}%`, backgroundColor: color }}
+                      style={{ width: `${Math.min(100, valueWidthPct)}%`, backgroundColor: "var(--dashboard-chart-holdings)" }}
                     />
+                    <div
+                      className="absolute inset-y-[2px] left-0 rounded-full"
+                      style={{ width: `${Math.min(100, costWidthPct)}%`, backgroundColor: "var(--dashboard-chart-cost-basis)" }}
+                    />
+                    {profitWidthPct > 0 ? (
+                      <div
+                        className="absolute inset-y-[2px] rounded-full"
+                        style={{
+                          left: `${Math.min(100, costWidthPct)}%`,
+                          width: `${Math.min(100 - costWidthPct, profitWidthPct)}%`,
+                          backgroundColor: "var(--dashboard-chart-gain)",
+                        }}
+                      />
+                    ) : null}
+                    {lossWidthPct > 0 ? (
+                      <div
+                        className="absolute inset-y-[2px] rounded-full"
+                        style={{
+                          left: `${Math.min(100, valueWidthPct)}%`,
+                          width: `${Math.min(100 - valueWidthPct, lossWidthPct)}%`,
+                          backgroundColor: "var(--dashboard-chart-loss)",
+                        }}
+                      />
+                    ) : null}
                   </div>
 
                   <div className="mt-1.5 text-[11px] tabular-nums text-subtle">
