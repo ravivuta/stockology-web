@@ -323,8 +323,7 @@ export function CsvImportExportBar({
     const outcome = importCsvRows(
       importMode === "watchlist" ? importRows : normalizedWithDefaults,
       importMode,
-      importedTrades,
-      undefined
+      importedTrades
     );
 
     if (outcome.importedSymbols.length > 0) {

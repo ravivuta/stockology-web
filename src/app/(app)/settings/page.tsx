@@ -108,6 +108,9 @@ function SettingsInner() {
 
   const [activeSection, setActiveSection] = useState<string>(SECTIONS[0].id);
   const [resetOpen, setResetOpen] = useState(false);
+  const [refreshChartOpen, setRefreshChartOpen] = useState(false);
+  const [isRefreshingChart, setIsRefreshingChart] = useState(false);
+  const [refreshChartSuccess, setRefreshChartSuccess] = useState(false);
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [snapshots, setSnapshots] = useState<Array<{
     id: number;
@@ -152,6 +155,27 @@ function SettingsInner() {
         timezone: "timezone" in patch ? patch.timezone : store.timezone,
         region: "region" in patch ? patch.region : store.region,
       });
+    }
+  }
+
+  async function handleRefreshChartBaseline() {
+    setIsRefreshingChart(true);
+    try {
+      // Delete all snapshot history so the chart starts fresh from today's
+      // current portfolio values. Holdings and watchlist are NOT touched.
+      await deleteAllPortfolioSnapshots();
+      await flushCurrentPortfolioSnapshotNow(true, { allowEmptyHoldings: false });
+      await deleteAllExternalCashFlows();
+      // Clear localStorage dashboard chart caches so stale lines don't persist.
+      try {
+        localStorage.removeItem("dash_chart_cloudPts");
+        localStorage.removeItem("dash_chart_spySeries");
+        localStorage.removeItem("dash_chart_extFlows");
+      } catch { /* ignore */ }
+    } finally {
+      setIsRefreshingChart(false);
+      setRefreshChartOpen(false);
+      setRefreshChartSuccess(true);
     }
   }
 
@@ -753,6 +777,13 @@ function SettingsInner() {
                 <p className="mt-0.5 text-[10px] leading-snug text-subtle">
                   Clears local portfolio in this browser. Cloud sync may repopulate when signed in.
                 </p>
+                {refreshChartSuccess && (
+                  <div className="mt-2 flex items-start gap-1.5 rounded-md border border-green-500/30 bg-green-500/10 px-2.5 py-2 text-xs text-green-700 dark:border-green-400/25 dark:text-green-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="mt-0.5 h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="20 6 9 17 4 12"/></svg>
+                    <span>Chart history cleared. The chart will rebuild from today&apos;s values as a new baseline.</span>
+                    <button type="button" onClick={() => setRefreshChartSuccess(false)} className="ml-auto shrink-0 opacity-60 hover:opacity-100" aria-label="Dismiss">✕</button>
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => void handleOpenRestore()}
@@ -760,6 +791,19 @@ function SettingsInner() {
                 >
                   <History className="h-3.5 w-3.5 opacity-70" aria-hidden />
                   Restore from backup
+                </button>
+                <button
+                  type="button"
+                  disabled={isRefreshingChart}
+                  onClick={() => setRefreshChartOpen(true)}
+                  className="ui-hover-surface mt-1.5 w-full rounded-md border border-primary/35 bg-background/90 px-2.5 py-1.5 text-xs font-semibold text-foreground dark:border-primary/28 dark:bg-yale/40 inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  {isRefreshingChart ? (
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                  )}
+                  Refresh chart baseline
                 </button>
                 <button
                   type="button"
@@ -774,6 +818,38 @@ function SettingsInner() {
           </SettingsCard>
         </div>
       </div>
+
+      <ConfirmModal
+        open={refreshChartOpen}
+        onClose={() => setRefreshChartOpen(false)}
+        onConfirm={handleRefreshChartBaseline}
+        title="Clear chart history?"
+        description={
+          <div className="space-y-2.5">
+            <p>Your entire performance chart history will be <strong className="text-foreground">permanently deleted</strong> and restarted from today&apos;s values.</p>
+            <div className="grid grid-cols-2 gap-2 rounded-md border border-border bg-surface px-3 py-2 text-xs">
+              <div>
+                <p className="mb-1 font-semibold text-error">Will be deleted</p>
+                <ul className="space-y-0.5 text-subtle">
+                  <li>• Chart snapshot history</li>
+                  <li>• Cash flow records</li>
+                </ul>
+              </div>
+              <div>
+                <p className="mb-1 font-semibold text-success">Not affected</p>
+                <ul className="space-y-0.5 text-subtle">
+                  <li>• Stocks &amp; holdings</li>
+                  <li>• Watchlist</li>
+                  <li>• Trade history</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        }
+        confirmLabel="Yes, clear history"
+        cancelLabel="Cancel"
+        variant="default"
+      />
 
       <ConfirmModal
         open={resetOpen}
