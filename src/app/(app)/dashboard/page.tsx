@@ -405,18 +405,18 @@ export default function DashboardPage() {
                     </span>
                   </div>
 
-                  <div className="relative mt-1 h-2 overflow-hidden rounded-full bg-border/75 dark:bg-white/[0.08]">
+                  <div className="relative mt-1 h-4 overflow-hidden rounded-full bg-border/75 dark:bg-white/[0.08]">
                     <div
                       className="h-full rounded-full"
                       style={{ width: `${Math.min(100, valueWidthPct)}%`, backgroundColor: "var(--dashboard-chart-holdings)" }}
                     />
                     <div
-                      className="absolute inset-y-[2px] left-0 rounded-full"
+                      className="absolute inset-y-[3px] left-0 rounded-full"
                       style={{ width: `${Math.min(100, costWidthPct)}%`, backgroundColor: "var(--dashboard-chart-cost-basis)" }}
                     />
                     {profitWidthPct > 0 ? (
                       <div
-                        className="absolute inset-y-[2px] rounded-full"
+                        className="absolute inset-y-[3px] rounded-full"
                         style={{
                           left: `${Math.min(100, costWidthPct)}%`,
                           width: `${Math.min(100 - costWidthPct, profitWidthPct)}%`,
@@ -426,7 +426,7 @@ export default function DashboardPage() {
                     ) : null}
                     {lossWidthPct > 0 ? (
                       <div
-                        className="absolute inset-y-[2px] rounded-full"
+                        className="absolute inset-y-[3px] rounded-full"
                         style={{
                           left: `${Math.min(100, valueWidthPct)}%`,
                           width: `${Math.min(100 - valueWidthPct, lossWidthPct)}%`,
@@ -436,7 +436,7 @@ export default function DashboardPage() {
                     ) : null}
                     {separatorPct > 0 && separatorPct < 100 ? (
                       <div
-                        className="absolute top-1/2 h-2 w-[2px] -translate-y-1/2 bg-black/75 dark:bg-white/90"
+                        className="absolute top-1/2 h-4 w-[2px] -translate-y-1/2 bg-black/75 dark:bg-white/90"
                         style={{ left: `calc(${separatorPct}% - 1px)` }}
                       />
                     ) : null}
