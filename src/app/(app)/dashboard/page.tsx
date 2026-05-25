@@ -21,11 +21,13 @@ import {
 import { isUsMarketTradingDay } from "@/lib/market-hours";
 import { formatAbsPercent, formatCompactCurrency, formatCurrency, formatPercent } from "@/lib/numberFormat";
 
+const CURRENT_VALUE_COLOR = "#2f7ef7";
+
 const PALETTE = {
   cash: "var(--dashboard-chart-cash)",
   costBasis: "var(--dashboard-chart-cost-basis)",
   gain: "var(--dashboard-chart-gain)",
-  holdingsValue: "var(--dashboard-chart-holdings)",
+  holdingsValue: CURRENT_VALUE_COLOR,
   loss: "var(--dashboard-chart-loss)",
 } as const;
 
@@ -298,6 +300,18 @@ export default function DashboardPage() {
               {pieData.map((p) => {
                 const pct = p.value * 100;
                 const pctLabel = pct < 0.5 && pct > 0 ? "<1%" : `${Math.round(pct)}%`;
+                const segmentValue =
+                  p.name === "Cash"
+                    ? cash
+                    : p.name === "Cost" || p.name === "Cost basis"
+                      ? holdingsCostBasis
+                      : p.name === "Gain"
+                        ? Math.max(holdingsPnL, 0)
+                        : p.name === "Holdings"
+                          ? holdingsValue
+                          : p.name === "Loss"
+                            ? Math.abs(holdingsPnL)
+                            : 0;
                 return (
                   <li key={p.name} className="flex items-center gap-2.5 text-sm">
                     <span
@@ -306,11 +320,20 @@ export default function DashboardPage() {
                       aria-hidden
                     />
                     <span className="min-w-0 flex-1 truncate font-medium text-foreground">{p.name}</span>
-                    <span className="shrink-0 tabular-nums text-subtle">{pctLabel}</span>
+                    <span className="shrink-0 tabular-nums text-subtle">{formatCompactCurrency(segmentValue)} · {pctLabel}</span>
                   </li>
                 );
               })}
             </ul>
+            <div className="rounded-lg border border-border/70 bg-elevated/70 px-3 py-2 text-[11px] leading-relaxed text-subtle dark:border-white/10">
+              <span className="font-semibold text-foreground">Current value:</span> {formatCurrency(holdingsValue)}
+              <span className="mx-1">=</span>
+              <span className="font-semibold text-[color:var(--dashboard-chart-cost-basis)]">Cost basis {formatCurrency(holdingsCostBasis)}</span>
+              <span className="mx-1">+</span>
+              <span className={holdingsPnL >= 0 ? "font-semibold text-[color:var(--dashboard-chart-gain)]" : "font-semibold text-[color:var(--dashboard-chart-loss)]"}>
+                Net P/L {formatCurrency(holdingsPnL)}
+              </span>
+            </div>
           </div>
 
           <dl className="grid w-full max-w-lg grid-cols-1 gap-0 lg:shrink-0">
@@ -339,7 +362,7 @@ export default function DashboardPage() {
                 <StatRow
                   label="Current value"
                   value={formatCurrency(holdingsValue)}
-                  valueClassName="text-[color:var(--dashboard-chart-holdings)]"
+                  valueClassName="text-[color:#2f7ef7]"
                 />
                 <StatRow
                   label="Loss"
@@ -405,18 +428,18 @@ export default function DashboardPage() {
                     </span>
                   </div>
 
-                  <div className="relative mt-1 h-4 overflow-hidden rounded-full bg-border/75 dark:bg-white/[0.08]">
+                  <div className="relative mt-1 h-8 overflow-hidden rounded-full bg-border/75 dark:bg-white/[0.08]">
                     <div
                       className="h-full rounded-full"
-                      style={{ width: `${Math.min(100, valueWidthPct)}%`, backgroundColor: "var(--dashboard-chart-holdings)" }}
+                      style={{ width: `${Math.min(100, valueWidthPct)}%`, backgroundColor: CURRENT_VALUE_COLOR }}
                     />
                     <div
-                      className="absolute inset-y-[3px] left-0 rounded-full"
+                      className="absolute inset-y-[4px] left-0 rounded-full"
                       style={{ width: `${Math.min(100, costWidthPct)}%`, backgroundColor: "var(--dashboard-chart-cost-basis)" }}
                     />
                     {profitWidthPct > 0 ? (
                       <div
-                        className="absolute inset-y-[3px] rounded-full"
+                        className="absolute inset-y-[4px] rounded-full"
                         style={{
                           left: `${Math.min(100, costWidthPct)}%`,
                           width: `${Math.min(100 - costWidthPct, profitWidthPct)}%`,
@@ -426,7 +449,7 @@ export default function DashboardPage() {
                     ) : null}
                     {lossWidthPct > 0 ? (
                       <div
-                        className="absolute inset-y-[3px] rounded-full"
+                        className="absolute inset-y-[4px] rounded-full"
                         style={{
                           left: `${Math.min(100, valueWidthPct)}%`,
                           width: `${Math.min(100 - valueWidthPct, lossWidthPct)}%`,
@@ -436,7 +459,7 @@ export default function DashboardPage() {
                     ) : null}
                     {separatorPct > 0 && separatorPct < 100 ? (
                       <div
-                        className="absolute top-1/2 h-4 w-[2px] -translate-y-1/2 bg-black/75 dark:bg-white/90"
+                        className="absolute top-1/2 h-8 w-[2px] -translate-y-1/2 bg-black/75 dark:bg-white/90"
                         style={{ left: `calc(${separatorPct}% - 1px)` }}
                       />
                     ) : null}
@@ -453,7 +476,7 @@ export default function DashboardPage() {
 
             <div className="flex items-center justify-between border-t border-border/80 pt-2 text-xs dark:border-white/10">
               <span className="text-subtle">Total holdings</span>
-              <span className="tabular-nums font-semibold text-[color:var(--dashboard-chart-center-text)]">{formatCurrency(accountBreakdown.total)}</span>
+              <span className="tabular-nums font-semibold text-[color:#2f7ef7]">{formatCurrency(accountBreakdown.total)}</span>
             </div>
           </div>
         </motion.section>
