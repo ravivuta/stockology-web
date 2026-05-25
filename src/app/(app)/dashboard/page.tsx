@@ -384,8 +384,8 @@ export default function DashboardPage() {
           <div className="mt-4 space-y-3.5" aria-label="Account allocation breakdown">
             {accountBreakdown.rows.map((row, index) => {
               const pct = (row.value / Math.max(accountBreakdown.total, 0.0001)) * 100;
-              const pctLabel = pct < 0.5 && pct > 0 ? "<1%" : `${Math.round(pct)}%`;
               const pnl = row.value - row.costBasis;
+              const pnlPct = row.costBasis > 0 ? (pnl / row.costBasis) * 100 : 0;
               const pnlClass = pnl >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]";
               const maxReference = Math.max(...accountBreakdown.rows.map((item) => Math.max(item.value, item.costBasis)), 0.0001);
               const valueWidthPct = Math.max(4, (row.value / maxReference) * 100);
@@ -399,8 +399,9 @@ export default function DashboardPage() {
                     <span className="min-w-0 flex-1 truncate font-medium text-foreground">
                       {row.account}
                     </span>
-                    <span className="shrink-0 tabular-nums font-bold text-foreground">{formatCompactCurrency(row.value)}</span>
-                    <span className="shrink-0 tabular-nums font-bold text-subtle">{pctLabel}</span>
+                    <span className="shrink-0 tabular-nums font-medium text-foreground">
+                      {`${formatCurrency(row.value)} (${Math.round(pct)}% of total portfolio value)`}
+                    </span>
                   </div>
 
                   <div className="relative mt-1 h-2 overflow-hidden rounded-full bg-border/75 dark:bg-white/[0.08]">
@@ -435,7 +436,7 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="mt-1.5 text-[11px] tabular-nums text-subtle">
-                    <span className="font-bold text-[color:var(--dashboard-chart-cost-basis)]">Cost {formatCompactCurrency(row.costBasis)}</span> · <span className={`${pnlClass} font-bold`}>P/L {formatCompactCurrency(pnl)}</span>
+                    <span className="font-bold text-[color:var(--dashboard-chart-cost-basis)]">Cost {formatCurrency(row.costBasis)}</span> · <span className={`${pnlClass} font-bold`}>P/L {formatCurrency(pnl)} ({`${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%`})</span>
                   </div>
 
                   {index < accountBreakdown.rows.length - 1 ? <div className="mt-2 border-t border-border/70 dark:border-white/10" /> : null}
