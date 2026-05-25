@@ -120,7 +120,7 @@ export function PortfolioDonut({
         fill="none"
         stroke="color-mix(in srgb, var(--dashboard-chart-cost-basis) 20%, transparent)"
         strokeWidth={strokeW}
-        strokeLinecap="round"
+        strokeLinecap="butt"
       />
         {arcs.map((arc, i) => (
           <motion.path
@@ -129,7 +129,7 @@ export function PortfolioDonut({
             fill="none"
             stroke={arc.color}
             strokeWidth={strokeW}
-            strokeLinecap="round"
+            strokeLinecap="butt"
             initial={reduceMotion ? { pathLength: 1, opacity: 1 } : { pathLength: 0, opacity: 0.9 }}
             animate={{ pathLength: 1, opacity: 1 }}
             transition={transition(i)}

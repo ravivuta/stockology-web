@@ -331,22 +331,26 @@ export default function DashboardPage() {
             <StatRow
               label="Cash"
               value={formatCurrency(cash)}
+              labelClassName="text-[color:var(--dashboard-chart-cash)]"
               valueClassName="text-[color:var(--dashboard-chart-cash)]"
               secondaryLabel="Current value"
               secondaryValue={formatCurrency(holdingsValue)}
               secondaryLabelClassName="text-[color:#14b8a6]"
               secondaryValueClassName="text-[color:#14b8a6]"
+              secondarySeparator
             />
             {isProfitable ? (
               <>
                 <StatRow
                   label="Cost"
                   value={formatCurrency(holdingsCostBasis)}
+                  labelClassName="text-[color:var(--dashboard-chart-cost-basis)]"
                   valueClassName="text-[color:var(--dashboard-chart-cost-basis)]"
                 />
                 <StatRow
                   label="Gain"
                   value={`${formatCurrency(holdingsPnL)} (${formatAbsPercent(totalPnLPct)})`}
+                  labelClassName="text-[color:var(--dashboard-chart-gain)]"
                   valueClassName="font-semibold text-[color:var(--dashboard-chart-gain)]"
                   last={!showTodayChange}
                 />
@@ -356,11 +360,13 @@ export default function DashboardPage() {
                 <StatRow
                   label="Cost basis"
                   value={formatCurrency(holdingsCostBasis)}
+                  labelClassName="text-[color:var(--dashboard-chart-cost-basis)]"
                   valueClassName="text-[color:var(--dashboard-chart-cost-basis)]"
                 />
                 <StatRow
                   label="Loss"
                   value={`${formatCurrency(Math.abs(holdingsPnL))} (${formatAbsPercent(totalPnLPct)})`}
+                  labelClassName="text-[color:var(--dashboard-chart-loss)]"
                   valueClassName="font-semibold text-[color:var(--dashboard-chart-loss)]"
                   last={!showTodayChange}
                 />
@@ -422,18 +428,18 @@ export default function DashboardPage() {
                     </span>
                   </div>
 
-                  <div className="relative mt-1 h-8 overflow-hidden rounded-full bg-border/75 dark:bg-white/[0.08]">
+                  <div className="relative mt-1 h-8 overflow-hidden rounded-none bg-border/75 dark:bg-white/[0.08]">
                     <div
-                      className="h-full rounded-full"
+                      className="h-full rounded-none"
                       style={{ width: `${Math.min(100, valueWidthPct)}%`, backgroundColor: CURRENT_VALUE_COLOR }}
                     />
                     <div
-                      className="absolute inset-y-[4px] left-0 rounded-full"
+                      className="absolute inset-y-[4px] left-0 rounded-none"
                       style={{ width: `${Math.min(100, costWidthPct)}%`, backgroundColor: "var(--dashboard-chart-cost-basis)" }}
                     />
                     {profitWidthPct > 0 ? (
                       <div
-                        className="absolute inset-y-[4px] rounded-full"
+                        className="absolute inset-y-[4px] rounded-none"
                         style={{
                           left: `${Math.min(100, costWidthPct)}%`,
                           width: `${Math.min(100 - costWidthPct, profitWidthPct)}%`,
@@ -443,7 +449,7 @@ export default function DashboardPage() {
                     ) : null}
                     {lossWidthPct > 0 ? (
                       <div
-                        className="absolute inset-y-[4px] rounded-full"
+                        className="absolute inset-y-[4px] rounded-none"
                         style={{
                           left: `${Math.min(100, valueWidthPct)}%`,
                           width: `${Math.min(100 - valueWidthPct, lossWidthPct)}%`,
@@ -558,6 +564,7 @@ function StatRow({
   secondaryValue,
   secondaryLabelClassName,
   secondaryValueClassName,
+  secondarySeparator,
   last,
 }: {
   label: string;
@@ -568,6 +575,7 @@ function StatRow({
   secondaryValue?: string;
   secondaryLabelClassName?: string;
   secondaryValueClassName?: string;
+  secondarySeparator?: boolean;
   last?: boolean;
 }) {
   return (
@@ -579,13 +587,25 @@ function StatRow({
       <div className="min-w-0 flex-1 space-y-1">
         <dt className={`text-sm font-medium ${labelClassName ?? "text-subtle"}`}>{label}</dt>
         {secondaryLabel ? (
-          <dt className={`text-xs font-medium ${secondaryLabelClassName ?? "text-subtle"}`}>{secondaryLabel}</dt>
+          <dt
+            className={`text-sm font-medium ${secondaryLabelClassName ?? "text-subtle"} ${
+              secondarySeparator ? "border-t border-border/80 pt-1.5 dark:border-foreground/10" : ""
+            }`}
+          >
+            {secondaryLabel}
+          </dt>
         ) : null}
       </div>
       <div className="space-y-1 text-right">
         <dd className={`text-sm tabular-nums ${valueClassName ?? "text-subtle"}`}>{value}</dd>
         {secondaryValue ? (
-          <dd className={`text-xs tabular-nums ${secondaryValueClassName ?? "text-subtle"}`}>{secondaryValue}</dd>
+          <dd
+            className={`text-sm tabular-nums ${secondaryValueClassName ?? "text-subtle"} ${
+              secondarySeparator ? "border-t border-border/80 pt-1.5 dark:border-foreground/10" : ""
+            }`}
+          >
+            {secondaryValue}
+          </dd>
         ) : null}
       </div>
     </div>
