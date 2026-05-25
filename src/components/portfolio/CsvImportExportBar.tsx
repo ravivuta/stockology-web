@@ -663,31 +663,45 @@ export function CsvImportExportBar({
               <p className="text-sm font-medium text-foreground">Column Mapping</p>
               <p className="mt-1 text-xs text-subtle">Map your CSV column headers to the standard iOS import fields. `Symbol` is required.</p>
             </div>
-            {CSV_IMPORT_FIELDS.filter((field) => !HIDDEN_MAPPING_FIELDS.has(field.key)).map((field) => (
-              <div key={field.key} className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                              onClick={() => setPresetPendingDelete(preset)}
-                            ...current,
-                            mapping: {
-                              ...current.mapping,
-                              [field.key]: value,
-                            },
-                          }
-                        : current
-                    );
-                  }}
-                  className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
-                >
-                  <option value="none">None</option>
-                  {(pendingMappingImport?.headers ?? []).map((header) => (
-                    <option key={`${field.key}:${header}`} value={header}>
-                      {header}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))}
+            {CSV_IMPORT_FIELDS.filter((field) => !HIDDEN_MAPPING_FIELDS.has(field.key)).map((field) => {
+              const fieldKey = field.key;
+              return (
+                <div key={fieldKey} className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      {field.label}
+                      {field.required && <span className="ml-1 text-xs text-red-500">*</span>}
+                    </p>
+                    <p className="mt-1 text-xs text-subtle">{field.description}</p>
+                  </div>
+                  <select
+                    value={pendingMappingImport?.mapping[fieldKey] ?? "none"}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setPendingMappingImport((current) =>
+                        current
+                          ? {
+                              ...current,
+                              mapping: {
+                                ...current.mapping,
+                                [fieldKey]: value,
+                              },
+                            }
+                          : current
+                      );
+                    }}
+                    className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
+                  >
+                    <option value="none">None</option>
+                    {(pendingMappingImport?.headers ?? []).map((header) => (
+                      <option key={`${fieldKey}:${header}`} value={header}>
+                        {header}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              );
+            })}
           </div>
         </ModalSection>
         <ModalSection className="flex flex-wrap justify-end gap-2 border-t border-border px-4 py-4 dark:border-foreground/10">
