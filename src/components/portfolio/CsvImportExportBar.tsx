@@ -227,7 +227,6 @@ export function CsvImportExportBar({
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
   const toExport = exportStocks ?? storeStocks;
   const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
-  const [portfolioSyncMode, setPortfolioSyncMode] = useState<"merge" | "replace">("merge");
   const [pendingMappingImport, setPendingMappingImport] = useState<PendingMappingImport | null>(null);
   const [presetPendingDelete, setPresetPendingDelete] = useState<SavedCsvMappingPreset | null>(null);
   const [progress, setProgress] = useState<ImportProgress>({ active: false, label: "", value: 0 });
@@ -325,7 +324,7 @@ export function CsvImportExportBar({
       importMode === "watchlist" ? importRows : normalizedWithDefaults,
       importMode,
       importedTrades,
-      importMode === "portfolio" ? { portfolioSyncMode } : undefined
+      undefined
     );
 
     if (outcome.importedSymbols.length > 0) {
@@ -366,14 +365,9 @@ export function CsvImportExportBar({
         ? `Merged ${outcome.importedCount} symbol(s) with the existing portfolio.${outcome.importedTradeCount > 0 ? ` Imported ${outcome.importedTradeCount} trade(s).` : ""}`
         : `Imported ${outcome.importedCount} watchlist symbol(s) into the portfolio tracker.`;
 
-    const mergeDeltaNote =
-      importMode === "portfolio" && portfolioSyncMode === "merge"
-        ? ` Updated ${outcome.mergedUpdatedCombos} account-symbol combo(s), removed ${outcome.mergedDeletedCombos}, detected ${outcome.mergedSoldCombos} sold combo(s).`
-        : "";
-
     setFlash({
       kind: "ok",
-      text: `${typeLead}${mergeDeltaNote}${prunedNote}${invalidNote}`,
+      text: `${typeLead}${prunedNote}${invalidNote}`,
     });
   }
 
@@ -497,19 +491,6 @@ export function CsvImportExportBar({
           Export Watchlist
         </button>
       </div>
-      {importMode === "portfolio" ? (
-        <label className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground dark:border-white/10">
-          <span className="text-subtle">Mode</span>
-          <select
-            value={portfolioSyncMode}
-            onChange={(e) => setPortfolioSyncMode(e.target.value as "merge" | "replace")}
-            className="rounded-md border border-border bg-elevated px-2 py-1 text-xs text-foreground"
-          >
-            <option value="merge">Merge</option>
-            <option value="replace">Replace</option>
-          </select>
-        </label>
-      ) : null}
       {importBusy ? (
         <div className="min-w-[14rem] flex-1">
           <div className="h-2 overflow-hidden rounded-full bg-border/80 dark:bg-white/[0.08]">
@@ -642,23 +623,6 @@ export function CsvImportExportBar({
                 <option value="yes">Retirement</option>
               </select>
             </div>
-            <div className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
-              <div>
-                <p className="text-sm font-medium text-foreground">Import Mode</p>
-                <p className="mt-1 text-xs text-subtle">Choose how this CSV syncs with current holdings.</p>
-              </div>
-              <select
-                value={portfolioSyncMode}
-                onChange={(e) => setPortfolioSyncMode(e.target.value as "merge" | "replace")}
-                className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
-              >
-                <option value="merge">Merge</option>
-                <option value="replace">Replace</option>
-              </select>
-            </div>
-            <p className="rounded-xl border border-border/70 bg-background/50 px-3 py-2 text-xs text-subtle">
-              Merge keeps existing holdings and updates matching account-symbol positions. Replace clears existing holdings first and then imports holdings from this CSV.
-            </p>
             <div className="rounded-xl border border-border/80 bg-background/60 p-3">
               <p className="text-sm font-medium text-foreground">Column Mapping</p>
               <p className="mt-1 text-xs text-subtle">Map your CSV column headers to the standard iOS import fields. `Symbol` is required.</p>
