@@ -404,7 +404,7 @@ export default function DashboardPage() {
           <p className="mt-1 text-[11px] leading-relaxed text-subtle">
             Current holdings grouped by lot account. Cash is excluded from this chart.
           </p>
-          <div className="mt-4 space-y-3.5" aria-label="Account allocation breakdown">
+          <div className="mt-4 grid gap-3.5 md:grid-cols-2" aria-label="Account allocation breakdown">
             {accountBreakdown.rows.map((row, index) => {
               const pct = (row.value / Math.max(accountBreakdown.total, 0.0001)) * 100;
               const pnl = row.value - row.costBasis;
@@ -428,18 +428,18 @@ export default function DashboardPage() {
                     </span>
                   </div>
 
-                  <div className="relative mt-1 h-8 overflow-hidden rounded-none bg-border/75 dark:bg-white/[0.08]">
+                  <div className="relative mt-1 h-6 overflow-hidden rounded-none bg-border/75 dark:bg-white/[0.08]">
                     <div
                       className="h-full rounded-none"
                       style={{ width: `${Math.min(100, valueWidthPct)}%`, backgroundColor: CURRENT_VALUE_COLOR }}
                     />
                     <div
-                      className="absolute inset-y-[4px] left-0 rounded-none"
+                      className="absolute inset-y-0 left-0 rounded-none"
                       style={{ width: `${Math.min(100, costWidthPct)}%`, backgroundColor: "var(--dashboard-chart-cost-basis)" }}
                     />
                     {profitWidthPct > 0 ? (
                       <div
-                        className="absolute inset-y-[4px] rounded-none"
+                        className="absolute inset-y-0 rounded-none"
                         style={{
                           left: `${Math.min(100, costWidthPct)}%`,
                           width: `${Math.min(100 - costWidthPct, profitWidthPct)}%`,
@@ -449,7 +449,7 @@ export default function DashboardPage() {
                     ) : null}
                     {lossWidthPct > 0 ? (
                       <div
-                        className="absolute inset-y-[4px] rounded-none"
+                        className="absolute inset-y-0 rounded-none"
                         style={{
                           left: `${Math.min(100, valueWidthPct)}%`,
                           width: `${Math.min(100 - valueWidthPct, lossWidthPct)}%`,
@@ -459,7 +459,7 @@ export default function DashboardPage() {
                     ) : null}
                     {separatorPct > 0 && separatorPct < 100 ? (
                       <div
-                        className="absolute top-1/2 h-8 w-[2px] -translate-y-1/2 bg-black/75 dark:bg-white/90"
+                        className="absolute top-1/2 h-6 w-[2px] -translate-y-1/2 bg-black/75 dark:bg-white/90"
                         style={{ left: `calc(${separatorPct}% - 1px)` }}
                       />
                     ) : null}
@@ -469,12 +469,11 @@ export default function DashboardPage() {
                     <span className="font-bold text-[color:var(--dashboard-chart-cost-basis)]">Cost {formatCurrency(row.costBasis)}</span> · <span className={`${pnlClass} font-bold`}>P/L {formatCurrency(pnl)} ({`${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%`})</span>
                   </div>
 
-                  {index < accountBreakdown.rows.length - 1 ? <div className="mt-2 border-t border-border/70 dark:border-white/10" /> : null}
                 </div>
               );
             })}
 
-            <div className="flex items-center justify-between border-t border-border/80 pt-2 text-xs dark:border-white/10">
+            <div className="flex items-center justify-between border-t border-border/80 pt-2 text-xs dark:border-white/10 md:col-span-2">
               <span className="text-subtle">Total holdings</span>
               <span className="tabular-nums font-semibold text-[color:#14b8a6]">{formatCurrency(accountBreakdown.total)}</span>
             </div>
