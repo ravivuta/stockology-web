@@ -416,7 +416,7 @@ export function DashboardReturnComparison() {
             <div className="flex h-full items-center justify-center text-sm text-subtle">Loading chart…</div>
           ) : lineData.length === 0 ? (
             <div className="flex h-full items-center justify-center px-4 text-center text-sm text-subtle">
-              Not enough history to compare yet. Record a few trades or check back after your portfolio has saved history.
+              Check back later to see history as it gets built.
             </div>
           ) : (
             <ResponsiveContainer key={chartKey} width="100%" height="100%">
