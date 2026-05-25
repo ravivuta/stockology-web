@@ -459,8 +459,8 @@ export default function DashboardPage() {
                     ) : null}
                     {separatorPct > 0 && separatorPct < 100 ? (
                       <div
-                        className="absolute top-1/2 h-6 w-[2px] -translate-y-1/2 bg-white/95 dark:bg-black/95"
-                        style={{ left: `calc(${separatorPct}% - 1px)` }}
+                        className="absolute top-1/2 h-6 w-px -translate-y-1/2 bg-white/95 dark:bg-black/95"
+                        style={{ left: `calc(${separatorPct}% - 0.5px)` }}
                       />
                     ) : null}
                   </div>
