@@ -424,7 +424,7 @@ export default function DashboardPage() {
                       {row.account}
                     </span>
                     <span className="shrink-0 tabular-nums font-medium text-foreground">
-                      {`${formatCurrency(row.value)} (${Math.round(pct)}% of total portfolio value)`}
+                      {`${formatCurrency(row.value)} (${Math.round(pct)}%)`}
                     </span>
                   </div>
 
