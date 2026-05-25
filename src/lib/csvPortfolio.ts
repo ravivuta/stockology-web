@@ -169,6 +169,32 @@ function getCell(row: Record<string, unknown>, headerKey: string | null): string
   return String(v).trim();
 }
 
+/** All recognised import column name candidates (lowercased, no spaces). */
+const HEADER_CANDIDATES = new Set<string>([
+  "symbol", "ticker", "code",
+  "qty", "quantity", "shares",
+  "price", "averagecost", "avgcost", "costbasis",
+  "transaction", "type", "side", "action",
+  "purchasedate", "tradedate", "date",
+  "account", "portfolio",
+  "name", "company",
+]);
+
+/**
+ * Returns the index in `lines` of the first line that looks like a CSV header
+ * (contains at least one recognised import column name).
+ * Falls back to 0 if nothing matches, so existing behaviour is preserved.
+ */
+function findHeaderLineIndex(lines: string[]): number {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    const delim = detectDelimiter(line);
+    const cols = splitCsvLine(line, delim).map((c) => normKey(c.replace(/^"+|"+$/g, "")));
+    if (cols.some((c) => HEADER_CANDIDATES.has(c))) return i;
+  }
+  return 0;
+}
+
 function detectDelimiter(line: string): string {
   const comma = (line.match(/,/g) ?? []).length;
   const tab = (line.match(/\t/g) ?? []).length;
@@ -220,11 +246,13 @@ function parseCsvRecordsFallback(text: string): Record<string, unknown>[] {
 
   if (lines.length === 0) return [];
 
-  const delimiter = detectDelimiter(lines[0] ?? "");
-  const headers = splitCsvLine(lines[0] ?? "", delimiter).map(stripCsvCell);
+  const headerIdx = findHeaderLineIndex(lines);
+  const headerLine = lines[headerIdx] ?? "";
+  const delimiter = detectDelimiter(headerLine);
+  const headers = splitCsvLine(headerLine, delimiter).map(stripCsvCell);
   if (headers.length === 0) return [];
 
-  return lines.slice(1).map((line) => {
+  return lines.slice(headerIdx + 1).map((line) => {
     const cells = splitCsvLine(line, delimiter).map(stripCsvCell);
     const row: Record<string, unknown> = {};
     headers.forEach((header, index) => {
@@ -236,14 +264,20 @@ function parseCsvRecordsFallback(text: string): Record<string, unknown>[] {
 
 async function parseCsvRecords(text: string): Promise<{ data: Record<string, unknown>[]; error?: string }> {
   const normalizedText = text.replace(/^\uFEFF/, "");
-  const firstLine = normalizedText
+  const allLines = normalizedText
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .find(Boolean);
-  const delimiter = detectDelimiter(firstLine ?? "");
+    .filter(Boolean);
+
+  const headerIdx = findHeaderLineIndex(allLines);
+  // Rebuild text from the header row onwards so PapaParse sees a clean CSV
+  const trimmedText = allLines.slice(headerIdx).join("\n");
+
+  const firstLine = allLines[headerIdx] ?? "";
+  const delimiter = detectDelimiter(firstLine);
 
   const { default: Papa } = await import("papaparse");
-  const parsed = Papa.parse<Record<string, unknown>>(normalizedText, {
+  const parsed = Papa.parse<Record<string, unknown>>(trimmedText, {
     header: true,
     delimiter,
     skipEmptyLines: "greedy",
@@ -256,7 +290,7 @@ async function parseCsvRecords(text: string): Promise<{ data: Record<string, unk
 
   const fieldMismatchOnly = parsed.errors.every((error) => error.code === "TooFewFields" || error.code === "TooManyFields");
   if (fieldMismatchOnly) {
-    const fallbackData = parseCsvRecordsFallback(normalizedText);
+    const fallbackData = parseCsvRecordsFallback(text);
     if (fallbackData.length > 0) {
       return { data: fallbackData };
     }
@@ -303,13 +337,15 @@ function findHeaderKey(headers: string[], candidates: string[]): string | null {
 }
 
 export function extractCsvHeaders(text: string): string[] {
-  const firstLine = text
+  const lines = text
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .find(Boolean);
-  if (!firstLine) return [];
-  const delimiter = detectDelimiter(firstLine);
-  return splitCsvLine(firstLine, delimiter).map((header) => header.replace(/^"+|"+$/g, "").trim()).filter(Boolean);
+    .filter(Boolean);
+  const headerIdx = findHeaderLineIndex(lines);
+  const headerLine = lines[headerIdx];
+  if (!headerLine) return [];
+  const delimiter = detectDelimiter(headerLine);
+  return splitCsvLine(headerLine, delimiter).map((header) => header.replace(/^"+|"+$/g, "").trim()).filter(Boolean);
 }
 
 export function parseWatchlistCsv(
@@ -324,8 +360,10 @@ export function parseWatchlistCsv(
     .filter(Boolean);
   if (lines.length === 0) return { ok: false, error: "No data rows in CSV." };
 
-  const delimiter = detectDelimiter(lines[0] ?? "");
-  const headers = splitCsvLine(lines[0] ?? "", delimiter).map((header) => header.replace(/^"+|"+$/g, "").trim());
+  const headerIdx = findHeaderLineIndex(lines);
+  const headerLine = lines[headerIdx] ?? "";
+  const delimiter = detectDelimiter(headerLine);
+  const headers = splitCsvLine(headerLine, delimiter).map((header) => header.replace(/^"+|"+$/g, "").trim());
   const symbolIndex = headers.findIndex((header) => CSV_IMPORT_CANDIDATES.symbol.some((candidate) => normKey(header) === normKey(candidate)));
   const nameIndex = headers.findIndex((header) => CSV_IMPORT_CANDIDATES.name.some((candidate) => normKey(header) === normKey(candidate)));
 
@@ -336,7 +374,7 @@ export function parseWatchlistCsv(
   const skipped: string[] = [];
   const rows: CsvImportRow[] = [];
 
-  for (const line of lines.slice(1)) {
+  for (const line of lines.slice(headerIdx + 1)) {
     const cells = splitCsvLine(line, delimiter).map((cell) => cell.replace(/^"+|"+$/g, "").trim());
     const symbol = (cells[symbolIndex] ?? "").toUpperCase();
     if (!symbol) continue;
