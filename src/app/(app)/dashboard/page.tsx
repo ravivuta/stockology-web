@@ -392,6 +392,7 @@ export default function DashboardPage() {
               const costWidthPct = Math.max(0, (Math.min(row.costBasis, row.value) / maxReference) * 100);
               const profitWidthPct = pnl > 0 ? (pnl / maxReference) * 100 : 0;
               const lossWidthPct = pnl < 0 ? (Math.abs(pnl) / maxReference) * 100 : 0;
+              const separatorPct = pnl >= 0 ? costWidthPct : valueWidthPct;
 
               return (
                 <div key={`${row.account}-${index}`} className="text-sm">
@@ -431,6 +432,12 @@ export default function DashboardPage() {
                           width: `${Math.min(100 - valueWidthPct, lossWidthPct)}%`,
                           backgroundColor: "var(--dashboard-chart-loss)",
                         }}
+                      />
+                    ) : null}
+                    {separatorPct > 0 && separatorPct < 100 ? (
+                      <div
+                        className="absolute top-1/2 h-2 w-[2px] -translate-y-1/2 bg-black/75 dark:bg-white/90"
+                        style={{ left: `calc(${separatorPct}% - 1px)` }}
                       />
                     ) : null}
                   </div>
