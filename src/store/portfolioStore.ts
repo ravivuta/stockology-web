@@ -140,6 +140,7 @@ type State = {
   /** Reverses the last journal entry only. Returns false if nothing to undo. */
   undoLastTrade: () => boolean;
   recalcMetrics: () => void;
+  clearAllHoldingsKeepingWatchlist: () => void;
   resetAll: () => void;
   setOptimizing: (v: boolean) => void;
   setOnboardingComplete: (v: boolean) => void;
@@ -988,6 +989,36 @@ export const usePortfolioStore = create<State>()(
           const derived = derivePortfolioState(st.stocks, st.cashBalance, ctx, st);
           return { stocks: derived.stocks, portfolioSize: derived.portfolioSize, lastLocalMutationAt: mutationAt };
         }),
+      clearAllHoldingsKeepingWatchlist: () => {
+        // Bump generation so any in-flight optimizePendingStocks loop aborts immediately.
+        optimizationGeneration += 1;
+        set((st) => {
+          const mutationAt = new Date().toISOString();
+          const stocks = st.stocks.map((stock) => ({
+            ...stock,
+            quantity: 0,
+            averageCost: 0,
+          }));
+          const lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }> = {};
+          const ctx: RecalcContext = {
+            etfProfitTarget: st.etfProfitTarget,
+            stockProfitTarget: st.stockProfitTarget,
+            useAISentimentForRecommendations: st.useAISentimentForRecommendations,
+            useRSIGatingForRecommendations: st.useRSIGatingForRecommendations,
+            sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
+            lotsBySymbol,
+          };
+          const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st);
+          return {
+            stocks: derived.stocks,
+            lotsBySymbol,
+            tradeJournal: [],
+            portfolioSize: derived.portfolioSize,
+            lastLocalMutationAt: mutationAt,
+            optimizing: false,
+          };
+        });
+      },
       resetAll: () => {
         get().clearCachesOnReset();
         // Bump generation so any in-flight optimizePendingStocks loop aborts immediately.

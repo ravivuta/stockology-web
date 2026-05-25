@@ -24,6 +24,7 @@ import {
   type CsvImportRow,
 } from "@/lib/csvPortfolio";
 import { AppModal, ModalSection } from "@/components/ui/AppModal";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { parseStockPeg } from "@/lib/stock-metric-parse";
 
 const MAX_TRACKED_STOCKS = 200;
@@ -45,7 +46,7 @@ type PendingMappingImport = {
   headers: string[];
   mapping: CsvColumnMapping;
   defaultAccountName: string;
-  defaultRetirementAccount: "no" | "yes";
+  defaultRetirementAccount: "no" | "yes" | "";
   activePresetId: string | null;
 };
 
@@ -66,6 +67,15 @@ type SavedCsvMappingPreset = {
 
 function describeAccountType(value: "no" | "yes"): string {
   return value === "yes" ? "Retirement" : "Taxable";
+}
+
+function canSubmitMappingImport(pending: PendingMappingImport | null): boolean {
+  if (!pending) return false;
+  const symbol = pending.mapping.symbol;
+  if (!symbol || symbol.toLowerCase() === "none") return false;
+  if (!pending.defaultAccountName.trim()) return false;
+  if (!(pending.defaultRetirementAccount === "no" || pending.defaultRetirementAccount === "yes")) return false;
+  return true;
 }
 
 function describePreset(preset: SavedCsvMappingPreset): string {
@@ -221,6 +231,7 @@ export function CsvImportExportBar({
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const importCsvRows = usePortfolioStore((s) => s.importCsvRows);
+  const clearAllHoldingsKeepingWatchlist = usePortfolioStore((s) => s.clearAllHoldingsKeepingWatchlist);
   const recalc = usePortfolioStore((s) => s.recalcMetrics);
   const updateStock = usePortfolioStore((s) => s.updateStock);
   const storeStocks = usePortfolioStore((s) => s.stocks);
@@ -231,6 +242,7 @@ export function CsvImportExportBar({
   const [presetPendingDelete, setPresetPendingDelete] = useState<SavedCsvMappingPreset | null>(null);
   const [progress, setProgress] = useState<ImportProgress>({ active: false, label: "", value: 0 });
   const [savedPresets, setSavedPresets] = useState<SavedCsvMappingPreset[]>([]);
+  const [deleteHoldingsOpen, setDeleteHoldingsOpen] = useState(false);
   // importBusy tracks only the import's own progress — not background optimization.
   // importCsvRows already cancels any in-flight optimizePendingStocks via optimizationGeneration,
   // so blocking import on `optimizing` just locks the button during normal post-load auto-optimize.
@@ -388,7 +400,7 @@ export function CsvImportExportBar({
               headers,
               mapping: suggestCsvColumnMapping(headers, loadSavedMappingMemory()),
               defaultAccountName: "",
-              defaultRetirementAccount: "no",
+              defaultRetirementAccount: "",
               activePresetId: null,
             });
             finishImportProgress();
@@ -448,6 +460,16 @@ export function CsvImportExportBar({
     setFlash({ kind: "ok", text: "Watchlist CSV downloaded." });
   }
 
+  async function onDeleteHoldings() {
+    clearAllHoldingsKeepingWatchlist();
+    recalc();
+    await saveImportSnapshot();
+    setFlash({
+      kind: "ok",
+      text: "Deleted all holdings. Symbols were kept in your watchlist, while cash, chart history, and saved snapshots were preserved.",
+    });
+  }
+
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
       <input
@@ -489,6 +511,18 @@ export function CsvImportExportBar({
         >
           Export Watchlist
         </button>
+        {importMode === "portfolio" ? (
+          <button
+            type="button"
+            onClick={() => setDeleteHoldingsOpen(true)}
+            disabled={importBusy || storeStocks.every((stock) => stock.quantity <= 0)}
+            className={`ui-hover-pop rounded-lg border border-error/45 bg-background font-medium text-error dark:border-error/35 ${
+              compact ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm"
+            } ${importBusy || storeStocks.every((stock) => stock.quantity <= 0) ? "cursor-not-allowed opacity-60" : ""}`}
+          >
+            Delete Holdings
+          </button>
+        ) : null}
       </div>
       {importBusy ? (
         <div className="min-w-[14rem] flex-1">
@@ -593,7 +627,7 @@ export function CsvImportExportBar({
             <div className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
               <div>
                 <p className="text-sm font-medium text-foreground">Profile Name</p>
-                <p className="mt-1 text-xs text-subtle">Used as the account/profile value for imported lots when the CSV does not provide one.</p>
+                <p className="mt-1 text-xs text-subtle">Required. Used as the account/profile value for imported lots when the CSV does not provide one.</p>
               </div>
               <input
                 value={pendingMappingImport?.defaultAccountName ?? ""}
@@ -608,16 +642,17 @@ export function CsvImportExportBar({
             <div className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
               <div>
                 <p className="text-sm font-medium text-foreground">Account Type</p>
-                <p className="mt-1 text-xs text-subtle">Saved with the profile and applied to holding lots when no account type column is mapped.</p>
+                <p className="mt-1 text-xs text-subtle">Required. Saved with the profile and applied to holding lots when no account type column is mapped.</p>
               </div>
               <select
-                value={pendingMappingImport?.defaultRetirementAccount ?? "no"}
+                value={pendingMappingImport?.defaultRetirementAccount ?? ""}
                 onChange={(e) => {
-                  const value = e.target.value as "no" | "yes";
+                  const value = e.target.value as "no" | "yes" | "";
                   setPendingMappingImport((current) => (current ? { ...current, defaultRetirementAccount: value } : current));
                 }}
                 className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
               >
+                <option value="">Select...</option>
                 <option value="no">Taxable</option>
                 <option value="yes">Retirement</option>
               </select>
@@ -691,7 +726,7 @@ export function CsvImportExportBar({
                       name: presetName,
                       mapping: pendingMappingImport.mapping,
                       defaultAccountName: pendingMappingImport.defaultAccountName,
-                      defaultRetirementAccount: pendingMappingImport.defaultRetirementAccount,
+                      defaultRetirementAccount: pendingMappingImport.defaultRetirementAccount === "yes" ? "yes" : "no",
                     });
                     setSavedPresets(next);
                     const savedPreset = next.find((preset) => preset.id === (pendingMappingImport.activePresetId ?? next[0]?.id));
@@ -732,9 +767,9 @@ export function CsvImportExportBar({
                 }
               })();
             }}
-            disabled={progress.active}
+            disabled={progress.active || !canSubmitMappingImport(pendingMappingImport)}
             className={`ui-hover-spotlight rounded-lg border border-primary/40 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground ${
-              progress.active ? "cursor-wait opacity-70" : ""
+              progress.active || !canSubmitMappingImport(pendingMappingImport) ? "cursor-not-allowed opacity-70" : ""
             }`}
           >
             {progress.active ? "Importing…" : "Import CSV"}
@@ -823,6 +858,19 @@ export function CsvImportExportBar({
           </button>
         </ModalSection>
       </AppModal>
+
+      <ConfirmModal
+        open={deleteHoldingsOpen}
+        onClose={() => setDeleteHoldingsOpen(false)}
+        onConfirm={() => {
+          void onDeleteHoldings();
+        }}
+        title="Delete all holdings?"
+        description="This clears all holdings quantities, cost basis, lot history, and trade history while keeping your tracked symbols in the watchlist. Cash, portfolio history, and chart data are preserved."
+        confirmLabel="Delete Holdings"
+        cancelLabel="Cancel"
+        variant="danger"
+      />
     </div>
   );
 }
