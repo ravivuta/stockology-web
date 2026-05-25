@@ -411,7 +411,7 @@ export default function DashboardPage() {
               const pnlPct = row.costBasis > 0 ? (pnl / row.costBasis) * 100 : 0;
               const pnlClass = pnl >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]";
               const maxReference = Math.max(...accountBreakdown.rows.map((item) => Math.max(item.value, item.costBasis)), 0.0001);
-              const valueWidthPct = Math.max(4, (row.value / maxReference) * 100);
+              const valueWidthPct = Math.max(0, (row.value / maxReference) * 100);
               const costWidthPct = Math.max(0, (Math.min(row.costBasis, row.value) / maxReference) * 100);
               const profitWidthPct = pnl > 0 ? (pnl / maxReference) * 100 : 0;
               const lossWidthPct = pnl < 0 ? (Math.abs(pnl) / maxReference) * 100 : 0;
@@ -744,6 +744,7 @@ function GainerLoserBars({
   const maxTotal = maxCostG + maxGain;
 
   const maxCostL = Math.max(...sortedL.map((l) => l.quantity * l.averageCost), 1);
+  const sharedScaleMax = Math.max(maxTotal, maxCostL, 1);
 
   return (
     <>
@@ -760,7 +761,7 @@ function GainerLoserBars({
               const costBasis = Math.max(g.quantity * g.averageCost, 0.0001);
               const gain = Math.max((g.lastPrice ?? g.averageCost) * g.quantity - costBasis, 0);
               const total = costBasis + gain;
-              const scaled = total / maxTotal;
+              const scaled = total / sharedScaleMax;
               const barH = 128 * scaled;
               const costH = barH * (costBasis / total);
               const gainH = barH * (gain / total);
@@ -811,7 +812,7 @@ function GainerLoserBars({
               const costBasis = Math.max(l.quantity * l.averageCost, 0.0001);
               const loss = Math.abs((l.lastPrice ?? l.averageCost) * l.quantity - costBasis);
               const currentValue = Math.max(costBasis - loss, 0);
-              const scaledCost = costBasis / maxCostL;
+              const scaledCost = costBasis / sharedScaleMax;
               const barH = 128 * scaledCost;
               const curH = barH * (currentValue / costBasis);
               const lossH = barH * (loss / costBasis);
