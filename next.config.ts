@@ -32,6 +32,31 @@ const nextConfig: NextConfig = {
         source: "/stocks-pm/landing/:path*",
         destination: "/landing/:path*",
       },
+      // Serve marketing/legal pages under the /stocks-pm/ namespace
+      { source: "/stocks-pm/privacy", destination: "/privacy" },
+      { source: "/stocks-pm/terms", destination: "/terms" },
+      { source: "/stocks-pm/about", destination: "/about" },
+      { source: "/stocks-pm/contact", destination: "/contact" },
+    ];
+  },
+  async redirects() {
+    return [
+      // Legacy / alternate privacy-policy URLs → canonical /stocks-pm/privacy
+      {
+        source: "/privacy-policy-2",
+        destination: "/stocks-pm/privacy",
+        permanent: true,
+      },
+      {
+        source: "/privacy-policy",
+        destination: "/stocks-pm/privacy",
+        permanent: true,
+      },
+      {
+        source: "/privacy",
+        destination: "/stocks-pm/privacy",
+        permanent: false,
+      },
     ];
   },
   async headers() {

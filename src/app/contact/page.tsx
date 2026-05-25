@@ -35,8 +35,8 @@ export default function ContactPage() {
             <h2 className="mb-2 text-base font-semibold text-white">General enquiries</h2>
             <p className="text-sm text-zinc-400">
               For product questions and general feedback, email us at{" "}
-              <a href="mailto:support@appaitech.net" className="text-emerald-400 no-underline hover:underline">
-                support@appaitech.net
+              <a href="mailto:appaitechmanager@gmail.com" className="text-emerald-400 no-underline hover:underline">
+                appaitechmanager@gmail.com
               </a>
             </p>
           </div>

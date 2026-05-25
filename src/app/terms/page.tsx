@@ -40,11 +40,6 @@ export default function TermsPage() {
           <p>
             AppAiTech may change, suspend, or remove features at any time. Use of the product is at your own risk.
           </p>
-          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6">
-            <p className="text-sm text-zinc-400">
-              This page is a product-facing terms summary and should be replaced with your finalized legal terms before public launch.
-            </p>
-          </div>
         </div>
 
         <div className="mt-14 flex flex-wrap gap-4 border-t border-white/[0.06] pt-10 text-sm text-zinc-500">

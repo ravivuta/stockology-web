@@ -40,18 +40,13 @@ export default function PrivacyPage() {
           <p>
             Browser-local settings such as appearance mode, onboarding completion, and cached market state may also be stored on your device to improve performance and preserve your workspace.
           </p>
-          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6">
-            <p className="text-sm text-zinc-400">
-              This page is a product-facing privacy summary and should be replaced with your finalized legal policy before public launch.
-            </p>
-          </div>
         </div>
 
         <div className="mt-14 flex flex-wrap gap-4 border-t border-white/[0.06] pt-10 text-sm text-zinc-500">
-          <Link href="/" className="no-underline transition-colors hover:text-zinc-300">Home</Link>
-          <Link href="/about" className="no-underline transition-colors hover:text-zinc-300">About</Link>
-          <Link href="/contact" className="no-underline transition-colors hover:text-zinc-300">Contact</Link>
-          <Link href="/terms" className="no-underline transition-colors hover:text-zinc-300">Terms</Link>
+          <Link href="/stocks-pm" className="no-underline transition-colors hover:text-zinc-300">Home</Link>
+          <Link href="/stocks-pm/about" className="no-underline transition-colors hover:text-zinc-300">About</Link>
+          <Link href="/stocks-pm/contact" className="no-underline transition-colors hover:text-zinc-300">Contact</Link>
+          <Link href="/stocks-pm/terms" className="no-underline transition-colors hover:text-zinc-300">Terms</Link>
           <span className="ml-auto text-zinc-600">© 2026 AppAiTech</span>
         </div>
       </main>
