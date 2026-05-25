@@ -21,7 +21,7 @@ import {
 import { isUsMarketTradingDay } from "@/lib/market-hours";
 import { formatAbsPercent, formatCompactCurrency, formatCurrency, formatPercent } from "@/lib/numberFormat";
 
-const CURRENT_VALUE_COLOR = "#2f7ef7";
+const CURRENT_VALUE_COLOR = "#14b8a6";
 
 const PALETTE = {
   cash: "var(--dashboard-chart-cash)",
@@ -325,19 +325,18 @@ export default function DashboardPage() {
                 );
               })}
             </ul>
-            <div className="rounded-lg border border-border/70 bg-elevated/70 px-3 py-2 text-[11px] leading-relaxed text-subtle dark:border-white/10">
-              <span className="font-semibold text-foreground">Current value:</span> {formatCurrency(holdingsValue)}
-              <span className="mx-1">=</span>
-              <span className="font-semibold text-[color:var(--dashboard-chart-cost-basis)]">Cost basis {formatCurrency(holdingsCostBasis)}</span>
-              <span className="mx-1">+</span>
-              <span className={holdingsPnL >= 0 ? "font-semibold text-[color:var(--dashboard-chart-gain)]" : "font-semibold text-[color:var(--dashboard-chart-loss)]"}>
-                Net P/L {formatCurrency(holdingsPnL)}
-              </span>
-            </div>
           </div>
 
           <dl className="grid w-full max-w-lg grid-cols-1 gap-0 lg:shrink-0">
-            <StatRow label="Cash" value={formatCurrency(cash)} valueClassName="text-[color:var(--dashboard-chart-cash)]" />
+            <StatRow
+              label="Cash"
+              value={formatCurrency(cash)}
+              valueClassName="text-[color:var(--dashboard-chart-cash)]"
+              secondaryLabel="Current value"
+              secondaryValue={formatCurrency(holdingsValue)}
+              secondaryLabelClassName="text-[color:#14b8a6]"
+              secondaryValueClassName="text-[color:#14b8a6]"
+            />
             {isProfitable ? (
               <>
                 <StatRow
@@ -358,11 +357,6 @@ export default function DashboardPage() {
                   label="Cost basis"
                   value={formatCurrency(holdingsCostBasis)}
                   valueClassName="text-[color:var(--dashboard-chart-cost-basis)]"
-                />
-                <StatRow
-                  label="Current value"
-                  value={formatCurrency(holdingsValue)}
-                  valueClassName="text-[color:#2f7ef7]"
                 />
                 <StatRow
                   label="Loss"
@@ -476,7 +470,7 @@ export default function DashboardPage() {
 
             <div className="flex items-center justify-between border-t border-border/80 pt-2 text-xs dark:border-white/10">
               <span className="text-subtle">Total holdings</span>
-              <span className="tabular-nums font-semibold text-[color:#2f7ef7]">{formatCurrency(accountBreakdown.total)}</span>
+              <span className="tabular-nums font-semibold text-[color:#14b8a6]">{formatCurrency(accountBreakdown.total)}</span>
             </div>
           </div>
         </motion.section>
@@ -558,12 +552,22 @@ export default function DashboardPage() {
 function StatRow({
   label,
   value,
+  labelClassName,
   valueClassName,
+  secondaryLabel,
+  secondaryValue,
+  secondaryLabelClassName,
+  secondaryValueClassName,
   last,
 }: {
   label: string;
   value: string;
+  labelClassName?: string;
   valueClassName?: string;
+  secondaryLabel?: string;
+  secondaryValue?: string;
+  secondaryLabelClassName?: string;
+  secondaryValueClassName?: string;
   last?: boolean;
 }) {
   return (
@@ -572,8 +576,18 @@ function StatRow({
         last ? "" : "border-b border-border/90 dark:border-foreground/10"
       }`}
     >
-      <dt className="text-sm font-medium text-subtle">{label}</dt>
-      <dd className={`text-right text-sm tabular-nums ${valueClassName ?? "text-subtle"}`}>{value}</dd>
+      <div className="min-w-0 flex-1 space-y-1">
+        <dt className={`text-sm font-medium ${labelClassName ?? "text-subtle"}`}>{label}</dt>
+        {secondaryLabel ? (
+          <dt className={`text-xs font-medium ${secondaryLabelClassName ?? "text-subtle"}`}>{secondaryLabel}</dt>
+        ) : null}
+      </div>
+      <div className="space-y-1 text-right">
+        <dd className={`text-sm tabular-nums ${valueClassName ?? "text-subtle"}`}>{value}</dd>
+        {secondaryValue ? (
+          <dd className={`text-xs tabular-nums ${secondaryValueClassName ?? "text-subtle"}`}>{secondaryValue}</dd>
+        ) : null}
+      </div>
     </div>
   );
 }
