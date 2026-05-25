@@ -473,7 +473,7 @@ export default function DashboardPage() {
               );
             })}
 
-            <div className="flex items-center justify-between border-t border-border/80 pt-2 text-xs dark:border-white/10 md:col-span-2">
+            <div className="flex items-center justify-center gap-2 border-t border-border/80 pt-2 text-xs dark:border-white/10 md:col-span-2">
               <span className="text-subtle">Total holdings</span>
               <span className="tabular-nums font-semibold text-[color:#14b8a6]">{formatCurrency(accountBreakdown.total)}</span>
             </div>
