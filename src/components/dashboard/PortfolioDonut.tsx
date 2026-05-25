@@ -109,7 +109,7 @@ export function PortfolioDonut({
     >
       <svg
         viewBox={`0 0 ${VIEW} ${VIEW}`}
-        className="h-full w-full overflow-visible drop-shadow-sm dark:drop-shadow-[0_2px_14px_rgba(0,0,0,0.4)]"
+        className="h-full w-full overflow-visible text-white dark:text-black drop-shadow-sm dark:drop-shadow-[0_2px_14px_rgba(0,0,0,0.4)]"
         aria-hidden
       >
       {/* Track ring */}
@@ -118,7 +118,7 @@ export function PortfolioDonut({
         cy={CY}
         r={midR}
         fill="none"
-        stroke="color-mix(in srgb, var(--dashboard-chart-cost-basis) 20%, transparent)"
+        stroke="currentColor"
         strokeWidth={strokeW}
         strokeLinecap="butt"
       />
