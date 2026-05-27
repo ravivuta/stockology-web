@@ -7,6 +7,20 @@ export type PortfolioSlice = {
   lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }>;
 };
 
+function finiteOrNull(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizeDateString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Date.parse(trimmed);
+  if (!Number.isFinite(parsed)) return null;
+  return new Date(parsed).toISOString();
+}
+
 function snapshotValuationPrice(stock: StockHolding): number {
   if (Number.isFinite(stock.lastPrice) && (stock.lastPrice ?? 0) > 0) {
     return stock.lastPrice as number;
@@ -23,23 +37,53 @@ function etCalendarDateString(d = new Date()): string {
 
 function holdingPayload(s: StockHolding, lots: { open: TradeLot[]; sold: SoldLot[] } | undefined) {
   const optimized = !s.pendingOptimization;
-  const openLots = (lots?.open ?? []).map((lot) => ({
-    lotId: lot.id,
-    symbol: s.symbol,
-    quantity: lot.quantity,
-    costBasis: lot.costBasis,
-    purchaseDate: lot.purchaseDate,
-    status: lot.status,
-    account: lot.account ?? null,
-    isRetirementAccount: lot.isRetirementAccount ?? null,
-  }));
-  const soldLots = (lots?.sold ?? []).map((lot) => ({
-    salePrice: lot.salePrice,
-    quantity: lot.quantity,
-    originalCostBasis:
-      lot.quantity > 0 ? lot.salePrice - lot.realizedGainLoss / lot.quantity : null,
-    saleDateIntervalSince1970: Date.parse(lot.saleDate) / 1000,
-  }));
+  const openLots = (lots?.open ?? []).flatMap((lot) => {
+    const quantity = finiteOrNull(lot.quantity);
+    const costBasis = finiteOrNull(lot.costBasis);
+    const purchaseDate = normalizeDateString(lot.purchaseDate);
+    if (quantity == null || quantity <= 0 || costBasis == null || costBasis <= 0 || purchaseDate == null) {
+      return [];
+    }
+
+    return [{
+      lotId: lot.id,
+      symbol: s.symbol,
+      quantity,
+      costBasis,
+      purchaseDate,
+      status: lot.status,
+      account: lot.account ?? null,
+      isRetirementAccount: lot.isRetirementAccount ?? null,
+    }];
+  });
+  const soldLots = (lots?.sold ?? []).flatMap((lot) => {
+    const salePrice = finiteOrNull(lot.salePrice);
+    const quantity = finiteOrNull(lot.quantity);
+    const realizedGainLoss = finiteOrNull(lot.realizedGainLoss);
+    const saleDateIso = normalizeDateString(lot.saleDate);
+    if (
+      salePrice == null ||
+      salePrice <= 0 ||
+      quantity == null ||
+      quantity <= 0 ||
+      realizedGainLoss == null ||
+      saleDateIso == null
+    ) {
+      return [];
+    }
+
+    const originalCostBasis = salePrice - realizedGainLoss / quantity;
+    if (!Number.isFinite(originalCostBasis)) {
+      return [];
+    }
+
+    return [{
+      salePrice,
+      quantity,
+      originalCostBasis,
+      saleDateIntervalSince1970: Date.parse(saleDateIso) / 1000,
+    }];
+  });
   return {
     symbol: s.symbol,
     quantity: s.quantity,
