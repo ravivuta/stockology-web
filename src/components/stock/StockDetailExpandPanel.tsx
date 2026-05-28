@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Pencil, PlusCircle, Settings, X, XCircle } from "lucide-react";
+import { CheckCircle2, Pencil, PlusCircle, Settings, Trash2, X, XCircle } from "lucide-react";
 import {
   computeRecommendationFactors,
   recommendedWatchlistSize,
@@ -281,7 +281,9 @@ function DetailFieldGrid({
 export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink }: Props) {
   const stocks = usePortfolioStore((s) => s.stocks);
   const recordTrade = usePortfolioStore((s) => s.recordTrade);
+  const recordSellFromLot = usePortfolioStore((s) => s.recordSellFromLot);
   const editOpenLot = usePortfolioStore((s) => s.editOpenLot);
+  const removeOpenLot = usePortfolioStore((s) => s.removeOpenLot);
   const updateStock = usePortfolioStore((s) => s.updateStock);
   const optimizeStock = usePortfolioStore((s) => s.optimizeStock);
   const optimizing = usePortfolioStore((s) => s.optimizing);
@@ -313,7 +315,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const [tradeModalOpen, setTradeModalOpen] = useState(false);
   const [lotsModalOpen, setLotsModalOpen] = useState(false);
   const [editingLotId, setEditingLotId] = useState<string | null>(null);
-  const [side, setSide] = useState<"BUY" | "SELL" | null>(null);
   const [qty, setQty] = useState("");
   const [price, setPrice] = useState("");
   const [tradeDate, setTradeDate] = useState(new Date().toISOString().slice(0, 10));
@@ -326,6 +327,12 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const [lotPrice, setLotPrice] = useState("");
   const [lotAccount, setLotAccount] = useState("");
   const [lotAccountType, setLotAccountType] = useState<"unknown" | "retirement" | "taxable">("unknown");
+  const [sellingLotId, setSellingLotId] = useState<string | null>(null);
+  const [sellLotQty, setSellLotQty] = useState("");
+  const [sellLotPrice, setSellLotPrice] = useState("");
+  const [sellLotDate, setSellLotDate] = useState(new Date().toISOString().slice(0, 10));
+  const [sellLotError, setSellLotError] = useState<string | null>(null);
+  const [lotPendingDeleteId, setLotPendingDeleteId] = useState<string | null>(null);
   const [aiNewsItems, setAiNewsItems] = useState<StockSentimentNewsItem[]>([]);
   const [aiNewsLoading, setAiNewsLoading] = useState(false);
   const [optimizationMessage, setOptimizationMessage] = useState<string | null>(null);
@@ -365,6 +372,14 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const editingLot = useMemo(
     () => lotSummary.openLots.find((lot) => lot.id === editingLotId) ?? null,
     [editingLotId, lotSummary.openLots]
+  );
+  const sellingLot = useMemo(
+    () => lotSummary.openLots.find((lot) => lot.id === sellingLotId) ?? null,
+    [lotSummary.openLots, sellingLotId]
+  );
+  const lotPendingDelete = useMemo(
+    () => lotSummary.openLots.find((lot) => lot.id === lotPendingDeleteId) ?? null,
+    [lotPendingDeleteId, lotSummary.openLots]
   );
   const storedRec = stock?.recommendation;
   const rec = useMemo(() => {
@@ -537,20 +552,13 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     setQty("");
     setPrice("");
 
-    const nextSide = rec ? suggestedTradeType(rec.action) : null;
     const lastPrice = stock.lastPrice ?? 0;
-    setSide(nextSide);
 
-    if (nextSide && lastPrice > 0) {
+    if (lastPrice > 0) {
       setPrice(lastPrice.toFixed(2));
     }
 
-    if (nextSide === "SELL") {
-      setQty(formatShareQuantity(Math.max(stock.quantity, 0)));
-      return;
-    }
-
-    if (nextSide === "BUY") {
+    if (rec && suggestedTradeType(rec.action) === "BUY") {
       const suggestedQty = parseSuggestedQuantity(rec?.comments ?? "");
       if (suggestedQty && suggestedQty > 0) {
         setQty(formatShareQuantity(suggestedQty));
@@ -622,11 +630,77 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     setLotAccountType("unknown");
   }
 
+  function openLotSellDialog(lot: (typeof lotSummary.openLots)[number]) {
+    setSellingLotId(lot.id);
+    setSellLotQty("");
+    setSellLotPrice(last > 0 ? last.toFixed(2) : "");
+    setSellLotDate(new Date().toISOString().slice(0, 10));
+    setSellLotError(null);
+  }
+
+  function closeLotSellDialog() {
+    setSellingLotId(null);
+    setSellLotQty("");
+    setSellLotPrice("");
+    setSellLotDate(new Date().toISOString().slice(0, 10));
+    setSellLotError(null);
+  }
+
+  function requestLotDelete(lotId: string) {
+    setLotPendingDeleteId(lotId);
+  }
+
+  function cancelLotDelete() {
+    setLotPendingDeleteId(null);
+  }
+
+  function confirmLotDelete() {
+    if (!lotPendingDelete) return;
+    removeOpenLot(symbol, lotPendingDelete.id);
+    void flushCurrentPortfolioSnapshotNow(true);
+    if (editingLot?.id === lotPendingDelete.id) {
+      closeLotEditor();
+    }
+    setLotPendingDeleteId(null);
+  }
+
+  function saveLotSell() {
+    if (!sellingLot) return;
+
+    const enteredQty = Number.parseFloat(sellLotQty);
+    const enteredPrice = Number.parseFloat(sellLotPrice);
+
+    if (!Number.isFinite(enteredQty) || enteredQty <= 0) {
+      setSellLotError("Enter a valid sell quantity.");
+      return;
+    }
+    if (!Number.isFinite(enteredPrice) || enteredPrice <= 0) {
+      setSellLotError("Enter a valid sell price.");
+      return;
+    }
+    if (!sellLotDate) {
+      setSellLotError("Choose a sell date.");
+      return;
+    }
+    if (enteredQty - sellingLot.quantity > SHARE_FRACTION_TOLERANCE) {
+      setSellLotError(`Sell quantity cannot exceed available lot quantity (${formatNumberMax2(sellingLot.quantity)}).`);
+      return;
+    }
+
+    recordSellFromLot(symbol, sellingLot.id, enteredQty, enteredPrice, sellLotDate);
+    void flushCurrentPortfolioSnapshotNow(true);
+    closeLotSellDialog();
+    closeLotEditor();
+  }
+
   function saveLotEdit() {
     if (!editingLot) return;
     const nextQty = Number.parseFloat(lotQuantity);
     const nextPrice = Number.parseFloat(lotPrice);
     if (!lotDate || !Number.isFinite(nextQty) || nextQty <= 0 || !Number.isFinite(nextPrice) || nextPrice <= 0) {
+      return;
+    }
+    if (editingLot.quantity - nextQty > SHARE_FRACTION_TOLERANCE) {
       return;
     }
 
@@ -643,7 +717,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   }
 
   function applyTrade() {
-    if (!side || !stock) return;
+    if (!stock) return;
 
     const enteredQty = Number.parseFloat(qty);
     const enteredPrice = Number.parseFloat(price);
@@ -651,38 +725,19 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       return;
     }
 
-    let normalizedQty = Math.abs(enteredQty);
-    if (side === "SELL") {
-      const currentQty = Math.max(stock.quantity, 0);
-      const fractionalRemainder = currentQty - Math.floor(currentQty);
-      const enteredWholePart = Math.floor(normalizedQty);
-      const wholePartMatches = Math.abs(enteredWholePart - Math.floor(currentQty)) < SHARE_FRACTION_TOLERANCE;
-      const ignoredFractionalPart =
-        fractionalRemainder > SHARE_FRACTION_TOLERANCE &&
-        Math.abs(normalizedQty - enteredWholePart) < SHARE_FRACTION_TOLERANCE &&
-        wholePartMatches;
-      const clampedSellQty = Math.min(normalizedQty, currentQty);
-      const remainingQty = Math.max(0, currentQty - clampedSellQty);
-      const shouldCloseSmallRemainder =
-        remainingQty > SHARE_FRACTION_TOLERANCE && remainingQty < 1;
-
-      normalizedQty = ignoredFractionalPart || shouldCloseSmallRemainder ? currentQty : clampedSellQty;
-    }
+    const normalizedQty = Math.abs(enteredQty);
 
     if (normalizedQty <= 0) return;
 
-    recordTrade(symbol, side, normalizedQty, enteredPrice, tradeDate, {
-      account: side === "BUY" ? tradeAccountName.trim() || undefined : undefined,
+    recordTrade(symbol, "BUY", normalizedQty, enteredPrice, tradeDate, {
+      account: tradeAccountName.trim() || undefined,
       isRetirementAccount:
-        side === "BUY"
-          ? tradeAccountType === "unknown"
-            ? null
-            : tradeAccountType === "retirement"
-          : undefined,
+        tradeAccountType === "unknown"
+          ? null
+          : tradeAccountType === "retirement",
     });
     void flushCurrentPortfolioSnapshotNow(true);
     setTradeModalOpen(false);
-    setSide(null);
     setQty("");
     setPrice("");
     setTradeDate(new Date().toISOString().slice(0, 10));
@@ -803,7 +858,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                     )}
                   >
                     <PlusCircle className={dense ? "h-3.5 w-3.5" : "h-4 w-4"} />
-                    Record trade
+                    Record Buy Trade
                   </button>
                 </div>
               </div>
@@ -1200,10 +1255,10 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
         <ModalSection className="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-elevated px-4 py-3 dark:border-foreground/10">
           <div>
             <h3 id="trade-modal-title" className="text-base font-semibold tracking-tight text-foreground">
-              Record Trade
+              Record Buy
             </h3>
             <p className="mt-0.5 text-xs text-subtle">
-              Update cash, shares, average cost, and lots for {stock.symbol}.
+              Add a buy transaction for {stock.symbol}. Sell transactions are recorded from open lots.
             </p>
           </div>
           <button
@@ -1216,51 +1271,15 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
           </button>
         </ModalSection>
         <ModalSection className="min-h-0 flex-1 space-y-4 px-4 py-4">
-          <div className="space-y-1.5">
-            <span className="text-sm font-medium text-foreground">Action</span>
-            <div className="grid grid-cols-2 gap-2">
-              {(["BUY", "SELL"] as const).map((option) => {
-                const active = side === option;
-                return (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => setSide(option)}
-                    className={cn(
-                      "rounded-xl border px-3 py-2 text-sm font-medium transition-colors",
-                      active
-                        ? "border-primary/40 bg-primary/10 text-primary"
-                        : "border-border bg-background text-foreground dark:border-white/10"
-                    )}
-                  >
-                    {option === "BUY" ? "Buy" : "Sell"}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           <div className="grid gap-2.5 sm:grid-cols-2">
             <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
               Quantity
-              <div className="flex gap-2">
-                <input
-                  value={qty}
-                  onChange={(e) => setQty(e.target.value)}
-                  placeholder="Quantity"
-                  className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm tabular-nums text-foreground dark:border-white/10"
-                />
-                {side === "SELL" ? (
-                  <button
-                    type="button"
-                    onClick={() => setQty(formatShareQuantity(Math.max(stock.quantity, 0)))}
-                    disabled={stock.quantity <= 0}
-                    className="rounded-xl border border-border px-3 py-2 text-xs font-medium text-foreground disabled:opacity-60"
-                  >
-                    Sell All
-                  </button>
-                ) : null}
-              </div>
+              <input
+                value={qty}
+                onChange={(e) => setQty(e.target.value)}
+                placeholder="Quantity"
+                className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm tabular-nums text-foreground dark:border-white/10"
+              />
             </label>
             <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
               Price
@@ -1292,68 +1311,66 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
             </label>
           </div>
 
-          {side === "BUY" ? (
-            <section className="rounded-2xl border border-border/80 bg-background/45 p-3 dark:border-white/[0.08] dark:bg-white/[0.03]">
-              <h4 className="text-sm font-semibold text-foreground">Lot Details</h4>
-              <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
-                <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground sm:col-span-2">
-                  Use Existing Profile
-                  <select
-                    value={selectedTradeProfile}
-                    onChange={(e) => setSelectedTradeProfile(e.target.value)}
-                    className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground dark:border-white/10"
-                  >
-                    <option value={NEW_PROFILE_VALUE}>Add New Account/Profile</option>
-                    {savedTradeProfiles.map((profile) => (
-                      <option key={profile.name} value={profile.name}>
-                        {profile.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {selectedTradeProfile === NEW_PROFILE_VALUE ? (
-                  <>
-                    <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground sm:col-span-2">
-                      Account/Profile (optional)
-                      <input
-                        value={tradeAccountName}
-                        onChange={(e) => setTradeAccountName(e.target.value)}
-                        placeholder="Brokerage / IRA"
-                        className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground dark:border-white/10"
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground sm:col-span-2">
-                      Account Type
-                      <select
-                        value={tradeAccountType}
-                        onChange={(e) => setTradeAccountType(e.target.value as "unknown" | "retirement" | "taxable")}
-                        className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground dark:border-white/10"
-                      >
-                        <option value="unknown">Unknown</option>
-                        <option value="retirement">Retirement</option>
-                        <option value="taxable">Taxable</option>
-                      </select>
-                    </label>
-                  </>
-                ) : (
-                  <>
-                    <div className="sm:col-span-2">
-                      <span className="text-xs font-medium uppercase tracking-[0.12em] text-subtle">Account/Profile</span>
-                      <p className="mt-1 rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground dark:border-white/10">
-                        {selectedTradeProfile}
-                      </p>
-                    </div>
-                    <div className="sm:col-span-2">
-                      <span className="text-xs font-medium uppercase tracking-[0.12em] text-subtle">Account Type</span>
-                      <p className="mt-1 rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground dark:border-white/10">
-                        {tradeAccountType === "unknown" ? "Unknown" : tradeAccountType === "retirement" ? "Retirement" : "Taxable"}
-                      </p>
-                    </div>
-                  </>
-                )}
-              </div>
-            </section>
-          ) : null}
+          <section className="rounded-2xl border border-border/80 bg-background/45 p-3 dark:border-white/[0.08] dark:bg-white/[0.03]">
+            <h4 className="text-sm font-semibold text-foreground">Lot Details</h4>
+            <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+              <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground sm:col-span-2">
+                Use Existing Profile
+                <select
+                  value={selectedTradeProfile}
+                  onChange={(e) => setSelectedTradeProfile(e.target.value)}
+                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground dark:border-white/10"
+                >
+                  <option value={NEW_PROFILE_VALUE}>Add New Account/Profile</option>
+                  {savedTradeProfiles.map((profile) => (
+                    <option key={profile.name} value={profile.name}>
+                      {profile.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {selectedTradeProfile === NEW_PROFILE_VALUE ? (
+                <>
+                  <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground sm:col-span-2">
+                    Account/Profile (optional)
+                    <input
+                      value={tradeAccountName}
+                      onChange={(e) => setTradeAccountName(e.target.value)}
+                      placeholder="Brokerage / IRA"
+                      className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground dark:border-white/10"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground sm:col-span-2">
+                    Account Type
+                    <select
+                      value={tradeAccountType}
+                      onChange={(e) => setTradeAccountType(e.target.value as "unknown" | "retirement" | "taxable")}
+                      className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground dark:border-white/10"
+                    >
+                      <option value="unknown">Unknown</option>
+                      <option value="retirement">Retirement</option>
+                      <option value="taxable">Taxable</option>
+                    </select>
+                  </label>
+                </>
+              ) : (
+                <>
+                  <div className="sm:col-span-2">
+                    <span className="text-xs font-medium uppercase tracking-[0.12em] text-subtle">Account/Profile</span>
+                    <p className="mt-1 rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground dark:border-white/10">
+                      {selectedTradeProfile}
+                    </p>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <span className="text-xs font-medium uppercase tracking-[0.12em] text-subtle">Account Type</span>
+                    <p className="mt-1 rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground dark:border-white/10">
+                      {tradeAccountType === "unknown" ? "Unknown" : tradeAccountType === "retirement" ? "Retirement" : "Taxable"}
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          </section>
         </ModalSection>
         <ModalSection className="flex justify-end gap-2 border-t border-border px-4 py-4 dark:border-foreground/10">
           <button
@@ -1367,7 +1384,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
             type="button"
             onClick={applyTrade}
             className={cn(appCtaButton("ui-hover-spotlight justify-center"), "rounded-xl px-4 py-2 text-sm")}
-            disabled={side == null || qty.trim().length === 0 || price.trim().length === 0}
+            disabled={qty.trim().length === 0 || price.trim().length === 0}
           >
             Save
           </button>
@@ -1396,7 +1413,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
         <ModalSection className="min-h-0 flex-1 px-4 py-4">
           {lotSummary.openLots.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="min-w-[720px] w-full text-left">
+              <table className="min-w-[820px] w-full text-left">
                 <thead className="border-b border-border/60 text-[11px] uppercase tracking-[0.12em] text-subtle dark:border-white/[0.06]">
                   <tr>
                     <th className="pb-2 pr-3 font-semibold">Bought</th>
@@ -1406,6 +1423,8 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                     <th className="pb-2 pr-3 text-right font-semibold">Value</th>
                     <th className="pb-2 pr-3 text-right font-semibold">P/L</th>
                     <th className="pb-2 pr-3 font-semibold">Account type</th>
+                    <th className="pb-2 pr-3 font-semibold">Account</th>
+                    <th className="pb-2 pr-3 text-right font-semibold">Action</th>
                     <th className="pb-2 text-right font-semibold">Edit</th>
                   </tr>
                 </thead>
@@ -1426,15 +1445,35 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                           {formatCurrency(lotUnrealized)}
                         </td>
                         <td className="py-2 pr-3 text-sm">{formatAccountType(lot.isRetirementAccount)}</td>
-                        <td className="py-2 text-right">
+                        <td className="py-2 pr-3 text-sm text-subtle">{lot.account?.trim() || "—"}</td>
+                        <td className="py-2 pr-3 text-right">
                           <button
                             type="button"
-                            onClick={() => openLotEditor(lot)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-border/70 px-2.5 py-1 text-xs text-foreground hover:bg-background/70 dark:border-white/[0.08] dark:hover:bg-white/[0.05]"
+                            onClick={() => openLotSellDialog(lot)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-red-300/70 px-2.5 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-300/30 dark:text-red-200 dark:hover:bg-red-500/10"
                           >
-                            <Pencil className="h-3.5 w-3.5" />
-                            Edit
+                            Sell
                           </button>
+                        </td>
+                        <td className="py-2 text-right">
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => openLotEditor(lot)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-border/70 px-2.5 py-1 text-xs text-foreground hover:bg-background/70 dark:border-white/[0.08] dark:hover:bg-white/[0.05]"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => requestLotDelete(lot.id)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-red-300/70 px-2.5 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-300/30 dark:text-red-200 dark:hover:bg-red-500/10"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1445,6 +1484,40 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
           ) : (
             <p className="text-sm text-subtle">No open lot records are available for this symbol yet.</p>
           )}
+        </ModalSection>
+      </AppModal>
+
+      <AppModal open={lotPendingDelete != null} onClose={cancelLotDelete} size="md" titleId="delete-lot-modal-title">
+        <ModalSection className="border-b border-border bg-elevated px-4 py-3 dark:border-foreground/10">
+          <h3 id="delete-lot-modal-title" className="text-base font-semibold tracking-tight text-foreground">
+            Delete Lot
+          </h3>
+        </ModalSection>
+        <ModalSection className="space-y-3 px-4 py-4 text-sm text-foreground">
+          <p>
+            {lotPendingDelete
+              ? `Delete ${formatNumberMax2(lotPendingDelete.quantity)} shares from ${formatDateLabel(lotPendingDelete.purchaseDate)} @ ${formatCurrency(lotPendingDelete.costBasis)}?`
+              : "Delete this lot?"}
+          </p>
+          <div className="rounded-lg border border-red-300/50 bg-red-50/60 px-3 py-3 text-xs text-red-700 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-200">
+            Deleting a lot does not add cash to cash balance. If this is a real sale, use Sell from this lot instead. Delete only for intentional data correction.
+          </div>
+        </ModalSection>
+        <ModalSection className="flex items-center justify-end gap-2 border-t border-border bg-elevated px-4 py-3 dark:border-foreground/10">
+          <button
+            type="button"
+            onClick={cancelLotDelete}
+            className="rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-background/70"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={confirmLotDelete}
+            className="rounded-lg border border-red-500/40 bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+          >
+            Delete lot
+          </button>
         </ModalSection>
       </AppModal>
 
@@ -1515,6 +1588,19 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               Total cost {formatCurrency((Number.parseFloat(lotQuantity) || 0) * (Number.parseFloat(lotPrice) || 0))}
             </div>
           ) : null}
+          <div className="rounded-lg border border-red-300/50 bg-red-50/60 px-3 py-3 dark:border-red-400/20 dark:bg-red-500/10">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-red-700 dark:text-red-200">Lot sell action</p>
+            <p className="mt-1 text-xs text-red-700/90 dark:text-red-200/90">
+              Record a SELL from this lot only. Quantity is validated against this lot's available shares.
+            </p>
+            <button
+              type="button"
+              onClick={() => editingLot && openLotSellDialog(editingLot)}
+              className="mt-3 inline-flex items-center rounded-lg border border-red-300/70 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 dark:border-red-300/30 dark:text-red-200 dark:hover:bg-red-500/20"
+            >
+              Sell from this lot
+            </button>
+          </div>
         </ModalSection>
         <ModalSection className="flex items-center justify-end gap-2 border-t border-border bg-elevated px-4 py-3 dark:border-foreground/10">
           <button
@@ -1531,6 +1617,85 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
             className={cn(appCtaButton("ui-hover-spotlight rounded-lg px-3 py-2 text-sm"), "disabled:opacity-50")}
           >
             Save
+          </button>
+        </ModalSection>
+      </AppModal>
+
+      <AppModal open={sellingLot != null} onClose={closeLotSellDialog} size="md" titleId="sell-lot-modal-title">
+        <ModalSection className="border-b border-border bg-elevated px-4 py-3 dark:border-foreground/10">
+          <h3 id="sell-lot-modal-title" className="text-base font-semibold tracking-tight text-foreground">
+            Sell From Open Lot
+          </h3>
+          {sellingLot ? (
+            <p className="mt-1 text-xs text-subtle">
+              Available: {formatNumberMax2(sellingLot.quantity)} shares from {formatDateLabel(sellingLot.purchaseDate)} @ {formatCurrency(sellingLot.costBasis)}
+            </p>
+          ) : null}
+        </ModalSection>
+        <ModalSection className="space-y-4 px-4 py-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="space-y-1 text-sm text-foreground">
+              <span>Sell quantity</span>
+              <input
+                type="number"
+                min="0"
+                step="0.0001"
+                value={sellLotQty}
+                onChange={(e) => {
+                  setSellLotQty(e.target.value);
+                  setSellLotError(null);
+                }}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+              />
+            </label>
+            <label className="space-y-1 text-sm text-foreground">
+              <span>Sell price</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={sellLotPrice}
+                onChange={(e) => {
+                  setSellLotPrice(e.target.value);
+                  setSellLotError(null);
+                }}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+              />
+            </label>
+          </div>
+          <label className="space-y-1 text-sm text-foreground">
+            <span>Sell date</span>
+            <input
+              type="date"
+              value={sellLotDate}
+              onChange={(e) => {
+                setSellLotDate(e.target.value);
+                setSellLotError(null);
+              }}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+            />
+          </label>
+          {sellLotError ? (
+            <div className="rounded-lg border border-red-300/60 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-300/25 dark:bg-red-500/10 dark:text-red-200">
+              {sellLotError}
+            </div>
+          ) : null}
+        </ModalSection>
+        <ModalSection className="flex items-center justify-end gap-2 border-t border-border bg-elevated px-4 py-3 dark:border-foreground/10">
+          <button
+            type="button"
+            onClick={closeLotSellDialog}
+            className="rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-background/70"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={saveLotSell}
+            className={cn(appCtaButton("ui-hover-spotlight rounded-lg px-3 py-2 text-sm"), "disabled:opacity-50")}
+            disabled={(Number.parseFloat(sellLotQty) || 0) <= 0 || (Number.parseFloat(sellLotPrice) || 0) <= 0}
+          >
+            Save Sell
           </button>
         </ModalSection>
       </AppModal>

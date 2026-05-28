@@ -128,6 +128,7 @@ type State = {
       isRetirementAccount?: boolean | null;
     }
   ) => void;
+  removeOpenLot: (symbol: string, lotId: string) => void;
   removeStock: (symbol: string) => void;
   recordTrade: (
     symbol: string,
@@ -137,6 +138,7 @@ type State = {
     date: string,
     options?: { account?: string; isRetirementAccount?: boolean | null }
   ) => void;
+  recordSellFromLot: (symbol: string, lotId: string, qty: number, price: number, date: string) => void;
   /** Reverses the last journal entry only. Returns false if nothing to undo. */
   undoLastTrade: () => boolean;
   recalcMetrics: () => void;
@@ -157,6 +159,9 @@ type State = {
     addedCount: number;
     prunedWatchlistCount: number;
     importedTradeCount: number;
+    netUpdates: Array<{ symbol: string; action: "BUY" | "SELL"; qty: number }>;
+    liquidationCashCredited: number;
+    cashAdjustedBy: number;
   };
   /** Replace local portfolio from a cloud snapshot (e.g. mobile sync). Recomputes recommendations. */
   replaceFromCloudSync: (payload: {
@@ -346,6 +351,20 @@ function reduceOpenLotsFifo(openLots: TradeLot[], qtyToSell: number): TradeLot[]
     lot.status = lot.quantity <= 1e-6 ? "fullySold" : "partiallySold";
     remaining -= sellQty;
   }
+
+  return next
+    .filter((lot) => lot.quantity > 1e-6)
+    .sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate));
+}
+
+function reduceOpenLotById(openLots: TradeLot[], lotId: string, qtyToSell: number): TradeLot[] {
+  const next = openLots.map((lot) => ({ ...lot }));
+  const target = next.find((lot) => lot.id === lotId);
+  if (!target) return next;
+
+  const sellQty = Math.min(qtyToSell, Math.max(0, target.quantity));
+  target.quantity -= sellQty;
+  target.status = target.quantity <= 1e-6 ? "fullySold" : "partiallySold";
 
   return next
     .filter((lot) => lot.quantity > 1e-6)
@@ -726,6 +745,55 @@ export const usePortfolioStore = create<State>()(
             lastLocalMutationAt: mutationAt,
           };
         }),
+      removeOpenLot: (symbol, lotId) =>
+        set((st) => {
+          const sym = symbol.trim().toUpperCase();
+          if (!sym || !lotId) return {};
+
+          const existing = st.stocks.find((item) => item.symbol === sym);
+          if (!existing) return {};
+
+          const bundle = st.lotsBySymbol[sym];
+          if (!bundle || bundle.open.length === 0) return {};
+
+          const openLots = bundle.open.filter((lot) => lot.id !== lotId);
+          if (openLots.length === bundle.open.length) return {};
+
+          const lots = {
+            ...st.lotsBySymbol,
+            [sym]: {
+              open: openLots.sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate)),
+              sold: bundle.sold.map((lot) => ({ ...lot })),
+            },
+          };
+
+          const syncedHolding = summarizeOpenLots(openLots);
+          const mutationAt = new Date().toISOString();
+          const ctx: RecalcContext = {
+            etfProfitTarget: st.etfProfitTarget,
+            stockProfitTarget: st.stockProfitTarget,
+            useAISentimentForRecommendations: st.useAISentimentForRecommendations,
+            useRSIGatingForRecommendations: st.useRSIGatingForRecommendations,
+            sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
+            lotsBySymbol: lots,
+          };
+          const stocks = st.stocks.map((item) =>
+            item.symbol === sym
+              ? {
+                  ...item,
+                  quantity: syncedHolding.quantity,
+                  averageCost: syncedHolding.quantity > 0 ? syncedHolding.averageCost : item.averageCost,
+                }
+              : item
+          );
+          const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st);
+          return {
+            stocks: derived.stocks,
+            lotsBySymbol: lots,
+            portfolioSize: derived.portfolioSize,
+            lastLocalMutationAt: mutationAt,
+          };
+        }),
       removeStock: (symbol) =>
         set((st) => {
           const mutationAt = new Date().toISOString();
@@ -863,6 +931,76 @@ export const usePortfolioStore = create<State>()(
             return { ...s, quantity: q1, lastPrice: price };
           });
           const entry: TradeJournalEntry = { ...journalBase, side: "SELL", quantity: sellQty };
+          const journal = [...st.tradeJournal, entry].slice(-200);
+          const derived = derivePortfolioState(stocks, newCash, ctx, st);
+          return {
+            stocks: derived.stocks,
+            lotsBySymbol: lots,
+            cashBalance: newCash,
+            tradeJournal: journal,
+            portfolioSize: derived.portfolioSize,
+            lastLocalMutationAt: mutationAt,
+          };
+        });
+      },
+      recordSellFromLot: (symbol, lotId, qty, price, date) => {
+        if (qty <= 0 || !Number.isFinite(price)) return;
+        const sym = symbol.toUpperCase();
+
+        set((st) => {
+          const mutationAt = new Date().toISOString();
+          const existing = st.stocks.find((s) => s.symbol === sym);
+          if (!existing || existing.quantity <= 0) return {};
+
+          const lots = { ...st.lotsBySymbol };
+          const cur = { ...(lots[sym] || { open: [], sold: [] }) };
+          const targetLot = cur.open.find((lot) => lot.id === lotId);
+          if (!targetLot || targetLot.quantity <= 0) return {};
+
+          const sellQty = Math.min(qty, targetLot.quantity, existing.quantity);
+          if (sellQty <= 0) return {};
+
+          const proceeds = sellQty * price;
+          const newCash = st.cashBalance + proceeds;
+          const realizedGainLoss = (price - targetLot.costBasis) * sellQty;
+
+          cur.open = reduceOpenLotById(cur.open, lotId, sellQty);
+          cur.sold.unshift({
+            saleDate: date,
+            quantity: sellQty,
+            salePrice: price,
+            realizedGainLoss,
+          });
+          lots[sym] = cur;
+
+          const stocks = st.stocks.map((s) => {
+            if (s.symbol !== sym) return s;
+            const q1 = Math.max(0, s.quantity - sellQty);
+            return { ...s, quantity: q1, lastPrice: price };
+          });
+
+          const entry: TradeJournalEntry = {
+            id: uid(),
+            createdAt: new Date().toISOString(),
+            symbol: sym,
+            side: "SELL",
+            quantity: sellQty,
+            price,
+            tradeDate: date,
+            cashBefore: st.cashBalance,
+            quantityBefore: existing.quantity,
+            averageCostBefore: existing.averageCost,
+            lastPriceBefore: existing.lastPrice ?? price,
+          };
+
+          const ctx: RecalcContext = {
+            etfProfitTarget: st.etfProfitTarget,
+            stockProfitTarget: st.stockProfitTarget,
+            useAISentimentForRecommendations: st.useAISentimentForRecommendations,
+            useRSIGatingForRecommendations: st.useRSIGatingForRecommendations,
+            sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
+            lotsBySymbol: lots,
+          };
           const journal = [...st.tradeJournal, entry].slice(-200);
           const derived = derivePortfolioState(stocks, newCash, ctx, st);
           return {
@@ -1187,17 +1325,53 @@ export const usePortfolioStore = create<State>()(
         let addedCount = 0;
         let prunedWatchlistCount = 0;
         let importedTradeCount = 0;
+        let liquidationCashCredited = 0;
+        let cashAdjustedBy = 0;
+        const importedSymbolsByAccount = new Map<string, Set<string>>();
+        const netUpdatesMap = new Map<string, number>();
+        const importPriceBySymbol = new Map<string, number>();
+
+        for (const [symbol, symbolRows] of grouped.entries()) {
+          let qtyTotal = 0;
+          let valueTotal = 0;
+          for (const row of symbolRows) {
+            const qty = Math.max(0, row.qty);
+            const price = Math.max(0, row.price);
+            if (qty <= 0 || price <= 0) continue;
+            qtyTotal += qty;
+            valueTotal += qty * price;
+          }
+          if (qtyTotal > 0 && valueTotal > 0) {
+            importPriceBySymbol.set(symbol, valueTotal / qtyTotal);
+          }
+        }
+
+        if (mode === "portfolio") {
+          for (const [symbol, symbolRows] of grouped.entries()) {
+            for (const row of symbolRows) {
+              if (Math.max(0, row.qty) <= 0) continue;
+              const key = normalizeAccountKey(row.account);
+              const symbols = importedSymbolsByAccount.get(key);
+              if (symbols) {
+                symbols.add(symbol);
+              } else {
+                importedSymbolsByAccount.set(key, new Set([symbol]));
+              }
+            }
+          }
+        }
 
         set((st) => {
           const mutationAt = new Date().toISOString();
-          const keepExisting =
-            mode === "watchlist"
-              ? st.stocks
-              : st.stocks.filter((stock) => {
-                  const shouldKeep = stock.quantity > 0 || importedSymbolSet.has(stock.symbol);
-                  if (!shouldKeep && stock.quantity <= 0) prunedWatchlistCount += 1;
-                  return shouldKeep;
-                });
+          const preImportQtyBySymbol = new Map<string, number>();
+
+          for (const stock of st.stocks) {
+            const lots = st.lotsBySymbol[stock.symbol];
+            const openQty = lots?.open.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0) ?? stock.quantity;
+            if (openQty > 0) preImportQtyBySymbol.set(stock.symbol, openQty);
+          }
+
+          const keepExisting = st.stocks;
 
           const stockMap = new Map(keepExisting.map((stock) => [stock.symbol, stock] as const));
           const lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }> = {};
@@ -1207,6 +1381,50 @@ export const usePortfolioStore = create<State>()(
               lotsBySymbol[stock.symbol] = {
                 open: lots.open.map(cloneTradeLot),
                 sold: lots.sold.map(cloneSoldLot),
+              };
+            }
+          }
+
+          if (mode === "portfolio" && importedSymbolsByAccount.size > 0) {
+            for (const [symbol, bundle] of Object.entries(lotsBySymbol)) {
+              if (!bundle.open.length) continue;
+              const keptOpen: TradeLot[] = [];
+              const soldLots: SoldLot[] = [...bundle.sold];
+              const groupedByAccount = new Map<string, TradeLot[]>();
+              for (const lot of bundle.open) {
+                const key = normalizeAccountKey(lot.account);
+                const list = groupedByAccount.get(key);
+                if (list) list.push(lot);
+                else groupedByAccount.set(key, [lot]);
+              }
+
+              for (const [accountKey, accountLots] of groupedByAccount.entries()) {
+                const importedSymbolsForAccount = importedSymbolsByAccount.get(accountKey);
+                if (!importedSymbolsForAccount || importedSymbolsForAccount.has(symbol)) {
+                  keptOpen.push(...accountLots);
+                  continue;
+                }
+
+                const removedQty = accountLots.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0);
+                if (removedQty <= 0) continue;
+
+                const marketPrice = Math.max(0, stockMap.get(symbol)?.lastPrice ?? 0);
+                const liquidationPrice = marketPrice;
+                liquidationCashCredited += removedQty * liquidationPrice;
+
+                soldLots.unshift({
+                  saleDate: defaultImportPurchaseDate(),
+                  quantity: removedQty,
+                  salePrice: liquidationPrice,
+                  realizedGainLoss:
+                    accountLots.reduce((sum, lot) => sum + (liquidationPrice - Math.max(0, lot.costBasis)) * Math.max(0, lot.quantity), 0),
+                });
+              }
+
+              keptOpen.sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate));
+              lotsBySymbol[symbol] = {
+                open: keptOpen,
+                sold: soldLots,
               };
             }
           }
@@ -1264,14 +1482,60 @@ export const usePortfolioStore = create<State>()(
               }
 
               // Keep existing accounts unless this account+symbol combo is explicitly included in import.
-              mergedOpenLots = preservedOpenLots.filter(
-                (lot) => !importedByAccount.has(normalizeAccountKey(lot.account))
-              );
+              mergedOpenLots = preservedOpenLots.filter((lot) => !importedByAccount.has(normalizeAccountKey(lot.account)));
 
-              for (const importedLots of importedByAccount.values()) {
-                if (importedLots.length > 0) {
-                  mergedOpenLots.push(...importedLots);
+              for (const [accountKey, importedLots] of importedByAccount.entries()) {
+                if (importedLots.length <= 0) continue;
+
+                const existingAccountLots = preservedOpenLots
+                  .filter((lot) => normalizeAccountKey(lot.account) === accountKey)
+                  .sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate));
+
+                if (importedLots.length === 1) {
+                  const importedLot = importedLots[0];
+                  const importedQty = Math.max(0, importedLot.quantity);
+                  const existingQty = existingAccountLots.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0);
+
+                  if (existingAccountLots.length === 0) {
+                    mergedOpenLots.push(importedLot);
+                    continue;
+                  }
+
+                  if (importedQty < existingQty) {
+                    const reducedLots = reduceOpenLotsFifo(existingAccountLots, existingQty - importedQty).map((lot) => ({
+                      ...lot,
+                      account: lot.account?.trim() || importedLot.account,
+                      isRetirementAccount:
+                        lot.isRetirementAccount == null ? importedLot.isRetirementAccount : lot.isRetirementAccount,
+                    }));
+                    mergedOpenLots.push(...reducedLots);
+                    continue;
+                  }
+
+                  if (importedQty > existingQty) {
+                    mergedOpenLots.push(...existingAccountLots);
+                    const deltaQty = importedQty - existingQty;
+                    if (deltaQty > 0) {
+                      mergedOpenLots.push({
+                        ...importedLot,
+                        quantity: deltaQty,
+                      });
+                    }
+                    continue;
+                  }
+
+                  mergedOpenLots.push(
+                    ...existingAccountLots.map((lot) => ({
+                      ...lot,
+                      account: lot.account?.trim() || importedLot.account,
+                      isRetirementAccount:
+                        lot.isRetirementAccount == null ? importedLot.isRetirementAccount : lot.isRetirementAccount,
+                    }))
+                  );
+                  continue;
                 }
+
+                mergedOpenLots.push(...importedLots);
               }
 
               mergedOpenLots.sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate));
@@ -1357,18 +1621,70 @@ export const usePortfolioStore = create<State>()(
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
             lotsBySymbol,
           };
+          const postImportQtyBySymbol = new Map<string, number>();
+          for (const stock of stockMap.values()) {
+            const lots = lotsBySymbol[stock.symbol];
+            const openQty = lots?.open.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0) ?? stock.quantity;
+            if (openQty > 0) postImportQtyBySymbol.set(stock.symbol, openQty);
+          }
+
+          let cashDeltaFromHoldings = 0;
+          const allSymbolsForDiff = new Set<string>([
+            ...preImportQtyBySymbol.keys(),
+            ...postImportQtyBySymbol.keys(),
+          ]);
+          for (const symbol of allSymbolsForDiff) {
+            const beforeQty = preImportQtyBySymbol.get(symbol) ?? 0;
+            const afterQty = postImportQtyBySymbol.get(symbol) ?? 0;
+            const delta = afterQty - beforeQty;
+            if (Math.abs(delta) > 1e-6) {
+              netUpdatesMap.set(symbol, (netUpdatesMap.get(symbol) ?? 0) + delta);
+
+              const stockSnapshot = stockMap.get(symbol);
+              const importPrice = importPriceBySymbol.get(symbol) ?? 0;
+              const currentPrice = Math.max(0, stockSnapshot?.lastPrice ?? 0);
+              const referencePrice =
+                delta > 0
+                  ? importPrice
+                  : importPrice > 0
+                    ? importPrice
+                    : currentPrice;
+
+              if (referencePrice > 0) {
+                if (delta > 0) {
+                  cashDeltaFromHoldings -= delta * referencePrice;
+                } else {
+                  cashDeltaFromHoldings += Math.abs(delta) * referencePrice;
+                }
+              }
+            }
+          }
+
+          cashAdjustedBy = cashDeltaFromHoldings;
           const sortedStocks = [...stockMap.values()].sort((a, b) => a.symbol.localeCompare(b.symbol));
           const tradeJournal = buildTradeJournalFromLots(lotsBySymbol);
-          const derived = derivePortfolioState(sortedStocks, st.cashBalance, ctx, st);
+          const nextCashBalance = st.cashBalance + cashDeltaFromHoldings;
+          const derived = derivePortfolioState(sortedStocks, nextCashBalance, ctx, st);
 
           return {
             stocks: derived.stocks,
             lotsBySymbol,
             tradeJournal,
             portfolioSize: derived.portfolioSize,
+            cashBalance: nextCashBalance,
             lastLocalMutationAt: mutationAt,
           };
         });
+
+        const netUpdates = [...netUpdatesMap.entries()]
+          .filter(([, delta]) => Math.abs(delta) > 1e-6)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([symbol, delta]) => ({
+            symbol,
+            action: delta > 0 ? ("BUY" as const) : ("SELL" as const),
+            qty: Math.abs(delta),
+          }));
+
         return {
           importType,
           importedSymbols,
@@ -1376,6 +1692,9 @@ export const usePortfolioStore = create<State>()(
           addedCount,
           prunedWatchlistCount,
           importedTradeCount,
+          netUpdates,
+          liquidationCashCredited,
+          cashAdjustedBy,
         };
       },
       replaceFromCloudSync: (payload) =>

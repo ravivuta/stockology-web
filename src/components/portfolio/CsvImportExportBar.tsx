@@ -371,6 +371,16 @@ export function CsvImportExportBar({
       outcome.prunedWatchlistCount > 0
         ? ` Removed ${outcome.prunedWatchlistCount} stale watchlist-only symbol(s).`
         : "";
+    const netUpdateNote =
+      outcome.netUpdates.length > 0
+        ? ` Net updates: ${outcome.netUpdates
+            .map((update) => `${update.symbol} ${update.action} ${formatNumberMax2(update.qty)}`)
+            .join(", ")}.`
+        : "";
+    const cashAdjustmentNote =
+      Math.abs(outcome.cashAdjustedBy) > 1e-6
+        ? ` Cash ${outcome.cashAdjustedBy > 0 ? "increased" : "decreased"} by ${formatCurrency(Math.abs(outcome.cashAdjustedBy))} from CSV holdings updates.`
+        : "";
     const typeLead =
       outcome.importType === "holdings"
         ? `Merged ${outcome.importedCount} symbol(s) with the existing portfolio.${outcome.importedTradeCount > 0 ? ` Imported ${outcome.importedTradeCount} trade(s).` : ""}`
@@ -378,7 +388,7 @@ export function CsvImportExportBar({
 
     setFlash({
       kind: "ok",
-      text: `${typeLead}${prunedNote}${invalidNote}`,
+      text: `${typeLead}${prunedNote}${netUpdateNote}${cashAdjustmentNote}${invalidNote}`,
     });
   }
 
