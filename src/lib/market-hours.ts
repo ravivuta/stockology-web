@@ -46,17 +46,6 @@ function easternParts(date: Date) {
   };
 }
 
-function weekdayOrdinalForMonth(year: number, month: number, day: number, weekday: number) {
-  let ordinal = 0;
-  for (let currentDay = 1; currentDay <= day; currentDay += 1) {
-    const utcDate = new Date(Date.UTC(year, month - 1, currentDay));
-    const jsWeekday = utcDate.getUTCDay(); // 0=Sun
-    const iosWeekday = jsWeekday === 0 ? 1 : jsWeekday + 1; // 1=Sun ... 7=Sat
-    if (iosWeekday === weekday) ordinal += 1;
-  }
-  return ordinal;
-}
-
 function dateUtc(year: number, month: number, day: number) {
   return new Date(Date.UTC(year, month - 1, day));
 }

@@ -15,7 +15,7 @@ import { isValidTicker } from "@/lib/csvPortfolio";
 import { formatCurrency, formatDecimal, formatNumberMax2, formatPercent, formatSignedCurrency, formatWholeCurrency } from "@/lib/numberFormat";
 import { recommendationActionDisplay } from "@/lib/recommendation";
 import { computeTodayChangeFromHistory, computeTodayChangeFromLiveQuotes, fetchCloudNetWorthHistory, type NetWorthPoint } from "@/lib/portfolio-net-worth-series";
-import { isUsMarketExtendedHoursOpen, isUsMarketTradingDay } from "@/lib/market-hours";
+import { isUsMarketTradingDay } from "@/lib/market-hours";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";

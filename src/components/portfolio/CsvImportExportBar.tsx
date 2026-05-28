@@ -26,6 +26,7 @@ import {
 import { AppModal, ModalSection } from "@/components/ui/AppModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { parseStockPeg } from "@/lib/stock-metric-parse";
+import { formatCurrency, formatNumberMax2 } from "@/lib/numberFormat";
 
 const MAX_TRACKED_STOCKS = 200;
 const HIDDEN_MAPPING_FIELDS = new Set<CsvColumnStandard>(["name", "account", "retirementAccount"]);

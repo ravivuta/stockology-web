@@ -1591,7 +1591,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
           <div className="rounded-lg border border-red-300/50 bg-red-50/60 px-3 py-3 dark:border-red-400/20 dark:bg-red-500/10">
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-red-700 dark:text-red-200">Lot sell action</p>
             <p className="mt-1 text-xs text-red-700/90 dark:text-red-200/90">
-              Record a SELL from this lot only. Quantity is validated against this lot's available shares.
+              Record a SELL from this lot only. Quantity is validated against this lot&apos;s available shares.
             </p>
             <button
               type="button"

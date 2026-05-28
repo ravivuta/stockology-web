@@ -415,7 +415,6 @@ function derivePortfolioState(
   options?: DeriveOptions
 ): { stocks: StockHolding[]; portfolioSize: number } {
   const shouldRecalculateLimits = options?.shouldRecalculateLimits ?? true;
-  const forceRecalculateAllHoldingLimits = options?.forceRecalculateAllHoldingLimits ?? false;
 
   const scoredStocks = stocksInput.map((stock) => ({
     ...stock,
@@ -1313,7 +1312,6 @@ export const usePortfolioStore = create<State>()(
         }
 
         const importedSymbols = [...new Set([...grouped.keys(), ...trades.map((trade) => trade.symbol.toUpperCase())])].sort((a, b) => a.localeCompare(b));
-        const importedSymbolSet = new Set(importedSymbols);
         const holdingsSymbols = new Set<string>();
         for (const [symbol, symbolRows] of grouped.entries()) {
           if (symbolRows.some((row) => Math.max(0, row.qty) > 0)) {
@@ -1323,7 +1321,7 @@ export const usePortfolioStore = create<State>()(
 
         const importType = mode === "watchlist" || holdingsSymbols.size === 0 ? "watchlist" : "holdings";
         let addedCount = 0;
-        let prunedWatchlistCount = 0;
+        const prunedWatchlistCount = 0;
         let importedTradeCount = 0;
         let liquidationCashCredited = 0;
         let cashAdjustedBy = 0;

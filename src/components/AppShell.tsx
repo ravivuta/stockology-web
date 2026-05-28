@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { HelpCircle, LayoutDashboard, ListOrdered, Newspaper, Settings, PieChart } from "lucide-react";
