@@ -1640,6 +1640,12 @@ export const usePortfolioStore = create<State>()(
             if (Math.abs(delta) > 1e-6) {
               netUpdatesMap.set(symbol, (netUpdatesMap.get(symbol) ?? 0) + delta);
 
+              // CSV import is a portfolio snapshot, not a trade ledger.
+              // Do not treat newly imported positions as fresh cash-spending buys.
+              if (beforeQty <= 1e-6 && delta > 0) {
+                continue;
+              }
+
               const stockSnapshot = stockMap.get(symbol);
               const importPrice = importPriceBySymbol.get(symbol) ?? 0;
               const currentPrice = Math.max(0, stockSnapshot?.lastPrice ?? 0);
