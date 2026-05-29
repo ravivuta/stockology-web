@@ -523,11 +523,24 @@ export function computeRecommendationFactors(
     case "REDUCE":
     case "WAIT_REDUCE": {
       const moneyToFree = Math.max(0, costBasis - stockLimit);
+      const maxHoldingLimit = 2 * stockLimit;
       factors.push({
         label: "Cost basis above limit",
         detail: `${formatCurrency(costBasis)} > ${formatCurrency(stockLimit)}`,
         passes: costBasis > stockLimit,
       });
+      factors.push({
+        label: "Below 2× accumulation cap (ADD still allowed)",
+        detail: `${formatCurrency(costBasis)} of ${formatCurrency(maxHoldingLimit)} max`,
+        passes: costBasis < maxHoldingLimit,
+      });
+      if (action === "WAIT_REDUCE" && rec.nextBuyPrice > 0) {
+        factors.push({
+          label: "Price at/below ADD target",
+          detail: `${formatCurrency(currentPrice)} vs ${formatCurrency(rec.nextBuyPrice)}`,
+          passes: currentPrice <= rec.nextBuyPrice,
+        });
+      }
       const gainNeeded = moneyToFree / 2;
       const gainTriggerPrice = quantity > 0 ? avgPrice + gainNeeded / quantity : 0;
       factors.push({
@@ -1040,6 +1053,30 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
     return {
       action: "WAIT_REDUCE",
       comments: `Position at 2× Stock Limit cap — no more adding. Reduce triggers when price rises above ${actualSmaPeriod.toFixed(0)}-day SMA (${formatCurrency(movingAvg)}) AND unrealized gains exceed the over-limit exposure.`,
+      nextBuyPrice,
+      movingAvg,
+      expectedReturnPct,
+    };
+  }
+
+  if (costBasis > stockLimit) {
+    const blockers: string[] = [];
+    if (currentPrice <= movingAvg) {
+      blockers.push(`price is below ${actualSmaPeriod.toFixed(0)}-day SMA (${formatCurrency(movingAvg)})`);
+    }
+    if (reduceQty <= 0) {
+      blockers.push("unrealized gain is not yet sufficient for a trim");
+    }
+    if (!passesLongTermCheckForReduce) {
+      blockers.push("long-term tax holding-period rule not yet met");
+    }
+
+    return {
+      action: "WAIT_REDUCE",
+      comments:
+        blockers.length === 0
+          ? "Position is above stock limit; monitoring for REDUCE trigger now. ADD can still trigger on deeper pullbacks while position remains below 2× stock limit."
+          : `Position is above stock limit. Waiting to REDUCE when triggers align: ${blockers.join("; ")}. ADD can still trigger on deeper pullbacks while below 2× stock limit.`,
       nextBuyPrice,
       movingAvg,
       expectedReturnPct,

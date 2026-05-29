@@ -59,7 +59,7 @@ export function PortfolioDonut({
   const arcs = useMemo(() => {
     const total = segments.reduce((s, x) => s + x.value, 0);
     if (total <= 0) {
-      return [] as { d: string; color: string; name: string }[];
+      return [] as { d: string; color: string; name: string; midAngle: number; fraction: number }[];
     }
 
     const norm = segments.map((s) => ({ ...s, f: s.value / total }));
@@ -73,15 +73,15 @@ export function PortfolioDonut({
     }
 
     if (significant.length === 1 && significant[0].f >= 0.998) {
-      return [{ d: fullRingD(CX, CY, midR), color: significant[0].color, name: significant[0].name }];
+      return [{ d: fullRingD(CX, CY, midR), color: significant[0].color, name: significant[0].name, midAngle: 0, fraction: 1 }];
     }
 
     let cursor = 0;
-    const out: { d: string; color: string; name: string }[] = [];
+    const out: { d: string; color: string; name: string; midAngle: number; fraction: number }[] = [];
     for (const s of significant) {
       const span = 360 * s.f;
       const d = arcStrokeD(CX, CY, midR, cursor, cursor + span);
-      if (d) out.push({ d, color: s.color, name: s.name });
+      if (d) out.push({ d, color: s.color, name: s.name, midAngle: cursor + span / 2, fraction: s.f });
       cursor += span;
     }
     return out;
@@ -135,6 +135,25 @@ export function PortfolioDonut({
             transition={transition(i)}
           />
         ))}
+        {arcs.map((arc) => {
+          if (arc.fraction < 0.06) return null;
+          const labelR = 58;
+          const { x, y } = polarToCartesian(CX, CY, labelR, arc.midAngle);
+          return (
+            <text
+              key={`label-${arc.name}`}
+              x={x}
+              y={y}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize={7.5}
+              fontWeight="700"
+              fill={arc.color}
+            >
+              {`${Math.round(arc.fraction * 100)}%`}
+            </text>
+          );
+        })}
       </svg>
 
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-2 text-center">
