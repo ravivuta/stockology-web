@@ -383,10 +383,10 @@ export function stockPassesRiskFilter(
     }
     case "High": {
       const meetsLow = marketCap >= lowCap && analystRating >= 4.5;
-      const meetsMedium = marketCap >= mediumCap && analystRating >= 4 && score >= 50;
+      const meetsMedium = marketCap >= mediumCap && analystRating >= 4 && (score === 0 || score >= 50);
       const hasHighUpside = up > 25;
       const smallerCapOk = marketCap >= 10_000_000_000 && analystRating >= 3.5;
-      const meetsHigh = (hasHighUpside || smallerCapOk) && score >= 40;
+      const meetsHigh = (hasHighUpside || smallerCapOk) && (score === 0 || score >= 40);
       return meetsLow || meetsMedium || meetsHigh;
     }
     default:
@@ -566,7 +566,7 @@ export function computeRecommendationFactors(
       factors.push({
         label: "Score ≥ 50",
         detail: `${score.toFixed(1)}/100`,
-        passes: score >= 50,
+        passes: score === 0 || score >= 50,
       });
       factors.push({
         label: "Expected return > 25%",
@@ -919,7 +919,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
   }
 
   const gateReturnAndScore =
-    relaxScoreRequirement || stock.isETF === true || (expectedReturnPct > 25 && metricScore > 50);
+    relaxScoreRequirement || stock.isETF === true || (expectedReturnPct > 25 && (metricScore === 0 || metricScore > 50));
 
   if (
     currentPrice <= nextBuyPrice &&
@@ -982,7 +982,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
       };
     }
 
-    if (metricScore < 50) {
+    if (metricScore > 0 && metricScore < 50) {
       return {
         action: "WAIT_ADD",
         comments: `Score ${metricScore.toFixed(0)}/100 below threshold (50) for adding to position. Wait for improvement.`,
@@ -1030,7 +1030,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
       if (expectedReturnPct <= 25) {
         blockers.push(`expected return ${expectedReturnPct.toFixed(2)}% is at/below 25% minimum`);
       }
-      if (metricScore <= 50) {
+      if (metricScore > 0 && metricScore <= 50) {
         blockers.push(`score ${metricScore.toFixed(0)}/100 is at/below 50 minimum`);
       }
     }
