@@ -20,6 +20,7 @@ import {
   type CsvColumnMapping,
   type CsvColumnStandard,
   type CsvExportStock,
+  type CsvImportField,
   type CsvImportTrade,
   type CsvImportRow,
 } from "@/lib/csvPortfolio";
@@ -30,6 +31,31 @@ import { formatCurrency, formatNumberMax2 } from "@/lib/numberFormat";
 
 const MAX_TRACKED_STOCKS = 200;
 const HIDDEN_MAPPING_FIELDS = new Set<CsvColumnStandard>(["name", "account", "retirementAccount"]);
+const FIELD_LABELS: Partial<Record<CsvColumnStandard, string>> = {
+  qty: "Qty",
+  price: "Avg cost",
+};
+
+function getMappingFieldsForMode(importMode: "portfolio" | "watchlist"): CsvImportField[] {
+  const byKey = new Map(CSV_IMPORT_FIELDS.map((field) => [field.key, field]));
+  const symbol = byKey.get("symbol");
+  const qty = byKey.get("qty");
+  const price = byKey.get("price");
+
+  if (importMode === "portfolio") {
+    const rest = CSV_IMPORT_FIELDS.filter((field) => !["symbol", "qty", "price"].includes(field.key));
+    return [
+      symbol ? { ...symbol, label: "Symbol", required: true } : { key: "symbol", label: "Symbol", required: true, description: "Required ticker column." },
+      qty ? { ...qty, label: "Qty", required: true } : { key: "qty", label: "Qty", required: true, description: "Required. Use with Avg cost for holdings." },
+      price ? { ...price, label: "Avg cost", required: true } : { key: "price", label: "Avg cost", required: true, description: "Required. Use with Qty for holdings." },
+      ...rest.map((field) => ({ ...field, label: FIELD_LABELS[field.key] ?? field.label, required: false })),
+    ];
+  }
+
+  return [
+    symbol ? { ...symbol, label: "Symbol", required: true } : { key: "symbol", label: "Symbol", required: true, description: "Required ticker column." },
+  ];
+}
 
 const CSV_MAPPING_MEMORY_KEY = "stocks-pm-csv-mapping-memory:v1";
 const CSV_MAPPING_PRESETS_KEY = "stocks-pm-csv-mapping-presets:v1";
@@ -244,6 +270,7 @@ export function CsvImportExportBar({
   const [progress, setProgress] = useState<ImportProgress>({ active: false, label: "", value: 0 });
   const [savedPresets, setSavedPresets] = useState<SavedCsvMappingPreset[]>([]);
   const [deleteHoldingsOpen, setDeleteHoldingsOpen] = useState(false);
+  const mappingFields = getMappingFieldsForMode(importMode);
   // importBusy tracks only the import's own progress — not background optimization.
   // importCsvRows already cancels any in-flight optimizePendingStocks via optimizationGeneration,
   // so blocking import on `optimizing` just locks the button during normal post-load auto-optimize.
@@ -372,24 +399,31 @@ export function CsvImportExportBar({
       outcome.prunedWatchlistCount > 0
         ? ` Removed ${outcome.prunedWatchlistCount} stale watchlist-only symbol(s).`
         : "";
-    const netUpdateNote =
-      outcome.netUpdates.length > 0
-        ? ` Net updates: ${outcome.netUpdates
-            .map((update) => `${update.symbol} ${update.action} ${formatNumberMax2(update.qty)}`)
-            .join(", ")}.`
-        : "";
+    const beforeImportSymbols = new Set(storeStocks.map((stock) => stock.symbol.toUpperCase()));
+    const buyUpdates = outcome.netUpdates.filter((update) => update.action === "BUY" && !beforeImportSymbols.has(update.symbol));
+    const addUpdates = outcome.netUpdates.filter((update) => update.action === "BUY" && beforeImportSymbols.has(update.symbol));
+    const soldUpdates = outcome.netUpdates.filter((update) => update.action === "SELL");
+    const describeUpdates = (updates: Array<{ symbol: string; qty: number }>, sign: "+" | "-") =>
+      updates.map((update) => `${update.symbol} ${sign}${formatNumberMax2(update.qty)}`).join(", ");
+
+    const hasDeltaUpdates = buyUpdates.length + addUpdates.length + soldUpdates.length > 0;
     const cashAdjustmentNote =
       Math.abs(outcome.cashAdjustedBy) > 1e-6
         ? ` Cash ${outcome.cashAdjustedBy > 0 ? "increased" : "decreased"} by ${formatCurrency(Math.abs(outcome.cashAdjustedBy))} from CSV holdings updates.`
         : "";
-    const typeLead =
-      outcome.importType === "holdings"
-        ? `Merged ${outcome.importedCount} symbol(s) with the existing portfolio.${outcome.importedTradeCount > 0 ? ` Imported ${outcome.importedTradeCount} trade(s).` : ""}`
-        : `Imported ${outcome.importedCount} watchlist symbol(s) into the portfolio tracker.`;
+
+    const summaryText = hasDeltaUpdates
+      ? [
+          "CSV updates applied.",
+          `Buy: ${buyUpdates.length}${buyUpdates.length > 0 ? ` (${describeUpdates(buyUpdates, "+")})` : ""}.`,
+          `Add: ${addUpdates.length}${addUpdates.length > 0 ? ` (${describeUpdates(addUpdates, "+")})` : ""}.`,
+          `Sold: ${soldUpdates.length}${soldUpdates.length > 0 ? ` (${describeUpdates(soldUpdates, "-")})` : ""}.`,
+        ].join(" ")
+      : "No updates detected from CSV.";
 
     setFlash({
       kind: "ok",
-      text: `${typeLead}${prunedNote}${netUpdateNote}${cashAdjustmentNote}${invalidNote}`,
+      text: `${summaryText}${prunedNote}${cashAdjustmentNote}${invalidNote}`,
     });
   }
 
@@ -566,113 +600,117 @@ export function CsvImportExportBar({
         </ModalSection>
         <ModalSection className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <div className="space-y-3">
-            <div className="rounded-2xl border border-border/80 bg-background/60 p-3">
-              <div className="flex flex-col gap-3">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Saved Mappings</p>
-                  <p className="mt-1 text-xs text-subtle">Apply a previously saved mapping profile, including profile name and account type defaults, before reviewing the column matches.</p>
-                </div>
-                {savedPresets.length > 0 ? (
-                  <div className="space-y-2">
-                    {savedPresets.map((preset) => {
-                      const isActive = pendingMappingImport?.activePresetId === preset.id;
-                      return (
-                        <div
-                          key={preset.id}
-                          className={`flex flex-col gap-2 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between ${
-                            isActive ? "border-primary/60 bg-primary/10" : "border-border/80 bg-elevated/60"
-                          }`}
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-foreground">{preset.name}</p>
-                            <p className="mt-1 text-xs text-subtle">{describePreset(preset)}</p>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setPendingMappingImport((current) =>
-                                  current
-                                    ? {
-                                        ...current,
-                                        mapping: preset.mapping,
-                                        defaultAccountName: preset.defaultAccountName,
-                                        defaultRetirementAccount: preset.defaultRetirementAccount,
-                                        activePresetId: preset.id,
-                                      }
-                                    : current
-                                );
-                              }}
-                              className="ui-hover-spotlight rounded-lg border border-primary/40 bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground"
+            {importMode === "portfolio" ? (
+              <>
+                <div className="rounded-2xl border border-border/80 bg-background/60 p-3">
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">* Mapping Profile</p>
+                      <p className="mt-1 text-xs text-subtle">Apply a previously saved mapping profile, including profile name and account type defaults, before reviewing the column matches.</p>
+                    </div>
+                    {savedPresets.length > 0 ? (
+                      <div className="space-y-2">
+                        {savedPresets.map((preset) => {
+                          const isActive = pendingMappingImport?.activePresetId === preset.id;
+                          return (
+                            <div
+                              key={preset.id}
+                              className={`flex flex-col gap-2 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between ${isActive ? "border-primary/60 bg-primary/10" : "border-border/80 bg-elevated/60"}`}
                             >
-                              Apply
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const next = removeSavedMappingPreset(preset.id);
-                                setSavedPresets(next);
-                                setPendingMappingImport((current) =>
-                                  current && current.activePresetId === preset.id
-                                    ? {
-                                        ...current,
-                                        activePresetId: null,
-                                      }
-                                    : current
-                                );
-                              }}
-                              className="ui-hover-pop rounded-lg border border-border px-3 py-2 text-sm text-foreground"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-foreground">{preset.name}</p>
+                                <p className="mt-1 text-xs text-subtle">{describePreset(preset)}</p>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPendingMappingImport((current) =>
+                                      current
+                                        ? {
+                                            ...current,
+                                            mapping: preset.mapping,
+                                            defaultAccountName: preset.defaultAccountName,
+                                            defaultRetirementAccount: preset.defaultRetirementAccount,
+                                            activePresetId: preset.id,
+                                          }
+                                        : current
+                                    );
+                                  }}
+                                  className="ui-hover-spotlight rounded-lg border border-primary/40 bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground"
+                                >
+                                  Apply
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = removeSavedMappingPreset(preset.id);
+                                    setSavedPresets(next);
+                                    setPendingMappingImport((current) =>
+                                      current && current.activePresetId === preset.id
+                                        ? { ...current, activePresetId: null }
+                                        : current
+                                    );
+                                  }}
+                                  className="ui-hover-pop rounded-lg border border-border px-3 py-2 text-sm text-foreground"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-subtle">No saved mappings yet.</p>
+                    )}
                   </div>
-                ) : (
-                  <p className="text-xs text-subtle">No saved mappings yet.</p>
-                )}
-              </div>
-            </div>
-            <div className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
-              <div>
-                <p className="text-sm font-medium text-foreground">Profile Name</p>
-                <p className="mt-1 text-xs text-subtle">Required. Used as the account/profile value for imported lots when the CSV does not provide one.</p>
-              </div>
-              <input
-                value={pendingMappingImport?.defaultAccountName ?? ""}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setPendingMappingImport((current) => (current ? { ...current, defaultAccountName: value } : current));
-                }}
-                placeholder="Brokerage, IRA, Roth, Taxable…"
-                className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
-              />
-            </div>
-            <div className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
-              <div>
-                <p className="text-sm font-medium text-foreground">Account Type</p>
-                <p className="mt-1 text-xs text-subtle">Required. Saved with the profile and applied to holding lots when no account type column is mapped.</p>
-              </div>
-              <select
-                value={pendingMappingImport?.defaultRetirementAccount ?? ""}
-                onChange={(e) => {
-                  const value = e.target.value as "no" | "yes" | "";
-                  setPendingMappingImport((current) => (current ? { ...current, defaultRetirementAccount: value } : current));
-                }}
-                className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
-              >
-                <option value="">Select...</option>
-                <option value="no">Taxable</option>
-                <option value="yes">Retirement</option>
-              </select>
-            </div>
+                </div>
+                <div className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">* Mapping Profile</p>
+                    <p className="mt-1 text-xs text-subtle">Required. Used as the account/profile value for imported lots when the CSV does not provide one.</p>
+                  </div>
+                  <input
+                    value={pendingMappingImport?.defaultAccountName ?? ""}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setPendingMappingImport((current) => (current ? { ...current, defaultAccountName: value } : current));
+                    }}
+                    placeholder="Brokerage, IRA, Roth, Taxable…"
+                    className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
+                  />
+                </div>
+                <div className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">* Taxable or Retirement?</p>
+                    <p className="mt-1 text-xs text-subtle">Required. Saved with the profile and applied to holding lots when no account type column is mapped.</p>
+                  </div>
+                  <select
+                    value={pendingMappingImport?.defaultRetirementAccount ?? ""}
+                    onChange={(e) => {
+                      const value = e.target.value as "no" | "yes" | "";
+                      setPendingMappingImport((current) => (current ? { ...current, defaultRetirementAccount: value } : current));
+                    }}
+                    className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
+                  >
+                    <option value="">Select...</option>
+                    <option value="no">Taxable</option>
+                    <option value="yes">Retirement</option>
+                  </select>
+                </div>
+              </>
+            ) : null}
+
             <div className="rounded-xl border border-border/80 bg-background/60 p-3">
               <p className="text-sm font-medium text-foreground">Column Mapping</p>
-              <p className="mt-1 text-xs text-subtle">Map your CSV column headers to the standard iOS import fields. `Symbol` is required.</p>
+              <p className="mt-1 text-xs text-subtle">
+                {importMode === "portfolio"
+                  ? "Map your CSV column headers to the iOS holdings import fields. Symbol, Qty, and Avg cost are required."
+                  : "Map your CSV column headers to the iOS watchlist import fields. Symbol is required. Holding columns are ignored."}
+              </p>
             </div>
-            {CSV_IMPORT_FIELDS.filter((field) => !HIDDEN_MAPPING_FIELDS.has(field.key)).map((field) => {
+            {mappingFields.filter((field) => !HIDDEN_MAPPING_FIELDS.has(field.key)).map((field) => {
               const fieldKey = field.key;
               return (
                 <div key={fieldKey} className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
