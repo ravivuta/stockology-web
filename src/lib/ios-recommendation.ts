@@ -407,7 +407,9 @@ export function calculateTradingLimits(
   portfolioSize: number,
   isETF?: boolean,
   score?: number | null,
-  watchlistSize = 10
+  watchlistSize = 10,
+  marketCap?: number | null,
+  beta?: number | null
 ): { stockLimit: number; transactionLimit: number } {
   const safeWatchlistSize = Math.max(1, Math.round(watchlistSize) || 1);
   const baseStockLimit = Math.max(0, portfolioSize) / safeWatchlistSize;
@@ -415,6 +417,14 @@ export function calculateTradingLimits(
   let riskMultiplier = 1;
   if (isETF === true) {
     riskMultiplier = 10;
+  } else {
+    // Conservative adjustment: apply 2/3 multiplier by default
+    // Only give full allocation to confirmed large/mega caps (≥$10B)
+    if (marketCap != null && marketCap >= 10_000_000_000) {
+      riskMultiplier = 1.0;  // Full size for large/mega cap
+    } else {
+      riskMultiplier = 2.0 / 3.0;  // ~0.67× for small/micro cap or unknown
+    }
   }
 
   const stockLimit = baseStockLimit * riskMultiplier;

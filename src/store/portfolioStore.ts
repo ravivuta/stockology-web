@@ -445,7 +445,14 @@ function derivePortfolioState(
         );
 
     stocksWithLimits = stocksWithLimits.map((stock) => {
-      const limits = calculateTradingLimits(portfolioSize, stock.isETF, stock.score, recommendedWatchlistSizeForLimits);
+      const limits = calculateTradingLimits(
+        portfolioSize,
+        stock.isETF,
+        stock.score,
+        recommendedWatchlistSizeForLimits,
+        stock.marketCap,
+        stock.beta
+      );
       return {
         ...stock,
         stockLimit: limits.stockLimit,
