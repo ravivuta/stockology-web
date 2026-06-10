@@ -10,6 +10,7 @@ export type IosOpenLot = {
   quantity?: number;
   costBasis?: number;
   status?: string;
+  isRetirementAccount?: boolean | null;
 };
 
 export type IosSoldLot = {
@@ -35,6 +36,7 @@ export type IosStockInput = {
   peg?: number;
   score?: number;
   aiSentimentScore?: number;
+  aiSentimentLastUpdated?: string; // ISO8601 timestamp
   movingAvg?: number;
   isShortlisted?: boolean;
   isInWatchlistSize?: boolean;
@@ -213,6 +215,15 @@ export function getOldestOpenLotDate(stock: IosStockInput): Date | null {
   return dates[0] ?? null;
 }
 
+export function getOldestTaxableGainLotDate(stock: IosStockInput, currentPrice: number): Date | null {
+  const dates = (stock.openLots ?? [])
+    .filter((lot) => lot.isRetirementAccount !== true && typeof lot.costBasis === "number" && lot.costBasis < currentPrice)
+    .map((lot) => parseDate(lot.purchaseDate))
+    .filter((date): date is Date => date != null)
+    .sort((a, b) => a.getTime() - b.getTime());
+  return dates[0] ?? null;
+}
+
 export function getWashSaleInfo(stock: IosStockInput, now = new Date()): WashSaleInfo {
   let restrictedUntil: Date | null = null;
   let restrictingLoss: number | null = null;
@@ -328,13 +339,67 @@ function estimateReduceQty(
 }
 
 function generateReduceComment(stock: IosStockInput, reduceQty: number): string {
-  let comment = `Consider diversifying. Reduce your holding size by selling some stocks - sell ${reduceQty} shares to reduce cost basis`;
-  const oldestLot = (stock.openLots ?? [])
+  const currentPrice = stock.lastPrice ?? stock.averageCost;
+  const openLots = stock.openLots ?? [];
+  
+  // Separate retirement and taxable lots
+  const retirementLots = openLots.filter(lot => lot.isRetirementAccount === true);
+  const taxableLots = openLots.filter(lot => lot.isRetirementAccount !== true);
+  
+  // Find retirement lots with positive gains
+  const retirementLotsInGain = retirementLots
+    .filter(lot => lot.costBasis && currentPrice > lot.costBasis)
     .map((lot) => ({ ...lot, purchaseDateObj: parseDate(lot.purchaseDate) }))
     .filter((lot): lot is IosOpenLot & { purchaseDateObj: Date } => lot.purchaseDateObj != null)
-    .sort((a, b) => a.purchaseDateObj.getTime() - b.purchaseDateObj.getTime())[0];
-
+    .sort((a, b) => a.purchaseDateObj.getTime() - b.purchaseDateObj.getTime());
+  
+  let comment = `Consider diversifying. Reduce your holding size by selling some stocks - sell ${reduceQty} shares to reduce cost basis`;
+  
+  // Determine which lots to sell: prioritize retirement lots with gains, then taxable lots
+  const lotsToSell: (IosOpenLot & { purchaseDateObj: Date })[] = [];
+  let remainingQty = reduceQty;
+  let accountTypeUsed = "";
+  
+  if (retirementLotsInGain.length > 0) {
+    // Use retirement lots with gains first (tax-free gains)
+    for (const lot of retirementLotsInGain) {
+      if (remainingQty <= 0) break;
+      const qtyFromThisLot = Math.min(remainingQty, lot.quantity ?? 0);
+      lotsToSell.push(lot);
+      remainingQty -= qtyFromThisLot;
+    }
+    accountTypeUsed = "retirement";
+  }
+  
+  // If still need more shares or no retirement lots in gain, use taxable lots (oldest first)
+  if (remainingQty > 0) {
+    const sortedTaxableLots = taxableLots
+      .map((lot) => ({ ...lot, purchaseDateObj: parseDate(lot.purchaseDate) }))
+      .filter((lot): lot is IosOpenLot & { purchaseDateObj: Date } => lot.purchaseDateObj != null)
+      .sort((a, b) => a.purchaseDateObj.getTime() - b.purchaseDateObj.getTime());
+    
+    for (const lot of sortedTaxableLots) {
+      if (remainingQty <= 0) break;
+      const qtyFromThisLot = Math.min(remainingQty, lot.quantity ?? 0);
+      lotsToSell.push(lot);
+      remainingQty -= qtyFromThisLot;
+    }
+    if (accountTypeUsed === "") {
+      accountTypeUsed = "taxable";
+    } else {
+      accountTypeUsed = "mixed";
+    }
+  }
+  
+  const oldestLot = lotsToSell[0];
   if (oldestLot?.purchaseDateObj) {
+    const accountInfo = accountTypeUsed === "retirement"
+      ? " from retirement account (tax-free gains)"
+      : accountTypeUsed === "mixed"
+      ? " from retirement and taxable accounts"
+      : "";
+    comment += `. Target lots: ${oldestLot.quantity} shares from ${oldestLot.purchaseDateObj.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}${accountInfo}`;
+    
     const isLongTerm = Date.now() - oldestLot.purchaseDateObj.getTime() > 365 * DAY_MS;
     comment = `${isLongTerm ? "Long-Term Holding" : "Short-Term Holding"}: ${comment}`;
   }
@@ -519,13 +584,32 @@ export function computeRecommendationFactors(
         });
       }
       if (useAISentiment && !isETF) {
-        const aiPass = aiScore == null || !(aiScore > 0) || aiScore < 65;
+        const lastUpdated = stock.aiSentimentLastUpdated ? new Date(stock.aiSentimentLastUpdated) : null;
+        const isFresh = lastUpdated && (Date.now() - lastUpdated.getTime()) < (14 * 24 * 60 * 60 * 1000);
+        
+        let aiPass: boolean;
+        let detail: string;
+        
+        if (aiScore != null && aiScore > 0) {
+          if (isFresh) {
+            // Fresh sentiment - apply normal gating (< 65 doesn't block sell)
+            aiPass = aiScore < 65;
+            detail = `${aiScore.toFixed(0)}/100 — ${sentimentLabelForScore(aiScore)}`;
+          } else {
+            // Stale sentiment - ignore for gating
+            aiPass = true;
+            const age = lastUpdated ? Math.floor((Date.now() - lastUpdated.getTime()) / (24 * 60 * 60 * 1000)) : 99;
+            detail = `${aiScore.toFixed(0)}/100 — Stale (${age}d old), not used`;
+          }
+        } else {
+          // No sentiment available
+          aiPass = true;
+          detail = "N/A — not blocking";
+        }
+        
         factors.push({
           label: "AI sentiment not blocking sell (< 65)",
-          detail:
-            aiScore != null && aiScore > 0
-              ? `${aiScore.toFixed(0)}/100 — ${sentimentLabelForScore(aiScore)}`
-              : "N/A — not blocking",
+          detail,
           passes: aiPass,
         });
       }
@@ -573,24 +657,46 @@ export function computeRecommendationFactors(
 
   if (["BUY", "ADD", "WAIT_BUY", "WAIT_ADD"].includes(action)) {
     if (!isETF) {
-      factors.push({
-        label: "Score ≥ 50",
-        detail: `${score.toFixed(1)}/100`,
-        passes: score === 0 || score >= 50,
-      });
+      // Only show score factor if score > 0 (skip when no fundamentals available)
+      if (score > 0) {
+        factors.push({
+          label: "Score ≥ 50",
+          detail: `${score.toFixed(1)}/100`,
+          passes: score >= 50,
+        });
+      }
       factors.push({
         label: "Expected return > 25%",
         detail: `${rec.expectedReturnPct.toFixed(1)}%`,
         passes: rec.expectedReturnPct > 25,
       });
       if (useAISentiment) {
-        const aiPass = aiScore == null || !(aiScore > 0) || aiScore >= 50;
+        const lastUpdated = stock.aiSentimentLastUpdated ? new Date(stock.aiSentimentLastUpdated) : null;
+        const isFresh = lastUpdated && (Date.now() - lastUpdated.getTime()) < (14 * 24 * 60 * 60 * 1000);
+        
+        let aiPass: boolean;
+        let detail: string;
+        
+        if (aiScore != null && aiScore > 0) {
+          if (isFresh) {
+            // Fresh sentiment - apply normal gating
+            aiPass = aiScore >= 50;
+            detail = `${aiScore.toFixed(0)}/100 — ${sentimentLabelForScore(aiScore)}`;
+          } else {
+            // Stale sentiment - ignore for gating
+            aiPass = true;
+            const age = lastUpdated ? Math.floor((Date.now() - lastUpdated.getTime()) / (24 * 60 * 60 * 1000)) : 99;
+            detail = `${aiScore.toFixed(0)}/100 — Stale (${age}d old), not used`;
+          }
+        } else {
+          // No sentiment available
+          aiPass = true;
+          detail = "N/A — not blocking";
+        }
+        
         factors.push({
           label: "AI sentiment OK (≥ 50)",
-          detail:
-            aiScore != null && aiScore > 0
-              ? `${aiScore.toFixed(0)}/100 — ${sentimentLabelForScore(aiScore)}`
-              : "N/A — not blocking",
+          detail,
           passes: aiPass,
         });
       }
@@ -810,7 +916,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
   const rawBuyFactor = numberPurchases === 0 ? 1 : 1 - dynamicFactor / 100 - (2 * numberPurchases) / 100;
   const buyFactorSMA = Math.max(0.1, rawBuyFactor);
 
-  const nextBuyPrice = numStock === 0 || avgPrice <= 0 ? movingAvg : avgPrice * buyFactorSMA;
+  const nextBuyPrice = numStock === 0 || avgPrice <= 0 ? movingAvg : movingAvg * buyFactorSMA;
 
   let targetPrice: number | undefined;
   if (stock.analystTarget != null && stock.analystTarget > 0) {
@@ -859,7 +965,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
 
   let passesLongTermCheckForSell = true;
   if (sellOnlyLongTermQualified && numStock > 0) {
-    const oldest = getOldestOpenLotDate(stock);
+    const oldest = getOldestTaxableGainLotDate(stock, currentPrice);
     passesLongTermCheckForSell =
       oldest != null &&
       !isUnknownPurchaseDate(oldest) &&
@@ -906,9 +1012,13 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
     }
     // AI Sentiment bullish gate — if sentiment is bullish (≥65) for a non-ETF, hold off selling;
     // recent positive news suggests potential upside beyond the current analyst target.
+    // Only apply if sentiment is fresh (updated within last 2 weeks)
     if (shouldApplyAISentimentGate) {
       const ai = stock.aiSentimentScore;
-      if (ai != null && ai >= 65) {
+      const lastUpdated = stock.aiSentimentLastUpdated ? new Date(stock.aiSentimentLastUpdated) : null;
+      const isFresh = lastUpdated && (Date.now() - lastUpdated.getTime()) < (14 * 24 * 60 * 60 * 1000);
+      
+      if (ai != null && ai >= 65 && isFresh) {
         const label = ai >= 70 ? "Bullish" : "Mildly Bullish";
         return {
           action: "WAIT_ADD" as const,
@@ -969,7 +1079,10 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
 
     if (shouldApplyAISentimentGate) {
       const ai = stock.aiSentimentScore;
-      if (ai != null && ai > 0 && ai < 50) {
+      const lastUpdated = stock.aiSentimentLastUpdated ? new Date(stock.aiSentimentLastUpdated) : null;
+      const isFresh = lastUpdated && (Date.now() - lastUpdated.getTime()) < (14 * 24 * 60 * 60 * 1000);
+      
+      if (ai != null && ai > 0 && ai < 50 && isFresh) {
         const label = ai < 30 ? "Bearish" : ai < 45 ? "Mildly Bearish" : "Cautious";
         return {
           action: numStock === 0 ? "WAIT_BUY" : "WAIT_ADD",
@@ -1014,7 +1127,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
 
   let passesLongTermCheckForReduce = true;
   if (sellOnlyLongTermQualified && numStock > 0) {
-    const oldest = getOldestOpenLotDate(stock);
+    const oldest = getOldestTaxableGainLotDate(stock, currentPrice);
     passesLongTermCheckForReduce =
       oldest != null &&
       !isUnknownPurchaseDate(oldest) &&

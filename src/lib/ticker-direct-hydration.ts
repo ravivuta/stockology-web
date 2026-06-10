@@ -19,11 +19,12 @@ export type TickerHydrationPriceRow = {
 
 export type TickerHydrationSentimentRow = {
   sentiment_score: number;
+  last_updated?: string;
 };
 
 export function mapTickerHydrationPriceRowToPatch(
   p: TickerHydrationPriceRow,
-  sentimentScore?: number | null
+  sentiment?: TickerHydrationSentimentRow | null
 ): Partial<StockHolding> {
   const patch: Partial<StockHolding> = {};
   if (p.last_price != null && Number.isFinite(Number(p.last_price))) {
@@ -60,8 +61,11 @@ export function mapTickerHydrationPriceRowToPatch(
   }
   if (p.is_etf === true) patch.isETF = true;
   else if (p.is_etf === false) patch.isETF = false;
-  if (sentimentScore != null && Number.isFinite(Number(sentimentScore))) {
-    patch.aiSentimentScore = Number(sentimentScore);
+  if (sentiment?.sentiment_score != null && Number.isFinite(Number(sentiment.sentiment_score))) {
+    patch.aiSentimentScore = Number(sentiment.sentiment_score);
+  }
+  if (sentiment?.last_updated) {
+    patch.aiSentimentLastUpdated = sentiment.last_updated;
   }
   return patch;
 }
@@ -90,7 +94,7 @@ export async function fetchTickerHydrationFromTables(
         "symbol, analyst_average, market_cap, peg_ratio, analyst_target, beta, company_name, consensus_conclusion, is_etf"
       )
       .in("symbol", upper),
-    supabase.from("ai_sentiment_scores").select("symbol, sentiment_score").in("symbol", upper),
+    supabase.from("ai_sentiment_scores").select("symbol, sentiment_score, last_updated").in("symbol", upper),
   ]);
 
   const fundBySym: Record<string, Record<string, unknown>> = {};

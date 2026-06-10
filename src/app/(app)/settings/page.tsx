@@ -736,9 +736,9 @@ function SettingsInner() {
                     onChange={(e) => persistSettingsPatch({ sellOnlyLongTermQualified: e.target.checked })}
                   />
                   <span>
-                    <span className="block text-[12px] font-medium leading-snug text-foreground">Only sell long-term qualified lots</span>
+                    <span className="block text-[12px] font-medium leading-snug text-foreground">Only sell taxable lots with long-term gains</span>
                     <span className="mt-px block text-[10px] leading-snug text-subtle">
-                      SELL and REDUCE stay blocked until holdings are older than 365 days, while retirement-account lots remain eligible regardless of holding period.
+                      SELL and REDUCE stay blocked for taxable lots with gains until they are older than 365 days, while retirement-account lots remain eligible regardless of holding period.
                     </span>
                   </span>
                 </label>

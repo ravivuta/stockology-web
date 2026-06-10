@@ -114,7 +114,7 @@ export async function runRefreshPipeline(
     const patches: Array<{ symbol: string; patch: Partial<StockHolding> }> = [];
 
     for (const [symbol, row] of Object.entries(prices)) {
-      const patch = mapTickerHydrationPriceRowToPatch(row, sentiment[symbol]?.sentiment_score);
+      const patch = mapTickerHydrationPriceRowToPatch(row, sentiment[symbol]);
       if (Object.keys(patch).length > 0) {
         patches.push({ symbol, patch });
       }

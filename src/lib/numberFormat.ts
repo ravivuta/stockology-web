@@ -55,3 +55,12 @@ export function formatCompactCurrency(value: number | null | undefined): string 
   if (value >= 1e3) return `$${formatDecimal(value / 1e3)}K`;
   return formatCurrency(value);
 }
+
+export function formatCompactNumber(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value) || value <= 0) return "—";
+  if (value >= 1e12) return `${formatDecimal(value / 1e12)}T`;
+  if (value >= 1e9) return `${formatDecimal(value / 1e9)}B`;
+  if (value >= 1e6) return `${formatDecimal(value / 1e6)}M`;
+  if (value >= 1e3) return `${formatDecimal(value / 1e3)}K`;
+  return formatDecimal(value);
+}

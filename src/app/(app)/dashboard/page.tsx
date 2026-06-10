@@ -19,7 +19,7 @@ import {
   type NetWorthPoint,
 } from "@/lib/portfolio-net-worth-series";
 import { isUsMarketTradingDay } from "@/lib/market-hours";
-import { formatAbsPercent, formatCompactCurrency, formatCurrency, formatPercent } from "@/lib/numberFormat";
+import { formatAbsPercent, formatCompactCurrency, formatCompactNumber, formatCurrency, formatPercent } from "@/lib/numberFormat";
 
 const CURRENT_VALUE_COLOR = "#14b8a6";
 
@@ -715,7 +715,7 @@ function EmptyCol({ message, sub }: { message: string; sub: string }) {
 }
 
 function fmtShort(n: number) {
-  return formatCompactCurrency(n);
+  return formatCompactNumber(n);
 }
 
 function GainerLoserBars({

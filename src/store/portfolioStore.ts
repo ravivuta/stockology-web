@@ -71,6 +71,7 @@ export type StockHolding = {
   isVisibleInRisk?: boolean;
   isInWatchlistSize?: boolean;
   aiSentimentScore?: number;
+  aiSentimentLastUpdated?: string; // ISO8601 timestamp
   beta?: number;
   marketCap?: number;
   peg?: number;
