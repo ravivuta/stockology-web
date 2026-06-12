@@ -198,6 +198,11 @@ export type GlobalSettings = {
   enableRiskFilter?: boolean;
   useAISentiment?: boolean;
   useRSIGating?: boolean;
+  rsiPeriod?: number;
+  rsiOversoldThreshold?: number;
+  rsiOverboughtThreshold?: number;
+  rsiHysteresisPoints?: number;
+  rsiMinRisingDays?: number;
   sellOnlyLongTerm?: boolean;
   limitWatchlistSize?: boolean;
   timezone?: string;

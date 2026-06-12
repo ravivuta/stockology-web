@@ -100,6 +100,11 @@ type State = {
   stockProfitTarget: number;
   useAISentimentForRecommendations: boolean;
   useRSIGatingForRecommendations: boolean;
+  rsiPeriodForRecommendations: number;
+  rsiOversoldThresholdForRecommendations: number;
+  rsiOverboughtThresholdForRecommendations: number;
+  rsiHysteresisPointsForRecommendations: number;
+  rsiMinRisingDaysForRecommendations: number;
   sellOnlyLongTermQualified: boolean;
   timezone: string;
   region: string;
@@ -113,7 +118,7 @@ type State = {
   lastLocalMutationAt: string | null;
   clearCachesOnReset: () => void;
   setCash: (n: number) => void;
-  setSettings: (p: Partial<Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "etfProfitTarget" | "stockProfitTarget" | "useAISentimentForRecommendations" | "useRSIGatingForRecommendations" | "sellOnlyLongTermQualified" | "timezone" | "region">>) => void;
+  setSettings: (p: Partial<Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "etfProfitTarget" | "stockProfitTarget" | "useAISentimentForRecommendations" | "useRSIGatingForRecommendations" | "rsiPeriodForRecommendations" | "rsiOversoldThresholdForRecommendations" | "rsiOverboughtThresholdForRecommendations" | "rsiHysteresisPointsForRecommendations" | "rsiMinRisingDaysForRecommendations" | "sellOnlyLongTermQualified" | "timezone" | "region">>) => void;
   addStock: (s: Partial<StockHolding> & { symbol: string }) => void;
   /** Merge fields into an existing symbol and rebuild recommendation. */
   updateStock: (symbol: string, patch: Partial<StockHolding>) => void;
@@ -276,6 +281,11 @@ type RecalcContext = {
   stockProfitTarget: number;
   useAISentimentForRecommendations: boolean;
   useRSIGatingForRecommendations: boolean;
+  rsiPeriodForRecommendations: number;
+  rsiOversoldThresholdForRecommendations: number;
+  rsiOverboughtThresholdForRecommendations: number;
+  rsiHysteresisPointsForRecommendations: number;
+  rsiMinRisingDaysForRecommendations: number;
   sellOnlyLongTermQualified: boolean;
   lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }>;
 };
@@ -401,6 +411,11 @@ function recalcHolding(
       stockProfitTarget: ctx.stockProfitTarget,
       useAISentiment: ctx.useAISentimentForRecommendations,
       useRSIGating: ctx.useRSIGatingForRecommendations,
+      rsiPeriod: ctx.rsiPeriodForRecommendations,
+      rsiOversoldThreshold: ctx.rsiOversoldThresholdForRecommendations,
+      rsiOverboughtThreshold: ctx.rsiOverboughtThresholdForRecommendations,
+      rsiHysteresisPoints: ctx.rsiHysteresisPointsForRecommendations,
+      rsiMinRisingDays: ctx.rsiMinRisingDaysForRecommendations,
       sellOnlyLongTermQualified: ctx.sellOnlyLongTermQualified,
       openLots: lots.open,
       soldLots: lots.sold,
@@ -565,6 +580,11 @@ export const usePortfolioStore = create<State>()(
       stockProfitTarget: 50,
       useAISentimentForRecommendations: false,
       useRSIGatingForRecommendations: false,
+      rsiPeriodForRecommendations: 14,
+      rsiOversoldThresholdForRecommendations: 30,
+      rsiOverboughtThresholdForRecommendations: 70,
+      rsiHysteresisPointsForRecommendations: 5,
+      rsiMinRisingDaysForRecommendations: 2,
       sellOnlyLongTermQualified: false,
       timezone: "America/New_York",
       region: "US",
@@ -588,6 +608,11 @@ export const usePortfolioStore = create<State>()(
             stockProfitTarget: st.stockProfitTarget,
             useAISentimentForRecommendations: st.useAISentimentForRecommendations,
             useRSIGatingForRecommendations: st.useRSIGatingForRecommendations,
+            rsiPeriodForRecommendations: st.rsiPeriodForRecommendations,
+            rsiOversoldThresholdForRecommendations: st.rsiOversoldThresholdForRecommendations,
+            rsiOverboughtThresholdForRecommendations: st.rsiOverboughtThresholdForRecommendations,
+            rsiHysteresisPointsForRecommendations: st.rsiHysteresisPointsForRecommendations,
+            rsiMinRisingDaysForRecommendations: st.rsiMinRisingDaysForRecommendations,
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
             lotsBySymbol: st.lotsBySymbol,
           };
@@ -614,6 +639,11 @@ export const usePortfolioStore = create<State>()(
             stockProfitTarget: nextState.stockProfitTarget,
             useAISentimentForRecommendations: nextState.useAISentimentForRecommendations,
             useRSIGatingForRecommendations: nextState.useRSIGatingForRecommendations,
+            rsiPeriodForRecommendations: nextState.rsiPeriodForRecommendations,
+            rsiOversoldThresholdForRecommendations: nextState.rsiOversoldThresholdForRecommendations,
+            rsiOverboughtThresholdForRecommendations: nextState.rsiOverboughtThresholdForRecommendations,
+            rsiHysteresisPointsForRecommendations: nextState.rsiHysteresisPointsForRecommendations,
+            rsiMinRisingDaysForRecommendations: nextState.rsiMinRisingDaysForRecommendations,
             sellOnlyLongTermQualified: nextState.sellOnlyLongTermQualified,
             lotsBySymbol: st.lotsBySymbol,
           };
@@ -632,6 +662,11 @@ export const usePortfolioStore = create<State>()(
             stockProfitTarget: st.stockProfitTarget,
             useAISentimentForRecommendations: st.useAISentimentForRecommendations,
             useRSIGatingForRecommendations: st.useRSIGatingForRecommendations,
+            rsiPeriodForRecommendations: st.rsiPeriodForRecommendations,
+            rsiOversoldThresholdForRecommendations: st.rsiOversoldThresholdForRecommendations,
+            rsiOverboughtThresholdForRecommendations: st.rsiOverboughtThresholdForRecommendations,
+            rsiHysteresisPointsForRecommendations: st.rsiHysteresisPointsForRecommendations,
+            rsiMinRisingDaysForRecommendations: st.rsiMinRisingDaysForRecommendations,
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
             lotsBySymbol: st.lotsBySymbol,
           };
@@ -648,6 +683,11 @@ export const usePortfolioStore = create<State>()(
             stockProfitTarget: st.stockProfitTarget,
             useAISentimentForRecommendations: st.useAISentimentForRecommendations,
             useRSIGatingForRecommendations: st.useRSIGatingForRecommendations,
+            rsiPeriodForRecommendations: st.rsiPeriodForRecommendations,
+            rsiOversoldThresholdForRecommendations: st.rsiOversoldThresholdForRecommendations,
+            rsiOverboughtThresholdForRecommendations: st.rsiOverboughtThresholdForRecommendations,
+            rsiHysteresisPointsForRecommendations: st.rsiHysteresisPointsForRecommendations,
+            rsiMinRisingDaysForRecommendations: st.rsiMinRisingDaysForRecommendations,
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
             lotsBySymbol: st.lotsBySymbol,
           };
@@ -732,6 +772,11 @@ export const usePortfolioStore = create<State>()(
             stockProfitTarget: st.stockProfitTarget,
             useAISentimentForRecommendations: st.useAISentimentForRecommendations,
             useRSIGatingForRecommendations: st.useRSIGatingForRecommendations,
+            rsiPeriodForRecommendations: st.rsiPeriodForRecommendations,
+            rsiOversoldThresholdForRecommendations: st.rsiOversoldThresholdForRecommendations,
+            rsiOverboughtThresholdForRecommendations: st.rsiOverboughtThresholdForRecommendations,
+            rsiHysteresisPointsForRecommendations: st.rsiHysteresisPointsForRecommendations,
+            rsiMinRisingDaysForRecommendations: st.rsiMinRisingDaysForRecommendations,
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
             lotsBySymbol: lots,
           };

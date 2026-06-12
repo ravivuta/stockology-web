@@ -68,6 +68,11 @@ export type IosRecOptions = {
   relaxScoreRequirement?: boolean;
   useAISentiment?: boolean;
   useRSIGating?: boolean;
+  rsiPeriod?: number;
+  rsiOversoldThreshold?: number;
+  rsiOverboughtThreshold?: number;
+  rsiHysteresisPoints?: number;
+  rsiMinRisingDays?: number;
   sellOnlyLongTermQualified?: boolean;
 };
 
@@ -503,6 +508,11 @@ export type RecommendationFactorOptions = {
   skipWashSale?: boolean;
   useRSIGating?: boolean;
   useAISentiment?: boolean;
+  rsiPeriod?: number;
+  rsiOversoldThreshold?: number;
+  rsiOverboughtThreshold?: number;
+  rsiHysteresisPoints?: number;
+  rsiMinRisingDays?: number;
   sellOnlyLongTermQualified?: boolean;
   closes?: number[];
 };
@@ -516,6 +526,11 @@ export function computeRecommendationFactors(
     skipWashSale = false,
     useRSIGating = true,
     useAISentiment = true,
+    rsiPeriod = 14,
+    rsiOversoldThreshold = 30,
+    rsiOverboughtThreshold = 70,
+    rsiHysteresisPoints = 5,
+    rsiMinRisingDays = 2,
     sellOnlyLongTermQualified = false,
     closes = [],
   } = options;
@@ -738,28 +753,28 @@ export function computeRecommendationFactors(
     });
   }
 
-  const rsiPeriod = stock.rsiPeriod ?? 14;
-  const rsiCurrentValue = rsiSeries(closes, rsiPeriod).at(-1);
+  const clampedRsiPeriod = Math.max(2, Math.min(30, rsiPeriod));
+  const clampedOversoldThreshold = Math.max(10, Math.min(50, rsiOversoldThreshold));
+  const clampedOverboughtThreshold = Math.max(50, Math.min(90, rsiOverboughtThreshold));
+  const clampedHysteresisPoints = Math.max(0, Math.min(20, rsiHysteresisPoints));
+  const clampedRsiMinRisingDays = Math.max(1, Math.min(5, rsiMinRisingDays));
+  const rsiCurrentValue = rsiSeries(closes, clampedRsiPeriod).at(-1);
   if (rsiCurrentValue != null) {
     const rsiGateEnabled = useRSIGating;
     if (rsiGateEnabled) {
-      const oversoldThreshold = stock.rsiOversoldThreshold ?? 30;
-      const overboughtThreshold = stock.rsiOverboughtThreshold ?? 70;
-      const rsiHysteresisPoints = stock.rsiHysteresisPoints ?? 5;
-      const rsiMinRisingDays = stock.rsiMinRisingDays ?? 2;
       const buyReversalDetected = passesRSIReversalWithHysteresis(
         closes,
-        rsiPeriod,
-        oversoldThreshold,
-        rsiHysteresisPoints,
-        rsiMinRisingDays
+        clampedRsiPeriod,
+        clampedOversoldThreshold,
+        clampedHysteresisPoints,
+        clampedRsiMinRisingDays
       );
       const sellReversalDetected = passesRSISellSignalWithHysteresis(
         closes,
-        rsiPeriod,
-        overboughtThreshold,
-        rsiHysteresisPoints,
-        rsiMinRisingDays
+        clampedRsiPeriod,
+        clampedOverboughtThreshold,
+        clampedHysteresisPoints,
+        clampedRsiMinRisingDays
       );
       const isRSIBlockedForCurrentRecommendation = rec.comments.includes("RSI reversal gate active");
       const rsiValueText = rsiCurrentValue.toFixed(0);
@@ -768,9 +783,9 @@ export function computeRecommendationFactors(
       let passesStatus = true;
 
       if (isRSIBlockedForCurrentRecommendation) {
-        if (rsiCurrentValue < oversoldThreshold) {
+        if (rsiCurrentValue < clampedOversoldThreshold) {
           statusLabel = `Blocking: Oversold, reversal pending | RSI ${rsiValueText}`;
-        } else if (rsiCurrentValue > overboughtThreshold) {
+        } else if (rsiCurrentValue > clampedOverboughtThreshold) {
           statusLabel = `Blocking: Overbought, reversal pending | RSI ${rsiValueText}`;
         } else {
           statusLabel = `Blocking: Wait for Reversal trend | RSI ${rsiValueText}`;
@@ -778,9 +793,9 @@ export function computeRecommendationFactors(
         passesStatus = false;
       } else if (buyReversalDetected || sellReversalDetected) {
         statusLabel = `Reversal detected | RSI ${rsiValueText}`;
-      } else if (rsiCurrentValue < oversoldThreshold) {
+      } else if (rsiCurrentValue < clampedOversoldThreshold) {
         statusLabel = `Non-blocking: Oversold | RSI ${rsiValueText}`;
-      } else if (rsiCurrentValue > overboughtThreshold) {
+      } else if (rsiCurrentValue > clampedOverboughtThreshold) {
         statusLabel = `Non-blocking: Overbought | RSI ${rsiValueText}`;
       }
 
@@ -865,6 +880,11 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
     relaxScoreRequirement = false,
     useAISentiment = true,
     useRSIGating = true,
+    rsiPeriod = 14,
+    rsiOversoldThreshold = 30,
+    rsiOverboughtThreshold = 70,
+    rsiHysteresisPoints = 5,
+    rsiMinRisingDays = 2,
     sellOnlyLongTermQualified = false,
   } = options;
 
@@ -946,11 +966,11 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
   const washSaleInfo = skipWashSaleCheck ? null : getWashSaleInfo(stock);
   const shouldApplyAISentimentGate = useAISentiment && !relaxScoreRequirement && stock.isETF !== true;
   const rsiGateEnabled = useRSIGating;
-  const rsiPeriod = stock.rsiPeriod ?? 14;
-  const rsiOversoldThreshold = stock.rsiOversoldThreshold ?? 30;
-  const rsiOverboughtThreshold = stock.rsiOverboughtThreshold ?? 70;
-  const rsiHysteresisPoints = stock.rsiHysteresisPoints ?? 5;
-  const rsiMinRisingDays = stock.rsiMinRisingDays ?? 2;
+  const clampedRsiPeriod = Math.max(2, Math.min(30, rsiPeriod));
+  const clampedOversoldThreshold = Math.max(10, Math.min(50, rsiOversoldThreshold));
+  const clampedOverboughtThreshold = Math.max(50, Math.min(90, rsiOverboughtThreshold));
+  const clampedHysteresisPoints = Math.max(0, Math.min(20, rsiHysteresisPoints));
+  const clampedRsiMinRisingDays = Math.max(1, Math.min(5, rsiMinRisingDays));
   const maxAccumulationLimit = 2 * stockLimit;
 
   if (!relaxScoreRequirement && stock.suppressTradeActions === true) {
@@ -975,13 +995,13 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
   if (numStock > 0 && rsiGateEnabled && currentPrice > avgPrice && passesLongTermCheckForSell) {
     const passesRsiSell = passesRSISellSignalWithHysteresis(
       closes,
-      rsiPeriod,
-      rsiOverboughtThreshold,
-      rsiHysteresisPoints,
-      rsiMinRisingDays
+      clampedRsiPeriod,
+      clampedOverboughtThreshold,
+      clampedHysteresisPoints,
+      clampedRsiMinRisingDays
     );
     if (passesRsiSell && reduceQty > 0) {
-      const currentRSI = rsiSeries(closes, rsiPeriod).at(-1) ?? 50;
+      const currentRSI = rsiSeries(closes, clampedRsiPeriod).at(-1) ?? 50;
       return {
         action: "REDUCE",
         comments: `RSI overbought reversal (RSI: ${currentRSI.toFixed(0)}/100) — trim ${reduceQty.toFixed(0)} shares to lock in partial gains while keeping position for continued upside.`,
@@ -999,8 +1019,8 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
   if (numStock > 0 && targetPrice != null && currentPrice >= targetPrice && passesLongTermCheckForSell && hasDefinitiveTarget) {
     // RSI gate: if overbought right now, defer SELL until RSI reverses
     if (rsiGateEnabled) {
-      const currentRSI = rsiSeries(closes, rsiPeriod).at(-1) ?? 0;
-      if (currentRSI > rsiOverboughtThreshold) {
+      const currentRSI = rsiSeries(closes, clampedRsiPeriod).at(-1) ?? 0;
+      if (currentRSI > clampedOverboughtThreshold) {
         return {
           action: "WAIT_ADD" as const,
           comments: `Target reached but RSI is overbought (${currentRSI.toFixed(0)}/100) — holding for RSI reversal confirmation before selling to avoid selling at momentum peak.`,
@@ -1050,16 +1070,16 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
     if (rsiGateEnabled) {
       const passesRSIGate = passesRSIReversalWithHysteresis(
         closes,
-        rsiPeriod,
-        rsiOversoldThreshold,
-        rsiHysteresisPoints,
-        rsiMinRisingDays
+        clampedRsiPeriod,
+        clampedOversoldThreshold,
+        clampedHysteresisPoints,
+        clampedRsiMinRisingDays
       );
       if (!passesRSIGate) {
         return {
           action: "WAIT_ADD",
           comments:
-            "RSI reversal gate active above stock limit: wait for oversold momentum to reverse with hysteresis confirmation before adding more.",
+            "RSI reversal gate active: wait for oversold momentum to reverse with hysteresis confirmation before buying.",
           nextBuyPrice,
           movingAvg,
           expectedReturnPct,

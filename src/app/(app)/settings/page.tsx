@@ -99,6 +99,11 @@ function SettingsInner() {
   const stockProfitTarget = usePortfolioStore((s) => s.stockProfitTarget);
   const useAISentimentForRecommendations = usePortfolioStore((s) => s.useAISentimentForRecommendations);
   const useRSIGatingForRecommendations = usePortfolioStore((s) => s.useRSIGatingForRecommendations);
+  const rsiPeriodForRecommendations = usePortfolioStore((s) => s.rsiPeriodForRecommendations);
+  const rsiOversoldThresholdForRecommendations = usePortfolioStore((s) => s.rsiOversoldThresholdForRecommendations);
+  const rsiOverboughtThresholdForRecommendations = usePortfolioStore((s) => s.rsiOverboughtThresholdForRecommendations);
+  const rsiHysteresisPointsForRecommendations = usePortfolioStore((s) => s.rsiHysteresisPointsForRecommendations);
+  const rsiMinRisingDaysForRecommendations = usePortfolioStore((s) => s.rsiMinRisingDaysForRecommendations);
   const sellOnlyLongTermQualified = usePortfolioStore((s) => s.sellOnlyLongTermQualified);
   const timezone = usePortfolioStore((s) => s.timezone);
   const region = usePortfolioStore((s) => s.region);
@@ -150,6 +155,11 @@ function SettingsInner() {
         enableRiskFilter: "enableRiskFilter" in patch ? patch.enableRiskFilter : store.enableRiskFilter,
         useAISentiment: "useAISentimentForRecommendations" in patch ? patch.useAISentimentForRecommendations : store.useAISentimentForRecommendations,
         useRSIGating: "useRSIGatingForRecommendations" in patch ? patch.useRSIGatingForRecommendations : store.useRSIGatingForRecommendations,
+        rsiPeriod: "rsiPeriodForRecommendations" in patch ? patch.rsiPeriodForRecommendations : store.rsiPeriodForRecommendations,
+        rsiOversoldThreshold: "rsiOversoldThresholdForRecommendations" in patch ? patch.rsiOversoldThresholdForRecommendations : store.rsiOversoldThresholdForRecommendations,
+        rsiOverboughtThreshold: "rsiOverboughtThresholdForRecommendations" in patch ? patch.rsiOverboughtThresholdForRecommendations : store.rsiOverboughtThresholdForRecommendations,
+        rsiHysteresisPoints: "rsiHysteresisPointsForRecommendations" in patch ? patch.rsiHysteresisPointsForRecommendations : store.rsiHysteresisPointsForRecommendations,
+        rsiMinRisingDays: "rsiMinRisingDaysForRecommendations" in patch ? patch.rsiMinRisingDaysForRecommendations : store.rsiMinRisingDaysForRecommendations,
         sellOnlyLongTerm: "sellOnlyLongTermQualified" in patch ? patch.sellOnlyLongTermQualified : store.sellOnlyLongTermQualified,
         limitWatchlistSize: "limitWatchlistSize" in patch ? patch.limitWatchlistSize : store.limitWatchlistSize,
         timezone: "timezone" in patch ? patch.timezone : store.timezone,
@@ -306,6 +316,11 @@ function SettingsInner() {
           ...(cloudSettings.enableRiskFilter != null ? { enableRiskFilter: cloudSettings.enableRiskFilter } : {}),
           ...(cloudSettings.useAISentiment != null ? { useAISentimentForRecommendations: cloudSettings.useAISentiment } : {}),
           ...(cloudSettings.useRSIGating != null ? { useRSIGatingForRecommendations: cloudSettings.useRSIGating } : {}),
+          ...(cloudSettings.rsiPeriod != null ? { rsiPeriodForRecommendations: cloudSettings.rsiPeriod } : {}),
+          ...(cloudSettings.rsiOversoldThreshold != null ? { rsiOversoldThresholdForRecommendations: cloudSettings.rsiOversoldThreshold } : {}),
+          ...(cloudSettings.rsiOverboughtThreshold != null ? { rsiOverboughtThresholdForRecommendations: cloudSettings.rsiOverboughtThreshold } : {}),
+          ...(cloudSettings.rsiHysteresisPoints != null ? { rsiHysteresisPointsForRecommendations: cloudSettings.rsiHysteresisPoints } : {}),
+          ...(cloudSettings.rsiMinRisingDays != null ? { rsiMinRisingDaysForRecommendations: cloudSettings.rsiMinRisingDays } : {}),
           ...(cloudSettings.sellOnlyLongTerm != null ? { sellOnlyLongTermQualified: cloudSettings.sellOnlyLongTerm } : {}),
           ...(cloudSettings.limitWatchlistSize != null ? { limitWatchlistSize: cloudSettings.limitWatchlistSize } : {}),
           ...(cloudSettings.timezone ? { timezone: cloudSettings.timezone } : {}),
@@ -714,6 +729,65 @@ function SettingsInner() {
                     </span>
                   </span>
                 </label>
+                {useRSIGatingForRecommendations ? (
+                  <div className="grid gap-2 rounded-md border border-border/80 bg-background/40 p-2.5 dark:border-white/[0.08] dark:bg-white/[0.03] sm:grid-cols-2">
+                    <label className="block">
+                      <FieldLabel>RSI period</FieldLabel>
+                      <input
+                        type="number"
+                        min={2}
+                        max={30}
+                        value={rsiPeriodForRecommendations}
+                        onChange={(e) => persistSettingsPatch({ rsiPeriodForRecommendations: Math.max(2, Math.min(30, Number(e.target.value) || 14)) })}
+                        className={inputClass}
+                      />
+                    </label>
+                    <label className="block">
+                      <FieldLabel>RSI oversold threshold</FieldLabel>
+                      <input
+                        type="number"
+                        min={10}
+                        max={50}
+                        value={rsiOversoldThresholdForRecommendations}
+                        onChange={(e) => persistSettingsPatch({ rsiOversoldThresholdForRecommendations: Math.max(10, Math.min(50, Number(e.target.value) || 30)) })}
+                        className={inputClass}
+                      />
+                    </label>
+                    <label className="block">
+                      <FieldLabel>RSI overbought threshold</FieldLabel>
+                      <input
+                        type="number"
+                        min={50}
+                        max={90}
+                        value={rsiOverboughtThresholdForRecommendations}
+                        onChange={(e) => persistSettingsPatch({ rsiOverboughtThresholdForRecommendations: Math.max(50, Math.min(90, Number(e.target.value) || 70)) })}
+                        className={inputClass}
+                      />
+                    </label>
+                    <label className="block">
+                      <FieldLabel>RSI hysteresis points</FieldLabel>
+                      <input
+                        type="number"
+                        min={0}
+                        max={20}
+                        value={rsiHysteresisPointsForRecommendations}
+                        onChange={(e) => persistSettingsPatch({ rsiHysteresisPointsForRecommendations: Math.max(0, Math.min(20, Number(e.target.value) || 5)) })}
+                        className={inputClass}
+                      />
+                    </label>
+                    <label className="block sm:col-span-2">
+                      <FieldLabel>RSI min rising days</FieldLabel>
+                      <input
+                        type="number"
+                        min={1}
+                        max={5}
+                        value={rsiMinRisingDaysForRecommendations}
+                        onChange={(e) => persistSettingsPatch({ rsiMinRisingDaysForRecommendations: Math.max(1, Math.min(5, Number(e.target.value) || 2)) })}
+                        className={inputClass}
+                      />
+                    </label>
+                  </div>
+                ) : null}
                 <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
                   <input
                     type="checkbox"

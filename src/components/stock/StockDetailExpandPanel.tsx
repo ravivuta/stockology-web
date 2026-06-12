@@ -291,6 +291,11 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const stockProfitTarget = usePortfolioStore((s) => s.stockProfitTarget);
   const useAISentimentForRecommendations = usePortfolioStore((s) => s.useAISentimentForRecommendations);
   const useRSIGatingForRecommendations = usePortfolioStore((s) => s.useRSIGatingForRecommendations);
+  const rsiPeriodForRecommendations = usePortfolioStore((s) => s.rsiPeriodForRecommendations);
+  const rsiOversoldThresholdForRecommendations = usePortfolioStore((s) => s.rsiOversoldThresholdForRecommendations);
+  const rsiOverboughtThresholdForRecommendations = usePortfolioStore((s) => s.rsiOverboughtThresholdForRecommendations);
+  const rsiHysteresisPointsForRecommendations = usePortfolioStore((s) => s.rsiHysteresisPointsForRecommendations);
+  const rsiMinRisingDaysForRecommendations = usePortfolioStore((s) => s.rsiMinRisingDaysForRecommendations);
   const sellOnlyLongTermQualified = usePortfolioStore((s) => s.sellOnlyLongTermQualified);
   const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
   const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
@@ -399,6 +404,11 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       stockProfitTarget,
       useAISentiment: useAISentimentForRecommendations,
       useRSIGating: useRSIGatingForRecommendations,
+      rsiPeriod: rsiPeriodForRecommendations,
+      rsiOversoldThreshold: rsiOversoldThresholdForRecommendations,
+      rsiOverboughtThreshold: rsiOverboughtThresholdForRecommendations,
+      rsiHysteresisPoints: rsiHysteresisPointsForRecommendations,
+      rsiMinRisingDays: rsiMinRisingDaysForRecommendations,
       sellOnlyLongTermQualified,
       openLots: lotSummary.openLots,
       soldLots: lotSummary.soldLots,
@@ -415,16 +425,38 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     storedRec,
     useAISentimentForRecommendations,
     useRSIGatingForRecommendations,
+    rsiPeriodForRecommendations,
+    rsiOversoldThresholdForRecommendations,
+    rsiOverboughtThresholdForRecommendations,
+    rsiHysteresisPointsForRecommendations,
+    rsiMinRisingDaysForRecommendations,
   ]);
   const recommendationFactors = useMemo(() => {
     if (!stock || !rec) return [];
     return computeRecommendationFactors(stock, rec, {
       useAISentiment: useAISentimentForRecommendations,
       useRSIGating: useRSIGatingForRecommendations,
+      rsiPeriod: rsiPeriodForRecommendations,
+      rsiOversoldThreshold: rsiOversoldThresholdForRecommendations,
+      rsiOverboughtThreshold: rsiOverboughtThresholdForRecommendations,
+      rsiHysteresisPoints: rsiHysteresisPointsForRecommendations,
+      rsiMinRisingDays: rsiMinRisingDaysForRecommendations,
       sellOnlyLongTermQualified,
       closes,
     });
-  }, [closes, rec, sellOnlyLongTermQualified, stock, useAISentimentForRecommendations, useRSIGatingForRecommendations]);
+  }, [
+    closes,
+    rec,
+    rsiHysteresisPointsForRecommendations,
+    rsiMinRisingDaysForRecommendations,
+    rsiOverboughtThresholdForRecommendations,
+    rsiOversoldThresholdForRecommendations,
+    rsiPeriodForRecommendations,
+    sellOnlyLongTermQualified,
+    stock,
+    useAISentimentForRecommendations,
+    useRSIGatingForRecommendations,
+  ]);
   const recommendationActionFactors = useMemo(
     () =>
       recommendationFactors.filter(

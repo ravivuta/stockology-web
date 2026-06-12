@@ -12,6 +12,11 @@ export type BuildRecommendationOptions = Pick<IosRecOptions, "closes"> & {
   stockProfitTarget?: number;
   useAISentiment?: boolean;
   useRSIGating?: boolean;
+  rsiPeriod?: number;
+  rsiOversoldThreshold?: number;
+  rsiOverboughtThreshold?: number;
+  rsiHysteresisPoints?: number;
+  rsiMinRisingDays?: number;
   sellOnlyLongTermQualified?: boolean;
   openLots?: IosStockInput["openLots"];
   soldLots?: IosStockInput["soldLots"];
@@ -36,6 +41,11 @@ export function buildRecommendation(stock: RecInput, options?: BuildRecommendati
       relaxScoreRequirement: false,
       useAISentiment: options?.useAISentiment ?? true,
       useRSIGating: options?.useRSIGating ?? true,
+      rsiPeriod: options?.rsiPeriod,
+      rsiOversoldThreshold: options?.rsiOversoldThreshold,
+      rsiOverboughtThreshold: options?.rsiOverboughtThreshold,
+      rsiHysteresisPoints: options?.rsiHysteresisPoints,
+      rsiMinRisingDays: options?.rsiMinRisingDays,
       sellOnlyLongTermQualified: options?.sellOnlyLongTermQualified ?? false,
     }
   );
