@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
 import { pushPortfolioSnapshotSlice } from "@/lib/portfolio-snapshot-client";
@@ -91,6 +91,21 @@ type SavedCsvMappingPreset = {
   defaultAccountName: string;
   defaultRetirementAccount: "no" | "yes";
   updatedAt: string;
+};
+
+type CloudCsvMappingPresetRow = {
+  id?: string;
+  name?: string;
+  mapping?: unknown;
+  defaultAccountName?: string;
+  defaultRetirementAccount?: "no" | "yes";
+  retirementAccountSelection?: "no" | "yes";
+  updatedAt?: string;
+};
+
+type CsvMappingsFunctionResponse = {
+  success?: boolean;
+  mappings?: CloudCsvMappingPresetRow[];
 };
 
 function describeAccountType(value: "no" | "yes"): string {
@@ -277,8 +292,7 @@ export function CsvImportExportBar({
   // so blocking import on `optimizing` just locks the button during normal post-load auto-optimize.
   const importBusy = progress.active;
 
-  function normalizeCloudPreset(item: any): SavedCsvMappingPreset | null {
-    if (!item || typeof item !== "object") return null;
+  function normalizeCloudPreset(item: CloudCsvMappingPresetRow): SavedCsvMappingPreset | null {
     const name = typeof item.name === "string" ? item.name.trim() : "";
     if (!name) return null;
 
@@ -302,7 +316,7 @@ export function CsvImportExportBar({
     };
   }
 
-  async function fetchCloudSavedPresets(): Promise<SavedCsvMappingPreset[] | null> {
+  const fetchCloudSavedPresets = useCallback(async (): Promise<SavedCsvMappingPreset[] | null> => {
     if (!hasSupabaseConfig()) return null;
 
     try {
@@ -327,7 +341,7 @@ export function CsvImportExportBar({
       });
 
       if (!response.ok) return null;
-      const payload = (await response.json()) as { success?: boolean; mappings?: any[] };
+      const payload = (await response.json()) as CsvMappingsFunctionResponse;
       if (!payload?.success || !Array.isArray(payload.mappings)) return [];
 
       return payload.mappings
@@ -337,9 +351,9 @@ export function CsvImportExportBar({
     } catch {
       return null;
     }
-  }
+  }, []);
 
-  async function saveCloudSavedPresets(presets: SavedCsvMappingPreset[]) {
+  const saveCloudSavedPresets = useCallback(async (presets: SavedCsvMappingPreset[]) => {
     if (!hasSupabaseConfig()) return;
 
     try {
@@ -370,7 +384,7 @@ export function CsvImportExportBar({
     } catch {
       // ignore cloud sync failures; local storage remains source of truth fallback
     }
-  }
+  }, []);
 
   useEffect(() => {
     const localPresets = loadSavedMappingPresets();
@@ -390,7 +404,7 @@ export function CsvImportExportBar({
         await saveCloudSavedPresets(localPresets);
       }
     })();
-  }, []);
+  }, [fetchCloudSavedPresets, saveCloudSavedPresets]);
 
   function beginImportProgress(label: string, value: number) {
     setProgress({ active: true, label, value });
