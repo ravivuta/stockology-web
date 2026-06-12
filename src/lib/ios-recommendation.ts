@@ -481,6 +481,7 @@ export function calculateTradingLimits(
   marketCap?: number | null,
   beta?: number | null
 ): { stockLimit: number; transactionLimit: number } {
+  void beta;
   const safeWatchlistSize = Math.max(1, Math.round(watchlistSize) || 1);
   const baseStockLimit = Math.max(0, portfolioSize) / safeWatchlistSize;
 
