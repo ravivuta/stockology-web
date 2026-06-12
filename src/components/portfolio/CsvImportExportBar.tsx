@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
 import { pushPortfolioSnapshotSlice } from "@/lib/portfolio-snapshot-client";
 import { fetchTickerHydrationFromTables, type TickerHydrationPriceRow } from "@/lib/ticker-direct-hydration";
+import { getSupabaseEnv } from "@/lib/supabase/config";
 import { usePortfolioStore, type StockHolding } from "@/store/portfolioStore";
 import {
   CSV_IMPORT_FIELDS,
@@ -276,6 +277,121 @@ export function CsvImportExportBar({
   // so blocking import on `optimizing` just locks the button during normal post-load auto-optimize.
   const importBusy = progress.active;
 
+  function normalizeCloudPreset(item: any): SavedCsvMappingPreset | null {
+    if (!item || typeof item !== "object") return null;
+    const name = typeof item.name === "string" ? item.name.trim() : "";
+    if (!name) return null;
+
+    const mapping = item.mapping && typeof item.mapping === "object" ? (item.mapping as CsvColumnMapping) : ({} as CsvColumnMapping);
+    const defaultAccountName =
+      typeof item.defaultAccountName === "string" && item.defaultAccountName.trim()
+        ? item.defaultAccountName.trim()
+        : name;
+    const defaultRetirementAccount =
+      item.defaultRetirementAccount === "yes" || item.retirementAccountSelection === "yes"
+        ? "yes"
+        : "no";
+
+    return {
+      id: typeof item.id === "string" && item.id.trim() ? item.id : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name,
+      mapping,
+      defaultAccountName,
+      defaultRetirementAccount,
+      updatedAt: typeof item.updatedAt === "string" && item.updatedAt.trim() ? item.updatedAt : new Date().toISOString(),
+    };
+  }
+
+  async function fetchCloudSavedPresets(): Promise<SavedCsvMappingPreset[] | null> {
+    if (!hasSupabaseConfig()) return null;
+
+    try {
+      const supabase = createClient();
+      const { data: userData } = await supabase.auth.getUser();
+      const authUserId = userData.user?.id;
+      if (!authUserId) return null;
+
+      const dataUserId = await resolveStocksPmDataUserId(supabase, authUserId);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const { url, key } = getSupabaseEnv();
+      const bearer = sessionData.session?.access_token ?? key;
+
+      const response = await fetch(`${url}/functions/v1/csv-mappings`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": key,
+          "Authorization": `Bearer ${bearer}`,
+        },
+        body: JSON.stringify({ operation: "get", user_id: dataUserId }),
+      });
+
+      if (!response.ok) return null;
+      const payload = (await response.json()) as { success?: boolean; mappings?: any[] };
+      if (!payload?.success || !Array.isArray(payload.mappings)) return [];
+
+      return payload.mappings
+        .map(normalizeCloudPreset)
+        .filter((item): item is SavedCsvMappingPreset => item != null)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    } catch {
+      return null;
+    }
+  }
+
+  async function saveCloudSavedPresets(presets: SavedCsvMappingPreset[]) {
+    if (!hasSupabaseConfig()) return;
+
+    try {
+      const supabase = createClient();
+      const { data: userData } = await supabase.auth.getUser();
+      const authUserId = userData.user?.id;
+      if (!authUserId) return;
+
+      const dataUserId = await resolveStocksPmDataUserId(supabase, authUserId);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const { url, key } = getSupabaseEnv();
+      const bearer = sessionData.session?.access_token ?? key;
+
+      const mappingsPayload = presets.map((preset) => ({
+        ...preset,
+        retirementAccountSelection: preset.defaultRetirementAccount,
+      }));
+
+      await fetch(`${url}/functions/v1/csv-mappings`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": key,
+          "Authorization": `Bearer ${bearer}`,
+        },
+        body: JSON.stringify({ operation: "set", user_id: dataUserId, mappings: mappingsPayload }),
+      });
+    } catch {
+      // ignore cloud sync failures; local storage remains source of truth fallback
+    }
+  }
+
+  useEffect(() => {
+    const localPresets = loadSavedMappingPresets();
+    setSavedPresets(localPresets);
+
+    void (async () => {
+      const cloudPresets = await fetchCloudSavedPresets();
+      if (cloudPresets == null) return;
+
+      if (cloudPresets.length > 0) {
+        persistSavedMappingPresets(cloudPresets);
+        setSavedPresets(cloudPresets);
+        return;
+      }
+
+      if (localPresets.length > 0) {
+        await saveCloudSavedPresets(localPresets);
+      }
+    })();
+  }, []);
+
   function beginImportProgress(label: string, value: number) {
     setProgress({ active: true, label, value });
   }
@@ -439,7 +555,7 @@ export function CsvImportExportBar({
           const text = String(reader.result ?? "");
           if (importMode === "portfolio" && shouldShowCsvMapping(text)) {
             const headers = extractCsvHeaders(text);
-            setSavedPresets(loadSavedMappingPresets());
+            setSavedPresets((current) => (current.length > 0 ? current : loadSavedMappingPresets()));
             setPendingMappingImport({
               text,
               headers,
@@ -646,6 +762,7 @@ export function CsvImportExportBar({
                                   onClick={() => {
                                     const next = removeSavedMappingPreset(preset.id);
                                     setSavedPresets(next);
+                                    void saveCloudSavedPresets(next);
                                     setPendingMappingImport((current) =>
                                       current && current.activePresetId === preset.id
                                         ? { ...current, activePresetId: null }
@@ -778,6 +895,7 @@ export function CsvImportExportBar({
                       defaultRetirementAccount: pendingMappingImport.defaultRetirementAccount === "yes" ? "yes" : "no",
                     });
                     setSavedPresets(next);
+                    void saveCloudSavedPresets(next);
                     const savedPreset = next.find((preset) => preset.id === (pendingMappingImport.activePresetId ?? next[0]?.id));
                     if (savedPreset) {
                       setPendingMappingImport((current) => (current ? { ...current, activePresetId: savedPreset.id } : current));
@@ -891,6 +1009,7 @@ export function CsvImportExportBar({
               if (!presetPendingDelete) return;
               const next = removeSavedMappingPreset(presetPendingDelete.id);
               setSavedPresets(next);
+              void saveCloudSavedPresets(next);
               setPendingMappingImport((current) =>
                 current && current.activePresetId === presetPendingDelete.id
                   ? {
