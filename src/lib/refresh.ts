@@ -92,20 +92,33 @@ export async function runRefreshPipeline(
       options?.includeSnapshot === true &&
       data.snapshot
     ) {
-      const parsed = parseCloudSnapshotForStore(data.snapshot);
-      usePortfolioStore.getState().replaceFromCloudSync({
-        ...parsed,
-        onboardingComplete: true,
-      });
-      if (dataUserId) {
-        markLastPushedPortfolioFingerprint(
-          dataUserId,
-          portfolioSyncFingerprint({
-            cashBalance: parsed.cashBalance,
-            stocks: parsed.stocks,
-            lotsBySymbol: parsed.lotsBySymbol,
-          })
-        );
+      const storeState = usePortfolioStore.getState();
+      const localMutationAt = storeState.lastLocalMutationAt
+        ? Date.parse(storeState.lastLocalMutationAt)
+        : Number.NaN;
+      const snapshotUpdatedAt = data.snapshot.updated_at
+        ? Date.parse(data.snapshot.updated_at)
+        : Number.NaN;
+      const snapshotIsStaleVsLocal =
+        Number.isFinite(localMutationAt) &&
+        (!Number.isFinite(snapshotUpdatedAt) || snapshotUpdatedAt < localMutationAt);
+
+      if (!snapshotIsStaleVsLocal) {
+        const parsed = parseCloudSnapshotForStore(data.snapshot);
+        usePortfolioStore.getState().replaceFromCloudSync({
+          ...parsed,
+          onboardingComplete: true,
+        });
+        if (dataUserId) {
+          markLastPushedPortfolioFingerprint(
+            dataUserId,
+            portfolioSyncFingerprint({
+              cashBalance: parsed.cashBalance,
+              stocks: parsed.stocks,
+              lotsBySymbol: parsed.lotsBySymbol,
+            })
+          );
+        }
       }
     }
 

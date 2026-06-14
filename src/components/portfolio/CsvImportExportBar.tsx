@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
 import { pushPortfolioSnapshotSlice } from "@/lib/portfolio-snapshot-client";
+import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { fetchTickerHydrationFromTables, type TickerHydrationPriceRow } from "@/lib/ticker-direct-hydration";
 import { getSupabaseEnv } from "@/lib/supabase/config";
 import { usePortfolioStore, type StockHolding } from "@/store/portfolioStore";
@@ -438,19 +439,40 @@ export function CsvImportExportBar({
     }
   }
 
-  async function saveImportSnapshot() {
-    if (!hasSupabaseConfig()) return;
+  async function saveImportSnapshot(): Promise<string | null> {
+    // First attempt uses the active in-memory user context and queued snapshot client.
+    const flushResult = await flushCurrentPortfolioSnapshotNow(true, {
+      allowEmptyHoldings: true,
+    });
+    if (!flushResult.error && !flushResult.skipped) return null;
+
+    if (!hasSupabaseConfig()) return null;
+
+    // Fallback path resolves user id explicitly when flush was skipped (e.g. session key missing)
+    // or failed due to transient client context issues.
     const supabase = createClient();
     const { data } = await supabase.auth.getUser();
     const authUserId = data.user?.id;
-    if (!authUserId) return;
+    if (!authUserId) {
+      return flushResult.error ? `Cloud snapshot save failed: ${flushResult.error.message}` : null;
+    }
     const dataUserId = await resolveStocksPmDataUserId(supabase, authUserId);
     const state = usePortfolioStore.getState();
-    await pushPortfolioSnapshotSlice(dataUserId, {
+    const fallback = await pushPortfolioSnapshotSlice(dataUserId, {
       cashBalance: state.cashBalance,
       stocks: state.stocks,
       lotsBySymbol: state.lotsBySymbol,
     }, { force: true, supabase });
+
+    if (fallback.error) {
+      return `Cloud snapshot save failed: ${fallback.error.message}`;
+    }
+
+    if (flushResult.error) {
+      return `Cloud snapshot retry succeeded after initial failure: ${flushResult.error.message}`;
+    }
+
+    return null;
   }
 
   async function applyImport(
@@ -496,13 +518,15 @@ export function CsvImportExportBar({
       importedTrades
     );
 
+    let snapshotWarning: string | null = null;
+
     if (outcome.importedSymbols.length > 0) {
       updateImportProgress("Loading market data", 76);
       await hydrateImportedSymbols(outcome.importedSymbols);
       recalc();
       usePortfolioStore.setState({ lastRefreshAt: new Date().toISOString() });
       updateImportProgress("Saving snapshot", 92);
-      await saveImportSnapshot();
+      snapshotWarning = await saveImportSnapshot();
     }
 
     const invalidNote =
@@ -553,7 +577,7 @@ export function CsvImportExportBar({
 
     setFlash({
       kind: "ok",
-      text: `${summaryText}${prunedNote}${cashAdjustmentNote}${invalidNote}`,
+      text: `${summaryText}${prunedNote}${cashAdjustmentNote}${invalidNote}${snapshotWarning ? ` ${snapshotWarning}` : ""}`,
     });
   }
 
