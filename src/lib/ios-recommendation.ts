@@ -601,7 +601,7 @@ export function computeRecommendationFactors(
       }
       if (useAISentiment && !isETF) {
         const lastUpdated = stock.aiSentimentLastUpdated ? new Date(stock.aiSentimentLastUpdated) : null;
-        const isFresh = lastUpdated && (Date.now() - lastUpdated.getTime()) < (14 * 24 * 60 * 60 * 1000);
+        const isFresh = lastUpdated && (Date.now() - lastUpdated.getTime()) < (3 * 24 * 60 * 60 * 1000);
         
         let aiPass: boolean;
         let detail: string;
@@ -681,7 +681,7 @@ export function computeRecommendationFactors(
       });
       if (useAISentiment) {
         const lastUpdated = stock.aiSentimentLastUpdated ? new Date(stock.aiSentimentLastUpdated) : null;
-        const isFresh = lastUpdated && (Date.now() - lastUpdated.getTime()) < (14 * 24 * 60 * 60 * 1000);
+        const isFresh = lastUpdated && (Date.now() - lastUpdated.getTime()) < (3 * 24 * 60 * 60 * 1000);
         
         let aiPass: boolean;
         let detail: string;
@@ -1026,11 +1026,11 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
     }
     // AI Sentiment bullish gate — if sentiment is bullish (≥65) for a non-ETF, hold off selling;
     // recent positive news suggests potential upside beyond the current analyst target.
-    // Only apply if sentiment is fresh (updated within last 2 weeks)
+    // Only apply if sentiment is fresh (updated within last 3 days)
     if (shouldApplyAISentimentGate) {
       const ai = stock.aiSentimentScore;
       const lastUpdated = stock.aiSentimentLastUpdated ? new Date(stock.aiSentimentLastUpdated) : null;
-      const isFresh = lastUpdated && (Date.now() - lastUpdated.getTime()) < (14 * 24 * 60 * 60 * 1000);
+      const isFresh = lastUpdated && (Date.now() - lastUpdated.getTime()) < (3 * 24 * 60 * 60 * 1000);
       
       if (ai != null && ai >= 65 && isFresh) {
         const label = ai >= 70 ? "Bullish" : "Mildly Bullish";
@@ -1094,7 +1094,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
     if (shouldApplyAISentimentGate) {
       const ai = stock.aiSentimentScore;
       const lastUpdated = stock.aiSentimentLastUpdated ? new Date(stock.aiSentimentLastUpdated) : null;
-      const isFresh = lastUpdated && (Date.now() - lastUpdated.getTime()) < (14 * 24 * 60 * 60 * 1000);
+      const isFresh = lastUpdated && (Date.now() - lastUpdated.getTime()) < (3 * 24 * 60 * 60 * 1000);
       
       if (ai != null && ai > 0 && ai < 50 && isFresh) {
         const label = ai < 30 ? "Bearish" : ai < 45 ? "Mildly Bearish" : "Cautious";
