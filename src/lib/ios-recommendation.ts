@@ -1006,6 +1006,51 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
     }
   }
 
+  // Profit-protection exit: lock gains during multi-signal weakness before analyst target is reached.
+  // Guardrail requested: only trigger when current price is still above SMA.
+  if (numStock > 0 && avgPrice > 0 && currentPrice > movingAvg && passesLongTermCheckForSell) {
+    const unrealizedGainPct = ((currentPrice - avgPrice) / Math.max(avgPrice, 0.0001)) * 100;
+    if (unrealizedGainPct >= 25) {
+      const scoreWeakness = metricScore > 0 && metricScore < 50;
+
+      const rsiValues = rsiSeries(closes, clampedRsiPeriod);
+      const rsiWeakness = rsiValues.length >= 3
+        && (rsiValues.at(-1) ?? 100) < 55
+        && (rsiValues.at(-1) ?? 100) < (rsiValues.at(-2) ?? 100)
+        && (rsiValues.at(-2) ?? 100) < (rsiValues.at(-3) ?? 100);
+
+      let aiWeakness = false;
+      if (shouldApplyAISentimentGate) {
+        const ai = stock.aiSentimentScore;
+        const lastUpdated = stock.aiSentimentLastUpdated ? new Date(stock.aiSentimentLastUpdated) : null;
+        const isFresh = lastUpdated && (Date.now() - lastUpdated.getTime()) < (3 * 24 * 60 * 60 * 1000);
+        aiWeakness = ai != null && ai < 45 && Boolean(isFresh);
+      }
+
+      const weaknessCount = [scoreWeakness, rsiWeakness, aiWeakness].filter(Boolean).length;
+      if (weaknessCount >= 2) {
+        if (weaknessCount >= 3) {
+          return {
+            action: "SELL",
+            comments: `Profit protection: Unrealized gain is ${unrealizedGainPct.toFixed(1)}% with broad weakness (score/RSI/AI). Price remains above SMA, but momentum is deteriorating — SELL to lock in gains.`,
+            nextBuyPrice,
+            movingAvg,
+            expectedReturnPct,
+          };
+        }
+
+        const protectiveReduceQty = numStock > 1 ? Math.max(1, Math.floor(numStock * 0.33)) : 1;
+        return {
+          action: "REDUCE",
+          comments: `Profit protection: Unrealized gain is ${unrealizedGainPct.toFixed(1)}% with weakening signals. Price is still above SMA — trim ${protectiveReduceQty.toFixed(0)} shares to lock in gains before deeper pullback risk.`,
+          nextBuyPrice,
+          movingAvg,
+          expectedReturnPct,
+        };
+      }
+    }
+  }
+
   // Guard: for non-ETF stocks, only trigger SELL when a real analyst target exists.
   // The fallback profit-% target drives expectedReturnPct display only, not a SELL signal,
   // to prevent false SELL flashes when analystTarget is temporarily missing during a refresh.
