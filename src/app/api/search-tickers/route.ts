@@ -2,8 +2,58 @@ import { NextRequest, NextResponse } from "next/server";
 
 const MARKETSTACK_BASE = "https://api.marketstack.com/v1/tickers";
 
+const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
+const RATE_WINDOW_MS = 60 * 1000;
+const RATE_MAX_REQUESTS = 30;
+
 const ALLOWED_US_MICS = new Set(["XNYS", "XNAS", "XASE", "ARCX", "BATS", "IEXG"]);
 const ALLOWED_US_ACRONYMS = new Set(["NYSE", "NASDAQ", "AMEX", "ARCA", "BATS", "IEX"]);
+
+type CachedSearch = {
+  expiresAt: number;
+  payload: Array<{ symbol: string; company_name: string | null; exchange: string | null }>;
+};
+
+const searchCache = new Map<string, CachedSearch>();
+const ipRateWindow = new Map<string, { windowStart: number; count: number }>();
+
+function getClientIp(req: NextRequest): string {
+  const forwarded = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  if (forwarded) return forwarded;
+  return req.headers.get("x-real-ip")?.trim() || "unknown";
+}
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const existing = ipRateWindow.get(ip);
+
+  if (!existing || now - existing.windowStart >= RATE_WINDOW_MS) {
+    ipRateWindow.set(ip, { windowStart: now, count: 1 });
+    return false;
+  }
+
+  existing.count += 1;
+  ipRateWindow.set(ip, existing);
+  return existing.count > RATE_MAX_REQUESTS;
+}
+
+function getCachedSearch(query: string): CachedSearch["payload"] | null {
+  const now = Date.now();
+  const cached = searchCache.get(query);
+  if (!cached) return null;
+  if (cached.expiresAt <= now) {
+    searchCache.delete(query);
+    return null;
+  }
+  return cached.payload;
+}
+
+function setCachedSearch(query: string, payload: CachedSearch["payload"]): void {
+  searchCache.set(query, {
+    payload,
+    expiresAt: Date.now() + SEARCH_CACHE_TTL_MS,
+  });
+}
 
 interface MSExchange {
   name?: string;
@@ -47,13 +97,24 @@ export async function GET(req: NextRequest) {
   const query = req.nextUrl.searchParams.get("q")?.trim() ?? "";
   if (query.length < 1) return NextResponse.json([]);
 
+  const clientIp = getClientIp(req);
+  if (isRateLimited(clientIp)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
+  const cacheKey = query.toUpperCase();
+  const cached = getCachedSearch(cacheKey);
+  if (cached) {
+    return NextResponse.json(cached);
+  }
+
   const apiKey = process.env.MARKETSTACK_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "Search unavailable" }, { status: 503 });
 
   // For short ticker-like queries (1-5 chars, no spaces, all uppercase),
   // run a direct ticker lookup in parallel with the name search so exact
   // symbol matches (e.g. RDY, DXYZ) always appear at the top.
-  const looksLikeTicker = query.length <= 5 && !query.includes(" ") && query === query.toUpperCase();
+  const looksLikeTicker = query.length >= 2 && query.length <= 5 && !query.includes(" ") && query === query.toUpperCase();
 
   const nameUrl = new URL(MARKETSTACK_BASE);
   nameUrl.searchParams.set("access_key", apiKey);
@@ -101,6 +162,8 @@ export async function GET(req: NextRequest) {
         company_name: t.name ?? null,
         exchange: t.stock_exchange?.acronym ?? t.stock_exchange?.name ?? null,
       }));
+
+    setCachedSearch(cacheKey, usResults);
 
     return NextResponse.json(usResults);
   } catch {
