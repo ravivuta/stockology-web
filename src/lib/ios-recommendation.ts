@@ -658,13 +658,6 @@ export function computeRecommendationFactors(
         detail: `Gain ${formatCurrency(unrealizedGain)} vs needed ${formatCurrency(gainNeeded)}${gainTriggerPrice > 0 ? ` (triggers at ${formatCurrency(gainTriggerPrice)})` : ""}`,
         passes: unrealizedGain > gainNeeded,
       });
-      if (rec.movingAvg > 0) {
-        factors.push({
-          label: `Price above ${stock.shortSMA}-day SMA`,
-          detail: `${formatCurrency(currentPrice)} vs ${formatCurrency(rec.movingAvg)}`,
-          passes: currentPrice > rec.movingAvg,
-        });
-      }
       break;
     }
     default:
@@ -1155,7 +1148,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
       Date.now() - oldest.getTime() > 365 * DAY_MS;
   }
 
-  if (numStock > 0 && costBasis > stockLimit && reduceQty > 0 && currentPrice > movingAvg && passesLongTermCheckForReduce) {
+  if (numStock > 0 && costBasis > stockLimit && reduceQty > 0 && passesLongTermCheckForReduce) {
     return {
       action: "REDUCE",
       comments: generateReduceComment(stock, reduceQty),
@@ -1196,7 +1189,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
   if (costBasis >= maxAccumulationLimit) {
     return {
       action: "WAIT_REDUCE",
-      comments: `Position at 2× Stock Limit cap — no more adding. Reduce triggers when price rises above ${actualSmaPeriod.toFixed(0)}-day SMA (${formatCurrency(movingAvg)}) AND unrealized gains exceed the over-limit exposure.`,
+      comments: "Position at 2× Stock Limit cap — no more adding. Reduce triggers when unrealized gains exceed the over-limit exposure.",
       nextBuyPrice,
       movingAvg,
       expectedReturnPct,
@@ -1205,9 +1198,6 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
 
   if (costBasis > stockLimit) {
     const blockers: string[] = [];
-    if (currentPrice <= movingAvg) {
-      blockers.push(`price is below ${actualSmaPeriod.toFixed(0)}-day SMA (${formatCurrency(movingAvg)})`);
-    }
     if (reduceQty <= 0) {
       blockers.push("unrealized gain is not yet sufficient for a trim");
     }
