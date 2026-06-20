@@ -74,6 +74,7 @@ export type IosRecOptions = {
   rsiHysteresisPoints?: number;
   rsiMinRisingDays?: number;
   sellOnlyLongTermQualified?: boolean;
+  useTraderMode?: boolean;
 };
 
 export type WashSaleInfo = {
@@ -545,6 +546,7 @@ export function computeRecommendationFactors(
   const quantity = stock.quantity;
   const costBasis = quantity * avgPrice;
   const stockLimit = stock.stockLimit;
+  const transactionLimit = stock.transactionLimit;
   const unrealizedGain = (currentPrice - avgPrice) * quantity;
   const action = rec.action.toUpperCase();
 
@@ -633,24 +635,16 @@ export function computeRecommendationFactors(
     case "REDUCE":
     case "WAIT_REDUCE": {
       const moneyToFree = Math.max(0, costBasis - stockLimit);
-      const maxHoldingLimit = 2 * stockLimit;
       factors.push({
         label: "Cost basis above limit",
         detail: `${formatCurrency(costBasis)} > ${formatCurrency(stockLimit)}`,
         passes: costBasis > stockLimit,
       });
       factors.push({
-        label: "Below 2× accumulation cap (ADD still allowed)",
-        detail: `${formatCurrency(costBasis)} of ${formatCurrency(maxHoldingLimit)} max`,
-        passes: costBasis < maxHoldingLimit,
+        label: "Excess costbasis to free is above transaction limit?",
+        detail: `${formatCurrency(moneyToFree)} > ${formatCurrency(transactionLimit)}`,
+        passes: moneyToFree > transactionLimit,
       });
-      if (action === "WAIT_REDUCE" && rec.nextBuyPrice > 0) {
-        factors.push({
-          label: "Price at/below ADD target",
-          detail: `${formatCurrency(currentPrice)} vs ${formatCurrency(rec.nextBuyPrice)}`,
-          passes: currentPrice <= rec.nextBuyPrice,
-        });
-      }
       const gainNeeded = moneyToFree / 2;
       const gainTriggerPrice = quantity > 0 ? avgPrice + gainNeeded / quantity : 0;
       factors.push({
@@ -880,6 +874,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
     rsiHysteresisPoints = 5,
     rsiMinRisingDays = 2,
     sellOnlyLongTermQualified = false,
+    useTraderMode = false,
   } = options;
 
   const currentPrice = stock.lastPrice ?? 0;
@@ -1006,9 +1001,10 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
     }
   }
 
-  // Profit-protection exit: lock gains during multi-signal weakness before analyst target is reached.
-  // Guardrail requested: only trigger when current price is still above SMA.
-  if (numStock > 0 && avgPrice > 0 && currentPrice > movingAvg && passesLongTermCheckForSell) {
+  // Profit-protection exit (Trader mode only): lock gains during multi-signal weakness before analyst target is reached.
+  // Guardrail: only trigger when current price is still above SMA.
+  // Investor mode: skip this block entirely — hold until analyst target.
+  if (useTraderMode && numStock > 0 && avgPrice > 0 && currentPrice > movingAvg && passesLongTermCheckForSell) {
     const unrealizedGainPct = ((currentPrice - avgPrice) / Math.max(avgPrice, 0.0001)) * 100;
     if (unrealizedGainPct >= 25) {
       const scoreWeakness = metricScore > 0 && metricScore < 50;
@@ -1028,21 +1024,10 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
       }
 
       const weaknessCount = [scoreWeakness, rsiWeakness, aiWeakness].filter(Boolean).length;
-      if (weaknessCount >= 2) {
-        if (weaknessCount >= 3) {
-          return {
-            action: "SELL",
-            comments: `Profit protection: Unrealized gain is ${unrealizedGainPct.toFixed(1)}% with broad weakness (score/RSI/AI). Price remains above SMA, but momentum is deteriorating — SELL to lock in gains.`,
-            nextBuyPrice,
-            movingAvg,
-            expectedReturnPct,
-          };
-        }
-
-        const protectiveReduceQty = numStock > 1 ? Math.max(1, Math.floor(numStock * 0.33)) : 1;
+      if (weaknessCount >= 3 && expectedReturnPct < 15) {
         return {
-          action: "REDUCE",
-          comments: `Profit protection: Unrealized gain is ${unrealizedGainPct.toFixed(1)}% with weakening signals. Price is still above SMA — trim ${protectiveReduceQty.toFixed(0)} shares to lock in gains before deeper pullback risk.`,
+          action: "SELL",
+          comments: `Profit protection: Unrealized gain is ${unrealizedGainPct.toFixed(1)}% with broad weakness (score/RSI/AI). Price remains above SMA, but momentum is deteriorating — SELL to lock in gains.`,
           nextBuyPrice,
           movingAvg,
           expectedReturnPct,
@@ -1055,7 +1040,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
   // The fallback profit-% target drives expectedReturnPct display only, not a SELL signal,
   // to prevent false SELL flashes when analystTarget is temporarily missing during a refresh.
   const hasDefinitiveTarget = (stock.analystTarget != null && stock.analystTarget > 0) || stock.isETF === true;
-  if (numStock > 0 && targetPrice != null && currentPrice >= targetPrice && passesLongTermCheckForSell && hasDefinitiveTarget) {
+  if (numStock > 0 && targetPrice != null && currentPrice >= targetPrice && passesLongTermCheckForSell && hasDefinitiveTarget && expectedReturnPct < 15) {
     // RSI gate: if overbought right now, defer SELL until RSI reverses
     if (rsiGateEnabled) {
       const currentRSI = rsiSeries(closes, clampedRsiPeriod).at(-1) ?? 0;
