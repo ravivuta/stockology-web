@@ -147,6 +147,25 @@ export async function fetchNewsFeedFromSupabase(
   return { items, error: null };
 }
 
+export async function refreshNewsSentimentFromSupabase(
+  supabase: SupabaseClient,
+  stocks: { symbol: string }[]
+): Promise<void> {
+  const symbols = [...new Set(stocks.map((s) => s.symbol.trim().toUpperCase()).filter(Boolean))];
+  if (symbols.length === 0) return;
+
+  const { error } = await supabase.functions.invoke("refresh-ai-sentiment", {
+    body: {
+      symbols,
+      limit: Math.min(100, symbols.length),
+    },
+  });
+
+  if (error) {
+    throw new Error(error.message || "refresh-ai-sentiment failed");
+  }
+}
+
 export function filterNewsItems(items: NewsFeedItem[], searchText: string): NewsFeedItem[] {
   const q = searchText.trim().toLowerCase();
   if (!q) return items;

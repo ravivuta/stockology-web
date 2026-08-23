@@ -798,7 +798,7 @@ function SettingsInner() {
                   <span>
                     <span className="block text-[12px] font-medium leading-snug text-foreground">Use RSI reversal gating</span>
                     <span className="mt-px block text-[10px] leading-snug text-subtle">
-                      RSI reversal confirmation can suppress BUY or ADD until oversold momentum reversal is confirmed. When disabled, RSI will not block recommendations.
+                      BUY is never RSI-gated. RSI can block ADD only when holding size is already above Stock Limit, and can delay SELL at overbought peaks until reversal confirms. When disabled, RSI does not block recommendation actions.
                     </span>
                   </span>
                 </label>
@@ -810,9 +810,9 @@ function SettingsInner() {
                     onChange={(e) => persistSettingsPatch({ sellOnlyLongTermQualified: e.target.checked })}
                   />
                   <span>
-                    <span className="block text-[12px] font-medium leading-snug text-foreground">Only sell taxable lots with long-term gains</span>
+                    <span className="block text-[12px] font-medium leading-snug text-foreground">Tax consideration</span>
                     <span className="mt-px block text-[10px] leading-snug text-subtle">
-                      SELL and REDUCE stay blocked for taxable lots with gains until they are older than 365 days, while retirement-account lots remain eligible regardless of holding period.
+                      Suppress SELL recommendations for short-term holdings/lots in taxable accounts. Does not apply to Retirement accounts as those transactions are tax-free.
                     </span>
                   </span>
                 </label>

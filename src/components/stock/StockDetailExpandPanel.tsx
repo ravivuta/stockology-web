@@ -545,6 +545,17 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       setAiNewsLoading(true);
       try {
         const supabase = createClient();
+
+        // Trigger a smart one-symbol refresh first so this panel can show newer headlines.
+        // The edge function internally skips heavy work when cached sentiment is still fresh.
+        try {
+          await supabase.functions.invoke("refresh-ai-sentiment", {
+            body: { symbols: [stockSymbol], limit: 1 },
+          });
+        } catch (refreshError) {
+          console.warn("[stock ai sentiment refresh]", refreshError);
+        }
+
         const { data, error } = await supabase
           .from("ai_sentiment_scores")
           .select("news_sources, last_updated")

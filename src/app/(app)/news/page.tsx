@@ -10,6 +10,7 @@ import {
   fetchNewsFeedFromSupabase,
   filterNewsItems,
   formatNewsRelativeDate,
+  refreshNewsSentimentFromSupabase,
   sentimentDotClass,
   type NewsFeedItem,
 } from "@/lib/news-feed";
@@ -153,6 +154,11 @@ export default function NewsPage() {
     setLoadError(null);
     try {
       const supabase = createClient();
+      try {
+        await refreshNewsSentimentFromSupabase(supabase, currentStocks);
+      } catch (refreshError) {
+        console.warn("[news sentiment refresh]", refreshError);
+      }
       const { items: next, error } = await fetchNewsFeedFromSupabase(supabase, currentStocks);
       if (error) setLoadError(error);
       setItems(next);

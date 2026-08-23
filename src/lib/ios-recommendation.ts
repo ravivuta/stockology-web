@@ -231,6 +231,9 @@ export function getOldestTaxableGainLotDate(stock: IosStockInput, currentPrice: 
 }
 
 export function getWashSaleInfo(stock: IosStockInput, now = new Date()): WashSaleInfo {
+  const washSaleRestrictionDays = 30;
+  const soldLotRetentionDays = 90;
+
   let restrictedUntil: Date | null = null;
   let restrictingLoss: number | null = null;
 
@@ -239,8 +242,8 @@ export function getWashSaleInfo(stock: IosStockInput, now = new Date()): WashSal
     const realized = Number(sold.realizedGainLoss ?? 0);
     if (!saleDate || !Number.isFinite(realized) || realized >= 0) continue;
     const ageMs = now.getTime() - saleDate.getTime();
-    if (ageMs < 0 || ageMs > 30 * DAY_MS) continue;
-    const end = new Date(saleDate.getTime() + 30 * DAY_MS);
+    if (ageMs < 0 || ageMs > soldLotRetentionDays * DAY_MS) continue;
+    const end = new Date(saleDate.getTime() + washSaleRestrictionDays * DAY_MS);
     if (end.getTime() > now.getTime() && (!restrictedUntil || end.getTime() > restrictedUntil.getTime())) {
       restrictedUntil = end;
       restrictingLoss = realized;
@@ -634,24 +637,26 @@ export function computeRecommendationFactors(
       break;
     case "REDUCE":
     case "WAIT_REDUCE": {
-      const moneyToFree = Math.max(0, costBasis - stockLimit);
-      factors.push({
-        label: "Cost basis above limit",
-        detail: `${formatCurrency(costBasis)} > ${formatCurrency(stockLimit)}`,
-        passes: costBasis > stockLimit,
-      });
-      factors.push({
-        label: "Excess costbasis to free is above transaction limit?",
-        detail: `${formatCurrency(moneyToFree)} > ${formatCurrency(transactionLimit)}`,
-        passes: moneyToFree > transactionLimit,
-      });
-      const gainNeeded = moneyToFree / 2;
-      const gainTriggerPrice = quantity > 0 ? avgPrice + gainNeeded / quantity : 0;
-      factors.push({
-        label: "Unrealized gain sufficient to reduce",
-        detail: `Gain ${formatCurrency(unrealizedGain)} vs needed ${formatCurrency(gainNeeded)}${gainTriggerPrice > 0 ? ` (triggers at ${formatCurrency(gainTriggerPrice)})` : ""}`,
-        passes: unrealizedGain > gainNeeded,
-      });
+      if (costBasis > stockLimit) {
+        const moneyToFree = Math.max(0, costBasis - stockLimit);
+        factors.push({
+          label: "Cost basis above limit",
+          detail: `${formatCurrency(costBasis)} > ${formatCurrency(stockLimit)}`,
+          passes: costBasis > stockLimit,
+        });
+        factors.push({
+          label: "Excess investment is significant (> Transaction limit)?",
+          detail: `${formatCurrency(moneyToFree)} > ${formatCurrency(transactionLimit)}`,
+          passes: moneyToFree > transactionLimit,
+        });
+        const gainNeeded = moneyToFree / 2;
+        const gainTriggerPrice = quantity > 0 ? avgPrice + gainNeeded / quantity : 0;
+        factors.push({
+          label: "Unrealized gain sufficient to reduce",
+          detail: `Gain ${formatCurrency(unrealizedGain)} vs needed ${formatCurrency(gainNeeded)}${gainTriggerPrice > 0 ? ` (triggers at ${formatCurrency(gainTriggerPrice)})` : ""}`,
+          passes: unrealizedGain > gainNeeded,
+        });
+      }
       break;
     }
     default:
@@ -961,6 +966,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
   const clampedHysteresisPoints = Math.max(0, Math.min(20, rsiHysteresisPoints));
   const clampedRsiMinRisingDays = Math.max(1, Math.min(5, rsiMinRisingDays));
   const maxAccumulationLimit = 2 * stockLimit;
+  const enforceRSIGateForThisEntry = rsiGateEnabled && numStock > 0 && costBasis > stockLimit;
 
   if (!relaxScoreRequirement && stock.suppressTradeActions === true) {
     return {
@@ -1091,7 +1097,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
     currentPrice < transactionLimit &&
     gateReturnAndScore
   ) {
-    if (rsiGateEnabled) {
+    if (enforceRSIGateForThisEntry) {
       const passesRSIGate = passesRSIReversalWithHysteresis(
         closes,
         clampedRsiPeriod,

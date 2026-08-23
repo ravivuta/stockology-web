@@ -102,7 +102,7 @@ const SECTIONS: Section[] = [
   {
     category: "signals",
     title: "Recommendations",
-    body: "High-level actions (BUY/ADD/SELL/REDUCE/WAIT) based on trend, targets, and position size versus limits. WAIT states become actionable BUY/ADD/SELL/REDUCE when conditions are met.",
+    body: "High-level actions (BUY/ADD/SELL/REDUCE/WAIT) based on trend, targets, and position size versus limits. With RSI gating enabled, BUY is never blocked by RSI, ADD can be blocked only when holdings are already above Stock Limit, and some SELL signals can wait for overbought reversal confirmation.",
   },
   {
     category: "stock-detail",
