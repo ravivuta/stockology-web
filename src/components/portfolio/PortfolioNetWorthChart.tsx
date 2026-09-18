@@ -74,14 +74,13 @@ export function PortfolioNetWorthChart({ stocks, cash, tradeJournal }: Props) {
         const { data: auth } = await supabase.auth.getUser();
         const uid = auth.user?.id;
         if (!uid) {
-          if (!cancelled) setCloudPts([]);
           return;
         }
         const dataUserId = await resolveStocksPmDataUserId(supabase, uid);
         const rows = await fetchCloudNetWorthHistory(supabase, dataUserId);
         if (!cancelled) setCloudPts(rows);
       } catch {
-        if (!cancelled) setCloudPts([]);
+        // Keep whatever was already loaded rather than forcing a blank series.
       }
     }
 

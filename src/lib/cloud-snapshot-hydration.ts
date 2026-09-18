@@ -13,8 +13,11 @@ type RawHolding = {
   last_price?: number;
   currentPrice?: number;
   current_price?: number;
+  pendingOptimization?: boolean | null;
   shortSMA?: number | null;
+  short_sma?: number | null;
   dynamicFactor?: number | null;
+  dynamic_factor?: number | null;
   stockLimit?: number | null;
   transactionLimit?: number | null;
   targetPrice?: number | null;
@@ -39,6 +42,14 @@ type RawHolding = {
   market_cap?: number | null;
   peg?: number | null;
   peg_ratio?: number | null;
+  returnOnEquity?: number | null;
+  return_on_equity?: number | null;
+  profitMargin?: number | null;
+  profit_margin?: number | null;
+  trailingPE?: number | null;
+  trailing_pe?: number | null;
+  debtToEquity?: number | null;
+  debt_to_equity?: number | null;
   isETF?: boolean | null;
   is_etf?: boolean | null;
   lotHistory?: {
@@ -143,14 +154,17 @@ function parseRawHolding(raw: unknown): { stock: StockHolding; lots: { open: Tra
   const averageCost = Number(h.averageCost ?? h.average_cost) || 0;
   const lastPrice = Number(h.lastPrice ?? h.last_price ?? h.currentPrice ?? h.current_price) || averageCost || 0;
 
+  const shortSMARaw = h.shortSMA ?? h.short_sma;
+  const factorRaw = h.dynamicFactor ?? h.dynamic_factor;
+  const shortSMA =
+    shortSMARaw != null && Number.isFinite(Number(shortSMARaw)) ? Math.round(Number(shortSMARaw)) : 50;
+  const dynamicFactor =
+    factorRaw != null && Number.isFinite(Number(factorRaw)) ? Number(factorRaw) : 20;
   const hasStrategy =
-    h.shortSMA != null &&
-    Number.isFinite(Number(h.shortSMA)) &&
-    h.dynamicFactor != null &&
-    Number.isFinite(Number(h.dynamicFactor));
-
-  const shortSMA = hasStrategy ? Math.round(Number(h.shortSMA)) : 50;
-  const dynamicFactor = hasStrategy ? Number(h.dynamicFactor) : 20;
+    shortSMARaw != null &&
+    Number.isFinite(Number(shortSMARaw)) &&
+    factorRaw != null &&
+    Number.isFinite(Number(factorRaw));
   const stockLimit = h.stockLimit != null && Number.isFinite(Number(h.stockLimit)) ? Number(h.stockLimit) : 10000;
   const transactionLimit =
     h.transactionLimit != null && Number.isFinite(Number(h.transactionLimit)) ? Number(h.transactionLimit) : 2500;
@@ -166,7 +180,7 @@ function parseRawHolding(raw: unknown): { stock: StockHolding; lots: { open: Tra
     stockLimit,
     transactionLimit,
     targetPrice,
-    pendingOptimization: !hasStrategy,
+    pendingOptimization: typeof h.pendingOptimization === "boolean" ? h.pendingOptimization : !hasStrategy,
     lastPrice,
     dailyChangePercent: 0,
     isShortlisted: h.isShortlisted === true,
@@ -205,6 +219,18 @@ function parseRawHolding(raw: unknown): { stock: StockHolding; lots: { open: Tra
 
   const peg = parseStockPeg(h.peg ?? h.peg_ratio);
   if (peg !== undefined) stock.peg = peg;
+
+  const roe = optFiniteNumber(h.returnOnEquity ?? h.return_on_equity);
+  if (roe != null) stock.returnOnEquity = roe;
+
+  const margin = optFiniteNumber(h.profitMargin ?? h.profit_margin);
+  if (margin != null) stock.profitMargin = margin;
+
+  const trailingPe = optFiniteNumber(h.trailingPE ?? h.trailing_pe);
+  if (trailingPe != null && trailingPe > 0) stock.trailingPE = trailingPe;
+
+  const debtToEquity = optFiniteNumber(h.debtToEquity ?? h.debt_to_equity);
+  if (debtToEquity != null && debtToEquity >= 0) stock.debtToEquity = debtToEquity;
 
   if (h.isETF === true || h.is_etf === true) stock.isETF = true;
   else if (h.isETF === false || h.is_etf === false) stock.isETF = false;

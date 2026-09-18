@@ -34,6 +34,9 @@ export type IosStockInput = {
   analystAvg?: string;
   marketCap?: number;
   peg?: number;
+  returnOnEquity?: number;
+  profitMargin?: number;
+  debtToEquity?: number;
   score?: number;
   aiSentimentScore?: number;
   aiSentimentLastUpdated?: string; // ISO8601 timestamp
@@ -51,6 +54,42 @@ export type IosStockInput = {
   openLots?: IosOpenLot[];
   soldLots?: IosSoldLot[];
 };
+
+function pegNormalized(pegRatio: number): number {
+  if (pegRatio < 1) return 1.0;
+  if (pegRatio < 1.5) return 0.8;
+  if (pegRatio < 2) return 0.6;
+  if (pegRatio < 3) return 0.4;
+  if (pegRatio < 5) return 0.2;
+  return 0.05;
+}
+
+function roeNormalized(roe: number): number {
+  if (roe >= 0.5) return 1.0;
+  if (roe >= 0.4) return 0.8;
+  if (roe >= 0.3) return 0.6;
+  if (roe >= 0.2) return 0.4;
+  if (roe >= 0.1) return 0.2;
+  return 0.0;
+}
+
+function marginNormalized(margin: number): number {
+  if (margin >= 0.5) return 1.0;
+  if (margin >= 0.4) return 0.8;
+  if (margin >= 0.3) return 0.6;
+  if (margin >= 0.2) return 0.4;
+  if (margin >= 0.1) return 0.2;
+  return 0.0;
+}
+
+function debtToEquityNormalized(debtToEquity: number): number {
+  if (debtToEquity < 0.5) return 1.0;
+  if (debtToEquity <= 1.0) return 0.8;
+  if (debtToEquity <= 1.8) return 0.6;
+  if (debtToEquity <= 3.0) return 0.4;
+  if (debtToEquity <= 5.0) return 0.2;
+  return 0.0;
+}
 
 export type IosRecOut = {
   action: string;
@@ -230,6 +269,42 @@ export function getOldestTaxableGainLotDate(stock: IosStockInput, currentPrice: 
   return dates[0] ?? null;
 }
 
+export function retirementOpenQuantity(stock: IosStockInput): number {
+  return (stock.openLots ?? [])
+    .filter((lot) => lot.isRetirementAccount === true)
+    .reduce((sum, lot) => sum + Math.max(0, lot.quantity ?? 0), 0);
+}
+
+function isLongTermLot(lot: IosOpenLot, now = Date.now()): boolean {
+  const date = parseDate(lot.purchaseDate);
+  if (!date || isUnknownPurchaseDate(date)) return false;
+  return now - date.getTime() > 365 * DAY_MS;
+}
+
+export function taxAwareEligibleReduceQuantity(stock: IosStockInput, currentPrice: number): number {
+  return (stock.openLots ?? [])
+    .filter((lot) => (lot.quantity ?? 0) > 1e-6)
+    .reduce((sum, lot) => {
+      const qty = Math.max(0, lot.quantity ?? 0);
+      if (lot.isRetirementAccount === true) return sum + qty;
+      const cost = lot.costBasis;
+      if (typeof cost === "number" && cost > currentPrice) return sum + qty;
+      if (isLongTermLot(lot)) return sum + qty;
+      return sum;
+    }, 0);
+}
+
+export function passesLongTermCheckForReduce(
+  stock: IosStockInput,
+  currentPrice: number,
+  reduceQty: number,
+  sellOnlyLongTermQualified: boolean
+): boolean {
+  if (!sellOnlyLongTermQualified) return true;
+  if (reduceQty <= 1e-6) return true;
+  return taxAwareEligibleReduceQuantity(stock, currentPrice) + 1e-6 >= reduceQty;
+}
+
 export function getWashSaleInfo(stock: IosStockInput, now = new Date()): WashSaleInfo {
   const washSaleRestrictionDays = 30;
   const soldLotRetentionDays = 90;
@@ -267,14 +342,33 @@ export function getWashSaleInfo(stock: IosStockInput, now = new Date()): WashSal
   return { canBuy, restrictedUntil, daysRemaining, restrictingLoss, displayText };
 }
 
-/** 0-100 composite; ETFs return undefined (matches iOS metrics). */
+/**
+ * 0-100 composite; ETFs return undefined (matches iOS metrics).
+ * Leftover upside vs the analyst target is not scored; it remains a BUY/ADD gate.
+ * With quality metrics: Analyst 40 + Market Cap 20 + Quality 40.
+ * Fallback: Analyst 60 + Market Cap 40.
+ */
 export function computeRiskReturnScore(stock: IosStockInput): number | undefined {
   if (stock.isETF) return undefined;
 
   let total = 0;
-  const usesPEG = (stock.peg ?? 0) > 0;
-  const analystWeight = usesPEG ? 30 : 40;
-  const upsideWeight = usesPEG ? 30 : 40;
+  const qualityComponents: number[] = [];
+  const peg = stock.peg ?? 0;
+  if (peg > 0) qualityComponents.push(pegNormalized(peg));
+  if (stock.returnOnEquity != null && Number.isFinite(stock.returnOnEquity)) {
+    qualityComponents.push(roeNormalized(stock.returnOnEquity));
+  }
+  if (stock.profitMargin != null && Number.isFinite(stock.profitMargin)) {
+    qualityComponents.push(marginNormalized(stock.profitMargin));
+  }
+  if (stock.debtToEquity != null && Number.isFinite(stock.debtToEquity) && stock.debtToEquity >= 0) {
+    qualityComponents.push(debtToEquityNormalized(stock.debtToEquity));
+  }
+
+  const hasQualityBucket = qualityComponents.length > 0;
+  const analystWeight = hasQualityBucket ? 40 : 60;
+  const marketCapWeight = hasQualityBucket ? 20 : 40;
+  const qualityWeight = hasQualityBucket ? 40 : 0;
 
   const analystAvg = stock.analystAvg?.trim();
   if (analystAvg) {
@@ -282,31 +376,17 @@ export function computeRiskReturnScore(stock: IosStockInput): number | undefined
     if (Number.isFinite(avgRating)) total += (avgRating / 5) * analystWeight;
   }
 
-  const lp = stock.lastPrice ?? 0;
-  const at = stock.analystTarget;
-  if (at != null && at > 0 && lp > 0) {
-    const upsidePercent = ((at - lp) / lp) * 100;
-    total += Math.min(Math.max((upsidePercent / 100) * upsideWeight, 0), upsideWeight);
-  }
-
   const marketCap = stock.marketCap;
   if (marketCap != null && marketCap > 0) {
-    if (marketCap >= 200_000_000_000) total += 20;
-    else if (marketCap >= 50_000_000_000) total += 15;
-    else if (marketCap >= 10_000_000_000) total += 10;
-    else if (marketCap >= 1_000_000_000) total += 5;
+    if (marketCap >= 200_000_000_000) total += marketCapWeight;
+    else if (marketCap >= 50_000_000_000) total += marketCapWeight * 0.75;
+    else if (marketCap >= 10_000_000_000) total += marketCapWeight * 0.5;
+    else if (marketCap >= 1_000_000_000) total += marketCapWeight * 0.25;
   }
 
-  if (!stock.isETF) {
-    const pegRatio = stock.peg ?? 0;
-    if (pegRatio > 0) {
-      if (pegRatio < 1) total += 20;
-      else if (pegRatio < 1.5) total += 16;
-      else if (pegRatio < 2) total += 12;
-      else if (pegRatio < 3) total += 8;
-      else if (pegRatio < 5) total += 4;
-      else total += 1;
-    }
+  if (qualityWeight > 0 && qualityComponents.length > 0) {
+    const averageQuality = qualityComponents.reduce((sum, v) => sum + v, 0) / qualityComponents.length;
+    total += averageQuality * qualityWeight;
   }
 
   return total;
@@ -347,69 +427,109 @@ function estimateReduceQty(
   return 0;
 }
 
-function generateReduceComment(stock: IosStockInput, reduceQty: number): string {
+function lotDateMs(lot: IosOpenLot): number {
+  const date = parseDate(lot.purchaseDate);
+  if (!date || isUnknownPurchaseDate(date)) return 0;
+  return date.getTime();
+}
+
+function formatShareCount(qty: number): string {
+  if (!Number.isFinite(qty)) return "0";
+  if (Math.abs(qty - Math.round(qty)) < 1e-6) return String(Math.round(qty));
+  return qty.toFixed(2);
+}
+
+function formatLotDate(lot: IosOpenLot): string {
+  const date = parseDate(lot.purchaseDate);
+  if (!date || isUnknownPurchaseDate(date)) return "missing date";
+  return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
+
+function generateReduceComment(stock: IosStockInput, reduceQty: number, taxAware = false): string {
   const currentPrice = stock.lastPrice ?? stock.averageCost;
-  const openLots = stock.openLots ?? [];
-  
-  // Separate retirement and taxable lots
-  const retirementLots = openLots.filter(lot => lot.isRetirementAccount === true);
-  const taxableLots = openLots.filter(lot => lot.isRetirementAccount !== true);
-  
-  // Find retirement lots with positive gains
-  const retirementLotsInGain = retirementLots
-    .filter(lot => lot.costBasis && currentPrice > lot.costBasis)
-    .map((lot) => ({ ...lot, purchaseDateObj: parseDate(lot.purchaseDate) }))
-    .filter((lot): lot is IosOpenLot & { purchaseDateObj: Date } => lot.purchaseDateObj != null)
-    .sort((a, b) => a.purchaseDateObj.getTime() - b.purchaseDateObj.getTime());
-  
-  let comment = `Consider diversifying. Reduce your holding size by selling some stocks - sell ${reduceQty} shares to reduce cost basis`;
-  
-  // Determine which lots to sell: prioritize retirement lots with gains, then taxable lots
-  const lotsToSell: (IosOpenLot & { purchaseDateObj: Date })[] = [];
+  const openLots = (stock.openLots ?? []).filter((lot) => (lot.quantity ?? 0) > 1e-6);
+
+  const retirementLots = openLots
+    .filter((lot) => lot.isRetirementAccount === true)
+    .sort((a, b) => lotDateMs(a) - lotDateMs(b));
+  const taxableLots = openLots
+    .filter((lot) => lot.isRetirementAccount !== true)
+    .sort((a, b) => lotDateMs(a) - lotDateMs(b));
+
+  let comment = `Consider diversifying. Reduce your holding size by selling some stocks - sell ${formatShareCount(reduceQty)} shares to reduce cost basis`;
+
+  const lotsToSell: Array<{ lot: IosOpenLot; qtyFromLot: number; bucket: string }> = [];
   let remainingQty = reduceQty;
-  let accountTypeUsed = "";
-  
-  if (retirementLotsInGain.length > 0) {
-    // Use retirement lots with gains first (tax-free gains)
-    for (const lot of retirementLotsInGain) {
-      if (remainingQty <= 0) break;
+
+  const take = (lots: IosOpenLot[], bucket: string) => {
+    for (const lot of lots) {
+      if (remainingQty <= 1e-6) return;
       const qtyFromThisLot = Math.min(remainingQty, lot.quantity ?? 0);
-      lotsToSell.push(lot);
+      lotsToSell.push({ lot, qtyFromLot: qtyFromThisLot, bucket });
       remainingQty -= qtyFromThisLot;
     }
-    accountTypeUsed = "retirement";
-  }
-  
-  // If still need more shares or no retirement lots in gain, use taxable lots (oldest first)
-  if (remainingQty > 0) {
-    const sortedTaxableLots = taxableLots
-      .map((lot) => ({ ...lot, purchaseDateObj: parseDate(lot.purchaseDate) }))
-      .filter((lot): lot is IosOpenLot & { purchaseDateObj: Date } => lot.purchaseDateObj != null)
-      .sort((a, b) => a.purchaseDateObj.getTime() - b.purchaseDateObj.getTime());
-    
-    for (const lot of sortedTaxableLots) {
-      if (remainingQty <= 0) break;
-      const qtyFromThisLot = Math.min(remainingQty, lot.quantity ?? 0);
-      lotsToSell.push(lot);
-      remainingQty -= qtyFromThisLot;
-    }
-    if (accountTypeUsed === "") {
-      accountTypeUsed = "taxable";
+  };
+
+  take(retirementLots, "retirement");
+  if (remainingQty > 1e-6) {
+    if (taxAware) {
+      take(
+        taxableLots.filter((lot) => typeof lot.costBasis === "number" && lot.costBasis > currentPrice),
+        "taxableLoss"
+      );
+      take(
+        taxableLots.filter(
+          (lot) => !(typeof lot.costBasis === "number" && lot.costBasis > currentPrice) && isLongTermLot(lot)
+        ),
+        "taxableLongTerm"
+      );
     } else {
-      accountTypeUsed = "mixed";
+      take(taxableLots, "taxable");
     }
   }
-  
-  const oldestLot = lotsToSell[0];
-  if (oldestLot?.purchaseDateObj) {
-    const accountInfo = accountTypeUsed === "retirement"
-      ? " from retirement account (tax-free gains)"
-      : accountTypeUsed === "mixed"
-      ? " from retirement and taxable accounts"
-      : "";
-    comment += `. Target lots: ${oldestLot.quantity} shares from ${oldestLot.purchaseDateObj.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}${accountInfo}`;
-    
-    const isLongTerm = Date.now() - oldestLot.purchaseDateObj.getTime() > 365 * DAY_MS;
+
+  const qtyIn = (bucket: string) =>
+    lotsToSell.filter((item) => item.bucket === bucket).reduce((sum, item) => sum + item.qtyFromLot, 0);
+  const firstIn = (bucket: string) => lotsToSell.find((item) => item.bucket === bucket)?.lot;
+
+  const parts: string[] = [];
+  const retirementQty = qtyIn("retirement");
+  const taxableLossQty = qtyIn("taxableLoss");
+  const taxableLongTermQty = qtyIn("taxableLongTerm");
+  const taxableOtherQty = qtyIn("taxable");
+
+  if (retirementQty > 1e-6) {
+    const firstRetirement = firstIn("retirement");
+    const dateNote = firstRetirement ? ` from ${formatLotDate(firstRetirement)}` : "";
+    parts.push(`${formatShareCount(retirementQty)} retirement shares first (no tax)${dateNote}`);
+  }
+  if (taxableLossQty > 1e-6) {
+    const firstLoss = firstIn("taxableLoss");
+    const dateNote = firstLoss ? formatLotDate(firstLoss) : "missing date";
+    const prefix = parts.length > 0 ? "then " : "";
+    parts.push(`${prefix}${formatShareCount(taxableLossQty)} taxable loss shares from ${dateNote}`);
+  }
+  if (taxableLongTermQty > 1e-6) {
+    const firstLongTerm = firstIn("taxableLongTerm");
+    const dateNote = firstLongTerm ? formatLotDate(firstLongTerm) : "missing date";
+    const prefix = parts.length > 0 ? "then " : "";
+    parts.push(`${prefix}${formatShareCount(taxableLongTermQty)} oldest long-term taxable shares from ${dateNote}`);
+  }
+  if (taxableOtherQty > 1e-6) {
+    const firstTaxable = firstIn("taxable");
+    const dateNote = firstTaxable ? formatLotDate(firstTaxable) : "missing date";
+    const prefix = parts.length > 0 ? "then " : "";
+    parts.push(`${prefix}${formatShareCount(taxableOtherQty)} oldest taxable shares from ${dateNote}`);
+  }
+  if (parts.length > 0) {
+    comment += `. Target lots: ${parts.join(", ")}`;
+  }
+
+  const durationLot =
+    lotsToSell.find((item) => item.lot.isRetirementAccount !== true)?.lot ?? lotsToSell[0]?.lot;
+  const durationDate = durationLot ? parseDate(durationLot.purchaseDate) : null;
+  if (durationDate && !isUnknownPurchaseDate(durationDate)) {
+    const isLongTerm = Date.now() - durationDate.getTime() > 365 * DAY_MS;
     comment = `${isLongTerm ? "Long-Term Holding" : "Short-Term Holding"}: ${comment}`;
   }
 
@@ -429,17 +549,11 @@ function generateSellComment(stock: IosStockInput, targetPrice: number): string 
 /**
  * Mirrors `filterStocksByRiskAppetite(..., includeScoreThreshold: false)` for a single stock.
  */
-export function stockPassesRiskFilter(
+export function stockPassesRiskAppetiteOnly(
   stock: IosStockInput,
   risk: "Low" | "Medium" | "High",
-  enableRiskFilter: boolean,
   upsidePercent?: number | null
 ): boolean {
-  if (!enableRiskFilter) return true;
-  const isHolding = stock.quantity > 0;
-  const isETF = stock.isETF === true;
-  if (isHolding || isETF) return true;
-
   const marketCap = stock.marketCap ?? 0;
   const analystRating = parseFloat(stock.analystAvg ?? "0") || 0;
   const score = stock.score ?? 0;
@@ -468,10 +582,164 @@ export function stockPassesRiskFilter(
   }
 }
 
+export function stockPassesRiskFilter(
+  stock: IosStockInput,
+  risk: "Low" | "Medium" | "High",
+  enableRiskFilter: boolean,
+  upsidePercent?: number | null
+): boolean {
+  if (!enableRiskFilter) return true;
+  const isHolding = stock.quantity > 0;
+  const isETF = stock.isETF === true;
+  if (isHolding || isETF) return true;
+  return stockPassesRiskAppetiteOnly(stock, risk, upsidePercent);
+}
+
 export function recommendedWatchlistSize(portfolioSize: number): number {
   const clamped = Math.max(10000, Math.min(1000000, portfolioSize));
   const stocks = 7 + ((clamped - 10000) / 990000) * 68;
   return Math.max(7, Math.min(75, Math.round(stocks)));
+}
+
+export type AddGateContext = {
+  enableRiskFilter: boolean;
+  limitWatchlistSize: boolean;
+  riskAppetite: "Low" | "Medium" | "High";
+  portfolioSize: number;
+  cashBalance?: number;
+  allStocks: IosStockInput[];
+};
+
+/** Non-ETF names that compete for top-N. Risk Low/Medium/High is applied first when enabled. Rank N of N is included. */
+export function rankedTopWatchlistCandidates(
+  stocks: IosStockInput[],
+  options?: { enableRiskFilter?: boolean; riskAppetite?: "Low" | "Medium" | "High" }
+): IosStockInput[] {
+  return stocks
+    .filter((stock) => stock.isETF !== true && stock.excludeFromShortlist !== true)
+    .filter((stock) => {
+      if (!options?.enableRiskFilter) return true;
+      return stockPassesRiskAppetiteOnly(stock, options.riskAppetite ?? "Medium", upsidePct(stock));
+    })
+    .filter((stock) => (stock.score ?? 0) > 50)
+    .sort((a, b) => {
+      const cmp = (b.score ?? 0) - (a.score ?? 0);
+      return cmp === 0 ? a.symbol.localeCompare(b.symbol) : cmp;
+    });
+}
+
+function rankInTopWatchlist(
+  stocks: IosStockInput[],
+  symbol: string,
+  ctx?: AddGateContext
+): number | null {
+  const ranked = rankedTopWatchlistCandidates(stocks, ctx);
+  const index = ranked.findIndex((stock) => stock.symbol === symbol);
+  return index >= 0 ? index + 1 : null;
+}
+
+function upsidePct(stock: IosStockInput): number {
+  const price = stock.lastPrice ?? 0;
+  const target = stock.analystTarget ?? 0;
+  if (price <= 0 || target <= 0) return 0;
+  return ((target - price) / price) * 100;
+}
+
+/** Holdings stay shortlisted; ADD still requires enabled risk/top-N gates. */
+export function holdingQualifiesForAdd(stock: IosStockInput, ctx: AddGateContext): boolean {
+  if (stock.excludeFromShortlist === true) return false;
+
+  if (ctx.enableRiskFilter && !stockPassesRiskAppetiteOnly(stock, ctx.riskAppetite, upsidePct(stock))) {
+    return false;
+  }
+
+  if (ctx.limitWatchlistSize) {
+    if (stock.isETF === true) return true;
+    if ((stock.score ?? 0) <= 50) return false;
+    const rank = rankInTopWatchlist(ctx.allStocks, stock.symbol, ctx);
+    const size = recommendedWatchlistSize(ctx.portfolioSize);
+    if (rank == null || rank > size) return false;
+  }
+
+  return true;
+}
+
+export function suppressAddIfHoldingOutsideGates<T extends IosRecOut>(
+  rec: T | undefined,
+  stock: IosStockInput,
+  ctx: AddGateContext
+): T | undefined {
+  if (!rec || stock.quantity <= 0) return rec;
+  if (rec.action !== "ADD" && rec.action !== "WAIT_ADD") return rec;
+  if (holdingQualifiesForAdd(stock, ctx)) return rec;
+  return {
+    ...rec,
+    action: "WAIT_ADD",
+    comments:
+      "ADD paused: this holding is outside the enabled shortlist rank/risk gates. REDUCE and SELL can still apply.",
+  };
+}
+
+/** Same red Portfolio names: non-ETF holdings outside top N when shortlist + risk are on. */
+export function holdingIsOutsideEnabledShortlistAndRisk(
+  stock: IosStockInput,
+  ctx: AddGateContext
+): boolean {
+  if (!ctx.limitWatchlistSize || !ctx.enableRiskFilter) return false;
+  if (stock.quantity <= 0 || stock.isETF === true || stock.excludeFromShortlist === true) return false;
+  const size = recommendedWatchlistSize(ctx.portfolioSize);
+  const rank = rankInTopWatchlist(ctx.allStocks, stock.symbol, ctx);
+  return rank == null || rank > size;
+}
+
+/**
+ * Holdings shown in red (outside shortlist/risk) should SELL the full position
+ * when unrealized gain % is already larger than leftover upside %, or when the
+ * position is in profit and available cash is under 20% of portfolio size.
+ */
+export function offloadHoldingOutsideShortlistIfNeeded<T extends IosRecOut>(
+  rec: T | undefined,
+  stock: IosStockInput,
+  ctx: AddGateContext,
+  options?: { sellOnlyLongTermQualified?: boolean; nowMs?: number }
+): T | undefined {
+  const gated = suppressAddIfHoldingOutsideGates(rec, stock, ctx);
+  if (!gated || stock.quantity <= 0) return gated;
+  if (!holdingIsOutsideEnabledShortlistAndRisk(stock, ctx)) return gated;
+  if (stock.suppressTradeActions === true) return gated;
+
+  const lastPrice = stock.lastPrice ?? 0;
+  const averageCost = stock.averageCost ?? 0;
+  const gainPct = averageCost > 0 ? ((lastPrice - averageCost) / averageCost) * 100 : 0;
+  const upside = upsidePct(stock);
+  const cashShareOfPortfolio =
+    ctx.portfolioSize > 0 && ctx.cashBalance != null ? ctx.cashBalance / ctx.portfolioSize : 1;
+  const cashIsTight = cashShareOfPortfolio < 0.2;
+  const gainBeatsUpside = gainPct > upside;
+  const cashRaiseWhileInProfit = lastPrice > averageCost && cashIsTight;
+  if (!(gainBeatsUpside || cashRaiseWhileInProfit)) return gated;
+
+  if (options?.sellOnlyLongTermQualified) {
+    const oldest = getOldestTaxableGainLotDate(stock, lastPrice);
+    const now = options.nowMs ?? Date.now();
+    if (oldest && !isUnknownPurchaseDate(oldest) && now - oldest.getTime() <= 365 * DAY_MS) {
+      return gated;
+    }
+  }
+
+  const cashText = (cashShareOfPortfolio * 100).toFixed(0);
+  const comments =
+    gainBeatsUpside && cashRaiseWhileInProfit
+      ? `Outside shortlist/risk gates. Unrealized gain is ${gainPct.toFixed(1)}% vs leftover upside ${upside.toFixed(1)}%, and cash is ${cashText}% of portfolio size (under 20%) — SELL to offload the entire position.`
+      : cashRaiseWhileInProfit
+        ? `Outside shortlist/risk gates with an unrealized gain, and cash is ${cashText}% of portfolio size (under 20%) — SELL to offload the entire position.`
+        : `Outside shortlist/risk gates. Unrealized gain is ${gainPct.toFixed(1)}% vs leftover upside ${upside.toFixed(1)}% — SELL to offload the entire position.`;
+
+  return {
+    ...gated,
+    action: "SELL",
+    comments,
+  };
 }
 
 /**
@@ -597,7 +865,15 @@ export function computeRecommendationFactors(
       }
       break;
     case "SELL":
-      if (!rec.comments.includes("RSI overbought reversal") && stock.analystTarget != null && stock.analystTarget > 0) {
+      const isRsiOverboughtLeftoverSell = rec.comments.includes("leftover upside");
+      if (isRsiOverboughtLeftoverSell) {
+        factors.push({
+          label: "Leftover upside < 10% (Trader)",
+          detail: `${rec.expectedReturnPct.toFixed(1)}% remaining to target`,
+          passes: rec.expectedReturnPct < 10,
+        });
+      }
+      if (!rec.comments.includes("RSI overbought reversal") && !isRsiOverboughtLeftoverSell && stock.analystTarget != null && stock.analystTarget > 0) {
         factors.push({
           label: "Price at/above Analyst Target (Median)",
           detail: `${formatCurrency(currentPrice)} ≥ ${formatCurrency(stock.analystTarget)}`,
@@ -729,21 +1005,42 @@ export function computeRecommendationFactors(
   }
 
   if (["SELL", "REDUCE", "WAIT_REDUCE"].includes(action) && sellOnlyLongTermQualified && stock.quantity > 0) {
-    const oldest = getOldestOpenLotDate(stock);
-    const passesLongTerm =
-      oldest != null &&
-      !isUnknownPurchaseDate(oldest) &&
-      Date.now() - oldest.getTime() > 365 * DAY_MS;
-    factors.push({
-      label: "Long-term sale qualified",
-      detail:
+    if (action === "REDUCE" || action === "WAIT_REDUCE") {
+      const reduceQty = estimateReduceQty(currentPrice, costBasis, stockLimit, transactionLimit, unrealizedGain);
+      const coveredByRetirement = reduceQty > 1e-6 && retirementOpenQuantity(stock) + 1e-6 >= reduceQty;
+      const passesLongTerm = passesLongTermCheckForReduce(stock, currentPrice, reduceQty, true);
+      let detail: string;
+      if (coveredByRetirement) {
+        detail = "Reduce quantity available from retirement lots (no tax holding-period gate)";
+      } else if (passesLongTerm) {
+        detail = "Reduce quantity available from retirement lots, taxable lots at a loss, and/or long-term taxable lots";
+      } else if (taxAwareEligibleReduceQuantity(stock, currentPrice) > 1e-6) {
+        detail = "Trim would require short-term taxable gains; tax-aware REDUCE is waiting";
+      } else {
+        detail = "No tax-aware lots available for REDUCE (retirement, taxable loss, or long-term)";
+      }
+      factors.push({
+        label: "Long-term sale qualified",
+        detail,
+        passes: passesLongTerm,
+      });
+    } else {
+      const oldest = getOldestTaxableGainLotDate(stock, currentPrice);
+      const passesLongTerm =
         oldest == null || isUnknownPurchaseDate(oldest)
-          ? "No dated open lot available"
-          : passesLongTerm
-            ? "Oldest open lot held more than 365 days"
-            : "Oldest open lot held less than 365 days",
-      passes: passesLongTerm,
-    });
+          ? true
+          : Date.now() - oldest.getTime() > 365 * DAY_MS;
+      factors.push({
+        label: "Long-term sale qualified",
+        detail:
+          oldest == null || isUnknownPurchaseDate(oldest)
+            ? "No dated taxable gain lot available; gate not blocking"
+            : passesLongTerm
+              ? "Oldest taxable gain lot held more than 365 days"
+              : "Oldest taxable gain lot held less than 365 days",
+        passes: passesLongTerm,
+      });
+    }
   }
 
   const clampedRsiPeriod = Math.max(2, Math.min(30, rsiPeriod));
@@ -806,17 +1103,43 @@ export function computeRecommendationFactors(
 export function scoreBreakdownRows(stock: IosStockInput): {
   analystLine: string;
   analystPoints: string;
-  upsideLine: string;
-  upsidePoints: string;
   capLine: string;
   capPoints: string;
-  pegLine: string;
-  pegPoints: string;
+  qualityPoints: string;
+  qualityMetrics: Array<{ label: string; value: string; points: string }>;
 } {
-  const lp = stock.lastPrice ?? 0;
-  const usesPEG = (stock.peg ?? 0) > 0 && stock.isETF !== true;
-  const analystWeight = usesPEG ? 30 : 40;
-  const upsideWeight = usesPEG ? 30 : 40;
+  const qualityItems: Array<{ label: string; value: string; normalized: number }> = [];
+  const peg = stock.peg ?? 0;
+  if (!stock.isETF && peg > 0) {
+    qualityItems.push({ label: "PEG", value: peg.toFixed(2), normalized: pegNormalized(peg) });
+  }
+  if (!stock.isETF && stock.returnOnEquity != null && Number.isFinite(stock.returnOnEquity)) {
+    qualityItems.push({
+      label: "ROE",
+      value: `${(stock.returnOnEquity * 100).toFixed(1)}%`,
+      normalized: roeNormalized(stock.returnOnEquity),
+    });
+  }
+  if (!stock.isETF && stock.profitMargin != null && Number.isFinite(stock.profitMargin)) {
+    qualityItems.push({
+      label: "Profit Margin",
+      value: `${(stock.profitMargin * 100).toFixed(1)}%`,
+      normalized: marginNormalized(stock.profitMargin),
+    });
+  }
+  if (!stock.isETF && stock.debtToEquity != null && Number.isFinite(stock.debtToEquity) && stock.debtToEquity >= 0) {
+    const ratio = stock.debtToEquity > 1 ? stock.debtToEquity / 100 : stock.debtToEquity;
+    qualityItems.push({
+      label: "Debt/Equity",
+      value: `${(ratio * 100).toFixed(1)}%`,
+      normalized: debtToEquityNormalized(stock.debtToEquity),
+    });
+  }
+
+  const hasQualityBucket = qualityItems.length > 0;
+  const analystWeight = hasQualityBucket ? 40 : 60;
+  const marketCapWeight = hasQualityBucket ? 20 : 40;
+  const qualityWeight = hasQualityBucket ? 40 : 0;
 
   let analystPoints = 0;
   const aa = stock.analystAvg?.trim();
@@ -825,42 +1148,34 @@ export function scoreBreakdownRows(stock: IosStockInput): {
     if (Number.isFinite(ar)) analystPoints = (ar / 5) * analystWeight;
   }
 
-  let upsidePct: number | null = null;
-  let upsidePoints = 0;
-  if (stock.analystTarget != null && lp > 0) {
-    upsidePct = ((stock.analystTarget - lp) / lp) * 100;
-    upsidePoints = Math.min(Math.max((upsidePct / 100) * upsideWeight, 0), upsideWeight);
-  }
-
   let capScore = 0;
   const mc = stock.marketCap;
   if (mc != null && mc > 0) {
-    if (mc >= 200_000_000_000) capScore = 20;
-    else if (mc >= 50_000_000_000) capScore = 15;
-    else if (mc >= 10_000_000_000) capScore = 10;
-    else if (mc >= 1_000_000_000) capScore = 5;
+    if (mc >= 200_000_000_000) capScore = marketCapWeight;
+    else if (mc >= 50_000_000_000) capScore = marketCapWeight * 0.75;
+    else if (mc >= 10_000_000_000) capScore = marketCapWeight * 0.5;
+    else if (mc >= 1_000_000_000) capScore = marketCapWeight * 0.25;
   }
 
-  let pegPoints = 0;
-  const peg = stock.peg ?? 0;
-  if (!stock.isETF && peg > 0) {
-    if (peg < 1) pegPoints = 20;
-    else if (peg < 1.5) pegPoints = 16;
-    else if (peg < 2) pegPoints = 12;
-    else if (peg < 3) pegPoints = 8;
-    else if (peg < 5) pegPoints = 4;
-    else pegPoints = 1;
-  }
+  const qualityPoints =
+    qualityWeight > 0 && qualityItems.length > 0
+      ? (qualityItems.reduce((sum, item) => sum + item.normalized, 0) / qualityItems.length) * qualityWeight
+      : 0;
+
+  const perMetricWeight = qualityItems.length > 0 ? qualityWeight / qualityItems.length : 0;
+  const qualityMetrics = qualityItems.map((item) => ({
+    label: item.label,
+    value: item.value,
+    points: `${(item.normalized * perMetricWeight).toFixed(1)}/${perMetricWeight.toFixed(1)}`,
+  }));
 
   return {
     analystLine: aa ? `${aa}/5.0` : "—",
-    analystPoints: `${analystPoints.toFixed(2)}/${analystWeight}`,
-    upsideLine: upsidePct != null ? `${upsidePct.toFixed(2)}%` : "—",
-    upsidePoints: `${upsidePoints.toFixed(2)}/${upsideWeight}`,
+    analystPoints: `${analystPoints.toFixed(1)}/${analystWeight}`,
     capLine: mc != null && mc > 0 ? `$${(mc / 1_000_000_000).toFixed(2)}B` : "—",
-    capPoints: `${capScore.toFixed(2)}/20`,
-    pegLine: peg > 0 ? peg.toFixed(2) : "—",
-    pegPoints: `${pegPoints.toFixed(2)}/20`,
+    capPoints: `${capScore.toFixed(1)}/${marketCapWeight}`,
+    qualityPoints: `${qualityPoints.toFixed(1)}/${qualityWeight || 40}`,
+    qualityMetrics,
   };
 }
 
@@ -901,7 +1216,12 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
   let movingAvg: number;
   let actualSmaPeriod: number;
   const pre = stock.movingAvg;
-  if (pre != null && pre > 0) {
+  const canComputePreferredSMA = closes.length >= shortSMAPeriod;
+
+  if (canComputePreferredSMA) {
+    movingAvg = sma(closes, shortSMAPeriod);
+    actualSmaPeriod = shortSMAPeriod;
+  } else if (pre != null && pre > 0) {
     movingAvg = pre;
     actualSmaPeriod = shortSMAPeriod;
   } else {
@@ -916,7 +1236,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
         expectedReturnPct: 0,
       };
     }
-    actualSmaPeriod = closes.length >= shortSMAPeriod ? shortSMAPeriod : Math.max(25, closes.length);
+    actualSmaPeriod = Math.max(25, closes.length);
     movingAvg = sma(closes, actualSmaPeriod);
   }
 
@@ -981,13 +1301,37 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
   let passesLongTermCheckForSell = true;
   if (sellOnlyLongTermQualified && numStock > 0) {
     const oldest = getOldestTaxableGainLotDate(stock, currentPrice);
-    passesLongTermCheckForSell =
-      oldest != null &&
-      !isUnknownPurchaseDate(oldest) &&
-      Date.now() - oldest.getTime() > 365 * DAY_MS;
+    if (oldest != null && !isUnknownPurchaseDate(oldest)) {
+      passesLongTermCheckForSell = Date.now() - oldest.getTime() > 365 * DAY_MS;
+    }
+  }
+  const passesLongTermReduceGate = passesLongTermCheckForReduce(
+    stock,
+    currentPrice,
+    reduceQty,
+    sellOnlyLongTermQualified
+  );
+
+  // Guard: for non-ETF stocks, leftover-upside SELLs require a real analyst target.
+  const hasDefinitiveTarget = (stock.analystTarget != null && stock.analystTarget > 0) || stock.isETF === true;
+
+  // Trader mode only: live RSI is overbought and leftover upside is under 10% → full SELL.
+  // Investor mode holds to analyst target. This uses the same overbought reading shown on
+  // the RSI Gate factor, not the hysteresis reversal used for REDUCE.
+  if (useTraderMode && rsiGateEnabled && numStock > 0 && passesLongTermCheckForSell && hasDefinitiveTarget) {
+    const currentRSI = rsiSeries(closes, clampedRsiPeriod).at(-1) ?? 0;
+    if (currentRSI > clampedOverboughtThreshold && expectedReturnPct < 10) {
+      return {
+        action: "SELL",
+        comments: `Trader mode: RSI is overbought (${currentRSI.toFixed(0)}/100) with only ${expectedReturnPct.toFixed(1)}% leftover upside — SELL to offload the full position.`,
+        nextBuyPrice,
+        movingAvg,
+        expectedReturnPct,
+      };
+    }
   }
 
-  if (numStock > 0 && rsiGateEnabled && currentPrice > avgPrice && passesLongTermCheckForSell) {
+  if (numStock > 0 && rsiGateEnabled && currentPrice > avgPrice && passesLongTermReduceGate) {
     const passesRsiSell = passesRSISellSignalWithHysteresis(
       closes,
       clampedRsiPeriod,
@@ -1045,7 +1389,6 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
   // Guard: for non-ETF stocks, only trigger SELL when a real analyst target exists.
   // The fallback profit-% target drives expectedReturnPct display only, not a SELL signal,
   // to prevent false SELL flashes when analystTarget is temporarily missing during a refresh.
-  const hasDefinitiveTarget = (stock.analystTarget != null && stock.analystTarget > 0) || stock.isETF === true;
   if (numStock > 0 && targetPrice != null && currentPrice >= targetPrice && passesLongTermCheckForSell && hasDefinitiveTarget && expectedReturnPct < 15) {
     // RSI gate: if overbought right now, defer SELL until RSI reverses
     if (rsiGateEnabled) {
@@ -1175,19 +1518,10 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
     };
   }
 
-  let passesLongTermCheckForReduce = true;
-  if (sellOnlyLongTermQualified && numStock > 0) {
-    const oldest = getOldestTaxableGainLotDate(stock, currentPrice);
-    passesLongTermCheckForReduce =
-      oldest != null &&
-      !isUnknownPurchaseDate(oldest) &&
-      Date.now() - oldest.getTime() > 365 * DAY_MS;
-  }
-
-  if (numStock > 0 && costBasis > stockLimit && reduceQty > 0 && passesLongTermCheckForReduce) {
+  if (numStock > 0 && costBasis > stockLimit && reduceQty > 0 && passesLongTermReduceGate) {
     return {
       action: "REDUCE",
-      comments: generateReduceComment(stock, reduceQty),
+      comments: generateReduceComment(stock, reduceQty, sellOnlyLongTermQualified),
       nextBuyPrice,
       movingAvg,
       expectedReturnPct,
@@ -1237,7 +1571,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
     if (reduceQty <= 0) {
       blockers.push("unrealized gain is not yet sufficient for a trim");
     }
-    if (!passesLongTermCheckForReduce) {
+    if (!passesLongTermReduceGate) {
       blockers.push("long-term tax holding-period rule not yet met");
     }
 
@@ -1253,9 +1587,28 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
     };
   }
 
+  const addBlockers: string[] = [];
+  if (currentPrice > nextBuyPrice) {
+    addBlockers.push(`price ${formatCurrency(currentPrice)} is above next buy target ${formatCurrency(nextBuyPrice)}`);
+  }
+  if (stock.isETF !== true && !relaxScoreRequirement) {
+    if (expectedReturnPct <= 25) {
+      addBlockers.push(`leftover upside ${expectedReturnPct.toFixed(1)}% is at/below 25% minimum`);
+    }
+    if (metricScore > 0 && metricScore <= 50) {
+      addBlockers.push(`score ${metricScore.toFixed(0)}/100 is at/below 50 minimum`);
+    }
+  }
+  if (currentPrice >= transactionLimit) {
+    addBlockers.push(`share price exceeds per-trade limit (${formatCurrency(transactionLimit)})`);
+  }
+
   return {
     action: "WAIT_ADD",
-    comments: `Add more shares when price is below next target buy price: ${formatCurrency(nextBuyPrice)}`,
+    comments:
+      addBlockers.length === 0
+        ? `Waiting for add conditions to align. Next buy trigger: ${formatCurrency(nextBuyPrice)}.`
+        : `WAIT to ADD due to: ${addBlockers.join("; ")}.`,
     nextBuyPrice,
     movingAvg,
     expectedReturnPct,

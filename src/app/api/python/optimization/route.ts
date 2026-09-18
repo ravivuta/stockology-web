@@ -6,11 +6,12 @@ import {
   computeRiskReturnScore,
   type IosStockInput,
 } from "@/lib/ios-recommendation";
-import { sanitizeProvidedHistory } from "@/lib/historical-price-server";
+import { resolveHistoryClose } from "@/lib/historical-price-server";
 
 type HistoryRow = {
   date: string;
   close: number | null;
+  adjusted_close?: number | null;
 };
 
 function clampNumber(value: unknown, fallback: number, min: number, max: number) {
@@ -188,11 +189,8 @@ export async function POST(request: NextRequest) {
   });
 
   const historyDays = 252 * 5 + 280;
-  const providedHistory = sanitizeProvidedHistory(payload.history);
   const [{ data: historyData, error: historyError }, { data: tickerRow }, { data: sentimentRow }] = await Promise.all([
-    providedHistory.length > 0
-      ? Promise.resolve({ data: providedHistory, error: null })
-      : supabase.rpc("get_historical_prices", { p_symbol: symbol, p_days: historyDays }),
+    supabase.rpc("get_historical_prices", { p_symbol: symbol, p_days: historyDays }),
     supabase
       .from("ticker_data")
       .select("symbol, analyst_average, market_cap, peg_ratio, analyst_target, is_etf")
@@ -210,8 +208,13 @@ export async function POST(request: NextRequest) {
   }
 
   const closes = ((historyData ?? []) as HistoryRow[])
-    .map((row) => Number(row.close))
-    .filter((close) => Number.isFinite(close) && close > 0);
+    .map((row) => ({
+      date: String(row.date).slice(0, 10),
+      close: resolveHistoryClose(row),
+    }))
+    .filter((row) => row.date.length >= 10 && Number.isFinite(row.close) && row.close > 0)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((row) => row.close);
 
   if (closes.length < 252) {
     return jsonError(`Insufficient historical data for ${symbol}. Need about 1 year of daily closes.`, 422);
@@ -219,8 +222,10 @@ export async function POST(request: NextRequest) {
 
   const availableYears = Math.max(1, Math.floor(closes.length / 252));
   const simulationYears = Math.min(5, availableYears);
-  const analystTarget =
+  const liveAnalystTarget =
     payload.analystTarget != null ? Number(payload.analystTarget) : tickerRow?.analyst_target != null ? Number(tickerRow.analyst_target) : undefined;
+  // Match iOS OptimizationEngine: do not overlay today's analyst target on historical prices.
+  // That creates instant sells / leftover-upside distortion and picks the wrong SMA/factor.
   const analystAvg =
     typeof payload.analystAvg === "string"
       ? payload.analystAvg
@@ -246,7 +251,7 @@ export async function POST(request: NextRequest) {
     stockLimit: 0,
     transactionLimit: 0,
     isETF,
-    analystTarget,
+    analystTarget: liveAnalystTarget,
     analystAvg,
     marketCap,
     peg,
@@ -265,7 +270,7 @@ export async function POST(request: NextRequest) {
     symbol,
     closes,
     isETF,
-    analystTarget,
+    analystTarget: undefined,
     analystAvg,
     marketCap,
     peg,

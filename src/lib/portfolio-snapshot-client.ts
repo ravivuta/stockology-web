@@ -5,6 +5,8 @@ import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import {
   portfolioSyncFingerprint,
   upsertPortfolioSnapshotForCloudUser,
+  patchPortfolioSnapshotCashForCloudUser,
+  patchPortfolioSnapshotHoldingsForCloudUser,
   type PortfolioSlice,
 } from "@/lib/portfolio-cloud-sync";
 import { usePortfolioStore } from "@/store/portfolioStore";
@@ -319,6 +321,71 @@ export async function flushCurrentPortfolioSnapshotNow(
     allowEmptyHoldings: options?.allowEmptyHoldings,
   });
   return { error: result.error, skipped: result.skipped };
+}
+
+export async function patchCurrentPortfolioSnapshotCash(
+  markPendingOptimization: boolean
+): Promise<{ error: Error | null; patched: boolean }> {
+  if (typeof window === "undefined" || !hasSupabaseConfig()) {
+    return { error: null, patched: false };
+  }
+
+  let dataUserId = "";
+  try {
+    dataUserId = sessionStorage.getItem(ACTIVE_DATA_USER_KEY) ?? "";
+  } catch {
+    dataUserId = "";
+  }
+  if (!dataUserId) return { error: null, patched: false };
+
+  const state = usePortfolioStore.getState();
+  const supabase = createClient();
+  const result = await patchPortfolioSnapshotCashForCloudUser(
+    supabase,
+    dataUserId,
+    state.cashBalance,
+    markPendingOptimization
+  );
+  if (!result.error && result.patched) {
+    markLastPushedPortfolioFingerprint(
+      dataUserId,
+      portfolioSyncFingerprint({
+        cashBalance: state.cashBalance,
+        stocks: state.stocks,
+        lotsBySymbol: state.lotsBySymbol,
+      })
+    );
+  }
+  return result;
+}
+
+export async function patchCurrentPortfolioSnapshotHoldings(
+  removedSymbols: string[] = []
+): Promise<{ error: Error | null; patched: boolean }> {
+  if (typeof window === "undefined" || !hasSupabaseConfig()) {
+    return { error: null, patched: false };
+  }
+
+  let dataUserId = "";
+  try {
+    dataUserId = sessionStorage.getItem(ACTIVE_DATA_USER_KEY) ?? "";
+  } catch {
+    dataUserId = "";
+  }
+  if (!dataUserId) return { error: null, patched: false };
+
+  const state = usePortfolioStore.getState();
+  const slice: PortfolioSlice = {
+    cashBalance: state.cashBalance,
+    stocks: state.stocks,
+    lotsBySymbol: state.lotsBySymbol,
+  };
+  const supabase = createClient();
+  const result = await patchPortfolioSnapshotHoldingsForCloudUser(supabase, dataUserId, slice, removedSymbols);
+  if (!result.error && result.patched) {
+    markLastPushedPortfolioFingerprint(dataUserId, portfolioSyncFingerprint(slice));
+  }
+  return result;
 }
 
 /**

@@ -18,6 +18,10 @@ type EdgeTickerPrice = {
   analyst_average?: number | string | null;
   market_cap?: number | null;
   peg_ratio?: number | null;
+  return_on_equity?: number | null;
+  profit_margin?: number | null;
+  trailing_pe?: number | null;
+  debt_to_equity?: number | null;
   beta?: number | null;
   analyst_target?: number | null;
   company_name?: string | null;
@@ -115,6 +119,10 @@ async function fetchFreshTickerHydration(symbols: string[]) {
       analyst_average: row.analyst_average ?? null,
       market_cap: row.market_cap ?? null,
       peg_ratio: row.peg_ratio ?? null,
+      return_on_equity: row.return_on_equity ?? null,
+      profit_margin: row.profit_margin ?? null,
+      trailing_pe: row.trailing_pe ?? null,
+      debt_to_equity: row.debt_to_equity ?? null,
       beta: row.beta ?? null,
       analyst_target: row.analyst_target ?? null,
       company_name: row.company_name ?? null,

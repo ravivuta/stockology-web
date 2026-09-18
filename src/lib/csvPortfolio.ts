@@ -27,14 +27,36 @@ export const CSV_IMPORT_FIELDS: CsvImportField[] = [
   { key: "name", label: "Name", description: "Optional company name." },
 ];
 
-const CSV_AUTO_DETECT_FIELDS = new Set<CsvColumnStandard>(["symbol", "qty", "price"]);
+const CSV_AUTO_DETECT_FIELDS = new Set<CsvColumnStandard>(["symbol", "qty", "price", "purchaseDate"]);
 
 const CSV_IMPORT_CANDIDATES: Record<CsvColumnStandard, string[]> = {
   symbol: ["symbol", "ticker", "code"],
   qty: ["qty", "quantity", "shares", "share quantity"],
-  price: ["price", "average cost", "averagecost", "average cost basis", "avg cost", "cost basis", "average price", "last price", "cost/share"],
+  price: [
+    "cost/share",
+    "cost per share",
+    "average cost basis",
+    "average cost",
+    "averagecost",
+    "avg cost",
+    "purchase price",
+    "price paid",
+    "trade price",
+    "price",
+    "cost basis",
+    "last price",
+  ],
   transaction: ["transaction", "type", "side", "action"],
-  purchaseDate: ["purchaseDate", "purchase date", "tradeDate", "trade date", "date", "buy date"],
+  purchaseDate: [
+    "purchaseDate",
+    "purchase date",
+    "tradeDate",
+    "trade date",
+    "opening date",
+    "date acquired",
+    "date",
+    "buy date",
+  ],
   account: ["account", "acct", "profile", "profileName", "accountName", "portfolio"],
   retirementAccount: ["retirementAccount", "retirement account", "accountType", "account type", "tax exempt", "tax-exempt"],
   name: ["name", "company", "company name", "security", "description"],
@@ -97,6 +119,99 @@ function parseSymbolOnlyText(text: string): { ok: true; rows: CsvImportRow[]; sk
 
 function normKey(s: string) {
   return s.trim().toLowerCase().replace(/[\s_]/g, "");
+}
+
+function compactHeaderKey(s: string) {
+  return normKey(s).replace(/[^a-z0-9]/g, "");
+}
+
+export function isBlankMappingValue(raw: string | null | undefined): boolean {
+  if (raw == null) return true;
+  const trimmed = raw.trim();
+  if (!trimmed) return true;
+  const lowered = trimmed.toLowerCase();
+  if (["none", "null", "n/a", "-", "\"\""].includes(lowered)) return true;
+  return compactHeaderKey(trimmed).length === 0;
+}
+
+function isMarketOrQuotePriceHeader(header: string): boolean {
+  const key = compactHeaderKey(header);
+  if (["lastprice", "marketprice", "currentprice", "closingprice", "closeprice", "markprice"].includes(key)) {
+    return true;
+  }
+  return (
+    key.includes("lastprice") ||
+    key.includes("marketprice") ||
+    key.includes("currentprice") ||
+    key.includes("closingprice")
+  );
+}
+
+function isTotalCostHeader(header: string): boolean {
+  const key = compactHeaderKey(header);
+  if (key.includes("average") || key.includes("avg") || key.includes("pershare")) return false;
+  if (key === "costpershare" || key === "costshare") return false;
+  if (key.includes("total") && key.includes("cost")) return true;
+  return key === "costbasis";
+}
+
+const PER_SHARE_COST_HEADER_PRIORITY = [
+  "costpershare",
+  "costshare",
+  "costbasispershare",
+  "persharecost",
+  "persharecostbasis",
+  "averagecostbasis",
+  "avgcostbasis",
+  "averagecost",
+  "avgcost",
+  "avgprice",
+  "averageprice",
+  "purchaseprice",
+  "pricepaid",
+  "tradeprice",
+  "unitcost",
+  "unitprice",
+  "priceusd",
+  "pricedollars",
+];
+
+const DATE_HEADER_PRIORITY = [
+  "purchasedate",
+  "tradedate",
+  "buydate",
+  "openingdate",
+  "dateacquired",
+  "acquireddate",
+  "opendate",
+  "date",
+];
+
+function findPriceHeader(headers: string[]): string | null {
+  for (const preferred of PER_SHARE_COST_HEADER_PRIORITY) {
+    const hit = headers.find((header) => compactHeaderKey(header) === preferred);
+    if (hit) return hit;
+  }
+  const total = headers.find((header) => isTotalCostHeader(header));
+  if (total) return total;
+  const generic = headers.find((header) => compactHeaderKey(header) === "price" && !isMarketOrQuotePriceHeader(header));
+  if (generic) return generic;
+  return headers.find((header) => isMarketOrQuotePriceHeader(header)) ?? null;
+}
+
+function findDateHeader(headers: string[]): string | null {
+  for (const preferred of DATE_HEADER_PRIORITY) {
+    const hit = headers.find((header) => compactHeaderKey(header) === preferred);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+function perSharePriceFromCell(rawPrice: number, qty: number, priceHeader: string | null): number {
+  if (priceHeader && isTotalCostHeader(priceHeader) && qty > 0) {
+    return rawPrice / qty;
+  }
+  return rawPrice;
 }
 
 export function normalizeCsvHeader(s: string) {
@@ -173,9 +288,9 @@ function getCell(row: Record<string, unknown>, headerKey: string | null): string
 const HEADER_CANDIDATES = new Set<string>([
   "symbol", "ticker", "code",
   "qty", "quantity", "shares",
-  "price", "averagecost", "avgcost", "costbasis",
+  "price", "averagecost", "avgcost", "costbasis", "costpershare", "costshare", "averagecostbasis",
   "transaction", "type", "side", "action",
-  "purchasedate", "tradedate", "date",
+  "purchasedate", "tradedate", "date", "openingdate", "dateacquired",
   "account", "portfolio",
   "name", "company",
 ]);
@@ -189,7 +304,7 @@ function findHeaderLineIndex(lines: string[]): number {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? "";
     const delim = detectDelimiter(line);
-    const cols = splitCsvLine(line, delim).map((c) => normKey(c.replace(/^"+|"+$/g, "")));
+    const cols = splitCsvLine(line, delim).map((c) => compactHeaderKey(c.replace(/^"+|"+$/g, "")));
     if (cols.some((c) => HEADER_CANDIDATES.has(c))) return i;
   }
   return 0;
@@ -302,12 +417,12 @@ async function parseCsvRecords(text: string): Promise<{ data: Record<string, unk
 function matchHeader(headers: string[], target: string): string | null {
   const normalizedTarget = normKey(target);
   for (const header of headers) {
-    const normalizedHeader = normKey(header);
-    if (normalizedHeader === normalizedTarget) return header;
+    if (normKey(header) === normalizedTarget) return header;
   }
+  const compactTarget = compactHeaderKey(target);
+  if (!compactTarget) return null;
   for (const header of headers) {
-    const normalizedHeader = normKey(header);
-    if (normalizedHeader.includes(normalizedTarget) || normalizedTarget.includes(normalizedHeader)) return header;
+    if (compactHeaderKey(header) === compactTarget) return header;
   }
   return null;
 }
@@ -320,9 +435,16 @@ function resolveMappedHeaderKey(
 ): string | null {
   const mapped = mapping?.[standard];
   if (typeof mapped === "string") {
-    if (mapped.trim().toLowerCase() === "none" || mapped.trim() === "") return null;
-    return matchHeader(headers, mapped);
+    if (isBlankMappingValue(mapped)) {
+      if (standard === "price") return findPriceHeader(headers) ?? findHeaderKey(headers, fallback);
+      if (standard === "purchaseDate") return findDateHeader(headers) ?? findHeaderKey(headers, fallback);
+      if (standard === "symbol" || standard === "qty") return findHeaderKey(headers, fallback);
+      return null;
+    }
+    return matchHeader(headers, mapped) ?? (standard === "price" ? findPriceHeader(headers) : standard === "purchaseDate" ? findDateHeader(headers) : findHeaderKey(headers, fallback));
   }
+  if (standard === "price") return findPriceHeader(headers) ?? findHeaderKey(headers, fallback);
+  if (standard === "purchaseDate") return findDateHeader(headers) ?? findHeaderKey(headers, fallback);
   return findHeaderKey(headers, fallback);
 }
 
@@ -345,7 +467,9 @@ export function extractCsvHeaders(text: string): string[] {
   const headerLine = lines[headerIdx];
   if (!headerLine) return [];
   const delimiter = detectDelimiter(headerLine);
-  return splitCsvLine(headerLine, delimiter).map((header) => header.replace(/^"+|"+$/g, "").trim()).filter(Boolean);
+  return splitCsvLine(headerLine, delimiter)
+    .map((header) => header.replace(/^"+|"+$/g, "").trim())
+    .filter((header) => !isBlankMappingValue(header));
 }
 
 export function parseWatchlistCsv(
@@ -411,10 +535,19 @@ export function suggestCsvColumnMapping(
   saved?: Partial<Record<string, CsvColumnStandard>>
 ): CsvColumnMapping {
   const suggestions: CsvColumnMapping = {};
+  const bestPrice = findPriceHeader(headers);
   for (const field of CSV_IMPORT_FIELDS) {
     if (!CSV_AUTO_DETECT_FIELDS.has(field.key)) continue;
-    const remembered = headers.find((header) => saved?.[normKey(header)] === field.key);
-    if (remembered) {
+    const remembered = headers.find(
+      (header) => !isBlankMappingValue(header) && saved?.[normKey(header)] === field.key
+    );
+    const skipRememberedPrice =
+      field.key === "price" &&
+      !!remembered &&
+      isMarketOrQuotePriceHeader(remembered) &&
+      !!bestPrice &&
+      !isMarketOrQuotePriceHeader(bestPrice);
+    if (remembered && !skipRememberedPrice) {
       suggestions[field.key] = remembered;
       continue;
     }
@@ -562,7 +695,7 @@ export async function parsePortfolioCsv(
         continue;
       }
       const qty = parseNumber(getCell(row, kQty)) ?? 0;
-      const price = parseNumber(getCell(row, kAvg)) ?? 0;
+      const price = perSharePriceFromCell(parseNumber(getCell(row, kAvg)) ?? 0, Math.abs(qty), kAvg);
       const shortSMA = parseNumber(getCell(row, kSma ?? "")) ?? undefined;
       const dynamicFactor = parseNumber(getCell(row, kDyn ?? "")) ?? undefined;
       const stockLimit = parseNumber(getCell(row, kSL ?? "")) ?? undefined;
@@ -635,7 +768,7 @@ export async function parsePortfolioCsv(
     const kQty = kQtyLot;
     const kPrice = resolveMappedHeaderKey(headers, mapping, "price", ["price", "Price", "average cost", "AverageCost", "cost"]);
     const kTxn = kTxnLot;
-    const kDate = resolveMappedHeaderKey(headers, mapping, "purchaseDate", ["purchaseDate", "purchase date", "tradeDate", "trade date"]);
+    const kDate = resolveMappedHeaderKey(headers, mapping, "purchaseDate", CSV_IMPORT_CANDIDATES.purchaseDate);
     const kAccount = resolveExplicitOptionalHeader("account", ["account", "Account", "profile", "profileName", "accountName"]);
     const kRetirement = resolveExplicitOptionalHeader("retirementAccount", ["retirementAccount", "retirement account", "accountType", "account type"]);
 
@@ -662,7 +795,7 @@ export async function parsePortfolioCsv(
       }
 
       const qty = hasQty ? parseNumber(rawQty) ?? 0 : 0;
-      const price = hasPrice ? parseNumber(rawPrice) ?? 0 : 0;
+      const price = hasPrice ? perSharePriceFromCell(parseNumber(rawPrice) ?? 0, Math.abs(qty), kPrice) : 0;
       const purchaseDate = normalizeImportedDate(getCell(row, kDate ?? ""));
       const account = normalizeImportedAccountName(getCell(row, kAccount ?? ""));
       const isRetirementAccount = parseRetirementAccountFlag(getCell(row, kRetirement ?? ""));
@@ -718,17 +851,8 @@ export async function parsePortfolioCsv(
     return { ok: false, error: "Could not find a symbol column (expected Symbol, ticker, etc.)." };
   }
   const kQty = resolveMappedHeaderKey(headers, mapping, "qty", ["qty", "quantity", "Quantity", "shares", "Shares", "quantity."]);
-  const kPrice = resolveMappedHeaderKey(headers, mapping, "price", [
-    "price",
-    "average cost",
-    "AverageCost",
-    "cost basis",
-    "cost/share",
-    "avg cost",
-    "average price",
-    "last price",
-  ]);
-  const kDate = resolveMappedHeaderKey(headers, mapping, "purchaseDate", ["purchaseDate", "purchase date", "tradeDate", "trade date"]);
+  const kPrice = resolveMappedHeaderKey(headers, mapping, "price", CSV_IMPORT_CANDIDATES.price);
+  const kDate = resolveMappedHeaderKey(headers, mapping, "purchaseDate", CSV_IMPORT_CANDIDATES.purchaseDate);
   const kAccount = resolveExplicitOptionalHeader("account", ["account", "Account", "profile", "profileName", "accountName"]);
   const kRetirement = resolveExplicitOptionalHeader("retirementAccount", ["retirementAccount", "retirement account", "accountType", "account type"]);
 
@@ -751,7 +875,7 @@ export async function parsePortfolioCsv(
     }
 
     const qty = hasQty ? parseNumber(rawQty) ?? 0 : 0;
-    const price = hasPrice ? parseNumber(rawPrice) ?? 0 : 0;
+    const price = hasPrice ? perSharePriceFromCell(parseNumber(rawPrice) ?? 0, Math.abs(qty), kPrice) : 0;
     const purchaseDate = normalizeImportedDate(getCell(row, kDate ?? ""));
     const account = normalizeImportedAccountName(getCell(row, kAccount ?? ""));
     const isRetirementAccount = parseRetirementAccountFlag(getCell(row, kRetirement ?? ""));

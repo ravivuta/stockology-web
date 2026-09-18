@@ -29,6 +29,64 @@ function parseYmdUtcNoon(ymd: string): number {
   return Date.UTC(p[0], p[1] - 1, p[2], 12, 0, 0);
 }
 
+export function mergeNetWorthOverlay(base: NetWorthPoint[], overlay: NetWorthPoint[]): NetWorthPoint[] {
+  const byDay = new Map<string, NetWorthPoint>();
+  for (const point of base) {
+    if (!Number.isFinite(point.value) || point.value <= 0) continue;
+    byDay.set(etCalendarDateString(new Date(point.t)), point);
+  }
+  for (const point of overlay) {
+    if (!Number.isFinite(point.value) || point.value <= 0) continue;
+    byDay.set(etCalendarDateString(new Date(point.t)), point);
+  }
+  return [...byDay.values()].sort((a, b) => a.t - b.t);
+}
+
+/** Mark current holdings to historical adjusted closes — same columns used for SPY. */
+export function reconstructNetWorthFromHoldingsCloses(
+  holdings: Array<{ symbol: string; quantity: number }>,
+  cash: number,
+  pricesBySymbol: Record<string, Array<{ date: string; close: number }>>
+): NetWorthPoint[] {
+  const positions = holdings.filter((h) => h.quantity > 0 && Number.isFinite(h.quantity));
+  if (positions.length === 0) return [];
+
+  const closeOnDate = new Map<string, Map<string, number>>();
+  const allDays = new Set<string>();
+  for (const holding of positions) {
+    const rows = pricesBySymbol[holding.symbol] ?? pricesBySymbol[holding.symbol.toUpperCase()] ?? [];
+    for (const row of rows) {
+      const ymd = row.date.slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd) || !Number.isFinite(row.close) || row.close <= 0) continue;
+      allDays.add(ymd);
+      if (!closeOnDate.has(ymd)) closeOnDate.set(ymd, new Map());
+      closeOnDate.get(ymd)!.set(holding.symbol.toUpperCase(), row.close);
+    }
+  }
+
+  const lastClose = new Map<string, number>();
+  const points: NetWorthPoint[] = [];
+  for (const ymd of [...allDays].sort((a, b) => a.localeCompare(b))) {
+    const dayCloses = closeOnDate.get(ymd);
+    if (dayCloses) {
+      for (const [symbol, close] of dayCloses) lastClose.set(symbol, close);
+    }
+    let total = Number.isFinite(cash) ? cash : 0;
+    let missing = false;
+    for (const holding of positions) {
+      const close = lastClose.get(holding.symbol.toUpperCase());
+      if (close == null) {
+        missing = true;
+        break;
+      }
+      total += holding.quantity * close;
+    }
+    if (missing || !Number.isFinite(total) || total <= 0) continue;
+    points.push({ t: parseYmdUtcNoon(ymd), value: total });
+  }
+  return points;
+}
+
 export function computeTodayChangeFromHistory(
   cloudHistory: NetWorthPoint[],
   liveTotal: number,
@@ -178,6 +236,58 @@ export function netWorthPointsFromJournal(journal: TradeJournalEntry[]): NetWort
   return points;
 }
 
+function coerceRpcArray(data: unknown): unknown[] {
+  if (Array.isArray(data)) return data;
+  if (typeof data === "string") {
+    try {
+      const parsed: unknown = JSON.parse(data);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function snapshotEtYmd(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (trimmed.length < 10) return null;
+  const ymd = trimmed.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? ymd : null;
+}
+
+function rowsToNetWorthPoints(rows: unknown[]): NetWorthPoint[] {
+  const byDate = new Map<string, { value: number; updated: string }>();
+  for (const row of rows as { et_calendar_date?: unknown; total_portfolio_value?: unknown; updated_at?: unknown }[]) {
+    const d = snapshotEtYmd(row.et_calendar_date) ?? snapshotEtYmd(String(row.updated_at ?? "").slice(0, 10));
+    if (!d) continue;
+    const v = Number(row.total_portfolio_value);
+    if (!Number.isFinite(v) || v <= 0) continue;
+    const upd = typeof row.updated_at === "string" ? row.updated_at : "";
+    const cur = byDate.get(d);
+    if (!cur || upd > cur.updated) byDate.set(d, { value: v, updated: upd });
+  }
+
+  return [...byDate.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, { value }]) => ({ t: parseYmdUtcNoon(date), value }));
+}
+
+function coerceLatestSnapshotRow(data: unknown): unknown | null {
+  if (data == null) return null;
+  if (Array.isArray(data)) return data[0] ?? null;
+  if (typeof data === "object") return data;
+  if (typeof data === "string") {
+    try {
+      return coerceLatestSnapshotRow(JSON.parse(data));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 export async function fetchCloudNetWorthHistory(
   supabase: SupabaseClient,
   dataUserId: string,
@@ -187,32 +297,45 @@ export async function fetchCloudNetWorthHistory(
   since.setUTCDate(since.getUTCDate() - maxDays);
   const sinceStr = since.toISOString().slice(0, 10);
 
-  // Holdings are AES-256-CBC encrypted at rest; must read via RPC which decrypts server-side.
-  const { data, error } = await supabase.rpc("get_portfolio_snapshots", {
+  const chart = await supabase.rpc("get_portfolio_chart_history", {
     p_user_id: dataUserId,
     p_start_et_date: sinceStr,
   });
+  const chartPts = rowsToNetWorthPoints(coerceRpcArray(chart.data));
+  if (chartPts.length > 0) return chartPts;
 
-  if (error || !data) return [];
+  // Holdings are AES-256-CBC encrypted at rest; must read via RPC which decrypts server-side.
+  const snapshots = await supabase.rpc("get_portfolio_snapshots", {
+    p_user_id: dataUserId,
+    p_start_et_date: sinceStr,
+  });
+  const snapshotPts = rowsToNetWorthPoints(coerceRpcArray(snapshots.data));
+  if (snapshotPts.length > 0) return snapshotPts;
 
-  // RPC returns a JSONB array
-  const rows = Array.isArray(data) ? data : [];
-  if (!rows.length) return [];
+  const latest = await supabase.rpc("get_latest_portfolio_snapshot", {
+    p_user_id: dataUserId,
+  });
+  const latestRow = coerceLatestSnapshotRow(latest.data);
+  return latestRow ? rowsToNetWorthPoints([latestRow]) : [];
+}
 
-  const byDate = new Map<string, { value: number; updated: string }>();
-  for (const row of rows as { et_calendar_date: string | null; total_portfolio_value: unknown; updated_at: string | null }[]) {
-    const d = row.et_calendar_date;
-    if (!d || typeof d !== "string") continue;
-    const v = Number(row.total_portfolio_value);
-    if (!Number.isFinite(v)) continue;
-    const upd = row.updated_at ?? "";
-    const cur = byDate.get(d);
-    if (!cur || upd > cur.updated) byDate.set(d, { value: v, updated: upd });
+export function distinctEtCalendarDays(points: NetWorthPoint[]): number {
+  const days = new Set<string>();
+  for (const point of points) {
+    days.add(etCalendarDateString(new Date(point.t)));
   }
+  return days.size;
+}
 
-  return [...byDate.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, { value }]) => ({ t: parseYmdUtcNoon(date), value }));
+/** vs-SPY needs two real portfolio days. Synthetic live_only placeholders do not count. */
+export function hasEnoughHistoryForSpyComparison(
+  source: NetWorthSeriesMeta["source"] | undefined,
+  cloudHistory: NetWorthPoint[] | null,
+  points: NetWorthPoint[]
+): boolean {
+  if (!source || source === "live_only") return false;
+  if ((cloudHistory?.length ?? 0) >= 1) return true;
+  return distinctEtCalendarDays(points) >= 1;
 }
 
 function mergeSortedPoints(points: NetWorthPoint[]): NetWorthPoint[] {

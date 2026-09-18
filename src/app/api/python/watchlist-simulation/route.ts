@@ -3,16 +3,18 @@ import { createClient } from "@supabase/supabase-js";
 import {
   computeIosRecommendation,
   computeRiskReturnScore,
+  rankedTopWatchlistCandidates,
   recommendedWatchlistSize,
-  stockPassesRiskFilter,
+  stockPassesRiskAppetiteOnly,
   type IosStockInput,
 } from "@/lib/ios-recommendation";
-import { sanitizeProvidedHistoryMap } from "@/lib/historical-price-server";
+import { resolveHistoryClose, sanitizeProvidedHistoryMap } from "@/lib/historical-price-server";
 import type { StockHolding } from "@/store/portfolioStore";
 
 type HistoryRow = {
   date: string;
   close: number | null;
+  adjusted_close?: number | null;
 };
 
 type SimPosition = {
@@ -56,7 +58,7 @@ function sanitizeHistory(rows: HistoryRow[] | null | undefined) {
   return (rows ?? [])
     .map((row) => ({
       date: String(row.date).slice(0, 10),
-      close: Number(row.close),
+      close: resolveHistoryClose(row),
     }))
     .filter((row) => row.date && Number.isFinite(row.close) && row.close > 0)
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -72,47 +74,39 @@ function buildUniverse(
   }
 ) {
   const idealWatchlistSize = recommendedWatchlistSize(settings.portfolioSize);
-  const scored: SimStock[] = stocks.map((stock) => {
-    const score = stock.isETF ? undefined : (stock.score ?? computeRiskReturnScore(stock));
-    const isVisibleInRisk = stockPassesRiskFilter(
-      { ...stock, score },
-      settings.riskAppetite,
-      settings.enableRiskFilter,
-      upsidePercent(stock.lastPrice, stock.analystTarget)
-    );
-    return {
-      ...stock,
-      score,
-      isVisibleInRisk,
-      isInRecommendedWatchlist: false,
-    };
-  });
+  const scored: SimStock[] = stocks
+    .filter((stock) => stock.excludeFromShortlist !== true)
+    .map((stock) => {
+      const score = stock.isETF ? undefined : (stock.score ?? computeRiskReturnScore(stock));
+      const isVisibleInRisk = !settings.enableRiskFilter
+        || stock.isETF === true
+        || stockPassesRiskAppetiteOnly(
+          { ...stock, score },
+          settings.riskAppetite,
+          upsidePercent(stock.lastPrice, stock.analystTarget)
+        );
+      return {
+        ...stock,
+        score,
+        isVisibleInRisk,
+        isInRecommendedWatchlist: false,
+      };
+    });
 
   const shortlistedSymbols = new Set<string>();
 
   if (settings.limitWatchlistSize) {
-    const holdingSymbols = scored.filter((stock) => stock.quantity > 0);
-    const unownedEtfs = scored.filter((stock) => stock.quantity <= 0 && stock.isETF === true);
-    const eligibleOthers = scored
-      .filter((stock) => stock.quantity <= 0 && stock.isETF !== true && stock.isVisibleInRisk)
-      .filter((stock) => (stock.lastPrice ?? 0) < stock.transactionLimit)
-      .sort((a, b) => {
-        const cmp = (b.score ?? Number.NEGATIVE_INFINITY) - (a.score ?? Number.NEGATIVE_INFINITY);
-        return cmp === 0 ? a.symbol.localeCompare(b.symbol) : cmp;
-      });
+    const etfs = scored.filter((stock) => stock.isETF === true);
+    const topN = rankedTopWatchlistCandidates(scored, {
+      enableRiskFilter: settings.enableRiskFilter,
+      riskAppetite: settings.riskAppetite,
+    }).slice(0, idealWatchlistSize);
 
-    for (const stock of holdingSymbols) shortlistedSymbols.add(stock.symbol);
-    for (const stock of unownedEtfs) shortlistedSymbols.add(stock.symbol);
-
-    const remainingSlots = idealWatchlistSize - holdingSymbols.length;
-    if (remainingSlots > 0) {
-      for (const stock of eligibleOthers.slice(0, remainingSlots)) {
-        shortlistedSymbols.add(stock.symbol);
-      }
-    }
+    for (const stock of etfs) shortlistedSymbols.add(stock.symbol);
+    for (const stock of topN) shortlistedSymbols.add(stock.symbol);
   } else {
     for (const stock of scored) {
-      if (stock.quantity > 0 || stock.isETF === true || stock.isVisibleInRisk) {
+      if (stock.isETF === true || stock.isVisibleInRisk) {
         shortlistedSymbols.add(stock.symbol);
       }
     }

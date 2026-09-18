@@ -1,6 +1,6 @@
 import type { PricePoint } from "@/lib/stock-chart";
 
-const STORAGE_PREFIX = "stocks-pm-historical-price-cache:v1:";
+const STORAGE_PREFIX = "stocks-pm-historical-price-cache:v2:";
 const MAX_POINTS_PER_SYMBOL = 2500;
 
 type HistoricalPriceCacheEntry = {

@@ -4,7 +4,14 @@ import { useEffect, useState } from "react";
 import { parseCloudSnapshotForStore } from "@/lib/cloud-snapshot-hydration";
 import {
   portfolioSyncFingerprint,
+  portfolioHoldingsIdentityFingerprint,
+  portfolioOptimizationFingerprint,
+  optimizationUpdatesFromSlice,
+  patchPortfolioSnapshotCashForCloudUser,
+  patchPortfolioSnapshotOptimizationForCloudUser,
+  patchPortfolioSnapshotHoldingsForCloudUser,
   loadGlobalSettingsForUser,
+  patchFromCloudGlobalSettings,
 } from "@/lib/portfolio-cloud-sync";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -16,6 +23,7 @@ import {
 } from "@/lib/clear-portfolio-client-state";
 import {
   flushCurrentPortfolioSnapshotNow,
+  markLastPushedPortfolioFingerprint,
   pushPortfolioSnapshotSlice,
   retryPendingPortfolioSnapshot,
 } from "@/lib/portfolio-snapshot-client";
@@ -191,7 +199,7 @@ export function PortfolioCloudBridge({
     };
 
     const flushNow = () => {
-      void flushCurrentPortfolioSnapshotNow(true);
+      void flushCurrentPortfolioSnapshotNow(false);
     };
 
     const handleOnline = () => {
@@ -224,7 +232,56 @@ export function PortfolioCloudBridge({
         });
         return;
       }
-      pushCurrentSnapshot();
+      const identityChanged =
+        portfolioHoldingsIdentityFingerprint(prevSlice) !== portfolioHoldingsIdentityFingerprint(nextSlice);
+      if (identityChanged) {
+        const removedSymbols = prevSlice.stocks
+          .map((stock) => stock.symbol)
+          .filter((symbol) => !nextSlice.stocks.some((stock) => stock.symbol === symbol));
+        const supabase = createClient();
+        void patchPortfolioSnapshotHoldingsForCloudUser(supabase, dataUserId, nextSlice, removedSymbols).then(
+          async (holdingsResult) => {
+            if (holdingsResult.error) return;
+            if (!holdingsResult.patched) {
+              pushCurrentSnapshot();
+              return;
+            }
+            const cashChanged = prevSlice.cashBalance !== nextSlice.cashBalance;
+            if (cashChanged) {
+              await patchPortfolioSnapshotCashForCloudUser(supabase, dataUserId, nextSlice.cashBalance, false);
+            }
+            markLastPushedPortfolioFingerprint(dataUserId, portfolioSyncFingerprint(nextSlice));
+          }
+        );
+        return;
+      }
+      const cashChanged = prevSlice.cashBalance !== nextSlice.cashBalance;
+      if (cashChanged) {
+        const prevPending = prevSlice.stocks.filter((stock) => stock.pendingOptimization).length;
+        const nextPending = nextSlice.stocks.filter((stock) => stock.pendingOptimization).length;
+        void patchPortfolioSnapshotCashForCloudUser(
+          createClient(),
+          dataUserId,
+          nextSlice.cashBalance,
+          nextPending > prevPending
+        ).then((result) => {
+          if (!result.error && result.patched) {
+            markLastPushedPortfolioFingerprint(dataUserId, portfolioSyncFingerprint(nextSlice));
+          }
+        });
+        return;
+      }
+      if (portfolioOptimizationFingerprint(prevSlice) !== portfolioOptimizationFingerprint(nextSlice)) {
+        const updates = optimizationUpdatesFromSlice(nextSlice, prevSlice);
+        if (updates.length === 0) return;
+        void patchPortfolioSnapshotOptimizationForCloudUser(createClient(), dataUserId, updates).then((result) => {
+          if (!result.error && result.patched) {
+            markLastPushedPortfolioFingerprint(dataUserId, portfolioSyncFingerprint(nextSlice));
+          }
+        });
+        return;
+      }
+      // Derived-only changes (shortlist, lastPrice) stay local.
     });
 
     return () => {
@@ -247,24 +304,28 @@ export function PortfolioCloudBridge({
     const supabase = createClient();
     loadGlobalSettingsForUser(supabase, dataUserId).then((settings) => {
       if (!settings) return;
-      usePortfolioStore.setState({
-        ...(settings.etfProfitTarget != null && settings.etfProfitTarget > 0 ? { etfProfitTarget: settings.etfProfitTarget } : {}),
-        ...(settings.stockProfitTarget != null && settings.stockProfitTarget > 0 ? { stockProfitTarget: settings.stockProfitTarget } : {}),
-        ...(settings.riskAppetite != null ? { riskAppetite: settings.riskAppetite } : {}),
-        ...(settings.enableRiskFilter != null ? { enableRiskFilter: settings.enableRiskFilter } : {}),
-        ...(settings.useAISentiment != null ? { useAISentimentForRecommendations: settings.useAISentiment } : {}),
-        ...(settings.useRSIGating != null ? { useRSIGatingForRecommendations: settings.useRSIGating } : {}),
-        ...(settings.sellOnlyLongTerm != null ? { sellOnlyLongTermQualified: settings.sellOnlyLongTerm } : {}),
-        ...(settings.limitWatchlistSize != null ? { limitWatchlistSize: settings.limitWatchlistSize } : {}),
-        ...(settings.timezone ? { timezone: settings.timezone } : {}),
-        ...(settings.region ? { region: settings.region } : {}),
-      });
-      // Recompute recommendations so the UI immediately reflects the loaded settings.
-      // stocks[].recommendation is stored in the Zustand store (not computed on-the-fly),
-      // so setState alone leaves stale recommendations until the next user interaction.
-      // recalcMetrics reruns derivePortfolioState with the new settings.
-      // The fingerprint subscriber only pushes to Supabase if shortlist/movingAvg
-      // actually changed — a legitimate write, not a loop.
+      const patch = patchFromCloudGlobalSettings(
+        {
+          etfProfitTarget: usePortfolioStore.getState().etfProfitTarget,
+          stockProfitTarget: usePortfolioStore.getState().stockProfitTarget,
+          riskAppetite: usePortfolioStore.getState().riskAppetite,
+          enableRiskFilter: usePortfolioStore.getState().enableRiskFilter,
+          useAISentimentForRecommendations: usePortfolioStore.getState().useAISentimentForRecommendations,
+          useRSIGatingForRecommendations: usePortfolioStore.getState().useRSIGatingForRecommendations,
+          rsiPeriodForRecommendations: usePortfolioStore.getState().rsiPeriodForRecommendations,
+          rsiOversoldThresholdForRecommendations: usePortfolioStore.getState().rsiOversoldThresholdForRecommendations,
+          rsiOverboughtThresholdForRecommendations: usePortfolioStore.getState().rsiOverboughtThresholdForRecommendations,
+          rsiHysteresisPointsForRecommendations: usePortfolioStore.getState().rsiHysteresisPointsForRecommendations,
+          rsiMinRisingDaysForRecommendations: usePortfolioStore.getState().rsiMinRisingDaysForRecommendations,
+          sellOnlyLongTermQualified: usePortfolioStore.getState().sellOnlyLongTermQualified,
+          limitWatchlistSize: usePortfolioStore.getState().limitWatchlistSize,
+          timezone: usePortfolioStore.getState().timezone,
+          region: usePortfolioStore.getState().region,
+        },
+        settings
+      );
+      if (Object.keys(patch).length === 0) return;
+      usePortfolioStore.setState(patch);
       usePortfolioStore.getState().recalcMetrics();
     });
   }, [syncReady, dataUserId]);

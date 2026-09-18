@@ -220,7 +220,6 @@ export default function DashboardPage() {
         const { data: auth } = await supabase.auth.getUser();
         const uid = auth.user?.id;
         if (!uid) {
-          if (!cancelled) setCloudHistory([]);
           return;
         }
         const dataUserId = await resolveStocksPmDataUserId(supabase, uid);
@@ -498,7 +497,7 @@ export default function DashboardPage() {
         transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: reduceMotion ? 0 : 0.15 }}
       >
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold tracking-tight">Top investments</h2>
+          <h2 className="text-base font-semibold tracking-tight">Your Holdings - Gainers/Losers</h2>
           <label className="ui-hover-pop flex cursor-pointer items-center gap-2 rounded-lg border border-transparent px-2 py-1 text-xs text-subtle transition-colors hover:border-border">
             <span className="font-medium">{bars ? "Bars" : "Cards"}</span>
             <input type="checkbox" className="accent-primary" checked={bars} onChange={(e) => setBars(e.target.checked)} />
@@ -733,18 +732,13 @@ function GainerLoserBars({
   selectedSymbol: string | null;
   onToggleSymbol: (symbol: string) => void;
 }) {
-  const sortedG = [...gainers].sort((a, b) => b.quantity * b.averageCost - a.quantity * a.averageCost).slice(0, 8);
-  const sortedL = [...losers].sort((a, b) => b.quantity * b.averageCost - a.quantity * a.averageCost).slice(0, 8);
+  const sortedG = [...gainers].sort((a, b) => b.quantity * b.averageCost - a.quantity * a.averageCost);
+  const sortedL = [...losers].sort((a, b) => b.quantity * b.averageCost - a.quantity * a.averageCost);
 
-  const maxGain = Math.max(
-    ...sortedG.map((g) => Math.max(0, (g.lastPrice ?? g.averageCost) * g.quantity - g.averageCost * g.quantity)),
-    1
-  );
   const maxCostG = Math.max(...sortedG.map((g) => g.quantity * g.averageCost), 1);
-  const maxTotal = maxCostG + maxGain;
-
   const maxCostL = Math.max(...sortedL.map((l) => l.quantity * l.averageCost), 1);
-  const sharedScaleMax = Math.max(maxTotal, maxCostL, 1);
+  // Use one cost-basis scale across gainers and losers so similar CB values look similar in height.
+  const sharedScaleMax = Math.max(maxCostG, maxCostL, 1);
 
   return (
     <>
@@ -756,12 +750,12 @@ function GainerLoserBars({
         {sortedG.length === 0 ? (
           <EmptyCol message="No gainers to chart." sub="Switch to cards or add positions." />
         ) : (
-          <div className="flex h-44 flex-wrap items-end gap-2 overflow-x-auto pb-1">
+          <div className="flex h-44 flex-nowrap items-end gap-2 overflow-x-auto pb-1" style={{ scrollbarGutter: "stable" }}>
             {sortedG.map((g) => {
               const costBasis = Math.max(g.quantity * g.averageCost, 0.0001);
               const gain = Math.max((g.lastPrice ?? g.averageCost) * g.quantity - costBasis, 0);
               const total = costBasis + gain;
-              const scaled = total / sharedScaleMax;
+              const scaled = costBasis / sharedScaleMax;
               const barH = 128 * scaled;
               const costH = barH * (costBasis / total);
               const gainH = barH * (gain / total);
@@ -807,7 +801,7 @@ function GainerLoserBars({
         {sortedL.length === 0 ? (
           <EmptyCol message="No losers to chart." sub="Switch to cards or add positions." />
         ) : (
-          <div className="flex h-44 flex-wrap items-end gap-2 overflow-x-auto pb-1">
+          <div className="flex h-44 flex-nowrap items-end gap-2 overflow-x-auto pb-1" style={{ scrollbarGutter: "stable" }}>
             {sortedL.map((l) => {
               const costBasis = Math.max(l.quantity * l.averageCost, 0.0001);
               const loss = Math.abs((l.lastPrice ?? l.averageCost) * l.quantity - costBasis);

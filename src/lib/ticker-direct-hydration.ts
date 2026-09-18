@@ -12,6 +12,10 @@ export type TickerHydrationPriceRow = {
   analyst_average?: number | string | null;
   market_cap?: number | null;
   peg_ratio?: number | null;
+  return_on_equity?: number | null;
+  profit_margin?: number | null;
+  trailing_pe?: number | null;
+  debt_to_equity?: number | null;
   beta?: number | null;
   company_name?: string | null;
   is_etf?: boolean | null;
@@ -55,6 +59,22 @@ export function mapTickerHydrationPriceRowToPatch(
   }
   const peg = parseStockPeg(p.peg_ratio);
   if (peg !== undefined) patch.peg = peg;
+  if (p.return_on_equity != null) {
+    const roe = Number(p.return_on_equity);
+    if (Number.isFinite(roe)) patch.returnOnEquity = roe;
+  }
+  if (p.profit_margin != null) {
+    const margin = Number(p.profit_margin);
+    if (Number.isFinite(margin)) patch.profitMargin = margin;
+  }
+  if (p.trailing_pe != null) {
+    const trailingPe = Number(p.trailing_pe);
+    if (Number.isFinite(trailingPe) && trailingPe > 0) patch.trailingPE = trailingPe;
+  }
+  if (p.debt_to_equity != null) {
+    const debtToEquity = Number(p.debt_to_equity);
+    if (Number.isFinite(debtToEquity) && debtToEquity >= 0) patch.debtToEquity = debtToEquity;
+  }
   if (p.beta != null) {
     const beta = Number(p.beta);
     if (Number.isFinite(beta)) patch.beta = beta;
@@ -91,7 +111,7 @@ export async function fetchTickerHydrationFromTables(
     supabase
       .from("ticker_data")
       .select(
-        "symbol, analyst_average, market_cap, peg_ratio, analyst_target, beta, company_name, consensus_conclusion, is_etf"
+        "symbol, analyst_average, market_cap, peg_ratio, return_on_equity, profit_margin, trailing_pe, debt_to_equity, analyst_target, beta, company_name, consensus_conclusion, is_etf"
       )
       .in("symbol", upper),
     supabase.from("ai_sentiment_scores").select("symbol, sentiment_score, last_updated").in("symbol", upper),
@@ -99,8 +119,9 @@ export async function fetchTickerHydrationFromTables(
 
   const fundBySym: Record<string, Record<string, unknown>> = {};
   for (const row of fundRes.data ?? []) {
-    const sym = row.symbol as string;
-    if (sym) fundBySym[sym] = row as Record<string, unknown>;
+    const raw = row.symbol as string;
+    if (!raw) continue;
+    fundBySym[raw.trim().toUpperCase()] = row as Record<string, unknown>;
   }
 
   function mergeFundamentals(sym: string, f: Record<string, unknown>): Pick<
@@ -108,6 +129,10 @@ export async function fetchTickerHydrationFromTables(
     | "analyst_average"
     | "market_cap"
     | "peg_ratio"
+    | "return_on_equity"
+    | "profit_margin"
+    | "trailing_pe"
+    | "debt_to_equity"
     | "analyst_target"
     | "beta"
     | "company_name"
@@ -126,6 +151,10 @@ export async function fetchTickerHydrationFromTables(
       analyst_average,
       market_cap: f.market_cap != null ? Number(f.market_cap) : null,
       peg_ratio: parseStockPeg(f.peg_ratio) ?? null,
+      return_on_equity: f.return_on_equity != null ? Number(f.return_on_equity) : null,
+      profit_margin: f.profit_margin != null ? Number(f.profit_margin) : null,
+      trailing_pe: f.trailing_pe != null ? Number(f.trailing_pe) : null,
+      debt_to_equity: f.debt_to_equity != null ? Number(f.debt_to_equity) : null,
       analyst_target: f.analyst_target != null ? Number(f.analyst_target) : null,
       beta: f.beta != null ? Number(f.beta) : null,
       company_name: typeof f.company_name === "string" ? f.company_name : null,
@@ -135,8 +164,9 @@ export async function fetchTickerHydrationFromTables(
 
   const prices: Record<string, TickerHydrationPriceRow> = {};
   for (const row of pricesRes.data ?? []) {
-    const sym = row.symbol as string;
-    if (!sym) continue;
+    const raw = row.symbol as string;
+    if (!raw) continue;
+    const sym = raw.trim().toUpperCase();
     const f = fundBySym[sym] ?? {};
     prices[sym] = {
       symbol: sym,

@@ -5,11 +5,12 @@ import {
   computeRiskReturnScore,
   type IosStockInput,
 } from "@/lib/ios-recommendation";
-import { sanitizeProvidedHistory } from "@/lib/historical-price-server";
+import { resolveHistoryClose, sanitizeProvidedHistory } from "@/lib/historical-price-server";
 
 type HistoryRow = {
   date: string;
   close: number | null;
+  adjusted_close?: number | null;
 };
 
 type TradeRecord = {
@@ -134,7 +135,7 @@ export async function POST(request: NextRequest) {
   const history = ((historyData ?? []) as HistoryRow[])
     .map((row) => ({
       date: String(row.date).slice(0, 10),
-      close: Number(row.close),
+      close: resolveHistoryClose(row),
     }))
     .filter((row) => row.date && Number.isFinite(row.close) && row.close > 0)
     .sort((a, b) => a.date.localeCompare(b.date));

@@ -10,6 +10,8 @@ import { usePortfolioStore } from "@/store/portfolioStore";
 import { STOCKS_PM_ONBOARDING_USER_META_KEY } from "@/lib/onboarding-meta";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { recordExternalCashFlow } from "@/lib/external-cash-flows";
+import { saveGlobalSettingsForUser } from "@/lib/portfolio-cloud-sync";
+import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
 
 const steps = [
   { title: "Strategy", body: "Practice emotionless rules: buy near moving averages, scale in, take profits at targets." },
@@ -70,6 +72,34 @@ export default function OnboardingPage() {
         }
       }
       setSettings({ riskAppetite: risk });
+      try {
+        const supabase = createClient();
+        const { data: authData } = await supabase.auth.getUser();
+        const uid = authData.user?.id;
+        if (uid) {
+          const dataUserId = await syncStocksPmAuthUser(supabase, uid);
+          const store = usePortfolioStore.getState();
+          await saveGlobalSettingsForUser(supabase, dataUserId, {
+            etfProfitTarget: store.etfProfitTarget,
+            stockProfitTarget: store.stockProfitTarget,
+            riskAppetite: store.riskAppetite,
+            enableRiskFilter: store.enableRiskFilter,
+            useAISentiment: store.useAISentimentForRecommendations,
+            useRSIGating: store.useRSIGatingForRecommendations,
+            rsiPeriod: store.rsiPeriodForRecommendations,
+            rsiOversoldThreshold: store.rsiOversoldThresholdForRecommendations,
+            rsiOverboughtThreshold: store.rsiOverboughtThresholdForRecommendations,
+            rsiHysteresisPoints: store.rsiHysteresisPointsForRecommendations,
+            rsiMinRisingDays: store.rsiMinRisingDaysForRecommendations,
+            sellOnlyLongTerm: store.sellOnlyLongTermQualified,
+            limitWatchlistSize: store.limitWatchlistSize,
+            timezone: store.timezone,
+            region: store.region,
+          });
+        }
+      } catch (error) {
+        console.warn("[onboarding global settings]", error);
+      }
 
       let seededSymbols: string[] = [];
       if (usePortfolioStore.getState().stocks.length === 0) {

@@ -14,14 +14,62 @@ type RpcRow = {
 
 const MAX_DAYS = 2000;
 const MASTER_CACHE_DAYS = MAX_DAYS;
+const CANONICAL_SPLIT_RATIOS = [1.25, 4 / 3, 1.5, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
+const SPLIT_RATIO_MATCH_TOLERANCE = 0.08;
+
+function nearestCanonicalSplitRatio(observed: number): number | null {
+  if (!Number.isFinite(observed) || observed <= 1.2) return null;
+
+  let best: number | null = null;
+  let bestError = Number.POSITIVE_INFINITY;
+  for (const ratio of CANONICAL_SPLIT_RATIOS) {
+    const relError = Math.abs(observed - ratio) / ratio;
+    if (relError < bestError) {
+      bestError = relError;
+      best = ratio;
+    }
+  }
+
+  return best != null && bestError <= SPLIT_RATIO_MATCH_TOLERANCE ? best : null;
+}
+
+function normalizeSplitContinuity(pointsAsc: PricePoint[]): PricePoint[] {
+  if (pointsAsc.length < 3) return pointsAsc;
+
+  const normalized = pointsAsc.map((point) => ({ ...point }));
+  let cumulativeScale = 1;
+
+  for (let i = pointsAsc.length - 2; i >= 0; i -= 1) {
+    const older = Number(pointsAsc[i]?.close);
+    const newer = Number(pointsAsc[i + 1]?.close);
+    if (!Number.isFinite(older) || !Number.isFinite(newer) || older <= 0 || newer <= 0) {
+      continue;
+    }
+
+    const forward = nearestCanonicalSplitRatio(older / newer);
+    const reverse = nearestCanonicalSplitRatio(newer / older);
+    if (forward) {
+      cumulativeScale *= 1 / forward;
+    } else if (reverse) {
+      cumulativeScale *= reverse;
+    }
+
+    normalized[i] = {
+      ...normalized[i],
+      close: older * cumulativeScale,
+    };
+  }
+
+  return normalized.filter((p) => Number.isFinite(p.close) && p.close > 0);
+}
 
 /**
  * Loads daily closes from `historical_prices` via `get_historical_prices` RPC.
  * Returns points sorted ascending by calendar date (oldest first) for charting.
+ * The RPC `close` column is COALESCE(adjusted_close, close).
  *
  * Note: The iOS app does **not** call this RPC — it uses `GET /rest/v1/historical_prices`
- * (see `SupabaseHistoricalService.swift`). Adding or changing this RPC does not affect iOS
- * as long as the `historical_prices` table and RLS stay the same.
+ * (see `SupabaseHistoricalService.swift`).
  */
 export async function fetchHistoricalPricePoints(
   supabase: SupabaseClient,
@@ -108,9 +156,17 @@ export async function fetchHistoricalPricePoints(
     return { date: row.date, close: rawClose };
   });
 
-  const points: PricePoint[] = resolved
-    .filter((p) => p.date.length >= 10 && Number.isFinite(p.close))
+  const sortedResolved = resolved
+    .filter((p) => p.date.length >= 10 && Number.isFinite(p.close) && (p.close as number) > 0)
     .sort((a, b) => a.date.localeCompare(b.date));
+
+  const pricedRows = rowTuples.filter((row) => Number.isFinite(row.rawClose) && row.rawClose > 0);
+  const allHaveAdjustedClose =
+    pricedRows.length > 0 &&
+    pricedRows.every((row) => row.adjustedClose != null && Number.isFinite(row.adjustedClose) && (row.adjustedClose as number) > 0);
+
+  // Already-adjusted RPC series should not be stitched again (a 50% crash would look like a 2:1 split).
+  const points: PricePoint[] = allHaveAdjustedClose ? sortedResolved : normalizeSplitContinuity(sortedResolved);
 
   setCachedHistoricalPricePoints(sym, points);
 

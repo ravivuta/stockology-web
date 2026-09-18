@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { calculateTradingLimits, computeRiskReturnScore, recommendedWatchlistSize, stockPassesRiskFilter } from "@/lib/ios-recommendation";
+import { calculateTradingLimits, computeRiskReturnScore, rankedTopWatchlistCandidates, recommendedWatchlistSize, stockPassesRiskFilter, offloadHoldingOutsideShortlistIfNeeded } from "@/lib/ios-recommendation";
 import { getRecommendationHistoryCloses } from "@/lib/recommendation-history-cache";
 import { buildRecommendation } from "@/lib/recommendation";
 import type { CsvImportRow, CsvImportTrade } from "@/lib/csvPortfolio";
@@ -75,6 +75,10 @@ export type StockHolding = {
   beta?: number;
   marketCap?: number;
   peg?: number;
+  returnOnEquity?: number;
+  profitMargin?: number;
+  trailingPE?: number;
+  debtToEquity?: number;
   analystTarget?: number;
   analystAvg?: string;
   isETF?: boolean;
@@ -154,6 +158,7 @@ type State = {
   setOnboardingComplete: (v: boolean) => void;
   optimizeStock: (symbol: string) => Promise<{ ok: boolean; error?: string }>;
   optimizePendingStocks: () => Promise<void>;
+  markAllPendingOptimization: () => number;
   importCsvRows: (
     rows: CsvImportRow[],
     mode: "portfolio" | "watchlist",
@@ -204,6 +209,34 @@ function countValidHistoricalCloses(history: { close?: number | null }[]): numbe
 // Incremented whenever an import starts, causing any in-flight optimizePendingStocks
 // loop to abort after its current in-progress fetch completes.
 let optimizationGeneration = 0;
+
+function csvImportHasCustomStrategy(row: CsvImportRow | undefined): boolean {
+  if (!row) return false;
+  return (
+    (row.shortSMA != null && row.shortSMA !== 50) ||
+    (row.dynamicFactor != null && Math.abs(row.dynamicFactor - 20) > 0.01) ||
+    (row.stockLimit != null && Math.abs(row.stockLimit - 10000) > 0.01) ||
+    (row.transactionLimit != null && Math.abs(row.transactionLimit - 2500) > 0.01) ||
+    row.targetPrice != null
+  );
+}
+
+function strategyFromImportOrExisting(imported: CsvImportRow | undefined, existing: StockHolding | undefined) {
+  if (csvImportHasCustomStrategy(imported)) {
+    return {
+      shortSMA: imported?.shortSMA ?? existing?.shortSMA ?? 50,
+      dynamicFactor: imported?.dynamicFactor ?? existing?.dynamicFactor ?? 20,
+      stockLimit: imported?.stockLimit ?? existing?.stockLimit ?? 10000,
+      transactionLimit: imported?.transactionLimit ?? existing?.transactionLimit ?? 2500,
+    };
+  }
+  return {
+    shortSMA: existing?.shortSMA ?? imported?.shortSMA ?? 50,
+    dynamicFactor: existing?.dynamicFactor ?? imported?.dynamicFactor ?? 20,
+    stockLimit: existing?.stockLimit ?? imported?.stockLimit ?? 10000,
+    transactionLimit: existing?.transactionLimit ?? imported?.transactionLimit ?? 2500,
+  };
+}
 
 function preserveImportedMetadata(existing: StockHolding | undefined) {
   if (!existing) return {};
@@ -382,6 +415,32 @@ function reduceOpenLotById(openLots: TradeLot[], lotId: string, qtyToSell: numbe
     .sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate));
 }
 
+function openLotCostBasis(openLots: TradeLot[] | undefined): number {
+  if (!openLots?.length) return 0;
+  return openLots.reduce((sum, lot) => sum + Math.max(0, lot.quantity) * Math.max(0, lot.costBasis), 0);
+}
+
+function holdingOpenCostBasis(
+  stock: StockHolding | undefined,
+  lots: { open: TradeLot[] } | undefined
+): number {
+  if (lots) return openLotCostBasis(lots.open);
+  if (!stock) return 0;
+  return Math.max(0, stock.quantity) * Math.max(0, stock.averageCost);
+}
+
+function totalOpenCostBasis(
+  stockMap: Map<string, StockHolding>,
+  lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }>
+): number {
+  const symbols = new Set<string>([...stockMap.keys(), ...Object.keys(lotsBySymbol)]);
+  let total = 0;
+  for (const symbol of symbols) {
+    total += holdingOpenCostBasis(stockMap.get(symbol), lotsBySymbol[symbol]);
+  }
+  return total;
+}
+
 function summarizeOpenLots(openLots: TradeLot[]) {
   const totalQty = openLots.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0);
   const totalBasis = openLots.reduce((sum, lot) => sum + Math.max(0, lot.quantity) * Math.max(0, lot.costBasis), 0);
@@ -432,10 +491,15 @@ function derivePortfolioState(
 ): { stocks: StockHolding[]; portfolioSize: number } {
   const shouldRecalculateLimits = options?.shouldRecalculateLimits ?? true;
 
-  const scoredStocks = stocksInput.map((stock) => ({
-    ...stock,
-    score: stock.isETF ? undefined : computeRiskReturnScore(stock),
-  }));
+  const scoredStocks = stocksInput.map((stock) => {
+    const bundle = recalcCtx.lotsBySymbol[stock.symbol];
+    if (!bundle) return { ...stock, score: stock.isETF ? undefined : computeRiskReturnScore(stock) };
+    const summary = summarizeOpenLots(bundle.open);
+    const quantity = summary.quantity;
+    const averageCost = quantity > 0 ? summary.averageCost : 0;
+    const synced = { ...stock, quantity, averageCost };
+    return { ...synced, score: synced.isETF ? undefined : computeRiskReturnScore(synced) };
+  });
   const portfolioSize = scoredStocks.reduce((sum, stock) => sum + stock.quantity * (stock.lastPrice ?? 0), 0) + cashBalance;
   const idealWatchlistSize = recommendedWatchlistSize(portfolioSize);
 
@@ -494,23 +558,14 @@ function derivePortfolioState(
   if (shortlistCtx.limitWatchlistSize) {
     const holdingSymbols = stocksWithRisk.filter((stock) => stock.quantity > 0 && stock.excludeFromShortlist !== true);
     const unownedEtfs = stocksWithRisk.filter((stock) => stock.quantity <= 0 && stock.isETF === true && stock.excludeFromShortlist !== true);
-    const eligibleOthers = stocksWithRisk
-      .filter((stock) => stock.quantity <= 0 && stock.isETF !== true && stock.isVisibleInRisk && stock.excludeFromShortlist !== true)
-      .filter((stock) => (stock.lastPrice ?? 0) < stock.transactionLimit)
-      .sort((a, b) => {
-        const cmp = (b.score ?? Number.NEGATIVE_INFINITY) - (a.score ?? Number.NEGATIVE_INFINITY);
-        return cmp === 0 ? a.symbol.localeCompare(b.symbol) : cmp;
-      });
+    const topN = rankedTopWatchlistCandidates(stocksWithRisk, {
+      enableRiskFilter: shortlistCtx.enableRiskFilter,
+      riskAppetite: shortlistCtx.riskAppetite,
+    }).slice(0, idealWatchlistSize);
 
     for (const stock of holdingSymbols) shortlistedSymbols.add(stock.symbol);
     for (const stock of unownedEtfs) shortlistedSymbols.add(stock.symbol);
-
-    const remainingSlots = idealWatchlistSize - holdingSymbols.length;
-    if (remainingSlots > 0) {
-      for (const stock of eligibleOthers.slice(0, remainingSlots)) {
-        shortlistedSymbols.add(stock.symbol);
-      }
-    }
+    for (const stock of topN) shortlistedSymbols.add(stock.symbol);
   } else {
     for (const stock of stocksWithRisk) {
       if (stock.excludeFromShortlist === true) continue;
@@ -522,11 +577,21 @@ function derivePortfolioState(
 
   const stocks = stocksWithRisk.map((stock) => {
     const isShortlisted = shortlistedSymbols.has(stock.symbol);
+    const gatedRec = isShortlisted
+      ? offloadHoldingOutsideShortlistIfNeeded(stock.recommendation, stock, {
+          enableRiskFilter: shortlistCtx.enableRiskFilter,
+          limitWatchlistSize: shortlistCtx.limitWatchlistSize,
+          riskAppetite: shortlistCtx.riskAppetite,
+          portfolioSize,
+          cashBalance,
+          allStocks: stocksWithRisk,
+        }, { sellOnlyLongTermQualified: recalcCtx.sellOnlyLongTermQualified })
+      : undefined;
     return {
       ...stock,
       isShortlisted,
       isInWatchlistSize: isShortlisted,
-      recommendation: isShortlisted ? stock.recommendation : undefined,
+      recommendation: gatedRec,
     };
   });
 
@@ -555,7 +620,7 @@ const defaultStock = (partial: Partial<StockHolding> & { symbol: string }): Stoc
   beta: partial.beta ?? 1.1,
   marketCap: partial.marketCap,
   peg: partial.peg ?? 1.5,
-  isETF: partial.isETF ?? false,
+  isETF: partial.isETF,
   movingAvg: partial.movingAvg,
   suppressTradeActions: partial.suppressTradeActions ?? false,
   excludeFromShortlist: partial.excludeFromShortlist ?? false,
@@ -619,13 +684,16 @@ export const usePortfolioStore = create<State>()(
           const currentPortfolioSize = st.stocks.reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) + st.cashBalance;
           const newPortfolioSize = st.stocks.reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) + n;
           const drift = currentPortfolioSize > 0 ? Math.abs(newPortfolioSize - currentPortfolioSize) / currentPortfolioSize : 0;
+          const markPending = drift > 0.10;
           const derived = derivePortfolioState(st.stocks, n, recalcCtx, st, {
             shouldRecalculateLimits: true,
             forceRecalculateAllHoldingLimits: drift > 0.10,
           });
           return {
             cashBalance: n,
-            stocks: derived.stocks,
+            stocks: markPending
+              ? derived.stocks.map((stock) => ({ ...stock, pendingOptimization: true }))
+              : derived.stocks,
             portfolioSize: derived.portfolioSize,
             lastLocalMutationAt: mutationAt,
           };
@@ -1423,6 +1491,18 @@ export const usePortfolioStore = create<State>()(
           get().setOptimizing(false);
         }
       },
+      markAllPendingOptimization: () => {
+        const mutationAt = new Date().toISOString();
+        let marked = 0;
+        set((st) => {
+          marked = st.stocks.length;
+          return {
+            stocks: st.stocks.map((stock) => ({ ...stock, pendingOptimization: true })),
+            lastLocalMutationAt: mutationAt,
+          };
+        });
+        return marked;
+      },
       importCsvRows: (rows, mode, trades = []) => {
         // Cancel any in-flight optimizePendingStocks loop from a previous import.
         optimizationGeneration += 1;
@@ -1450,22 +1530,6 @@ export const usePortfolioStore = create<State>()(
         let cashAdjustedBy = 0;
         const importedSymbolsByAccount = new Map<string, Set<string>>();
         const netUpdatesMap = new Map<string, number>();
-        const importPriceBySymbol = new Map<string, number>();
-
-        for (const [symbol, symbolRows] of grouped.entries()) {
-          let qtyTotal = 0;
-          let valueTotal = 0;
-          for (const row of symbolRows) {
-            const qty = Math.max(0, row.qty);
-            const price = Math.max(0, row.price);
-            if (qty <= 0 || price <= 0) continue;
-            qtyTotal += qty;
-            valueTotal += qty * price;
-          }
-          if (qtyTotal > 0 && valueTotal > 0) {
-            importPriceBySymbol.set(symbol, valueTotal / qtyTotal);
-          }
-        }
 
         if (mode === "portfolio") {
           for (const [symbol, symbolRows] of grouped.entries()) {
@@ -1485,6 +1549,8 @@ export const usePortfolioStore = create<State>()(
         set((st) => {
           const mutationAt = new Date().toISOString();
           const preImportQtyBySymbol = new Map<string, number>();
+          const preImportStockMap = new Map(st.stocks.map((stock) => [stock.symbol, stock] as const));
+          const preOpenCostBasis = totalOpenCostBasis(preImportStockMap, st.lotsBySymbol);
 
           for (const stock of st.stocks) {
             const lots = st.lotsBySymbol[stock.symbol];
@@ -1496,14 +1562,11 @@ export const usePortfolioStore = create<State>()(
 
           const stockMap = new Map(keepExisting.map((stock) => [stock.symbol, stock] as const));
           const lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }> = {};
-          for (const stock of keepExisting) {
-            const lots = st.lotsBySymbol[stock.symbol];
-            if (lots) {
-              lotsBySymbol[stock.symbol] = {
-                open: lots.open.map(cloneTradeLot),
-                sold: lots.sold.map(cloneSoldLot),
-              };
-            }
+          for (const [symbol, lots] of Object.entries(st.lotsBySymbol)) {
+            lotsBySymbol[symbol] = {
+              open: lots.open.map(cloneTradeLot),
+              sold: lots.sold.map(cloneSoldLot),
+            };
           }
 
           if (mode === "portfolio" && importedSymbolsByAccount.size > 0) {
@@ -1529,16 +1592,15 @@ export const usePortfolioStore = create<State>()(
                 const removedQty = accountLots.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0);
                 if (removedQty <= 0) continue;
 
-                const marketPrice = Math.max(0, stockMap.get(symbol)?.lastPrice ?? 0);
-                const liquidationPrice = marketPrice;
-                liquidationCashCredited += removedQty * liquidationPrice;
+                const removedBasis = openLotCostBasis(accountLots);
+                const averageCost = removedQty > 0 ? removedBasis / removedQty : 0;
+                liquidationCashCredited += removedBasis;
 
                 soldLots.unshift({
                   saleDate: defaultImportPurchaseDate(),
                   quantity: removedQty,
-                  salePrice: liquidationPrice,
-                  realizedGainLoss:
-                    accountLots.reduce((sum, lot) => sum + (liquidationPrice - Math.max(0, lot.costBasis)) * Math.max(0, lot.quantity), 0),
+                  salePrice: averageCost,
+                  realizedGainLoss: 0,
                 });
               }
 
@@ -1616,8 +1678,20 @@ export const usePortfolioStore = create<State>()(
                   const importedLot = importedLots[0];
                   const importedQty = Math.max(0, importedLot.quantity);
                   const existingQty = existingAccountLots.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0);
+                  const existingBasis = existingAccountLots.reduce(
+                    (sum, lot) => sum + Math.max(0, lot.quantity) * Math.max(0, lot.costBasis),
+                    0
+                  );
+                  const existingAvg = existingQty > 0 ? existingBasis / existingQty : 0;
+                  const importedPriceMatchesExisting = Math.abs(importedLot.costBasis - existingAvg) <= 0.01;
 
                   if (existingAccountLots.length === 0) {
+                    mergedOpenLots.push(importedLot);
+                    continue;
+                  }
+
+                  // CSV snapshot restated cost: keep stale per-lot prices only when qty AND avg still match.
+                  if (!importedPriceMatchesExisting) {
                     mergedOpenLots.push(importedLot);
                     continue;
                   }
@@ -1664,6 +1738,7 @@ export const usePortfolioStore = create<State>()(
               const mergedTotalQty = mergedOpenLots.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0);
               const mergedTotalBasis = mergedOpenLots.reduce((sum, lot) => sum + Math.max(0, lot.quantity) * Math.max(0, lot.costBasis), 0);
               const mergedAverageCost = mergedTotalQty > 0 ? mergedTotalBasis / mergedTotalQty : 0;
+              const strategy = strategyFromImportOrExisting(imported.template, existing);
 
               lotsBySymbol[symbol] = {
                 open: mergedOpenLots,
@@ -1681,13 +1756,13 @@ export const usePortfolioStore = create<State>()(
                       : imported.template.price > 0
                         ? imported.template.price
                         : undefined,
-                  shortSMA: imported.template.shortSMA,
-                  dynamicFactor: imported.template.dynamicFactor,
-                  stockLimit: imported.template.stockLimit,
-                  transactionLimit: imported.template.transactionLimit,
-                  targetPrice: imported.template.targetPrice,
+                  shortSMA: strategy.shortSMA,
+                  dynamicFactor: strategy.dynamicFactor,
+                  stockLimit: strategy.stockLimit,
+                  transactionLimit: strategy.transactionLimit,
+                  targetPrice: imported.template.targetPrice ?? existing?.targetPrice,
                   name: imported.template.name ?? existing?.name,
-                  pendingOptimization: true,
+                  pendingOptimization: existing?.pendingOptimization ?? true,
                   ...preserveImportedMetadata(existing),
                 })
               );
@@ -1717,20 +1792,36 @@ export const usePortfolioStore = create<State>()(
             for (const trade of trades) {
               const symbol = trade.symbol.toUpperCase();
               const qty = Math.max(0, trade.qty);
-              const price = Math.max(0, trade.price);
               if (qty <= 0) continue;
               importedTradeCount += 1;
+              if (holdingsSymbols.has(symbol)) continue;
 
               const bundle = lotsBySymbol[symbol] ?? { open: [], sold: [] };
-              const stock = stockMap.get(symbol);
-              const averageCost = stock?.averageCost ?? 0;
-              bundle.sold.unshift({
-                saleDate: trade.tradeDate || defaultImportPurchaseDate(),
-                quantity: qty,
-                salePrice: price,
-                realizedGainLoss: (price - averageCost) * qty,
-              });
+              const basisBefore = openLotCostBasis(bundle.open);
+              const openBefore = bundle.open.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0);
+              bundle.open = reduceOpenLotsFifo(bundle.open, qty);
+              const openAfter = bundle.open.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0);
+              const soldQty = Math.max(0, openBefore - openAfter);
+              if (soldQty > 0) {
+                const removedBasis = Math.max(0, basisBefore - openLotCostBasis(bundle.open));
+                const lotAverageCost = soldQty > 0 ? removedBasis / soldQty : 0;
+                bundle.sold.unshift({
+                  saleDate: trade.tradeDate || defaultImportPurchaseDate(),
+                  quantity: soldQty,
+                  salePrice: lotAverageCost,
+                  realizedGainLoss: 0,
+                });
+              }
               lotsBySymbol[symbol] = bundle;
+              const summary = summarizeOpenLots(bundle.open);
+              const stock = stockMap.get(symbol);
+              if (stock) {
+                stockMap.set(symbol, {
+                  ...stock,
+                  quantity: summary.quantity,
+                  averageCost: summary.quantity > 0 ? summary.averageCost : 0,
+                });
+              }
             }
           }
 
@@ -1754,7 +1845,8 @@ export const usePortfolioStore = create<State>()(
             if (openQty > 0) postImportQtyBySymbol.set(stock.symbol, openQty);
           }
 
-          let cashDeltaFromHoldings = 0;
+          const hadExistingHoldings =
+            preOpenCostBasis > 1e-6 || [...preImportQtyBySymbol.values()].some((qty) => qty > 1e-6);
           const allSymbolsForDiff = new Set<string>([
             ...preImportQtyBySymbol.keys(),
             ...postImportQtyBySymbol.keys(),
@@ -1765,32 +1857,13 @@ export const usePortfolioStore = create<State>()(
             const delta = afterQty - beforeQty;
             if (Math.abs(delta) > 1e-6) {
               netUpdatesMap.set(symbol, (netUpdatesMap.get(symbol) ?? 0) + delta);
-
-              // CSV import is a portfolio snapshot, not a trade ledger.
-              // Do not treat newly imported positions as fresh cash-spending buys.
-              if (beforeQty <= 1e-6 && delta > 0) {
-                continue;
-              }
-
-              const stockSnapshot = stockMap.get(symbol);
-              const importPrice = importPriceBySymbol.get(symbol) ?? 0;
-              const currentPrice = Math.max(0, stockSnapshot?.lastPrice ?? 0);
-              const referencePrice =
-                delta > 0
-                  ? importPrice
-                  : importPrice > 0
-                    ? importPrice
-                    : currentPrice;
-
-              if (referencePrice > 0) {
-                if (delta > 0) {
-                  cashDeltaFromHoldings -= delta * referencePrice;
-                } else {
-                  cashDeltaFromHoldings += Math.abs(delta) * referencePrice;
-                }
-              }
             }
           }
+
+          // Incremental CSV snapshots move cash by the change in open-lot cost
+          // basis (qty × avg cost). First-time seed leaves independently set cash alone.
+          const postOpenCostBasis = totalOpenCostBasis(stockMap, lotsBySymbol);
+          const cashDeltaFromHoldings = hadExistingHoldings ? preOpenCostBasis - postOpenCostBasis : 0;
 
           cashAdjustedBy = cashDeltaFromHoldings;
           const sortedStocks = [...stockMap.values()].sort((a, b) => a.symbol.localeCompare(b.symbol));

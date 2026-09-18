@@ -48,14 +48,23 @@ export function adjustNetWorthPointsForExternalCashFlows(
   const sortedFlowDays = [...flowTotalsByDay.entries()].sort(([a], [b]) => a.localeCompare(b));
   let flowIndex = 0;
   let cumulativeExternalFlow = 0;
+  let previousValue = sortedPoints[0]!.value;
 
   return sortedPoints.map((point) => {
     const pointYmd = etYmdFromMs(point.t);
+    const valueDelta = point.value - previousValue;
     while (flowIndex < sortedFlowDays.length && sortedFlowDays[flowIndex]![0] <= pointYmd) {
       const [flowDay, flowAmount] = sortedFlowDays[flowIndex]!;
-      if (flowDay > baselineYmd) cumulativeExternalFlow += flowAmount;
+      if (flowDay > baselineYmd) {
+        const sameDirection =
+          (flowAmount > 0 && valueDelta > 0) || (flowAmount < 0 && valueDelta < 0);
+        if (sameDirection && Math.abs(valueDelta) >= Math.abs(flowAmount) * 0.4) {
+          cumulativeExternalFlow += flowAmount;
+        }
+      }
       flowIndex += 1;
     }
+    previousValue = point.value;
     return {
       ...point,
       value: point.value - cumulativeExternalFlow,
@@ -172,6 +181,8 @@ export type ComparisonChartRow = {
   portfolioPct: number;
   spyPct: number;
   value: number;
+  sma50?: number | null;
+  sma200?: number | null;
 };
 
 /** Cumulative % from the first point in the (already range-filtered) series. */

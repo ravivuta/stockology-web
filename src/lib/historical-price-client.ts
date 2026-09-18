@@ -14,7 +14,7 @@ export async function loadHistoricalPayloadForSymbol(symbol: string, days: numbe
   if (!normalized) return [];
 
   const cached = getCachedHistoricalPricePoints(normalized, days);
-  if (cached?.points.length) {
+  if (cached?.isFresh && cached.points.length) {
     return cached.points;
   }
 

@@ -3,6 +3,17 @@ type HistoryRow = {
   close: number;
 };
 
+export function resolveHistoryClose(row: {
+  close?: unknown;
+  adjusted_close?: unknown;
+}): number {
+  const adjusted = Number(row.adjusted_close);
+  if (Number.isFinite(adjusted) && adjusted > 0) return adjusted;
+  const close = Number(row.close);
+  if (Number.isFinite(close) && close > 0) return close;
+  return Number.NaN;
+}
+
 export function sanitizeProvidedHistory(value: unknown): HistoryRow[] {
   if (!Array.isArray(value)) return [];
 
@@ -10,7 +21,7 @@ export function sanitizeProvidedHistory(value: unknown): HistoryRow[] {
   for (const row of value) {
     if (!row || typeof row !== "object") continue;
     const date = typeof (row as { date?: unknown }).date === "string" ? (row as { date: string }).date.slice(0, 10) : "";
-    const close = Number((row as { close?: unknown }).close);
+    const close = resolveHistoryClose(row as { close?: unknown; adjusted_close?: unknown });
     if (date.length !== 10 || !Number.isFinite(close) || close <= 0) continue;
     deduped.set(date, close);
   }

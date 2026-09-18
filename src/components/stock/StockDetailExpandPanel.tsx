@@ -8,6 +8,7 @@ import {
   recommendedWatchlistSize,
   scoreBreakdownRows,
   sentimentLabelForScore,
+  offloadHoldingOutsideShortlistIfNeeded,
 } from "@/lib/ios-recommendation";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
 import { formatNewsRelativeDate, parseNewsPublishedAt, sentimentDotClass, type NewsSourceRow } from "@/lib/news-feed";
@@ -15,7 +16,7 @@ import { buildRecommendation } from "@/lib/recommendation";
 import { formatCompactCurrency, formatCurrency, formatDecimal, formatNumberMax2, formatPercent } from "@/lib/numberFormat";
 import { safeHttpUrlForHref } from "@/lib/safe-external-url";
 import { createClient } from "@/lib/supabase/client";
-import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
+import { patchCurrentPortfolioSnapshotHoldings } from "@/lib/portfolio-snapshot-client";
 import { parseSuggestedQuantity, suggestedTradeType } from "@/lib/tradePrefill";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { useSupabaseStockHistory } from "@/hooks/useSupabaseStockHistory";
@@ -298,8 +299,10 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const rsiMinRisingDaysForRecommendations = usePortfolioStore((s) => s.rsiMinRisingDaysForRecommendations);
   const sellOnlyLongTermQualified = usePortfolioStore((s) => s.sellOnlyLongTermQualified);
   const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
+  const enableRiskFilter = usePortfolioStore((s) => s.enableRiskFilter);
   const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
   const portfolioSize = usePortfolioStore((s) => s.portfolioSize);
+  const cashBalance = usePortfolioStore((s) => s.cashBalance);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
 
   const stock = useMemo(() => stocks.find((s) => s.symbol === symbol), [stocks, symbol]);
@@ -398,21 +401,33 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       }
       return storedRec;
     }
-    return buildRecommendation(stock, {
-      closes,
-      etfProfitTarget,
-      stockProfitTarget,
-      useAISentiment: useAISentimentForRecommendations,
-      useRSIGating: useRSIGatingForRecommendations,
-      rsiPeriod: rsiPeriodForRecommendations,
-      rsiOversoldThreshold: rsiOversoldThresholdForRecommendations,
-      rsiOverboughtThreshold: rsiOverboughtThresholdForRecommendations,
-      rsiHysteresisPoints: rsiHysteresisPointsForRecommendations,
-      rsiMinRisingDays: rsiMinRisingDaysForRecommendations,
-      sellOnlyLongTermQualified,
-      openLots: lotSummary.openLots,
-      soldLots: lotSummary.soldLots,
-    });
+    return offloadHoldingOutsideShortlistIfNeeded(
+      buildRecommendation(stock, {
+        closes,
+        etfProfitTarget,
+        stockProfitTarget,
+        useAISentiment: useAISentimentForRecommendations,
+        useRSIGating: useRSIGatingForRecommendations,
+        rsiPeriod: rsiPeriodForRecommendations,
+        rsiOversoldThreshold: rsiOversoldThresholdForRecommendations,
+        rsiOverboughtThreshold: rsiOverboughtThresholdForRecommendations,
+        rsiHysteresisPoints: rsiHysteresisPointsForRecommendations,
+        rsiMinRisingDays: rsiMinRisingDaysForRecommendations,
+        sellOnlyLongTermQualified,
+        openLots: lotSummary.openLots,
+        soldLots: lotSummary.soldLots,
+      }),
+      stock,
+      {
+        enableRiskFilter,
+        limitWatchlistSize,
+        riskAppetite,
+        portfolioSize,
+        cashBalance,
+        allStocks: stocks,
+      },
+      { sellOnlyLongTermQualified }
+    );
   }, [
     closes,
     etfProfitTarget,
@@ -430,6 +445,12 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     rsiOverboughtThresholdForRecommendations,
     rsiHysteresisPointsForRecommendations,
     rsiMinRisingDaysForRecommendations,
+    enableRiskFilter,
+    limitWatchlistSize,
+    riskAppetite,
+    portfolioSize,
+    cashBalance,
+    stocks,
   ]);
   const recommendationFactors = useMemo(() => {
     if (!stock || !rec) return [];
@@ -469,16 +490,32 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const shortlistFactors = useMemo(() => {
     if (!stock) return [];
 
-    if (stock.isETF === true && stock.quantity <= 0) {
-      return [
+    if (stock.isETF === true) {
+      const rows = [
+        {
+          label: "Current holding",
+          detail: stock.quantity > 0 ? "Yes" : "No",
+          passes: stock.quantity > 0,
+        },
         {
           label: "ETF handling",
           detail: "ETFs are always included for recommendations regardless of filters",
           passes: true,
         },
       ];
+
+      if (stock.excludeFromShortlist === true) {
+        rows.push({
+          label: "User override: Excluded from shortlist",
+          detail: "You excluded this stock — no recommendations generated",
+          passes: false,
+        });
+      }
+
+      return rows;
     }
 
+    const riskPasses = stock.isVisibleInRisk === true;
     const rows = [
       {
         label: "Current holding",
@@ -487,15 +524,17 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       },
       {
         label: `${riskAppetite} Risk Appetite Filter`,
-        detail: stock.isVisibleInRisk ? "Passes" : "Filtered",
-        passes: stock.isVisibleInRisk === true,
+        detail: riskPasses ? "Passes" : "Filtered",
+        passes: riskPasses,
       },
-      {
+    ];
+    if (riskPasses) {
+      rows.push({
         label: `Score-Driven Top ${recommendedWatchlistSize(portfolioSize)} Watchlist`,
         detail: limitWatchlistSize ? (stock.isInWatchlistSize ? "Included" : "Beyond limit") : "Limit disabled",
         passes: limitWatchlistSize ? stock.isInWatchlistSize === true : true,
-      },
-    ];
+      });
+    }
 
     if (stock.excludeFromShortlist === true) {
       rows.push({
@@ -514,10 +553,9 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     if (stock.excludeFromShortlist === true) {
       reasons.push("Excluded by your per-stock shortlist override.");
     }
-    if (stock.isVisibleInRisk === false) {
+    if (!stock.isETF && stock.isVisibleInRisk === false) {
       reasons.push("Does not meet the current risk appetite criteria.");
-    }
-    if (limitWatchlistSize && stock.isInWatchlistSize === false) {
+    } else if (!stock.isETF && limitWatchlistSize && stock.isInWatchlistSize === false) {
       reasons.push(`Score ranks below the top ${recommendedWatchlistSize(portfolioSize)} watchlist limit.`);
     }
     return reasons;
@@ -700,7 +738,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   function confirmLotDelete() {
     if (!lotPendingDelete) return;
     removeOpenLot(symbol, lotPendingDelete.id);
-    void flushCurrentPortfolioSnapshotNow(true);
+    void patchCurrentPortfolioSnapshotHoldings();
     if (editingLot?.id === lotPendingDelete.id) {
       closeLotEditor();
     }
@@ -731,7 +769,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     }
 
     recordSellFromLot(symbol, sellingLot.id, enteredQty, enteredPrice, sellLotDate);
-    void flushCurrentPortfolioSnapshotNow(true);
+    void patchCurrentPortfolioSnapshotHoldings();
     closeLotSellDialog();
     closeLotEditor();
   }
@@ -755,7 +793,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       isRetirementAccount:
         lotAccountType === "unknown" ? null : lotAccountType === "retirement",
     });
-    void flushCurrentPortfolioSnapshotNow(true);
+    void patchCurrentPortfolioSnapshotHoldings();
     closeLotEditor();
   }
 
@@ -779,7 +817,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
           ? null
           : tradeAccountType === "retirement",
     });
-    void flushCurrentPortfolioSnapshotNow(true);
+    void patchCurrentPortfolioSnapshotHoldings();
     setTradeModalOpen(false);
     setQty("");
     setPrice("");
@@ -801,12 +839,12 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
 
   function handleSuppressTradeActionsChange(nextValue: boolean) {
     updateStock(symbol, { suppressTradeActions: nextValue });
-    void flushCurrentPortfolioSnapshotNow(true);
+    void patchCurrentPortfolioSnapshotHoldings();
   }
 
   function handleExcludeFromShortlistChange(nextValue: boolean) {
     updateStock(symbol, { excludeFromShortlist: nextValue });
-    void flushCurrentPortfolioSnapshotNow(true);
+    void patchCurrentPortfolioSnapshotHoldings();
   }
 
   return (
@@ -968,6 +1006,19 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                         { label: "Market cap", value: stock.marketCap != null ? formatCompactCurrency(stock.marketCap) : "—" },
                         { label: "PEG ratio", value: stock.peg != null ? formatDecimal(stock.peg) : "—" },
                         {
+                          label: "ROE",
+                          value: stock.returnOnEquity != null ? formatPercent(stock.returnOnEquity * 100) : "—",
+                        },
+                        {
+                          label: "Profit margin",
+                          value: stock.profitMargin != null ? formatPercent(stock.profitMargin * 100) : "—",
+                        },
+                        { label: "P/E ratio", value: stock.trailingPE != null ? formatNumberMax2(stock.trailingPE) : "—" },
+                        {
+                          label: "Debt/Equity",
+                          value: stock.debtToEquity != null ? formatNumberMax2(stock.debtToEquity) : "—",
+                        },
+                        {
                           label: "Analyst avg",
                           value: stock.analystAvg?.trim() || "—",
                           valueClassName: analystRatingTone(stock.analystAvg),
@@ -992,7 +1043,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                   compact={dense}
                   title={
                     <span className="flex items-center justify-between gap-3">
-                      <span>Score</span>
+                      <span>Score:</span>
                       <span className={cn("tabular-nums", dense ? "text-sm" : "text-base", scoreTone(stock.score))}>
                         {formatScoreDisplay(stock.score)}
                       </span>
@@ -1011,15 +1062,22 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                             hint={scoreRows.analystPoints}
                             valueClassName={analystRatingTone(stock.analystAvg)}
                           />
-                          <SnapshotRow
-                            compact={dense}
-                            label="Potential Upside to target"
-                            value={scoreRows.upsideLine}
-                            hint={scoreRows.upsidePoints}
-                            valueClassName={valueTone(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget))}
-                          />
                           <SnapshotRow compact={dense} label="Market cap" value={scoreRows.capLine} hint={scoreRows.capPoints} />
-                          <SnapshotRow compact={dense} label="PEG ratio" value={scoreRows.pegLine} hint={scoreRows.pegPoints} />
+                          {scoreRows.qualityMetrics.length > 0 ? (
+                            <>
+                              <SnapshotRow compact={dense} label="Quality" hint={scoreRows.qualityPoints} />
+                              {scoreRows.qualityMetrics.map((metric) => (
+                                <SnapshotRow
+                                  key={metric.label}
+                                  compact={dense}
+                                  indent
+                                  label={metric.label}
+                                  value={metric.value}
+                                  hint={metric.points}
+                                />
+                              ))}
+                            </>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>
@@ -1248,14 +1306,20 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                   <div>
                     <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Status reasons</p>
                     <div className={cn(dense ? "mt-3 space-y-1.5" : "mt-3 space-y-1.5")}>
-                      {shortlistFactors.map((factor) => (
-                        <FactorFlagRow
-                          key={`${factor.label}-${factor.detail}`}
-                          compact={dense}
-                          label={factor.label}
-                          detail={factor.detail}
-                          passes={factor.passes}
-                        />
+                      {shortlistFactors.map((factor, index) => (
+                        <div key={`${factor.label}-${factor.detail}`}>
+                          <FactorFlagRow
+                            compact={dense}
+                            label={factor.label}
+                            detail={factor.detail}
+                            passes={factor.passes}
+                          />
+                          {index === 0 && stock?.isETF !== true && shortlistFactors.length > 1 ? (
+                            <p className={cn("py-0.5 text-center font-semibold tracking-wide text-subtle", dense ? "text-[10px]" : "text-xs")}>
+                              OR
+                            </p>
+                          ) : null}
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -1757,7 +1821,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
         )}
         onSave={(patch) => {
           updateStock(symbol, patch);
-          void flushCurrentPortfolioSnapshotNow(true);
         }}
       />
     </div>
@@ -1801,32 +1864,37 @@ function SnapshotRow({
   value,
   hint,
   compact,
+  indent,
   valueClassName,
 }: {
   label: string;
-  value: string;
+  value?: string;
   hint?: string;
   compact?: boolean;
+  indent?: boolean;
   valueClassName?: string;
 }) {
   return (
     <li
       className={cn(
-        compact ? "pb-1.5 last:pb-0" : "pb-2 last:pb-0"
+        compact ? "pb-1.5 last:pb-0" : "pb-2 last:pb-0",
+        indent && "pl-4"
       )}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
           <span className={cn("font-medium text-foreground/80", compact ? "text-xs" : "text-sm")}>{label}</span>
-          <span
-            className={cn(
-              "font-semibold tabular-nums text-foreground",
-              compact ? "text-xs" : "text-sm",
-              valueClassName
-            )}
-          >
-            {value}
-          </span>
+          {value ? (
+            <span
+              className={cn(
+                "font-semibold tabular-nums text-foreground",
+                compact ? "text-xs" : "text-sm",
+                valueClassName
+              )}
+            >
+              {value}
+            </span>
+          ) : null}
         </div>
         {hint ? (
           <span className={cn("shrink-0 text-subtle", compact ? "text-[10px]" : "text-xs")}>

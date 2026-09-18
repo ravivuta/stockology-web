@@ -10,8 +10,9 @@ import type { PortfolioSnapshotRow } from "@/lib/cloud-portfolio";
 import {
   markLastPushedPortfolioFingerprint,
 } from "@/lib/portfolio-snapshot-client";
-import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
-import { portfolioSyncFingerprint } from "@/lib/portfolio-cloud-sync";
+import { portfolioSyncFingerprint, loadGlobalSettingsForUser, patchFromCloudGlobalSettings } from "@/lib/portfolio-cloud-sync";
+import { createClient } from "@/lib/supabase/client";
+import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
 import type { StockHolding } from "@/store/portfolioStore";
 import { usePortfolioStore } from "@/store/portfolioStore";
 
@@ -39,6 +40,46 @@ export type RefreshPipelineResult = {
   staleSymbols: string[];
 };
 
+function currentStoreSettings() {
+  const store = usePortfolioStore.getState();
+  return {
+    etfProfitTarget: store.etfProfitTarget,
+    stockProfitTarget: store.stockProfitTarget,
+    riskAppetite: store.riskAppetite,
+    enableRiskFilter: store.enableRiskFilter,
+    useAISentimentForRecommendations: store.useAISentimentForRecommendations,
+    useRSIGatingForRecommendations: store.useRSIGatingForRecommendations,
+    rsiPeriodForRecommendations: store.rsiPeriodForRecommendations,
+    rsiOversoldThresholdForRecommendations: store.rsiOversoldThresholdForRecommendations,
+    rsiOverboughtThresholdForRecommendations: store.rsiOverboughtThresholdForRecommendations,
+    rsiHysteresisPointsForRecommendations: store.rsiHysteresisPointsForRecommendations,
+    rsiMinRisingDaysForRecommendations: store.rsiMinRisingDaysForRecommendations,
+    sellOnlyLongTermQualified: store.sellOnlyLongTermQualified,
+    limitWatchlistSize: store.limitWatchlistSize,
+    timezone: store.timezone,
+    region: store.region,
+  };
+}
+
+async function syncCloudSettingsIfChanged(): Promise<boolean> {
+  try {
+    const supabase = createClient();
+    const { data } = await supabase.auth.getUser();
+    const uid = data.user?.id;
+    if (!uid) return false;
+    const dataUserId = await syncStocksPmAuthUser(supabase, uid);
+    const cloud = await loadGlobalSettingsForUser(supabase, dataUserId);
+    if (!cloud) return false;
+    const patch = patchFromCloudGlobalSettings(currentStoreSettings(), cloud);
+    if (Object.keys(patch).length === 0) return false;
+    usePortfolioStore.setState(patch);
+    return true;
+  } catch (error) {
+    console.warn("[refresh settings sync]", error);
+    return false;
+  }
+}
+
 function sanitizeSymbols(symbols: string[]): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
@@ -65,6 +106,7 @@ export async function runRefreshPipeline(
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
   try {
+    const settingsChanged = await syncCloudSettingsIfChanged();
     const clean = sanitizeSymbols(symbols);
     const res = await fetch(`${basePath}/api/python/refresh`, {
       method: "POST",
@@ -92,33 +134,20 @@ export async function runRefreshPipeline(
       options?.includeSnapshot === true &&
       data.snapshot
     ) {
-      const storeState = usePortfolioStore.getState();
-      const localMutationAt = storeState.lastLocalMutationAt
-        ? Date.parse(storeState.lastLocalMutationAt)
-        : Number.NaN;
-      const snapshotUpdatedAt = data.snapshot.updated_at
-        ? Date.parse(data.snapshot.updated_at)
-        : Number.NaN;
-      const snapshotIsStaleVsLocal =
-        Number.isFinite(localMutationAt) &&
-        (!Number.isFinite(snapshotUpdatedAt) || snapshotUpdatedAt < localMutationAt);
-
-      if (!snapshotIsStaleVsLocal) {
-        const parsed = parseCloudSnapshotForStore(data.snapshot);
-        usePortfolioStore.getState().replaceFromCloudSync({
-          ...parsed,
-          onboardingComplete: true,
-        });
-        if (dataUserId) {
-          markLastPushedPortfolioFingerprint(
-            dataUserId,
-            portfolioSyncFingerprint({
-              cashBalance: parsed.cashBalance,
-              stocks: parsed.stocks,
-              lotsBySymbol: parsed.lotsBySymbol,
-            })
-          );
-        }
+      const parsed = parseCloudSnapshotForStore(data.snapshot);
+      usePortfolioStore.getState().replaceFromCloudSync({
+        ...parsed,
+        onboardingComplete: true,
+      });
+      if (dataUserId) {
+        markLastPushedPortfolioFingerprint(
+          dataUserId,
+          portfolioSyncFingerprint({
+            cashBalance: parsed.cashBalance,
+            stocks: parsed.stocks,
+            lotsBySymbol: parsed.lotsBySymbol,
+          })
+        );
       }
     }
 
@@ -140,17 +169,16 @@ export async function runRefreshPipeline(
     if (options?.optimizePending !== false) {
       await usePortfolioStore.getState().optimizePendingStocks();
     }
+    if (settingsChanged) {
+      usePortfolioStore.getState().recalcMetrics();
+    }
 
     usePortfolioStore.setState({
       lastRefreshAt: data.refreshed_at ?? new Date().toISOString(),
     });
 
-    if (options?.includeSnapshot === true) {
-      const saveResult = await flushCurrentPortfolioSnapshotNow(true);
-      if (saveResult.error) {
-        console.warn("[runRefreshPipeline]", saveResult.error.message);
-      }
-    }
+    // Refresh is pull-only. Optimize/import/settings persist via their own mutation flush.
+    // Do not rewrite today's snapshot from a price hydrate.
 
     return {
       ok: true,

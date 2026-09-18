@@ -4,7 +4,7 @@ import { routeBusy, Sk } from "@/components/route-loading/page-skeletons/_common
 
 /**
  * Mirrors `app/(app)/dashboard/page.tsx`: header actions, portfolio summary (donut + stats),
- * recommended actions, return comparison (range + chart), top investments (gainers/losers grid).
+ * recommended actions, return comparison (range + chart), holdings gainers/losers grid.
  */
 export function DashboardPageSkeleton() {
   return (

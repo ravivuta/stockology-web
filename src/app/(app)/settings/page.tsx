@@ -110,12 +110,15 @@ function SettingsInner() {
   const setSettings = usePortfolioStore((s) => s.setSettings);
   const resetAll = usePortfolioStore((s) => s.resetAll);
   const recalc = usePortfolioStore((s) => s.recalcMetrics);
+  const markAllPendingOptimization = usePortfolioStore((s) => s.markAllPendingOptimization);
 
   const [activeSection, setActiveSection] = useState<string>(SECTIONS[0].id);
   const [resetOpen, setResetOpen] = useState(false);
   const [refreshChartOpen, setRefreshChartOpen] = useState(false);
   const [isRefreshingChart, setIsRefreshingChart] = useState(false);
   const [refreshChartSuccess, setRefreshChartSuccess] = useState(false);
+  const [pendingOptOpen, setPendingOptOpen] = useState(false);
+  const [pendingOptSuccessCount, setPendingOptSuccessCount] = useState<number | null>(null);
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [snapshots, setSnapshots] = useState<Array<{
     id: number;
@@ -142,9 +145,7 @@ function SettingsInner() {
     patch: Parameters<typeof setSettings>[0]
   ) {
     setSettings(patch);
-    // No explicit snapshot flush here — setSettings recalculates stocks (isShortlisted,
-    // movingAvg, etc.), which the PortfolioCloudBridge fingerprint subscriber picks up
-    // and pushes automatically when the derived stocks array actually changes.
+    // Settings live in users.global_settings. Do not rewrite snapshot holdings.
     if (userId) {
       const supabase = supabaseRef.current;
       const store = usePortfolioStore.getState();
@@ -189,6 +190,12 @@ function SettingsInner() {
     }
   }
 
+  function handleMarkPendingOptimization() {
+    const marked = markAllPendingOptimization();
+    setPendingOptOpen(false);
+    setPendingOptSuccessCount(marked);
+  }
+
   async function handleResetConfirm() {
     // Preserve CSV mapping presets/memory so reset only clears portfolio state.
     const mappingPresetsKey = "stocks-pm-csv-mapping-presets:v1";
@@ -211,7 +218,6 @@ function SettingsInner() {
     // stale pre-reset data (which would cause SPY line to appear outside the new domain).
     try {
       localStorage.removeItem("dash_chart_cloudPts");
-      localStorage.removeItem("dash_chart_spySeries");
       localStorage.removeItem("dash_chart_extFlows");
     } catch { /* ignore */ }
     // Delete snapshot history first so the chart starts fresh, then push the
@@ -812,7 +818,7 @@ function SettingsInner() {
                   <span>
                     <span className="block text-[12px] font-medium leading-snug text-foreground">Tax consideration</span>
                     <span className="mt-px block text-[10px] leading-snug text-subtle">
-                      Suppress SELL recommendations for short-term holdings/lots in taxable accounts. Does not apply to Retirement accounts as those transactions are tax-free.
+                      Suppress SELL recommendations for short-term holdings/lots in taxable accounts. REDUCE is still shown when retirement lots, taxable lots at a loss, or long-term taxable lots can cover the trim. Does not apply to Retirement accounts as those transactions are tax-free.
                     </span>
                   </span>
                 </label>
@@ -837,7 +843,6 @@ function SettingsInner() {
                   type="button"
                   onClick={() => {
                     recalc();
-                    void flushCurrentPortfolioSnapshotNow(true);
                   }}
                   className="ui-hover-pop inline-flex items-center gap-1.5 rounded-md border border-primary/35 px-3 py-1.5 text-sm font-medium text-foreground dark:border-primary/28"
                 >
@@ -856,6 +861,12 @@ function SettingsInner() {
                     <svg xmlns="http://www.w3.org/2000/svg" className="mt-0.5 h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="20 6 9 17 4 12"/></svg>
                     <span>Chart history cleared. The chart will rebuild from today&apos;s values as a new baseline.</span>
                     <button type="button" onClick={() => setRefreshChartSuccess(false)} className="ml-auto shrink-0 opacity-60 hover:opacity-100" aria-label="Dismiss">✕</button>
+                  </div>
+                )}
+                {pendingOptSuccessCount != null && (
+                  <div className="mt-2 flex items-start gap-1.5 rounded-md border border-green-500/30 bg-green-500/10 px-2.5 py-2 text-xs text-green-700 dark:border-green-400/25 dark:text-green-400">
+                    <span>{pendingOptSuccessCount} stocks will be optimized on the next refresh. Cash was not changed.</span>
+                    <button type="button" onClick={() => setPendingOptSuccessCount(null)} className="ml-auto shrink-0 opacity-60 hover:opacity-100" aria-label="Dismiss">Dismiss</button>
                   </div>
                 )}
                 <button
@@ -878,6 +889,15 @@ function SettingsInner() {
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                   )}
                   Refresh chart baseline
+                </button>
+                <button
+                  type="button"
+                  disabled={stockCount === 0}
+                  onClick={() => setPendingOptOpen(true)}
+                  className="ui-hover-surface mt-1.5 w-full rounded-md border border-primary/35 bg-background/90 px-2.5 py-1.5 text-xs font-semibold text-foreground dark:border-primary/28 dark:bg-yale/40 inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  <RefreshCw className="h-3.5 w-3.5 opacity-70" aria-hidden />
+                  Re-optimize on next refresh
                 </button>
                 <button
                   type="button"
@@ -921,6 +941,17 @@ function SettingsInner() {
           </div>
         }
         confirmLabel="Yes, clear history"
+        cancelLabel="Cancel"
+        variant="default"
+      />
+
+      <ConfirmModal
+        open={pendingOptOpen}
+        onClose={() => setPendingOptOpen(false)}
+        onConfirm={handleMarkPendingOptimization}
+        title="Re-optimize on next refresh?"
+        description="All tracked stocks will be marked so the next refresh runs auto-optimization. Cash, holdings, and current SMA/factor values are not changed."
+        confirmLabel="Mark for optimization"
         cancelLabel="Cancel"
         variant="default"
       />

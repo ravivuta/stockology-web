@@ -61,6 +61,11 @@ const SECTIONS: Section[] = [
   },
   {
     category: "portfolio",
+    title: "Composite Score",
+    body: "Stocks are ranked using analyst rating, market cap, and a quality bucket. Leftover upside vs the analyst target is not part of the score; it is a separate BUY/ADD gate (stocks need more than 25% expected return). When at least one quality metric is available (PEG, ROE, profit margin, debt/equity), weighting is Analyst 40, Market Cap 20, Quality 40. The quality bucket uses only available metrics. If none of those quality metrics are available or the symbol is an ETF, scoring falls back to Analyst 60, Market Cap 40.",
+  },
+  {
+    category: "portfolio",
     title: "Stock Limit Calculation",
     body: "Stock Limit = (Portfolio Size ÷ Recommended Watchlist Size) × Risk Multiplier. Risk multipliers: ETFs get 10x base allocation for larger positions, stocks with score ≥50 get 1x base allocation, stocks with score <50 get 0.5x for smaller positions. Example: $100k portfolio with 20 recommended stocks = $5k base per stock. High-score stock gets $5k limit, low-score gets $2.5k, ETF gets $50k.",
   },
@@ -97,7 +102,7 @@ const SECTIONS: Section[] = [
   {
     category: "filters",
     title: "Stock Shortlisting Process",
-    body: "Stocks PM intelligently filters your watchlist to focus on high-quality opportunities. When Risk Appetite filtering is enabled in Profile settings, stocks are screened based on market capitalization and analyst ratings. The same filters apply to both watchlist views and live recommendations for consistency. When 'Enforce Ideal Watchlist Size' is enabled, only the top-scoring stocks (up to your recommended watchlist size) receive BUY/SELL/ADD/REDUCE signals - others show as HOLD or no recommendation. When disabled, all qualifying stocks receive recommendations.",
+    body: "Stocks PM intelligently filters your watchlist to focus on high-quality opportunities. When Risk Appetite filtering is enabled in Profile settings, stocks are screened based on market capitalization and analyst ratings. Composite score ranking then uses the same score as the rest of the app: analyst rating, market cap, and quality metrics when available. Leftover upside is applied later as the 25% expected-return gate for BUY/ADD, not as a ranking factor. The same filters apply to both watchlist views and live recommendations for consistency. When 'Enforce Ideal Watchlist Size' is enabled, only the top-scoring stocks (up to your recommended watchlist size) receive BUY/SELL/ADD/REDUCE signals - others show as HOLD or no recommendation. When disabled, all qualifying stocks receive recommendations.",
   },
   {
     category: "signals",

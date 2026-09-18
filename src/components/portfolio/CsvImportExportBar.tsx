@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
-import { pushPortfolioSnapshotSlice } from "@/lib/portfolio-snapshot-client";
-import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
+import { patchCurrentPortfolioSnapshotHoldings, pushPortfolioSnapshotSlice } from "@/lib/portfolio-snapshot-client";
+import { patchPortfolioSnapshotHoldingsForCloudUser } from "@/lib/portfolio-cloud-sync";
 import { fetchTickerHydrationFromTables, type TickerHydrationPriceRow } from "@/lib/ticker-direct-hydration";
 import { getSupabaseEnv } from "@/lib/supabase/config";
 import { usePortfolioStore, type StockHolding } from "@/store/portfolioStore";
@@ -19,6 +19,7 @@ import {
   exportPortfolioCsv,
   exportWatchlistCsv,
   downloadCsv,
+  isBlankMappingValue,
   type CsvColumnMapping,
   type CsvColumnStandard,
   type CsvExportStock,
@@ -116,7 +117,7 @@ function describeAccountType(value: "no" | "yes"): string {
 function canSubmitMappingImport(pending: PendingMappingImport | null): boolean {
   if (!pending) return false;
   const symbol = pending.mapping.symbol;
-  if (!symbol || symbol.toLowerCase() === "none") return false;
+  if (isBlankMappingValue(symbol) || symbol?.toLowerCase() === "none") return false;
   if (!pending.defaultAccountName.trim()) return false;
   if (!(pending.defaultRetirementAccount === "no" || pending.defaultRetirementAccount === "yes")) return false;
   return true;
@@ -155,6 +156,22 @@ function mapHydrationRowToPatch(row: TickerHydrationPriceRow): Partial<StockHold
   }
   const peg = parseStockPeg(row.peg_ratio);
   if (peg !== undefined) patch.peg = peg;
+  if (row.return_on_equity != null) {
+    const roe = Number(row.return_on_equity);
+    if (Number.isFinite(roe)) patch.returnOnEquity = roe;
+  }
+  if (row.profit_margin != null) {
+    const margin = Number(row.profit_margin);
+    if (Number.isFinite(margin)) patch.profitMargin = margin;
+  }
+  if (row.trailing_pe != null) {
+    const trailingPe = Number(row.trailing_pe);
+    if (Number.isFinite(trailingPe) && trailingPe > 0) patch.trailingPE = trailingPe;
+  }
+  if (row.debt_to_equity != null) {
+    const debtToEquity = Number(row.debt_to_equity);
+    if (Number.isFinite(debtToEquity) && debtToEquity >= 0) patch.debtToEquity = debtToEquity;
+  }
   if (row.beta != null) {
     const beta = Number(row.beta);
     if (Number.isFinite(beta)) patch.beta = beta;
@@ -440,36 +457,37 @@ export function CsvImportExportBar({
   }
 
   async function saveImportSnapshot(): Promise<string | null> {
-    // First attempt uses the active in-memory user context and queued snapshot client.
-    const flushResult = await flushCurrentPortfolioSnapshotNow(true, {
-      allowEmptyHoldings: true,
-    });
-    if (!flushResult.error && !flushResult.skipped) return null;
+    // Holdings-only patch: keep existing SMA/factor/limits/cash/settings intact.
+    const patchResult = await patchCurrentPortfolioSnapshotHoldings();
+    if (!patchResult.error && patchResult.patched) return null;
 
     if (!hasSupabaseConfig()) return null;
 
-    // Fallback path resolves user id explicitly when flush was skipped (e.g. session key missing)
-    // or failed due to transient client context issues.
     const supabase = createClient();
     const { data } = await supabase.auth.getUser();
     const authUserId = data.user?.id;
     if (!authUserId) {
-      return flushResult.error ? `Cloud snapshot save failed: ${flushResult.error.message}` : null;
+      return patchResult.error ? `Cloud snapshot save failed: ${patchResult.error.message}` : null;
     }
     const dataUserId = await resolveStocksPmDataUserId(supabase, authUserId);
     const state = usePortfolioStore.getState();
-    const fallback = await pushPortfolioSnapshotSlice(dataUserId, {
+    const slice = {
       cashBalance: state.cashBalance,
       stocks: state.stocks,
       lotsBySymbol: state.lotsBySymbol,
-    }, { force: true, supabase });
+    };
+    const fallbackPatch = await patchPortfolioSnapshotHoldingsForCloudUser(supabase, dataUserId, slice);
+    if (!fallbackPatch.error && fallbackPatch.patched) return null;
+
+    // No snapshot row yet — create the first one. After that, identity patches are used.
+    const fallback = await pushPortfolioSnapshotSlice(dataUserId, slice, { force: true, supabase });
 
     if (fallback.error) {
       return `Cloud snapshot save failed: ${fallback.error.message}`;
     }
 
-    if (flushResult.error) {
-      return `Cloud snapshot retry succeeded after initial failure: ${flushResult.error.message}`;
+    if (patchResult.error) {
+      return `Cloud snapshot retry succeeded after initial failure: ${patchResult.error.message}`;
     }
 
     return null;
@@ -877,7 +895,11 @@ export function CsvImportExportBar({
                     <p className="mt-1 text-xs text-subtle">{field.description}</p>
                   </div>
                   <select
-                    value={pendingMappingImport?.mapping[fieldKey] ?? "none"}
+                    value={
+                      isBlankMappingValue(pendingMappingImport?.mapping[fieldKey])
+                        ? "none"
+                        : pendingMappingImport?.mapping[fieldKey] ?? "none"
+                    }
                     onChange={(e) => {
                       const value = e.target.value;
                       setPendingMappingImport((current) =>
@@ -895,7 +917,9 @@ export function CsvImportExportBar({
                     className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
                   >
                     <option value="none">None</option>
-                    {(pendingMappingImport?.headers ?? []).map((header) => (
+                    {(pendingMappingImport?.headers ?? [])
+                      .filter((header) => !isBlankMappingValue(header))
+                      .map((header) => (
                       <option key={`${fieldKey}:${header}`} value={header}>
                         {header}
                       </option>

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
+import { recommendedWatchlistSize } from "@/lib/ios-recommendation";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
 import { formatCurrency, formatDecimal, formatPercent } from "@/lib/numberFormat";
 import { recommendationActionDisplay } from "@/lib/recommendation";
@@ -12,7 +13,7 @@ import { SymbolTradeCombobox } from "@/components/portfolio/SymbolTradeCombobox"
 import { StockDetailModal } from "@/components/stock/StockDetailModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
-import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
+import { patchCurrentPortfolioSnapshotHoldings } from "@/lib/portfolio-snapshot-client";
 
 type SortKey = "symbol" | "lastPrice" | "change" | "analyst" | "upside" | "score" | "signal";
 
@@ -47,8 +48,9 @@ function scoreTextClass(score: number | null | undefined): string {
 
 function upsideTextClass(upside: number | null | undefined): string {
   if (upside == null || !Number.isFinite(upside)) return "text-subtle";
-  if (upside > 0) return "text-emerald-600 dark:text-emerald-400";
-  if (upside < 0) return "text-red-600 dark:text-red-400";
+  if (upside > 50) return "text-emerald-600 dark:text-emerald-400";
+  if (upside >= 25) return "text-orange-600 dark:text-orange-400";
+  return "text-red-600 dark:text-red-400";
   return "text-subtle";
 }
 
@@ -81,6 +83,8 @@ function columnFilterClass(active: boolean, tone: "amber" | "emerald") {
  */
 export default function WatchlistPage() {
   const stocks = usePortfolioStore((s) => s.stocks);
+  const portfolioSize = usePortfolioStore((s) => s.portfolioSize);
+  const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
   const removeStock = usePortfolioStore((s) => s.removeStock);
   const addStock = usePortfolioStore((s) => s.addStock);
   const [query, setQuery] = useState("");
@@ -93,6 +97,32 @@ export default function WatchlistPage() {
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
   const watchlistStocks = useMemo(() => stocks.filter((s) => s.quantity <= 0), [stocks]);
+  const shortlistedSymbolsForWatchlistFilter = useMemo(() => {
+    const eligible = watchlistStocks.filter((s) => s.excludeFromShortlist !== true);
+
+    if (!limitWatchlistSize) {
+      return new Set(eligible.filter((s) => s.isShortlisted === true).map((s) => s.symbol));
+    }
+
+    const idealSize = recommendedWatchlistSize(portfolioSize);
+    const etfSymbols = new Set(eligible.filter((s) => s.isETF === true).map((s) => s.symbol));
+    const stockSlots = idealSize;
+
+    const topStockSymbols = new Set(
+      eligible
+        .filter((s) => s.isETF !== true)
+        .sort((a, b) => {
+          const lhs = a.score ?? 0;
+          const rhs = b.score ?? 0;
+          if (lhs === rhs) return a.symbol.localeCompare(b.symbol);
+          return rhs - lhs;
+        })
+        .slice(0, stockSlots)
+        .map((s) => s.symbol)
+    );
+
+    return new Set([...etfSymbols, ...topStockSymbols]);
+  }, [limitWatchlistSize, portfolioSize, watchlistStocks]);
 
   function isActionable(action: string | undefined): boolean {
     if (!action) return false;
@@ -123,7 +153,7 @@ export default function WatchlistPage() {
     const q = query.trim().toUpperCase();
     const filtered = watchlistStocks
       .filter((s) => {
-        if (showShortlisted && !s.isShortlisted) return false;
+        if (showShortlisted && !shortlistedSymbolsForWatchlistFilter.has(s.symbol)) return false;
         if (showActionable && !isActionable(s.recommendation?.action)) return false;
         if (!q) return true;
         return (
@@ -168,7 +198,7 @@ export default function WatchlistPage() {
     });
 
     return filtered;
-  }, [query, showActionable, showShortlisted, sort, sortDirection, watchlistStocks]);
+  }, [query, shortlistedSymbolsForWatchlistFilter, showActionable, showShortlisted, sort, sortDirection, watchlistStocks]);
 
   const hasActiveFilters = showShortlisted || showActionable || query.trim().length > 0;
   const watchlistCountText = hasActiveFilters ? `Showing ${rows.length} of ${totalTrackedCount}` : `Total: ${totalTrackedCount}`;
@@ -177,7 +207,7 @@ export default function WatchlistPage() {
     const sym = newSymbol.trim().toUpperCase().replace(/[^A-Z0-9.-]/g, "");
     if (!sym) return;
     addStock({ symbol: sym, quantity: 0, averageCost: 0, lastPrice: 0 });
-    void flushCurrentPortfolioSnapshotNow(true);
+    void patchCurrentPortfolioSnapshotHoldings();
     setNewSymbol("");
   }
 
@@ -397,7 +427,7 @@ export default function WatchlistPage() {
                     </td>
                     <td className="px-1.5 py-2.5 text-center tabular-nums md:hidden">
                       <div className="flex min-w-[4.1rem] flex-col items-center leading-tight sm:min-w-[4.75rem]">
-                        <span className="text-foreground">{formatCurrency(s.lastPrice ?? 0)}</span>
+                        <span className="text-foreground">{formatDecimal(s.lastPrice ?? 0)}</span>
                         <span
                           className={
                             s.dailyChangePercent == null
@@ -413,7 +443,7 @@ export default function WatchlistPage() {
                         </span>
                       </div>
                     </td>
-                    <td className="hidden px-2 py-3 text-center tabular-nums text-subtle md:table-cell md:px-3">{formatCurrency(s.lastPrice ?? 0)}</td>
+                    <td className="hidden px-2 py-3 text-center tabular-nums text-subtle md:table-cell md:px-3">{formatDecimal(s.lastPrice ?? 0)}</td>
                     <td
                       className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${
                         s.dailyChangePercent == null
@@ -447,7 +477,7 @@ export default function WatchlistPage() {
                       <span className="block truncate">{formatUpsidePct(upside)}</span>
                     </td>
                     <td className={`hidden min-w-0 px-2 py-3 text-center tabular-nums font-medium sm:table-cell sm:px-3 ${scoreTextClass(s.score)}`}>
-                      <span className="block truncate">{s.score != null ? formatDecimal(s.score) : "—"}</span>
+                      <span className="block truncate text-center">{s.score != null ? formatDecimal(s.score) : "—"}</span>
                     </td>
                     <td className="min-w-0 px-1.5 py-2.5 text-center text-xs text-subtle sm:px-3 sm:py-3">
                       {s.recommendation ? (

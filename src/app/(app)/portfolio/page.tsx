@@ -18,7 +18,7 @@ import { computeTodayChangeFromHistory, computeTodayChangeFromLiveQuotes, fetchC
 import { isUsMarketTradingDay } from "@/lib/market-hours";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
-import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
+import { patchCurrentPortfolioSnapshotCash, patchCurrentPortfolioSnapshotHoldings } from "@/lib/portfolio-snapshot-client";
 import { recordExternalCashFlow } from "@/lib/external-cash-flows";
 
 type SortKey = "symbol" | "quantity" | "averageCost" | "costBasis" | "lastPrice" | "value" | "gainLoss" | "upside" | "score" | "today" | "signal";
@@ -66,8 +66,9 @@ function scoreTextClass(score: number | null | undefined): string {
 
 function upsideTextClass(upside: number | null | undefined): string {
   if (upside == null || !Number.isFinite(upside)) return "text-subtle";
-  if (upside > 0) return "text-emerald-600 dark:text-emerald-400";
-  if (upside < 0) return "text-red-600 dark:text-red-400";
+  if (upside > 50) return "text-emerald-600 dark:text-emerald-400";
+  if (upside >= 25) return "text-orange-600 dark:text-orange-400";
+  return "text-red-600 dark:text-red-400";
   return "text-subtle";
 }
 
@@ -356,8 +357,11 @@ export default function PortfolioPage() {
   const showPortfolioTodayChange = isUsMarketTradingDay() && portfolioTodayChange.hasBaseline && Math.abs(portfolioTodayChange.change) > 0.01;
 
   function saveCash() {
-    const previousCash = cash;
+      const previousCash = cash;
     const n = parseFloat(cashInput.replace(/,/g, "")) || 0;
+    const previousPortfolio = stocks.reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) + previousCash;
+    const nextPortfolio = stocks.reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) + n;
+    const drift = previousPortfolio > 0 ? Math.abs(nextPortfolio - previousPortfolio) / previousPortfolio : 0;
     setCash(n);
     recalc();
     setIsCashEditing(false);
@@ -382,13 +386,11 @@ export default function PortfolioPage() {
       } else {
         console.log("[portfolio cash] Delta too small (< $0.005), skipping flow record");
       }
-      const snapshotResult = await flushCurrentPortfolioSnapshotNow(true, {
-        allowEmptyHoldings: true,
-      });
+      const snapshotResult = await patchCurrentPortfolioSnapshotCash(drift > 0.10);
       if (snapshotResult.error) {
         console.error("[portfolio cash snapshot] ❌ Failed:", snapshotResult.error.message);
       } else {
-        console.log("[portfolio cash snapshot] ✅ Flushed");
+        console.log("[portfolio cash snapshot] ✅ Cash patched (pending=" + (drift > 0.10) + ")");
       }
     })();
   }
@@ -428,7 +430,7 @@ export default function PortfolioPage() {
       });
     }
 
-    void flushCurrentPortfolioSnapshotNow(true);
+    void patchCurrentPortfolioSnapshotHoldings();
 
     setNewSymbol("");
     setNewQuantity("1");
@@ -538,8 +540,7 @@ export default function PortfolioPage() {
                 <col className="w-[12%] md:w-[7%]" />
                 <col className="hidden sm:table-column sm:w-[9%] md:w-[9%]" />
                 <col className="hidden md:table-column md:w-[10%]" />
-                <col className="w-[18%] md:w-[10%]" />
-                <col className="w-[14%] md:w-[13%]" />
+                <col className="w-[22%] md:w-[16%]" />
                 <col className="hidden md:table-column md:w-[7%]" />
                 <col className="hidden md:table-column md:w-[6%]" />
                 <col className="w-[24%] md:w-[9%]" />
@@ -578,8 +579,7 @@ export default function PortfolioPage() {
                   <SortableHeaderCell label="Qty" column="quantity" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 md:px-4 md:pt-3" />
                   <SortableHeaderCell label="Avg" column="averageCost" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-3 pb-2 pt-2.5 sm:table-cell md:px-4 md:pt-3" />
                   <SortableHeaderCell label="Costbasis" column="costBasis" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
-                  <SortableHeaderCell label="Current Value" column="value" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 md:px-4 md:pt-3" />
-                  <SortableHeaderCell label="P/L" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 md:px-4 md:pt-3" />
+                  <SortableHeaderCell label="Gain" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 md:px-4 md:pt-3" />
                   <SortableHeaderCell label="Potential Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
                   <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
                   <th scope="col" aria-sort={sort === "signal" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className="px-2 pb-2 pt-2.5 text-center text-xs font-semibold tracking-wide md:px-4 md:pt-3">
@@ -663,18 +663,23 @@ export default function PortfolioPage() {
                       <td className="px-2 py-2.5 text-center tabular-nums text-foreground md:px-4 md:py-3">{formatNumberMax2(s.quantity)}</td>
                       <td className="hidden px-3 py-2.5 text-center tabular-nums text-foreground sm:table-cell md:px-4 md:py-3">{formatCurrency(s.averageCost)}</td>
                       <td className="hidden px-4 py-3 text-center tabular-nums text-foreground md:table-cell">{formatWholeCurrency(costBasis)}</td>
-                      <td className="px-2 py-2.5 text-center tabular-nums text-foreground md:px-4 md:py-3">{formatWholeCurrency(value)}</td>
-                      <td
-                        className={`px-2 py-2.5 text-center tabular-nums font-medium md:px-4 md:py-3 ${
-                          gainLoss > 0
-                            ? "text-emerald-700 dark:text-primary"
-                            : gainLoss < 0
-                              ? "text-red-700 dark:text-red-400"
-                              : "text-subtle"
-                        }`}
-                      >
-                        {formatWholeCurrency(Math.abs(gainLoss))}
-                        {gainLossPct != null ? ` (${formatPercent(gainLossPct, true)})` : ""}
+                      <td className="px-2 py-2.5 text-center tabular-nums md:px-4 md:py-3">
+                        <div className="flex flex-col items-center leading-tight">
+                          <span
+                            className={`font-medium ${
+                              gainLoss > 0
+                                ? "text-emerald-700 dark:text-primary"
+                                : gainLoss < 0
+                                  ? "text-red-700 dark:text-red-400"
+                                  : "text-subtle"
+                            }`}
+                          >
+                            {gainLossPct == null
+                              ? "—"
+                              : `${gainLossPct >= 0 ? "+" : ""}${gainLossPct.toFixed(1)}%`}
+                          </span>
+                          <span className="text-[11px] text-subtle">{formatWholeCurrency(value)}</span>
+                        </div>
                       </td>
                       <td className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${upsideTextClass(upside)}`}>
                         {formatUpsidePct(upside)}
