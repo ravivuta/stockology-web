@@ -1,4 +1,5 @@
 import type { NetWorthPoint } from "@/lib/portfolio-net-worth-series";
+import { interpolateOneDayValueSpikes } from "@/lib/portfolio-net-worth-series";
 
 export type SpyDaily = { date: string; close: number };
 export type ExternalCashFlowPoint = { occurredAtMs: number; amount: number };
@@ -58,6 +59,9 @@ export function adjustNetWorthPointsForExternalCashFlows(
       if (flowDay > baselineYmd) {
         const sameDirection =
           (flowAmount > 0 && valueDelta > 0) || (flowAmount < 0 && valueDelta < 0);
+        // Same-day snapshot must actually jump with the cash edit. Ghost Settings
+        // taps that never changed the stored total are skipped so vs-SPY stays
+        // a market comparison. Portfolio (value) mode uses the unadjusted series.
         if (sameDirection && Math.abs(valueDelta) >= Math.abs(flowAmount) * 0.4) {
           cumulativeExternalFlow += flowAmount;
         }
@@ -188,9 +192,15 @@ export type ComparisonChartRow = {
 /** Cumulative % from the first point in the (already range-filtered) series. */
 export function toCumulativePercentRows(rows: ComparisonBaseRow[]): ComparisonChartRow[] {
   if (rows.length === 0) return [];
-  const v0 = rows[0].portfolioValue;
-  const s0 = rows[0].spyClose;
-  return rows.map((r) => ({
+  const keptValues = interpolateOneDayValueSpikes(
+    rows.map((r) => ({ t: r.dateMs, value: r.portfolioValue }))
+  );
+  const keptTimes = new Set(keptValues.map((p) => p.t));
+  const keptRows = rows.filter((r) => keptTimes.has(r.dateMs));
+  if (keptRows.length === 0) return [];
+  const v0 = keptRows[0].portfolioValue;
+  const s0 = keptRows[0].spyClose;
+  return keptRows.map((r) => ({
     dateMs: r.dateMs,
     value: r.portfolioValue,
     portfolioPct: v0 > 0 && Number.isFinite(v0) ? 100 * (r.portfolioValue / v0 - 1) : 0,

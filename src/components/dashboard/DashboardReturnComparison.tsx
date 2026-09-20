@@ -9,10 +9,12 @@ import { hasSupabaseConfig, createClient } from "@/lib/supabase/client";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
 import { fetchTickerHydrationFromTables } from "@/lib/ticker-direct-hydration";
 import {
+  coerceRpcArray,
   computeLivePortfolioTotal,
   fetchCloudNetWorthHistory,
   finalizeNetWorthSeries,
   hasEnoughHistoryForSpyComparison,
+  interpolateOneDayValueSpikes,
   mergeNetWorthOverlay,
   reconstructNetWorthFromHoldingsCloses,
   type NetWorthPoint,
@@ -140,8 +142,9 @@ const EMPTY_NET_WORTH: NetWorthPoint[] = [];
 
 function portfolioOnlyPercentRows(points: NetWorthPoint[]): ComparisonChartRow[] {
   if (points.length === 0) return [];
-  const v0 = points[0].value;
-  return points.map((p) => ({
+  const kept = interpolateOneDayValueSpikes(points);
+  const v0 = kept[0]?.value ?? 0;
+  return kept.map((p) => ({
     dateMs: p.t,
     value: p.value,
     portfolioPct: v0 > 0 && Number.isFinite(v0) ? 100 * (p.value / v0 - 1) : 0,
@@ -252,12 +255,12 @@ export function DashboardReturnComparison() {
           p_limit: 2000,
         });
 
-        const flows = !flowError && Array.isArray(flowData)
-          ? flowData
+        const flows = !flowError
+          ? coerceRpcArray(flowData)
               .map((row) => {
                 const amount = Number((row as { amount?: unknown }).amount);
                 const occurredAt = new Date(String((row as { occurred_at?: unknown }).occurred_at ?? "")).getTime();
-                if (!Number.isFinite(amount) || !Number.isFinite(occurredAt)) return null;
+                if (!Number.isFinite(amount) || amount === 0 || !Number.isFinite(occurredAt)) return null;
                 return { amount, occurredAtMs: occurredAt };
               })
               .filter((row): row is ExternalCashFlowPoint => row !== null)
@@ -413,7 +416,7 @@ export function DashboardReturnComparison() {
   const valueModeData = useMemo(() => {
     const ptT = fullPortfolioPts.map((p) => ({ ...p, t: p.t }));
     const { filtered, usedFullHistoryFallback: fb } = filterDataByRange(ptT, range);
-    const pts = filtered.length >= 1 ? filtered : fullPortfolioPts;
+    const pts = interpolateOneDayValueSpikes(filtered.length >= 1 ? filtered : fullPortfolioPts);
     return {
       rows: pts.map((p) => ({
         dateMs: p.t,

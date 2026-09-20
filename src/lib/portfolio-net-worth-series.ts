@@ -236,7 +236,7 @@ export function netWorthPointsFromJournal(journal: TradeJournalEntry[]): NetWort
   return points;
 }
 
-function coerceRpcArray(data: unknown): unknown[] {
+export function coerceRpcArray(data: unknown): unknown[] {
   if (Array.isArray(data)) return data;
   if (typeof data === "string") {
     try {
@@ -317,6 +317,45 @@ export async function fetchCloudNetWorthHistory(
   });
   const latestRow = coerceLatestSnapshotRow(latest.data);
   return latestRow ? rowsToNetWorthPoints([latestRow]) : [];
+}
+
+export function omitOneDayValueOutliers(
+  points: NetWorthPoint[],
+  threshold = 0.25
+): NetWorthPoint[] {
+  if (points.length < 3) return points;
+  const kept: NetWorthPoint[] = [points[0]!];
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1]!.value;
+    const cur = points[i]!.value;
+    const next = points[i + 1]!.value;
+    const isPeak =
+      prev > 0 &&
+      next > 0 &&
+      cur > prev &&
+      cur > next &&
+      cur > prev * (1 + threshold) &&
+      cur > next * (1 + threshold);
+    const isValley =
+      prev > 0 &&
+      next > 0 &&
+      cur < prev &&
+      cur < next &&
+      cur < prev * (1 - threshold) &&
+      cur < next * (1 - threshold);
+    if (isPeak || isValley) continue;
+    kept.push(points[i]!);
+  }
+  kept.push(points[points.length - 1]!);
+  return kept;
+}
+
+/** @deprecated Use omitOneDayValueOutliers — bad days are skipped, not rewritten. */
+export function interpolateOneDayValueSpikes(
+  points: NetWorthPoint[],
+  threshold = 0.25
+): NetWorthPoint[] {
+  return omitOneDayValueOutliers(points, threshold);
 }
 
 export function distinctEtCalendarDays(points: NetWorthPoint[]): number {

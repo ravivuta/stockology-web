@@ -664,22 +664,19 @@ export default function PortfolioPage() {
                       <td className="hidden px-3 py-2.5 text-center tabular-nums text-foreground sm:table-cell md:px-4 md:py-3">{formatCurrency(s.averageCost)}</td>
                       <td className="hidden px-4 py-3 text-center tabular-nums text-foreground md:table-cell">{formatWholeCurrency(costBasis)}</td>
                       <td className="px-2 py-2.5 text-center tabular-nums md:px-4 md:py-3">
-                        <div className="flex flex-col items-center leading-tight">
-                          <span
-                            className={`font-medium ${
-                              gainLoss > 0
-                                ? "text-emerald-700 dark:text-primary"
-                                : gainLoss < 0
-                                  ? "text-red-700 dark:text-red-400"
-                                  : "text-subtle"
-                            }`}
-                          >
-                            {gainLossPct == null
-                              ? "—"
-                              : `${gainLossPct >= 0 ? "+" : ""}${gainLossPct.toFixed(1)}%`}
-                          </span>
-                          <span className="text-[11px] text-subtle">{formatWholeCurrency(value)}</span>
-                        </div>
+                        <span
+                          className={`font-medium ${
+                            gainLoss > 0
+                              ? "text-emerald-700 dark:text-primary"
+                              : gainLoss < 0
+                                ? "text-red-700 dark:text-red-400"
+                                : "text-subtle"
+                          }`}
+                        >
+                          {gainLossPct == null
+                            ? "—"
+                            : `${gainLossPct >= 0 ? "+" : ""}${gainLossPct.toFixed(1)}%`}
+                        </span>
                       </td>
                       <td className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${upsideTextClass(upside)}`}>
                         {formatUpsidePct(upside)}
