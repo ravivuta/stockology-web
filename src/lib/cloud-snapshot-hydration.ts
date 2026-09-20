@@ -1,6 +1,7 @@
 import { computeRiskReturnScore } from "@/lib/ios-recommendation";
 import { parseStockPeg } from "@/lib/stock-metric-parse";
 import type { LotStatus, SoldLot, StockHolding, TradeLot } from "@/store/portfolioStore";
+import { CASH_SYMBOL, isCashSymbol, migrateCashLots, cashLotQuantity } from "@/lib/cash-accounts";
 
 /** Raw holding JSON from iOS `user_portfolio_snapshots.holdings`. */
 type RawHolding = {
@@ -288,21 +289,31 @@ export function parseCloudSnapshotForStore(row: CloudSnapshotHydrationInput): {
   const cashBalance = Number(row.cash_balance) || 0;
   const holdings = row.holdings;
   if (!Array.isArray(holdings)) {
-    return { cashBalance, stocks: [], lotsBySymbol: {} };
+    const lotsBySymbol = migrateCashLots({}, cashBalance);
+    return { cashBalance: cashLotQuantity(lotsBySymbol[CASH_SYMBOL]) || cashBalance, stocks: [], lotsBySymbol };
   }
 
   const stocks: StockHolding[] = [];
-  const lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }> = {};
+  let lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }> = {};
 
   for (const item of holdings) {
     const parsed = parseRawHolding(item);
     if (!parsed) continue;
+    if (isCashSymbol(parsed.stock.symbol)) {
+      lotsBySymbol[CASH_SYMBOL] = parsed.lots;
+      continue;
+    }
     stocks.push(parsed.stock);
     if (parsed.lots.open.length > 0 || parsed.lots.sold.length > 0) {
       lotsBySymbol[parsed.stock.symbol] = parsed.lots;
     }
   }
 
+  lotsBySymbol = migrateCashLots(lotsBySymbol, cashBalance);
+  const cashLots = lotsBySymbol[CASH_SYMBOL];
+  const cashFromLots = (cashLots?.open ?? []).reduce((sum, lot) => sum + Math.max(0, Number(lot.quantity) || 0), 0);
+  const resolvedCash = cashLots ? cashFromLots : cashBalance;
+
   stocks.sort((a, b) => a.symbol.localeCompare(b.symbol));
-  return { cashBalance, stocks, lotsBySymbol };
+  return { cashBalance: resolvedCash, stocks, lotsBySymbol };
 }

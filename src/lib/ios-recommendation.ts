@@ -613,7 +613,7 @@ export type AddGateContext = {
 /** Non-ETF names that compete for top-N. Risk Low/Medium/High is applied first when enabled. Rank N of N is included. */
 export function rankedTopWatchlistCandidates(
   stocks: IosStockInput[],
-  options?: { enableRiskFilter?: boolean; riskAppetite?: "Low" | "Medium" | "High" }
+  options?: { enableRiskFilter?: boolean; riskAppetite?: "Low" | "Medium" | "High"; includeLowScores?: boolean }
 ): IosStockInput[] {
   return stocks
     .filter((stock) => stock.isETF !== true && stock.excludeFromShortlist !== true)
@@ -621,7 +621,7 @@ export function rankedTopWatchlistCandidates(
       if (!options?.enableRiskFilter) return true;
       return stockPassesRiskAppetiteOnly(stock, options.riskAppetite ?? "Medium", upsidePct(stock));
     })
-    .filter((stock) => (stock.score ?? 0) > 50)
+    .filter((stock) => (options?.includeLowScores ? true : (stock.score ?? 0) > 50))
     .sort((a, b) => {
       const cmp = (b.score ?? 0) - (a.score ?? 0);
       return cmp === 0 ? a.symbol.localeCompare(b.symbol) : cmp;
@@ -635,6 +635,16 @@ function rankInTopWatchlist(
 ): number | null {
   const ranked = rankedTopWatchlistCandidates(stocks, ctx);
   const index = ranked.findIndex((stock) => stock.symbol === symbol);
+  return index >= 0 ? index + 1 : null;
+}
+
+export function rankInWatchlistScoreUniverse(
+  stocks: IosStockInput[],
+  symbol: string,
+  options?: { enableRiskFilter?: boolean; riskAppetite?: "Low" | "Medium" | "High" }
+): number | null {
+  const ranked = rankedTopWatchlistCandidates(stocks, { ...options, includeLowScores: true });
+  const index = ranked.findIndex((stock) => stock.symbol.toUpperCase() === symbol.toUpperCase());
   return index >= 0 ? index + 1 : null;
 }
 

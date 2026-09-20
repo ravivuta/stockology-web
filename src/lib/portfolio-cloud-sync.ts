@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SoldLot, StockHolding, TradeLot } from "@/store/portfolioStore";
+import { cashHoldingPayload, isCashSymbol } from "@/lib/cash-accounts";
 
 export type PortfolioSlice = {
   cashBalance: number;
@@ -137,7 +138,7 @@ function totals(state: PortfolioSlice) {
   let cost = 0;
   let value = 0;
   for (const s of state.stocks) {
-    if (s.quantity <= 0) continue;
+    if (isCashSymbol(s.symbol) || s.quantity <= 0) continue;
     cost += s.quantity * s.averageCost;
     value += s.quantity * snapshotValuationPrice(s);
   }
@@ -288,7 +289,10 @@ export async function patchPortfolioSnapshotHoldingsForCloudUser(
   state: PortfolioSlice,
   removedSymbols: string[] = []
 ): Promise<{ error: Error | null; patched: boolean }> {
-  const holdings = state.stocks.map((stock) => holdingIdentityPayload(stock, state.lotsBySymbol[stock.symbol]));
+  const holdings = state.stocks
+    .filter((stock) => !isCashSymbol(stock.symbol))
+    .map((stock) => holdingIdentityPayload(stock, state.lotsBySymbol[stock.symbol]));
+  holdings.push(cashHoldingPayload(state.lotsBySymbol["$CASH"]) as unknown as (typeof holdings)[number]);
   const { data, error } = await supabase.rpc("patch_portfolio_snapshot_holdings", {
     p_user_id: dataUserId,
     p_holdings: holdings,
@@ -368,7 +372,10 @@ export async function upsertPortfolioSnapshotForCloudUser(
   dataUserId: string,
   state: PortfolioSlice
 ): Promise<{ error: Error | null }> {
-  const holdings = state.stocks.map((stock) => holdingPayload(stock, state.lotsBySymbol[stock.symbol]));
+  const holdings = state.stocks
+    .filter((stock) => !isCashSymbol(stock.symbol))
+    .map((stock) => holdingPayload(stock, state.lotsBySymbol[stock.symbol]));
+  holdings.push(cashHoldingPayload(state.lotsBySymbol["$CASH"]) as unknown as (typeof holdings)[number]);
   const t = totals(state);
 
   const { error } = await supabase.rpc("save_portfolio_snapshot", {

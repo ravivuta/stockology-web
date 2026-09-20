@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CheckCircle2, Pencil, PlusCircle, Settings, Trash2, X, XCircle } from "lucide-react";
 import {
   computeRecommendationFactors,
+  rankInWatchlistScoreUniverse,
   recommendedWatchlistSize,
   scoreBreakdownRows,
   sentimentLabelForScore,
@@ -529,9 +530,16 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       },
     ];
     if (riskPasses) {
+      const topN = recommendedWatchlistSize(portfolioSize);
+      const rank = rankInWatchlistScoreUniverse(stocks, stock.symbol, {
+        enableRiskFilter,
+        riskAppetite,
+      });
+      const rankLabel =
+        rank != null ? `Ranked ${rank} in top ${topN}` : `Not ranked in top ${topN}`;
       rows.push({
-        label: `Score-Driven Top ${recommendedWatchlistSize(portfolioSize)} Watchlist`,
-        detail: limitWatchlistSize ? (stock.isInWatchlistSize ? "Included" : "Beyond limit") : "Limit disabled",
+        label: `Score-Driven Top ${topN} Watchlist`,
+        detail: limitWatchlistSize ? rankLabel : "Limit disabled",
         passes: limitWatchlistSize ? stock.isInWatchlistSize === true : true,
       });
     }
@@ -545,7 +553,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     }
 
     return rows;
-  }, [limitWatchlistSize, portfolioSize, riskAppetite, stock]);
+  }, [enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stock, stocks]);
   const shortlistReasons = useMemo(() => {
     if (!stock || isShortlistedForPortfolio) return [];
 
@@ -556,10 +564,19 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     if (!stock.isETF && stock.isVisibleInRisk === false) {
       reasons.push("Does not meet the current risk appetite criteria.");
     } else if (!stock.isETF && limitWatchlistSize && stock.isInWatchlistSize === false) {
-      reasons.push(`Score ranks below the top ${recommendedWatchlistSize(portfolioSize)} watchlist limit.`);
+      const topN = recommendedWatchlistSize(portfolioSize);
+      const rank = rankInWatchlistScoreUniverse(stocks, stock.symbol, {
+        enableRiskFilter,
+        riskAppetite,
+      });
+      reasons.push(
+        rank != null
+          ? `Ranked ${rank} in top ${topN} watchlist.`
+          : `Score ranks below the top ${topN} watchlist limit.`
+      );
     }
     return reasons;
-  }, [isShortlistedForPortfolio, limitWatchlistSize, portfolioSize, stock]);
+  }, [enableRiskFilter, isShortlistedForPortfolio, limitWatchlistSize, portfolioSize, riskAppetite, stock, stocks]);
   const scoreRows = useMemo(() => (stock ? scoreBreakdownRows(stock) : null), [stock]);
   const dense = Boolean(embedded);
   const stockSymbol = stock?.symbol ?? null;

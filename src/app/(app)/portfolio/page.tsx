@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Check, Pencil, X } from "lucide-react";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
@@ -18,8 +17,7 @@ import { computeTodayChangeFromHistory, computeTodayChangeFromLiveQuotes, fetchC
 import { isUsMarketTradingDay } from "@/lib/market-hours";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
-import { patchCurrentPortfolioSnapshotCash, patchCurrentPortfolioSnapshotHoldings } from "@/lib/portfolio-snapshot-client";
-import { recordExternalCashFlow } from "@/lib/external-cash-flows";
+import { patchCurrentPortfolioSnapshotHoldings } from "@/lib/portfolio-snapshot-client";
 
 type SortKey = "symbol" | "quantity" | "averageCost" | "costBasis" | "lastPrice" | "value" | "gainLoss" | "upside" | "score" | "today" | "signal";
 
@@ -82,12 +80,6 @@ function actionableFilterClass(active: boolean) {
 
 function PortfolioSummaryTiles({
   cash,
-  cashInput,
-  isCashEditing,
-  onStartCashEdit,
-  onCancelCashEdit,
-  onCashInputChange,
-  onSaveCash,
   assetsValue,
   netWorth,
   totalGainLoss,
@@ -96,12 +88,6 @@ function PortfolioSummaryTiles({
   showPortfolioTodayChange,
 }: {
   cash: number;
-  cashInput: string;
-  isCashEditing: boolean;
-  onStartCashEdit: () => void;
-  onCancelCashEdit: () => void;
-  onCashInputChange: (value: string) => void;
-  onSaveCash: () => void;
   assetsValue: number;
   netWorth: number;
   totalGainLoss: number;
@@ -113,56 +99,8 @@ function PortfolioSummaryTiles({
     <>
       <div className="rounded-xl border border-border/80 bg-elevated px-4 py-3 shadow-sm dark:border-white/[0.08]">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Cash balance</p>
-        <div className="mt-1 flex items-center gap-2">
-          {isCashEditing ? (
-            <>
-              <label className="min-w-0 flex-1 text-[10px] text-subtle">
-                <span className="sr-only">Edit cash balance</span>
-                <input
-                  value={cashInput}
-                  onChange={(e) => onCashInputChange(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") onSaveCash();
-                    if (e.key === "Escape") onCancelCashEdit();
-                  }}
-                  className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm font-semibold text-foreground"
-                  inputMode="decimal"
-                  placeholder="0"
-                  aria-label="Cash balance"
-                  autoFocus
-                />
-              </label>
-              <button
-                type="button"
-                onClick={onSaveCash}
-                className={appCtaButton("ui-hover-pop px-2 py-1.5 text-xs")}
-                aria-label="Save cash balance"
-              >
-                <Check className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={onCancelCashEdit}
-                className="rounded-lg border border-border bg-background px-2 py-1.5 text-subtle transition-colors hover:text-foreground"
-                aria-label="Cancel cash edit"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </>
-          ) : (
-            <>
-              <p className="text-lg font-semibold tabular-nums text-foreground">{formatCurrency(cash)}</p>
-              <button
-                type="button"
-                onClick={onStartCashEdit}
-                className="rounded-lg border border-border/70 bg-background/60 p-1.5 text-subtle transition-colors hover:text-foreground"
-                aria-label="Edit cash balance"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </button>
-            </>
-          )}
-        </div>
+        <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">{formatCurrency(cash)}</p>
+        <p className="mt-0.5 text-[11px] text-subtle">Edit per account from Dashboard</p>
       </div>
       <div className="rounded-xl border border-border/80 bg-elevated px-4 py-3 shadow-sm dark:border-white/[0.08]">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Assets value</p>
@@ -212,8 +150,6 @@ function PortfolioSummaryTiles({
 export default function PortfolioPage() {
   const stocks = usePortfolioStore((s) => s.stocks);
   const cash = usePortfolioStore((s) => s.cashBalance);
-  const setCash = usePortfolioStore((s) => s.setCash);
-  const recalc = usePortfolioStore((s) => s.recalcMetrics);
   const addStock = usePortfolioStore((s) => s.addStock);
   const updateStock = usePortfolioStore((s) => s.updateStock);
 
@@ -250,18 +186,12 @@ export default function PortfolioPage() {
   const [newSymbol, setNewSymbol] = useState("");
   const [newQuantity, setNewQuantity] = useState("1");
   const [newAverageCost, setNewAverageCost] = useState("");
-  const [cashInput, setCashInput] = useState(String(cash));
-  const [isCashEditing, setIsCashEditing] = useState(false);
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
 
   /** Portfolio page lists positions only; watchlist-only symbols (0 qty) stay in store for trading elsewhere. */
-  const holdings = useMemo(() => stocks.filter((s) => s.quantity > 0), [stocks]);
+  const holdings = useMemo(() => stocks.filter((s) => s.quantity > 0 && s.symbol !== "$CASH"), [stocks]);
   const portfolioCountText = holdings.length === 1 ? "1 holding" : `${holdings.length} holdings`;
-
-  useEffect(() => {
-    setCashInput(String(cash));
-  }, [cash]);
 
   function isActionable(action: string | undefined): boolean {
     if (!action) return false;
@@ -339,8 +269,8 @@ export default function PortfolioPage() {
   }, [holdings, query, showActionable, sort, sortDirection]);
 
   const { assetsValue, totalGainLoss, totalGainLossPct, netWorth, portfolioTodayChange } = useMemo(() => {
-    const assets = stocks.reduce((a, s) => a + s.quantity * (s.lastPrice ?? 0), 0);
-    const holdingsCostBasis = stocks.reduce((a, s) => a + s.quantity * s.averageCost, 0);
+    const assets = stocks.filter((s) => s.symbol !== "$CASH").reduce((a, s) => a + s.quantity * (s.lastPrice ?? 0), 0);
+    const holdingsCostBasis = stocks.filter((s) => s.symbol !== "$CASH").reduce((a, s) => a + s.quantity * s.averageCost, 0);
     const totalGainLoss = assets - holdingsCostBasis;
     const totalGainLossPct = holdingsCostBasis > 0 ? (totalGainLoss / holdingsCostBasis) * 100 : null;
     const net = assets + cash;
@@ -355,55 +285,6 @@ export default function PortfolioPage() {
     return { assetsValue: assets, holdingsCostBasis, totalGainLoss, totalGainLossPct, netWorth: net, portfolioTodayChange };
   }, [stocks, cash, cloudHistory]);
   const showPortfolioTodayChange = isUsMarketTradingDay() && portfolioTodayChange.hasBaseline && Math.abs(portfolioTodayChange.change) > 0.01;
-
-  function saveCash() {
-      const previousCash = cash;
-    const n = parseFloat(cashInput.replace(/,/g, "")) || 0;
-    const previousPortfolio = stocks.reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) + previousCash;
-    const nextPortfolio = stocks.reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) + n;
-    const drift = previousPortfolio > 0 ? Math.abs(nextPortfolio - previousPortfolio) / previousPortfolio : 0;
-    setCash(n);
-    recalc();
-    setIsCashEditing(false);
-    void (async () => {
-      const delta = n - previousCash;
-      console.log("[portfolio cash] Update: previous=$" + previousCash.toFixed(2) + ", new=$" + n.toFixed(2) + ", delta=$" + delta.toFixed(2));
-      if (Math.abs(delta) >= 0.005) {
-        console.log("[portfolio cash] Recording external cash flow...");
-        const flowResult = await recordExternalCashFlow({
-          amount: delta,
-          source: "web_portfolio_cash_edit",
-          balanceBefore: previousCash,
-          balanceAfter: n,
-        });
-        if (flowResult.error) {
-          console.error("[portfolio cash flow] ❌ Failed:", flowResult.error.message);
-        } else if (flowResult.id) {
-          console.log("[portfolio cash flow] ✅ Recorded flow ID:", flowResult.id);
-        } else {
-          console.warn("[portfolio cash flow] ⚠️ No error but no ID returned");
-        }
-      } else {
-        console.log("[portfolio cash] Delta too small (< $0.005), skipping flow record");
-      }
-      const snapshotResult = await patchCurrentPortfolioSnapshotCash(drift > 0.10);
-      if (snapshotResult.error) {
-        console.error("[portfolio cash snapshot] ❌ Failed:", snapshotResult.error.message);
-      } else {
-        console.log("[portfolio cash snapshot] ✅ Cash patched (pending=" + (drift > 0.10) + ")");
-      }
-    })();
-  }
-
-  function startCashEdit() {
-    setCashInput(String(cash));
-    setIsCashEditing(true);
-  }
-
-  function cancelCashEdit() {
-    setCashInput(String(cash));
-    setIsCashEditing(false);
-  }
 
   function addHolding() {
     const sym = newSymbol.trim().toUpperCase().replace(/[^A-Z0-9.-]/g, "");
@@ -451,12 +332,6 @@ export default function PortfolioPage() {
       <div className="hidden gap-3 md:grid md:grid-cols-2 lg:grid-cols-4">
         <PortfolioSummaryTiles
           cash={cash}
-          cashInput={cashInput}
-          isCashEditing={isCashEditing}
-          onStartCashEdit={startCashEdit}
-          onCancelCashEdit={cancelCashEdit}
-          onCashInputChange={setCashInput}
-          onSaveCash={saveCash}
           assetsValue={assetsValue}
           netWorth={netWorth}
           totalGainLoss={totalGainLoss}

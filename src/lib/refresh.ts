@@ -130,24 +130,30 @@ export async function runRefreshPipeline(
 
     const dataUserId = data.data_user_id?.trim() ?? "";
 
-    if (
-      options?.includeSnapshot === true &&
-      data.snapshot
-    ) {
-      const parsed = parseCloudSnapshotForStore(data.snapshot);
-      usePortfolioStore.getState().replaceFromCloudSync({
-        ...parsed,
-        onboardingComplete: true,
-      });
-      if (dataUserId) {
-        markLastPushedPortfolioFingerprint(
-          dataUserId,
-          portfolioSyncFingerprint({
-            cashBalance: parsed.cashBalance,
-            stocks: parsed.stocks,
-            lotsBySymbol: parsed.lotsBySymbol,
-          })
-        );
+    if (options?.includeSnapshot === true && data.snapshot) {
+      const localMutationAt = Date.parse(usePortfolioStore.getState().lastLocalMutationAt ?? "");
+      const snapshotUpdatedAt = Date.parse(data.snapshot.updated_at ?? "");
+      const snapshotIsStale =
+        Number.isFinite(localMutationAt) &&
+        Number.isFinite(snapshotUpdatedAt) &&
+        snapshotUpdatedAt < localMutationAt;
+
+      if (!snapshotIsStale) {
+        const parsed = parseCloudSnapshotForStore(data.snapshot);
+        usePortfolioStore.getState().replaceFromCloudSync({
+          ...parsed,
+          onboardingComplete: true,
+        });
+        if (dataUserId) {
+          markLastPushedPortfolioFingerprint(
+            dataUserId,
+            portfolioSyncFingerprint({
+              cashBalance: parsed.cashBalance,
+              stocks: parsed.stocks,
+              lotsBySymbol: parsed.lotsBySymbol,
+            })
+          );
+        }
       }
     }
 

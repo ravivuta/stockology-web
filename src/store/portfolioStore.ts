@@ -7,6 +7,15 @@ import type { CsvImportRow, CsvImportTrade } from "@/lib/csvPortfolio";
 import { buildTradeJournalFromLots } from "@/lib/trade-journal-from-lots";
 import { analystTargetUpsidePct } from "@/lib/marketFormat";
 import { loadHistoricalPayloadForSymbol } from "@/lib/historical-price-client";
+import {
+  CASH_SYMBOL,
+  DEFAULT_ACCOUNT,
+  applyCashDelta,
+  cashLotQuantity,
+  isCashSymbol,
+  migrateCashLots,
+  replaceCashLots,
+} from "@/lib/cash-accounts";
 
 export type LotStatus = "open" | "partiallySold" | "fullySold" | "washSaleRestricted";
 
@@ -122,6 +131,7 @@ type State = {
   lastLocalMutationAt: string | null;
   clearCachesOnReset: () => void;
   setCash: (n: number) => void;
+  applyCashLotsEdit: (amountsByAccount: Record<string, number>) => { previousCash: number; nextCash: number; markedPending: boolean };
   setSettings: (p: Partial<Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "etfProfitTarget" | "stockProfitTarget" | "useAISentimentForRecommendations" | "useRSIGatingForRecommendations" | "rsiPeriodForRecommendations" | "rsiOversoldThresholdForRecommendations" | "rsiOverboughtThresholdForRecommendations" | "rsiHysteresisPointsForRecommendations" | "rsiMinRisingDaysForRecommendations" | "sellOnlyLongTermQualified" | "timezone" | "region">>) => void;
   addStock: (s: Partial<StockHolding> & { symbol: string }) => void;
   /** Merge fields into an existing symbol and rebuild recommendation. */
@@ -436,6 +446,7 @@ function totalOpenCostBasis(
   const symbols = new Set<string>([...stockMap.keys(), ...Object.keys(lotsBySymbol)]);
   let total = 0;
   for (const symbol of symbols) {
+    if (isCashSymbol(symbol)) continue;
     total += holdingOpenCostBasis(stockMap.get(symbol), lotsBySymbol[symbol]);
   }
   return total;
@@ -491,7 +502,9 @@ function derivePortfolioState(
 ): { stocks: StockHolding[]; portfolioSize: number } {
   const shouldRecalculateLimits = options?.shouldRecalculateLimits ?? true;
 
-  const scoredStocks = stocksInput.map((stock) => {
+  const scoredStocks = stocksInput
+    .filter((stock) => stock.symbol.trim().toUpperCase() !== "$CASH")
+    .map((stock) => {
     const bundle = recalcCtx.lotsBySymbol[stock.symbol];
     if (!bundle) return { ...stock, score: stock.isETF ? undefined : computeRiskReturnScore(stock) };
     const summary = summarizeOpenLots(bundle.open);
@@ -668,6 +681,8 @@ export const usePortfolioStore = create<State>()(
       setCash: (n) =>
         set((st) => {
           const mutationAt = new Date().toISOString();
+          const lots = replaceCashLots(migrateCashLots(st.lotsBySymbol, st.cashBalance), { [DEFAULT_ACCOUNT]: n });
+          const nextCash = cashLotQuantity(lots[CASH_SYMBOL]);
           const recalcCtx: RecalcContext = {
             etfProfitTarget: st.etfProfitTarget,
             stockProfitTarget: st.stockProfitTarget,
@@ -679,18 +694,19 @@ export const usePortfolioStore = create<State>()(
             rsiHysteresisPointsForRecommendations: st.rsiHysteresisPointsForRecommendations,
             rsiMinRisingDaysForRecommendations: st.rsiMinRisingDaysForRecommendations,
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
-            lotsBySymbol: st.lotsBySymbol,
+            lotsBySymbol: lots,
           };
-          const currentPortfolioSize = st.stocks.reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) + st.cashBalance;
-          const newPortfolioSize = st.stocks.reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) + n;
+          const currentPortfolioSize = st.stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) + st.cashBalance;
+          const newPortfolioSize = st.stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) + nextCash;
           const drift = currentPortfolioSize > 0 ? Math.abs(newPortfolioSize - currentPortfolioSize) / currentPortfolioSize : 0;
           const markPending = drift > 0.10;
-          const derived = derivePortfolioState(st.stocks, n, recalcCtx, st, {
+          const derived = derivePortfolioState(st.stocks, nextCash, recalcCtx, st, {
             shouldRecalculateLimits: true,
             forceRecalculateAllHoldingLimits: drift > 0.10,
           });
           return {
-            cashBalance: n,
+            cashBalance: nextCash,
+            lotsBySymbol: lots,
             stocks: markPending
               ? derived.stocks.map((stock) => ({ ...stock, pendingOptimization: true }))
               : derived.stocks,
@@ -698,6 +714,48 @@ export const usePortfolioStore = create<State>()(
             lastLocalMutationAt: mutationAt,
           };
         }),
+      applyCashLotsEdit: (amountsByAccount) => {
+        let previousCash = 0;
+        let nextCash = 0;
+        let markedPending = false;
+        set((st) => {
+          const mutationAt = new Date().toISOString();
+          previousCash = st.cashBalance;
+          const lots = replaceCashLots(migrateCashLots(st.lotsBySymbol, st.cashBalance), amountsByAccount);
+          nextCash = cashLotQuantity(lots[CASH_SYMBOL]);
+          const recalcCtx: RecalcContext = {
+            etfProfitTarget: st.etfProfitTarget,
+            stockProfitTarget: st.stockProfitTarget,
+            useAISentimentForRecommendations: st.useAISentimentForRecommendations,
+            useRSIGatingForRecommendations: st.useRSIGatingForRecommendations,
+            rsiPeriodForRecommendations: st.rsiPeriodForRecommendations,
+            rsiOversoldThresholdForRecommendations: st.rsiOversoldThresholdForRecommendations,
+            rsiOverboughtThresholdForRecommendations: st.rsiOverboughtThresholdForRecommendations,
+            rsiHysteresisPointsForRecommendations: st.rsiHysteresisPointsForRecommendations,
+            rsiMinRisingDaysForRecommendations: st.rsiMinRisingDaysForRecommendations,
+            sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
+            lotsBySymbol: lots,
+          };
+          const currentPortfolioSize = st.stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) + st.cashBalance;
+          const newPortfolioSize = st.stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) + nextCash;
+          const drift = currentPortfolioSize > 0 ? Math.abs(newPortfolioSize - currentPortfolioSize) / currentPortfolioSize : 0;
+          markedPending = drift > 0.10;
+          const derived = derivePortfolioState(st.stocks, nextCash, recalcCtx, st, {
+            shouldRecalculateLimits: true,
+            forceRecalculateAllHoldingLimits: drift > 0.10,
+          });
+          return {
+            cashBalance: nextCash,
+            lotsBySymbol: lots,
+            stocks: markedPending
+              ? derived.stocks.map((stock) => ({ ...stock, pendingOptimization: true }))
+              : derived.stocks,
+            portfolioSize: derived.portfolioSize,
+            lastLocalMutationAt: mutationAt,
+          };
+        });
+        return { previousCash, nextCash, markedPending };
+      },
       setSettings: (p) =>
         set((st) => {
           const mutationAt = new Date().toISOString();
@@ -724,6 +782,7 @@ export const usePortfolioStore = create<State>()(
         }),
       addStock: (s) =>
         set((st) => {
+          if (isCashSymbol(s.symbol)) return {};
           const mutationAt = new Date().toISOString();
           const ctx: RecalcContext = {
             etfProfitTarget: st.etfProfitTarget,
@@ -973,9 +1032,10 @@ export const usePortfolioStore = create<State>()(
 
           if (side === "BUY") {
             const cost = qty * price;
-            const newCash = cashBefore - cost;
+            let lots = migrateCashLots({ ...st.lotsBySymbol }, st.cashBalance);
+            lots = applyCashDelta(lots, options?.account, -cost);
+            const newCash = cashLotQuantity(lots[CASH_SYMBOL]);
             const lotId = uid();
-            const lots = { ...st.lotsBySymbol };
             const cur = { ...(lots[sym] || { open: [], sold: [] }) };
             cur.open = [
               ...cur.open,
@@ -1046,8 +1106,10 @@ export const usePortfolioStore = create<State>()(
           const avgBefore = existing.averageCost;
           const realizedGainLoss = (price - avgBefore) * sellQty;
           const proceeds = sellQty * price;
-          const newCash = cashBefore + proceeds;
-          const lots = { ...st.lotsBySymbol };
+          let lots = migrateCashLots({ ...st.lotsBySymbol }, st.cashBalance);
+          const creditAccount = options?.account || lots[sym]?.open?.[0]?.account;
+          lots = applyCashDelta(lots, creditAccount, proceeds);
+          const newCash = cashLotQuantity(lots[CASH_SYMBOL]);
           const cur = { ...(lots[sym] || { open: [], sold: [] }) };
           cur.open = reduceOpenLotsFifo(cur.open, sellQty);
           cur.sold.unshift({
@@ -1097,7 +1159,7 @@ export const usePortfolioStore = create<State>()(
           const existing = st.stocks.find((s) => s.symbol === sym);
           if (!existing || existing.quantity <= 0) return {};
 
-          const lots = { ...st.lotsBySymbol };
+          const lots = migrateCashLots({ ...st.lotsBySymbol }, st.cashBalance);
           const cur = { ...(lots[sym] || { open: [], sold: [] }) };
           const targetLot = cur.open.find((lot) => lot.id === lotId);
           if (!targetLot || targetLot.quantity <= 0) return {};
@@ -1106,17 +1168,22 @@ export const usePortfolioStore = create<State>()(
           if (sellQty <= 0) return {};
 
           const proceeds = sellQty * price;
-          const newCash = st.cashBalance + proceeds;
+          const nextLots = applyCashDelta(lots, targetLot.account, proceeds);
+          const newCash = cashLotQuantity(nextLots[CASH_SYMBOL]);
           const realizedGainLoss = (price - targetLot.costBasis) * sellQty;
 
-          cur.open = reduceOpenLotById(cur.open, lotId, sellQty);
-          cur.sold.unshift({
-            saleDate: date,
-            quantity: sellQty,
-            salePrice: price,
-            realizedGainLoss,
-          });
-          lots[sym] = cur;
+          const updated = { ...(nextLots[sym] || { open: [], sold: [] }) };
+          updated.open = reduceOpenLotById(updated.open, lotId, sellQty);
+          updated.sold = [
+            {
+              saleDate: date,
+              quantity: sellQty,
+              salePrice: price,
+              realizedGainLoss,
+            },
+            ...updated.sold,
+          ];
+          nextLots[sym] = updated;
 
           const stocks = st.stocks.map((s) => {
             if (s.symbol !== sym) return s;
@@ -1149,13 +1216,13 @@ export const usePortfolioStore = create<State>()(
             rsiHysteresisPointsForRecommendations: st.rsiHysteresisPointsForRecommendations,
             rsiMinRisingDaysForRecommendations: st.rsiMinRisingDaysForRecommendations,
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
-            lotsBySymbol: lots,
+            lotsBySymbol: nextLots,
           };
           const journal = [...st.tradeJournal, entry].slice(-200);
           const derived = derivePortfolioState(stocks, newCash, ctx, st);
           return {
             stocks: derived.stocks,
-            lotsBySymbol: lots,
+            lotsBySymbol: nextLots,
             cashBalance: newCash,
             tradeJournal: journal,
             portfolioSize: derived.portfolioSize,
@@ -1171,9 +1238,10 @@ export const usePortfolioStore = create<State>()(
           const mutationAt = new Date().toISOString();
           const sym = entry.symbol;
           const journal = s.tradeJournal.slice(0, -1);
-          const newCash = entry.cashBefore;
+          const cashDelta = entry.cashBefore - s.cashBalance;
           if (entry.side === "BUY") {
-            const lots = { ...s.lotsBySymbol };
+            let lots = applyCashDelta(migrateCashLots({ ...s.lotsBySymbol }, s.cashBalance), undefined, cashDelta);
+            const newCash = cashLotQuantity(lots[CASH_SYMBOL]);
             const cur = { ...(lots[sym] || { open: [], sold: [] }) };
             if (entry.lotId) {
               cur.open = cur.open.filter((l) => l.id !== entry.lotId);
@@ -1218,7 +1286,8 @@ export const usePortfolioStore = create<State>()(
             };
           }
           /* undo SELL */
-          const lots = { ...s.lotsBySymbol };
+          let lots = applyCashDelta(migrateCashLots({ ...s.lotsBySymbol }, s.cashBalance), undefined, cashDelta);
+          const newCash = cashLotQuantity(lots[CASH_SYMBOL]);
           const cur = { ...(lots[sym] || { open: [], sold: [] }) };
           const [head, ...restSold] = cur.sold;
           if (
@@ -1866,14 +1935,21 @@ export const usePortfolioStore = create<State>()(
           const cashDeltaFromHoldings = hadExistingHoldings ? preOpenCostBasis - postOpenCostBasis : 0;
 
           cashAdjustedBy = cashDeltaFromHoldings;
-          const sortedStocks = [...stockMap.values()].sort((a, b) => a.symbol.localeCompare(b.symbol));
-          const tradeJournal = buildTradeJournalFromLots(lotsBySymbol);
-          const nextCashBalance = st.cashBalance + cashDeltaFromHoldings;
-          const derived = derivePortfolioState(sortedStocks, nextCashBalance, ctx, st);
+          const sortedStocks = [...stockMap.values()]
+            .filter((stock) => !isCashSymbol(stock.symbol))
+            .sort((a, b) => a.symbol.localeCompare(b.symbol));
+          const nextLots = applyCashDelta(
+            migrateCashLots(lotsBySymbol, st.cashBalance),
+            undefined,
+            cashDeltaFromHoldings
+          );
+          const tradeJournal = buildTradeJournalFromLots(nextLots);
+          const nextCashBalance = cashLotQuantity(nextLots[CASH_SYMBOL]);
+          const derived = derivePortfolioState(sortedStocks, nextCashBalance, { ...ctx, lotsBySymbol: nextLots }, st);
 
           return {
             stocks: derived.stocks,
-            lotsBySymbol,
+            lotsBySymbol: nextLots,
             tradeJournal,
             portfolioSize: derived.portfolioSize,
             cashBalance: nextCashBalance,

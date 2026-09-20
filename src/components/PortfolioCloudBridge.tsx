@@ -248,7 +248,14 @@ export function PortfolioCloudBridge({
             }
             const cashChanged = prevSlice.cashBalance !== nextSlice.cashBalance;
             if (cashChanged) {
-              await patchPortfolioSnapshotCashForCloudUser(supabase, dataUserId, nextSlice.cashBalance, false);
+              const prevPending = prevSlice.stocks.filter((stock) => stock.pendingOptimization).length;
+              const nextPending = nextSlice.stocks.filter((stock) => stock.pendingOptimization).length;
+              await patchPortfolioSnapshotCashForCloudUser(
+                supabase,
+                dataUserId,
+                nextSlice.cashBalance,
+                nextPending > prevPending
+              );
             }
             markLastPushedPortfolioFingerprint(dataUserId, portfolioSyncFingerprint(nextSlice));
           }

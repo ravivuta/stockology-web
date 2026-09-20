@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { TrendingDown, TrendingUp } from "lucide-react";
@@ -10,6 +10,7 @@ import { PortfolioDonut } from "@/components/dashboard/PortfolioDonut";
 import { StockDetailExpandPanel } from "@/components/stock/StockDetailExpandPanel";
 import { RecommendedActionsWidget } from "@/components/dashboard/RecommendedActionsWidget";
 import { DashboardReturnComparison } from "@/components/dashboard/DashboardReturnComparison";
+import { CashAccountsEditor } from "@/components/dashboard/CashAccountsEditor";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
 import {
@@ -20,6 +21,7 @@ import {
 } from "@/lib/portfolio-net-worth-series";
 import { isUsMarketTradingDay } from "@/lib/market-hours";
 import { formatAbsPercent, formatCompactCurrency, formatCompactNumber, formatCurrency, formatPercent } from "@/lib/numberFormat";
+import { cashByAccount, displayAccount, isCashSymbol } from "@/lib/cash-accounts";
 
 const CURRENT_VALUE_COLOR = "#14b8a6";
 
@@ -47,6 +49,7 @@ export default function DashboardPage() {
   const cash = usePortfolioStore((s) => s.cashBalance);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
   const [bars, setBars] = useState(true);
+  const [showCashEditor, setShowCashEditor] = useState(false);
   const [dashStockDetail, setDashStockDetail] = useState<string | null>(null);
   // Pre-seed from the same cache used by DashboardReturnComparison for instant today-value display
   const [cloudHistory, setCloudHistory] = useState<NetWorthPoint[] | null>(() => {
@@ -58,7 +61,7 @@ export default function DashboardPage() {
     }
   });
 
-  const held = useMemo(() => stocks.filter((s) => s.quantity > 0), [stocks]);
+  const held = useMemo(() => stocks.filter((s) => s.quantity > 0 && !isCashSymbol(s.symbol)), [stocks]);
   const holdingsValue = useMemo(() => held.reduce((a, s) => a + s.quantity * (s.lastPrice ?? 0), 0), [held]);
   const holdingsCostBasis = useMemo(() => held.reduce((a, s) => a + s.quantity * s.averageCost, 0), [held]);
   const holdingsPnL = holdingsValue - holdingsCostBasis;
@@ -69,7 +72,10 @@ export default function DashboardPage() {
     () => computeTodayChangeFromHistory(cloudHistory ?? [], totalBalance),
     [cloudHistory, totalBalance]
   );
-  const todayQuoteChange = useMemo(() => computeTodayChangeFromLiveQuotes(stocks, cash), [stocks, cash]);
+  const todayQuoteChange = useMemo(
+    () => computeTodayChangeFromLiveQuotes(stocks.filter((s) => !isCashSymbol(s.symbol)), cash),
+    [stocks, cash]
+  );
   // Prefer live-quote delta only when it's non-trivial (avoids using defaulted dailyChangePercent:0
   // blocking the snapshot fallback — stocks default to 0% until a real price refresh arrives).
   const todayChange =
@@ -102,17 +108,19 @@ export default function DashboardPage() {
 
   const accountBreakdown = useMemo(() => {
     const bySymbol = new Map(stocks.map((stock) => [stock.symbol, stock]));
-    const accountMap = new Map<string, { account: string; value: number; costBasis: number }>();
+    const accountMap = new Map<string, { account: string; value: number; costBasis: number; cash: number }>();
 
-    const addToAccount = (account: string, value: number, costBasis: number) => {
-      if (value <= 0 && costBasis <= 0) return;
-      const existing = accountMap.get(account) ?? { account, value: 0, costBasis: 0 };
+    const addToAccount = (account: string, value = 0, costBasis = 0, cash = 0) => {
+      if (value <= 0 && costBasis <= 0 && cash <= 0) return;
+      const existing = accountMap.get(account) ?? { account, value: 0, costBasis: 0, cash: 0 };
       existing.value += value;
       existing.costBasis += costBasis;
+      existing.cash += cash;
       accountMap.set(account, existing);
     };
 
     for (const [symbol, lots] of Object.entries(lotsBySymbol)) {
+      if (isCashSymbol(symbol)) continue;
       const stock = bySymbol.get(symbol);
       if (!stock || stock.quantity <= 0) continue;
 
@@ -123,7 +131,7 @@ export default function DashboardPage() {
       for (const lot of lots.open ?? []) {
         if (remainingQty <= 1e-6) break;
 
-        const account = lot.account?.trim() || "Unassigned";
+        const account = displayAccount(lot.account);
         const rawLotQty = Number(lot.quantity) || 0;
         const lotCost = Number(lot.costBasis) || 0;
         const lotQty = Math.min(rawLotQty, remainingQty);
@@ -135,16 +143,21 @@ export default function DashboardPage() {
       }
 
       if (remainingQty > 1e-6) {
-        addToAccount("Unassigned", remainingQty * price, remainingQty * averageCost);
+        addToAccount(displayAccount(null), remainingQty * price, remainingQty * averageCost);
       }
     }
 
+    for (const [account, amount] of Object.entries(cashByAccount(lotsBySymbol["$CASH"]))) {
+      addToAccount(account, 0, 0, amount);
+    }
+
     const allRows = Array.from(accountMap.values())
-      .filter((item) => item.value > 0 || item.costBasis > 0)
-      .sort((a, b) => b.value - a.value);
+      .filter((item) => item.value > 0 || item.costBasis > 0 || item.cash > 0)
+      .sort((a, b) => b.value + b.cash - (a.value + a.cash));
 
     const total = allRows.reduce((sum, row) => sum + row.value, 0);
-    if (allRows.length < 2 || total <= 0) {
+    const cashTotal = allRows.reduce((sum, row) => sum + row.cash, 0);
+    if (allRows.length < 2) {
       return null;
     }
 
@@ -152,9 +165,10 @@ export default function DashboardPage() {
     const remaining = allRows.slice(5);
     const otherValue = remaining.reduce((sum, row) => sum + row.value, 0);
     const otherCost = remaining.reduce((sum, row) => sum + row.costBasis, 0);
+    const otherCash = remaining.reduce((sum, row) => sum + row.cash, 0);
 
-    const rows = otherValue > 0
-      ? [...topRows, { account: "Other", value: otherValue, costBasis: otherCost }]
+    const rows = remaining.length > 0
+      ? [...topRows, { account: "Other", value: otherValue, costBasis: otherCost, cash: otherCash }]
       : topRows;
 
     const segments = rows.map((row, index) => {
@@ -165,7 +179,7 @@ export default function DashboardPage() {
       };
     });
 
-    return { rows, segments, total };
+    return { rows, segments, total, cashTotal };
   }, [lotsBySymbol, stocks]);
 
   const gainers = useMemo(
@@ -332,6 +346,15 @@ export default function DashboardPage() {
               value={formatCurrency(cash)}
               labelClassName="text-[color:var(--dashboard-chart-cash)]"
               valueClassName="text-[color:var(--dashboard-chart-cash)]"
+              labelAction={(
+                <button
+                  type="button"
+                  onClick={() => setShowCashEditor(true)}
+                  className="ml-[5ch] rounded border border-current px-2 py-0.5 text-[11px] font-semibold leading-none text-[color:var(--dashboard-chart-cash)] hover:bg-foreground/5"
+                >
+                  Edit
+                </button>
+              )}
               secondaryLabel="Current value"
               secondaryValue={formatCurrency(holdingsValue)}
               secondaryLabelClassName="text-[color:#14b8a6]"
@@ -401,20 +424,26 @@ export default function DashboardPage() {
         >
           <h2 className="text-base font-semibold tracking-tight">Allocation by account</h2>
           <p className="mt-1 text-[11px] leading-relaxed text-subtle">
-            Current holdings grouped by lot account. Cash is excluded from this chart.
+            Current holdings grouped by lot account, including cash in each account.
           </p>
           <div className="mt-4 grid gap-3.5 md:grid-cols-2" aria-label="Account allocation breakdown">
             {accountBreakdown.rows.map((row, index) => {
-              const pct = (row.value / Math.max(accountBreakdown.total, 0.0001)) * 100;
+              const rowTotal = row.value + row.cash;
+              const pct = (rowTotal / Math.max(accountBreakdown.total + accountBreakdown.cashTotal, 0.0001)) * 100;
               const pnl = row.value - row.costBasis;
               const pnlPct = row.costBasis > 0 ? (pnl / row.costBasis) * 100 : 0;
               const pnlClass = pnl >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]";
-              const maxReference = Math.max(...accountBreakdown.rows.map((item) => Math.max(item.value, item.costBasis)), 0.0001);
+              const maxReference = Math.max(
+                ...accountBreakdown.rows.map((item) => Math.max(item.value, item.costBasis) + Math.max(0, item.cash)),
+                0.0001
+              );
               const valueWidthPct = Math.max(0, (row.value / maxReference) * 100);
               const costWidthPct = Math.max(0, (Math.min(row.costBasis, row.value) / maxReference) * 100);
               const profitWidthPct = pnl > 0 ? (pnl / maxReference) * 100 : 0;
               const lossWidthPct = pnl < 0 ? (Math.abs(pnl) / maxReference) * 100 : 0;
-              const separatorPct = pnl >= 0 ? costWidthPct : valueWidthPct;
+              const cashWidthPct = Math.max(0, (row.cash / maxReference) * 100);
+              const holdingsSpanPct = Math.max(valueWidthPct, costWidthPct + profitWidthPct, valueWidthPct + lossWidthPct);
+              const cashOriginPct = holdingsSpanPct;
 
               return (
                 <div key={`${row.account}-${index}`} className="text-sm">
@@ -423,18 +452,24 @@ export default function DashboardPage() {
                       {row.account}
                     </span>
                     <span className="shrink-0 tabular-nums font-medium text-foreground">
-                      {`${formatCurrency(row.value)} (${Math.round(pct)}%)`}
+                      {`${formatCurrency(rowTotal)} (${Math.round(pct)}%)`}
                     </span>
                   </div>
 
                   <div className="relative mt-1 h-6 overflow-hidden rounded-none bg-border/75 dark:bg-white/[0.08]">
                     <div
-                      className="h-full rounded-none"
-                      style={{ width: `${Math.min(100, valueWidthPct)}%`, backgroundColor: CURRENT_VALUE_COLOR }}
+                      className="absolute inset-y-0 left-0 rounded-none"
+                      style={{
+                        width: `${Math.min(100, valueWidthPct)}%`,
+                        backgroundColor: CURRENT_VALUE_COLOR,
+                      }}
                     />
                     <div
                       className="absolute inset-y-0 left-0 rounded-none"
-                      style={{ width: `${Math.min(100, costWidthPct)}%`, backgroundColor: "var(--dashboard-chart-cost-basis)" }}
+                      style={{
+                        width: `${Math.min(100, costWidthPct)}%`,
+                        backgroundColor: "var(--dashboard-chart-cost-basis)",
+                      }}
                     />
                     {profitWidthPct > 0 ? (
                       <div
@@ -456,16 +491,37 @@ export default function DashboardPage() {
                         }}
                       />
                     ) : null}
-                    {separatorPct > 0 && separatorPct < 100 ? (
+                    {cashWidthPct > 0 ? (
                       <div
-                        className="absolute top-1/2 h-6 w-px -translate-y-1/2 bg-white/95 dark:bg-black/95"
-                        style={{ left: `calc(${separatorPct}% - 0.5px)` }}
+                        className="absolute inset-y-0 rounded-none"
+                        style={{
+                          left: `${Math.min(100, cashOriginPct)}%`,
+                          width: `${Math.min(100 - cashOriginPct, cashWidthPct)}%`,
+                          backgroundColor: "var(--dashboard-chart-cash)",
+                        }}
                       />
                     ) : null}
+                    {[
+                      profitWidthPct > 0 ? costWidthPct : null,
+                      lossWidthPct > 0 ? valueWidthPct : null,
+                      cashWidthPct > 0 ? cashOriginPct : null,
+                    ]
+                      .filter((mark): mark is number => mark != null && mark > 0 && mark < 100)
+                      .map((mark, separatorIndex) => (
+                        <div
+                          key={`separator-${separatorIndex}-${mark.toFixed(2)}`}
+                          className="absolute top-1/2 h-6 w-px -translate-y-1/2 bg-white/95 dark:bg-black/95"
+                          style={{ left: `calc(${mark}% - 0.5px)` }}
+                        />
+                      ))}
                   </div>
 
-                  <div className="mt-1.5 text-[11px] tabular-nums text-subtle">
-                    <span className="font-bold text-[color:var(--dashboard-chart-cost-basis)]">Cost {formatCurrency(row.costBasis)}</span> · <span className={`${pnlClass} font-bold`}>P/L {formatCurrency(pnl)} ({`${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%`})</span>
+                  <div className="mt-1.5 truncate text-[11px] tabular-nums text-subtle">
+                    <span className="font-bold text-[color:var(--dashboard-chart-cost-basis)]">Cost {formatCurrency(row.costBasis)}</span>
+                    {" · "}
+                    <span className={`${pnlClass} font-bold`}>P/L {formatCurrency(pnl)} ({`${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%`})</span>
+                    {" · "}
+                    <span className="font-bold text-[color:var(--dashboard-chart-cash)]">Cash {formatCurrency(row.cash)}</span>
                   </div>
 
                 </div>
@@ -475,6 +531,8 @@ export default function DashboardPage() {
             <div className="flex items-center justify-center gap-2 border-t border-border/80 pt-2 text-xs dark:border-white/10 md:col-span-2">
               <span className="text-subtle">Total holdings</span>
               <span className="tabular-nums font-semibold text-[color:#14b8a6]">{formatCurrency(accountBreakdown.total)}</span>
+              <span className="text-subtle">·</span>
+              <span className="tabular-nums font-semibold text-[color:var(--dashboard-chart-cash)]">Cash {formatCurrency(accountBreakdown.cashTotal)}</span>
             </div>
           </div>
         </motion.section>
@@ -549,6 +607,7 @@ export default function DashboardPage() {
           </div>
         ) : null}
       </motion.section>
+      <CashAccountsEditor open={showCashEditor} onClose={() => setShowCashEditor(false)} />
     </div>
   );
 }
@@ -558,6 +617,7 @@ function StatRow({
   value,
   labelClassName,
   valueClassName,
+  labelAction,
   secondaryLabel,
   secondaryValue,
   secondaryLabelClassName,
@@ -569,6 +629,7 @@ function StatRow({
   value: string;
   labelClassName?: string;
   valueClassName?: string;
+  labelAction?: ReactNode;
   secondaryLabel?: string;
   secondaryValue?: string;
   secondaryLabelClassName?: string;
@@ -583,7 +644,10 @@ function StatRow({
       }`}
     >
       <div className="min-w-0 flex-1 space-y-1">
-        <dt className={`text-sm font-medium ${labelClassName ?? "text-subtle"}`}>{label}</dt>
+        <dt className={`flex items-center text-sm font-medium ${labelClassName ?? "text-subtle"}`}>
+          <span>{label}</span>
+          {labelAction}
+        </dt>
         {secondaryLabel ? (
           <dt
             className={`text-sm font-medium ${secondaryLabelClassName ?? "text-subtle"} ${

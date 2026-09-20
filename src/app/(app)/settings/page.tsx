@@ -89,7 +89,6 @@ function SettingsInner() {
   const searchParams = useSearchParams();
   const [userId, setUserId] = useState<string | undefined>();
   const { row, loading, allowed } = useSubscriptionGate(userId);
-  const cashBalance = usePortfolioStore((s) => s.cashBalance);
   const portfolioSize = usePortfolioStore((s) => s.portfolioSize);
   const stockCount = usePortfolioStore((s) => s.stocks.length);
   const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
@@ -396,12 +395,6 @@ function SettingsInner() {
                 Your account does not have an active trial or subscription, so navigation is locked to Settings until billing is activated.
               </div>
             ) : null}
-          </div>
-          <div className="flex shrink-0 sm:justify-end">
-            <div className="rounded-md border border-border/80 bg-background/80 px-2.5 py-1.5 text-right dark:border-white/[0.08] dark:bg-white/[0.04]">
-              <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-subtle">Cash (saved)</p>
-              <p className="mt-px text-sm font-semibold tabular-nums text-foreground">{formatCurrency(cashBalance)}</p>
-            </div>
           </div>
         </div>
       </header>
