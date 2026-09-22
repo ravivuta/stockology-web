@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { TrendingDown, TrendingUp } from "lucide-react";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { PortfolioDonut } from "@/components/dashboard/PortfolioDonut";
@@ -444,11 +443,13 @@ export default function DashboardPage() {
               const cashWidthPct = Math.max(0, (row.cash / maxReference) * 100);
               const holdingsSpanPct = Math.max(valueWidthPct, costWidthPct + profitWidthPct, valueWidthPct + lossWidthPct);
               const cashOriginPct = holdingsSpanPct;
+              const usedPct = Math.min(100, Math.max(0, holdingsSpanPct + cashWidthPct));
+              const innerScale = usedPct > 0.0001 ? 100 / usedPct : 1;
 
               return (
                 <div key={`${row.account}-${index}`} className="text-sm">
-                  <div className="flex items-center gap-2.5">
-                    <span className="min-w-0 flex-1 truncate font-medium text-foreground">
+                  <div className="flex min-w-0 items-baseline gap-2">
+                    <span className="min-w-0 truncate font-medium text-foreground">
                       {row.account}
                     </span>
                     <span className="shrink-0 tabular-nums font-medium text-foreground">
@@ -456,18 +457,20 @@ export default function DashboardPage() {
                     </span>
                   </div>
 
-                  <div className="relative mt-1 h-6 overflow-hidden rounded-none bg-border/75 dark:bg-white/[0.08]">
+                  <div className="relative mt-1 h-6">
+                    {usedPct > 0 ? (
+                      <div className="relative h-6 overflow-hidden" style={{ width: `${usedPct}%` }}>
                     <div
                       className="absolute inset-y-0 left-0 rounded-none"
                       style={{
-                        width: `${Math.min(100, valueWidthPct)}%`,
+                        width: `${Math.min(100, valueWidthPct * innerScale)}%`,
                         backgroundColor: CURRENT_VALUE_COLOR,
                       }}
                     />
                     <div
                       className="absolute inset-y-0 left-0 rounded-none"
                       style={{
-                        width: `${Math.min(100, costWidthPct)}%`,
+                        width: `${Math.min(100, costWidthPct * innerScale)}%`,
                         backgroundColor: "var(--dashboard-chart-cost-basis)",
                       }}
                     />
@@ -475,8 +478,8 @@ export default function DashboardPage() {
                       <div
                         className="absolute inset-y-0 rounded-none"
                         style={{
-                          left: `${Math.min(100, costWidthPct)}%`,
-                          width: `${Math.min(100 - costWidthPct, profitWidthPct)}%`,
+                          left: `${Math.min(100, costWidthPct * innerScale)}%`,
+                          width: `${Math.min(100 - costWidthPct * innerScale, profitWidthPct * innerScale)}%`,
                           backgroundColor: "var(--dashboard-chart-gain)",
                         }}
                       />
@@ -485,8 +488,8 @@ export default function DashboardPage() {
                       <div
                         className="absolute inset-y-0 rounded-none"
                         style={{
-                          left: `${Math.min(100, valueWidthPct)}%`,
-                          width: `${Math.min(100 - valueWidthPct, lossWidthPct)}%`,
+                          left: `${Math.min(100, valueWidthPct * innerScale)}%`,
+                          width: `${Math.min(100 - valueWidthPct * innerScale, lossWidthPct * innerScale)}%`,
                           backgroundColor: "var(--dashboard-chart-loss)",
                         }}
                       />
@@ -495,16 +498,16 @@ export default function DashboardPage() {
                       <div
                         className="absolute inset-y-0 rounded-none"
                         style={{
-                          left: `${Math.min(100, cashOriginPct)}%`,
-                          width: `${Math.min(100 - cashOriginPct, cashWidthPct)}%`,
+                          left: `${Math.min(100, cashOriginPct * innerScale)}%`,
+                          width: `${Math.min(100 - cashOriginPct * innerScale, cashWidthPct * innerScale)}%`,
                           backgroundColor: "var(--dashboard-chart-cash)",
                         }}
                       />
                     ) : null}
                     {[
-                      profitWidthPct > 0 ? costWidthPct : null,
-                      lossWidthPct > 0 ? valueWidthPct : null,
-                      cashWidthPct > 0 ? cashOriginPct : null,
+                      profitWidthPct > 0 ? costWidthPct * innerScale : null,
+                      lossWidthPct > 0 ? valueWidthPct * innerScale : null,
+                      cashWidthPct > 0 ? cashOriginPct * innerScale : null,
                     ]
                       .filter((mark): mark is number => mark != null && mark > 0 && mark < 100)
                       .map((mark, separatorIndex) => (
@@ -514,6 +517,8 @@ export default function DashboardPage() {
                           style={{ left: `calc(${mark}% - 0.5px)` }}
                         />
                       ))}
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="mt-1.5 truncate text-[11px] tabular-nums text-subtle">
@@ -527,13 +532,6 @@ export default function DashboardPage() {
                 </div>
               );
             })}
-
-            <div className="flex items-center justify-center gap-2 border-t border-border/80 pt-2 text-xs dark:border-white/10 md:col-span-2">
-              <span className="text-subtle">Total holdings</span>
-              <span className="tabular-nums font-semibold text-[color:#14b8a6]">{formatCurrency(accountBreakdown.total)}</span>
-              <span className="text-subtle">·</span>
-              <span className="tabular-nums font-semibold text-[color:var(--dashboard-chart-cash)]">Cash {formatCurrency(accountBreakdown.cashTotal)}</span>
-            </div>
           </div>
         </motion.section>
       ) : null}
@@ -557,7 +555,7 @@ export default function DashboardPage() {
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-base font-semibold tracking-tight">Your Holdings - Gainers/Losers</h2>
           <label className="ui-hover-pop flex cursor-pointer items-center gap-2 rounded-lg border border-transparent px-2 py-1 text-xs text-subtle transition-colors hover:border-border">
-            <span className="font-medium">{bars ? "Bars" : "Cards"}</span>
+            <span className="font-medium">{bars ? "Bars" : "Heat map"}</span>
             <input type="checkbox" className="accent-primary" checked={bars} onChange={(e) => setBars(e.target.checked)} />
           </label>
         </div>
@@ -565,18 +563,15 @@ export default function DashboardPage() {
         <AnimatePresence mode="wait">
           {!bars ? (
             <motion.div
-              key="cards"
+              key="heatmap"
               initial={reduceMotion ? false : { opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              className="grid gap-8 sm:grid-cols-2"
             >
-              <GainerLoserCards
+              <HoldingsHeatmap
                 gainers={gainers}
                 losers={losers}
-                totalGainerCb={totalGainerCostBasis}
-                totalLoserCb={totalLoserCostBasis}
                 selectedSymbol={dashStockDetail}
                 onToggleSymbol={(sym) => setDashStockDetail((x) => (x === sym ? null : sym))}
               />
@@ -681,93 +676,6 @@ type Row = {
   lastPrice?: number;
 };
 
-function GainerLoserCards({
-  gainers,
-  losers,
-  totalGainerCb,
-  totalLoserCb,
-  selectedSymbol,
-  onToggleSymbol,
-}: {
-  gainers: Row[];
-  losers: Row[];
-  totalGainerCb: number;
-  totalLoserCb: number;
-  selectedSymbol: string | null;
-  onToggleSymbol: (symbol: string) => void;
-}) {
-  return (
-    <>
-      <div className="flex min-h-[140px] flex-col">
-        <div className="mb-3 flex flex-wrap items-baseline gap-2">
-          <h3 className="flex items-center gap-1.5 text-sm font-semibold text-primary">
-            <TrendingUp className="h-4 w-4 opacity-90" aria-hidden />
-            Gainers
-          </h3>
-          <span className="text-xs text-subtle">Cost basis {fmtShort(totalGainerCb)}</span>
-        </div>
-        <div className="flex flex-1 flex-wrap content-start gap-2">
-          {gainers.map((s) => {
-            const cost = s.quantity * s.averageCost;
-            const cur = s.quantity * (s.lastPrice ?? s.averageCost);
-            const gain = cur - cost;
-            return (
-              <button
-                key={s.symbol}
-                type="button"
-                onClick={() => onToggleSymbol(s.symbol)}
-                className={`ui-hover-lift min-w-[7.5rem] rounded-xl border p-3 text-left text-sm shadow-sm transition-colors dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 ${
-                  selectedSymbol === s.symbol
-                    ? "border-primary/50 bg-primary/10 ring-1 ring-primary/15 dark:bg-primary/15"
-                    : "border-border bg-muted/30 hover:border-primary/35 hover:bg-primary/5"
-                }`}
-              >
-                <div className="font-semibold text-foreground">{s.symbol}</div>
-                <div className="text-[11px] text-subtle">Cost {fmtShort(cost)}</div>
-                <div className="text-[11px] font-semibold text-primary">+{fmtShort(gain)}</div>
-              </button>
-            );
-          })}
-          {gainers.length === 0 && <EmptyCol message="No gainers yet." sub="Add holdings or refresh prices to see leaders." />}
-        </div>
-      </div>
-      <div className="flex min-h-[140px] flex-col">
-        <div className="mb-3 flex flex-wrap items-baseline gap-2">
-          <h3 className="flex items-center gap-1.5 text-sm font-semibold text-[color:var(--dashboard-chart-loss)]">
-            <TrendingDown className="h-4 w-4 opacity-90" aria-hidden />
-            Losers
-          </h3>
-          <span className="text-xs text-subtle">Cost basis {fmtShort(totalLoserCb)}</span>
-        </div>
-        <div className="flex flex-1 flex-wrap content-start gap-2">
-          {losers.map((s) => {
-            const cost = s.quantity * s.averageCost;
-            const cur = s.quantity * (s.lastPrice ?? s.averageCost);
-            const loss = Math.abs(cur - cost);
-            return (
-              <button
-                key={s.symbol}
-                type="button"
-                onClick={() => onToggleSymbol(s.symbol)}
-                className={`ui-hover-lift min-w-[7.5rem] rounded-xl border p-3 text-left text-sm shadow-sm transition-colors dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 ${
-                  selectedSymbol === s.symbol
-                    ? "border-[color:var(--dashboard-chart-loss)]/40 bg-[color:var(--dashboard-chart-loss)]/10 dark:bg-[color:var(--dashboard-chart-loss)]/15"
-                    : "border-border bg-muted/40 hover:border-[color:var(--dashboard-chart-loss)]/35 hover:bg-[color:var(--dashboard-chart-loss)]/5"
-                }`}
-              >
-                <div className="font-semibold text-foreground">{s.symbol}</div>
-                <div className="text-[11px] text-subtle">Cost {fmtShort(cost)}</div>
-                <div className="text-[11px] font-semibold text-[color:var(--dashboard-chart-loss)]">−{fmtShort(loss)}</div>
-              </button>
-            );
-          })}
-          {losers.length === 0 && <EmptyCol message="No losers yet." sub="Positions at or above cost won’t appear here." />}
-        </div>
-      </div>
-    </>
-  );
-}
-
 function EmptyCol({ message, sub }: { message: string; sub: string }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-background/50 px-4 py-8 text-center dark:border-foreground/15 dark:bg-white/5">
@@ -779,6 +687,136 @@ function EmptyCol({ message, sub }: { message: string; sub: string }) {
 
 function fmtShort(n: number) {
   return formatCompactNumber(n);
+}
+
+const HEATMAP_SIDE_PX = 600;
+
+type HeatmapItem = {
+  symbol: string;
+  weight: number;
+  pnl: number;
+  pnlPercent: number;
+  costBasis: number;
+};
+
+type HeatmapTile = HeatmapItem & { x: number; y: number; width: number; height: number };
+
+function layoutHeatmapTiles(items: HeatmapItem[], size: number, gap = 2): HeatmapTile[] {
+  const filtered = items.filter((i) => i.weight > 0).sort((a, b) => b.weight - a.weight);
+  if (filtered.length === 0 || size <= 1) return [];
+
+  const split = (list: HeatmapItem[], x: number, y: number, w: number, h: number): HeatmapTile[] => {
+    if (list.length === 0) return [];
+    if (list.length === 1) {
+      return [
+        {
+          ...list[0],
+          x: x + gap / 2,
+          y: y + gap / 2,
+          width: Math.max(0, w - gap),
+          height: Math.max(0, h - gap),
+        },
+      ];
+    }
+    const total = list.reduce((sum, item) => sum + item.weight, 0);
+    let running = 0;
+    let index = 0;
+    for (let i = 0; i < list.length; i++) {
+      running += list[i].weight;
+      index = i;
+      if (running >= total * 0.5) break;
+    }
+    const splitIndex = Math.min(Math.max(index, 0), list.length - 2);
+    const left = list.slice(0, splitIndex + 1);
+    const right = list.slice(splitIndex + 1);
+    const leftWeight = left.reduce((sum, item) => sum + item.weight, 0);
+    const frac = leftWeight / Math.max(total, 0.0001);
+    if (w >= h) {
+      const w1 = w * frac;
+      return [...split(left, x, y, w1, h), ...split(right, x + w1, y, w - w1, h)];
+    }
+    const h1 = h * frac;
+    return [...split(left, x, y, w, h1), ...split(right, x, y + h1, w, h - h1)];
+  };
+
+  return split(filtered, 0, 0, size, size);
+}
+
+function HoldingsHeatmap({
+  gainers,
+  losers,
+  selectedSymbol,
+  onToggleSymbol,
+}: {
+  gainers: Row[];
+  losers: Row[];
+  selectedSymbol: string | null;
+  onToggleSymbol: (symbol: string) => void;
+}) {
+  const items = useMemo<HeatmapItem[]>(() => {
+    return [...gainers, ...losers].map((s) => {
+      const costBasis = Math.max(s.quantity * s.averageCost, 0);
+      const current = s.quantity * (s.lastPrice ?? s.averageCost);
+      const pnl = current - costBasis;
+      return {
+        symbol: s.symbol,
+        weight: Math.max(costBasis, 0.0001),
+        pnl,
+        pnlPercent: costBasis > 0 ? (pnl / costBasis) * 100 : 0,
+        costBasis,
+      };
+    });
+  }, [gainers, losers]);
+
+  const tiles = useMemo(() => layoutHeatmapTiles(items, HEATMAP_SIDE_PX), [items]);
+
+  if (items.length === 0) {
+    return <p className="text-xs text-subtle">No holdings to map.</p>;
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-[600px]">
+      <div className="relative aspect-square w-full overflow-hidden rounded-[10px]">
+        {tiles.map((tile) => {
+          const intensity = Math.min(1, Math.abs(tile.pnlPercent) / 25);
+          const colorVar = tile.pnl >= 0 ? "var(--dashboard-chart-gain)" : "var(--dashboard-chart-loss)";
+          const mix = 45 + 55 * intensity;
+          const showPercent = tile.height >= 36 && tile.width >= 44;
+          const showAmount = tile.height >= 54 && tile.width >= 56;
+          const selected = selectedSymbol === tile.symbol;
+          return (
+            <button
+              key={tile.symbol}
+              type="button"
+              onClick={() => onToggleSymbol(tile.symbol)}
+              className={`absolute overflow-hidden p-1.5 text-left text-white ${
+                selected ? "z-10 ring-2 ring-white ring-offset-1 ring-offset-background" : ""
+              }`}
+              style={{
+                left: `${(tile.x / HEATMAP_SIDE_PX) * 100}%`,
+                top: `${(tile.y / HEATMAP_SIDE_PX) * 100}%`,
+                width: `${(tile.width / HEATMAP_SIDE_PX) * 100}%`,
+                height: `${(tile.height / HEATMAP_SIDE_PX) * 100}%`,
+                backgroundColor: `color-mix(in srgb, ${colorVar} ${mix}%, #111827)`,
+              }}
+            >
+              <div className="text-[11px] font-bold leading-tight sm:text-xs">{tile.symbol}</div>
+              {showPercent ? (
+                <div className="text-[10px] font-semibold tabular-nums text-white/95">
+                  {`${tile.pnlPercent >= 0 ? "+" : ""}${Math.round(tile.pnlPercent)}%`}
+                </div>
+              ) : null}
+              {showAmount ? (
+                <div className="text-[10px] tabular-nums text-white/90">
+                  {`${tile.pnl < 0 ? "-" : ""}${fmtShort(Math.abs(tile.pnl))}`}
+                </div>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function GainerLoserBars({

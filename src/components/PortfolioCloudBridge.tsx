@@ -235,9 +235,10 @@ export function PortfolioCloudBridge({
       const identityChanged =
         portfolioHoldingsIdentityFingerprint(prevSlice) !== portfolioHoldingsIdentityFingerprint(nextSlice);
       if (identityChanged) {
+        const remaining = new Set(nextSlice.stocks.map((stock) => stock.symbol.toUpperCase()));
         const removedSymbols = prevSlice.stocks
-          .map((stock) => stock.symbol)
-          .filter((symbol) => !nextSlice.stocks.some((stock) => stock.symbol === symbol));
+          .map((stock) => stock.symbol.toUpperCase())
+          .filter((symbol) => !remaining.has(symbol));
         const supabase = createClient();
         void patchPortfolioSnapshotHoldingsForCloudUser(supabase, dataUserId, nextSlice, removedSymbols).then(
           async (holdingsResult) => {

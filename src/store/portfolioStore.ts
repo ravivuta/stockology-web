@@ -12,6 +12,7 @@ import {
   DEFAULT_ACCOUNT,
   applyCashDelta,
   cashLotQuantity,
+  displayAccount,
   isCashSymbol,
   migrateCashLots,
   replaceCashLots,
@@ -88,6 +89,8 @@ export type StockHolding = {
   profitMargin?: number;
   trailingPE?: number;
   debtToEquity?: number;
+  dividendYield?: number;
+  payoutRatio?: number;
   analystTarget?: number;
   analystAvg?: string;
   isETF?: boolean;
@@ -297,7 +300,7 @@ function buildImportedOpenLots(rows: CsvImportRow[]): {
       quantity: qty,
       costBasis: price,
       purchaseDate: row.purchaseDate || defaultImportPurchaseDate(),
-      account: row.account?.trim() || "",
+      account: displayAccount(row.account),
       isRetirementAccount: row.isRetirementAccount ?? null,
       status: "open",
     });
@@ -452,6 +455,120 @@ function totalOpenCostBasis(
   return total;
 }
 
+function positionsByAccountSymbol(
+  stockMap: Map<string, StockHolding>,
+  lotsBySymbol: Record<string, { open: TradeLot[]; sold?: SoldLot[] }>
+): Map<string, { name: string; qty: number; basis: number }> {
+  const byKey = new Map<string, { name: string; qty: number; basis: number }>();
+  const add = (account: string | undefined, symbol: string, qty: number, basis: number) => {
+    if (!(qty > 1e-6)) return;
+    const name = displayAccount(account);
+    const key = `${name.toLowerCase()}|${symbol.toUpperCase()}`;
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.qty += qty;
+      existing.basis += basis;
+    } else {
+      byKey.set(key, { name, qty, basis });
+    }
+  };
+
+  const symbols = new Set<string>([...stockMap.keys(), ...Object.keys(lotsBySymbol)]);
+  for (const symbol of symbols) {
+    if (isCashSymbol(symbol)) continue;
+    const openLots = lotsBySymbol[symbol]?.open;
+    if (openLots && openLots.length > 0) {
+      for (const lot of openLots) {
+        const qty = Math.max(0, lot.quantity);
+        add(lot.account, symbol, qty, qty * Math.max(0, lot.costBasis));
+      }
+      continue;
+    }
+    const stock = stockMap.get(symbol);
+    const qty = Math.max(0, stock?.quantity ?? 0);
+    add(undefined, symbol, qty, qty * Math.max(0, stock?.averageCost ?? 0));
+  }
+  return byKey;
+}
+
+function cashDeltasFromDetectedQtyChanges(
+  pre: Map<string, { name: string; qty: number; basis: number }>,
+  post: Map<string, { name: string; qty: number; basis: number }>,
+  options?: {
+    explicitSoldQtyBySymbol?: Map<string, number>;
+    explicitSoldProceedsBySymbol?: Map<string, number>;
+    lastPriceBySymbol?: Map<string, number>;
+  }
+): Map<string, { name: string; delta: number }> {
+  const cash = new Map<string, { name: string; delta: number }>();
+  const add = (name: string, amount: number) => {
+    if (Math.abs(amount) <= 1e-6) return;
+    const key = name.toLowerCase();
+    const existing = cash.get(key);
+    if (existing) existing.delta += amount;
+    else cash.set(key, { name, delta: amount });
+  };
+
+  const remainingExplicitSoldBySymbol = new Map(options?.explicitSoldQtyBySymbol ?? []);
+  const remainingExplicitProceedsBySymbol = new Map(options?.explicitSoldProceedsBySymbol ?? []);
+  const keys = new Set<string>([...pre.keys(), ...post.keys()]);
+  for (const key of keys) {
+    const before = pre.get(key);
+    const after = post.get(key);
+    const name = before?.name ?? after?.name ?? DEFAULT_ACCOUNT;
+    const symbol = (key.split("|")[1] ?? "").toUpperCase();
+    const preQty = before?.qty ?? 0;
+    const postQty = after?.qty ?? 0;
+    const preBasis = before?.basis ?? 0;
+    const postBasis = after?.basis ?? 0;
+    const soldQty = Math.max(0, preQty - postQty);
+    const boughtQty = Math.max(0, postQty - preQty);
+    const remainingExplicitQty = remainingExplicitSoldBySymbol.get(symbol) ?? 0;
+    const claimedExplicit = Math.min(soldQty, remainingExplicitQty);
+    if (claimedExplicit > 1e-6 && remainingExplicitQty > 1e-6) {
+      const remainingProceeds = remainingExplicitProceedsBySymbol.get(symbol) ?? 0;
+      const explicitPrice = remainingProceeds / remainingExplicitQty;
+      add(name, claimedExplicit * explicitPrice);
+      remainingExplicitSoldBySymbol.set(symbol, remainingExplicitQty - claimedExplicit);
+      remainingExplicitProceedsBySymbol.set(symbol, remainingProceeds - claimedExplicit * explicitPrice);
+    }
+    const inferredSoldQty = Math.max(0, soldQty - claimedExplicit);
+    if (inferredSoldQty > 1e-6 && preQty > 1e-6) {
+      const lastPrice = options?.lastPriceBySymbol?.get(symbol) ?? 0;
+      const creditPrice = lastPrice > 0 ? lastPrice : preBasis / preQty;
+      add(name, inferredSoldQty * creditPrice);
+    }
+    if (boughtQty > 1e-6) {
+      const remainingQty = Math.min(preQty, postQty);
+      const remainingAtOldCost = preQty > 1e-6 ? (preBasis / preQty) * remainingQty : 0;
+      add(name, -(Math.max(0, postBasis - remainingAtOldCost)));
+    }
+  }
+  for (const [symbol, leftoverQty] of remainingExplicitSoldBySymbol.entries()) {
+    if (leftoverQty <= 1e-6) continue;
+    const leftoverProceeds = remainingExplicitProceedsBySymbol.get(symbol) ?? 0;
+    if (leftoverProceeds <= 1e-6) continue;
+    const suffix = `|${symbol}`;
+    const match = [...pre.entries()].find(([key]) => key.endsWith(suffix))
+      ?? [...post.entries()].find(([key]) => key.endsWith(suffix));
+    add(match?.[1].name ?? DEFAULT_ACCOUNT, leftoverProceeds);
+  }
+  return cash;
+}
+
+function accountForImportedSell(
+  trade: { symbol: string; account?: string },
+  pre: Map<string, { name: string; qty: number; basis: number }>
+): string {
+  const explicit = trade.account?.trim();
+  if (explicit) return displayAccount(explicit);
+  const suffix = `|${trade.symbol.toUpperCase()}`;
+  const matching = [...pre.entries()].filter(([key]) => key.endsWith(suffix));
+  if (matching.length === 1) return matching[0][1].name;
+  if (matching[0]) return matching[0][1].name;
+  return DEFAULT_ACCOUNT;
+}
+
 function summarizeOpenLots(openLots: TradeLot[]) {
   const totalQty = openLots.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0);
   const totalBasis = openLots.reduce((sum, lot) => sum + Math.max(0, lot.quantity) * Math.max(0, lot.costBasis), 0);
@@ -462,7 +579,7 @@ function summarizeOpenLots(openLots: TradeLot[]) {
 }
 
 function normalizeAccountKey(value: string | undefined | null): string {
-  return (value ?? "").trim().toLowerCase();
+  return displayAccount(value).toLowerCase();
 }
 
 /** Risk–return score + iOS-aligned recommendation (same as `RecommendationEngine` + `calculateScore`). */
@@ -986,9 +1103,12 @@ export const usePortfolioStore = create<State>()(
       removeStock: (symbol) =>
         set((st) => {
           const mutationAt = new Date().toISOString();
-          const stocks = st.stocks.filter((s) => s.symbol !== symbol);
+          const sym = symbol.toUpperCase();
+          const stocks = st.stocks.filter((s) => s.symbol.toUpperCase() !== sym);
           const lots = { ...st.lotsBySymbol };
-          delete lots[symbol];
+          for (const key of Object.keys(lots)) {
+            if (key.toUpperCase() === sym) delete lots[key];
+          }
           const ctx: RecalcContext = {
             etfProfitTarget: st.etfProfitTarget,
             stockProfitTarget: st.stockProfitTarget,
@@ -1591,7 +1711,7 @@ export const usePortfolioStore = create<State>()(
           }
         }
 
-        const importType = mode === "watchlist" || holdingsSymbols.size === 0 ? "watchlist" : "holdings";
+        const importType = mode === "watchlist" || (holdingsSymbols.size === 0 && trades.length === 0) ? "watchlist" : "holdings";
         let addedCount = 0;
         const prunedWatchlistCount = 0;
         let importedTradeCount = 0;
@@ -1599,6 +1719,8 @@ export const usePortfolioStore = create<State>()(
         let cashAdjustedBy = 0;
         const importedSymbolsByAccount = new Map<string, Set<string>>();
         const netUpdatesMap = new Map<string, number>();
+        const explicitSoldQtyBySymbol = new Map<string, number>();
+        const explicitSellProceedsBySymbol = new Map<string, number>();
 
         if (mode === "portfolio") {
           for (const [symbol, symbolRows] of grouped.entries()) {
@@ -1620,6 +1742,17 @@ export const usePortfolioStore = create<State>()(
           const preImportQtyBySymbol = new Map<string, number>();
           const preImportStockMap = new Map(st.stocks.map((stock) => [stock.symbol, stock] as const));
           const preOpenCostBasis = totalOpenCostBasis(preImportStockMap, st.lotsBySymbol);
+          const prePositionsByAccountSymbol = positionsByAccountSymbol(preImportStockMap, st.lotsBySymbol);
+
+          if (mode === "portfolio") {
+            for (const trade of trades) {
+              const symbol = trade.symbol.toUpperCase();
+              const key = normalizeAccountKey(accountForImportedSell(trade, prePositionsByAccountSymbol));
+              const symbols = importedSymbolsByAccount.get(key);
+              if (symbols) symbols.add(symbol);
+              else importedSymbolsByAccount.set(key, new Set([symbol]));
+            }
+          }
 
           for (const stock of st.stocks) {
             const lots = st.lotsBySymbol[stock.symbol];
@@ -1858,26 +1991,36 @@ export const usePortfolioStore = create<State>()(
           }
 
           if (mode === "portfolio") {
+            const lastPriceBySymbol = new Map(
+              [...preImportStockMap.values()]
+                .filter((stock) => !isCashSymbol(stock.symbol))
+                .map((stock) => [stock.symbol.toUpperCase(), stock.lastPrice ?? 0] as const)
+            );
             for (const trade of trades) {
               const symbol = trade.symbol.toUpperCase();
               const qty = Math.max(0, trade.qty);
               if (qty <= 0) continue;
               importedTradeCount += 1;
+              const lastPrice = lastPriceBySymbol.get(symbol) ?? 0;
+              const salePrice = trade.price > 0 ? trade.price : lastPrice;
+              explicitSoldQtyBySymbol.set(symbol, (explicitSoldQtyBySymbol.get(symbol) ?? 0) + qty);
+              explicitSellProceedsBySymbol.set(
+                symbol,
+                (explicitSellProceedsBySymbol.get(symbol) ?? 0) + qty * Math.max(0, salePrice)
+              );
+
               if (holdingsSymbols.has(symbol)) continue;
 
               const bundle = lotsBySymbol[symbol] ?? { open: [], sold: [] };
-              const basisBefore = openLotCostBasis(bundle.open);
               const openBefore = bundle.open.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0);
               bundle.open = reduceOpenLotsFifo(bundle.open, qty);
               const openAfter = bundle.open.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0);
               const soldQty = Math.max(0, openBefore - openAfter);
               if (soldQty > 0) {
-                const removedBasis = Math.max(0, basisBefore - openLotCostBasis(bundle.open));
-                const lotAverageCost = soldQty > 0 ? removedBasis / soldQty : 0;
                 bundle.sold.unshift({
                   saleDate: trade.tradeDate || defaultImportPurchaseDate(),
                   quantity: soldQty,
-                  salePrice: lotAverageCost,
+                  salePrice: Math.max(0, salePrice),
                   realizedGainLoss: 0,
                 });
               }
@@ -1929,20 +2072,39 @@ export const usePortfolioStore = create<State>()(
             }
           }
 
-          // Incremental CSV snapshots move cash by the change in open-lot cost
-          // basis (qty × avg cost). First-time seed leaves independently set cash alone.
-          const postOpenCostBasis = totalOpenCostBasis(stockMap, lotsBySymbol);
-          const cashDeltaFromHoldings = hadExistingHoldings ? preOpenCostBasis - postOpenCostBasis : 0;
+          // Incremental CSV snapshots move cash from detected SOLD/BUY quantity
+          // changes per account. First-time seed leaves independently set cash alone.
+          const postPositionsByAccountSymbol = positionsByAccountSymbol(stockMap, lotsBySymbol);
+          let nextLots = migrateCashLots(lotsBySymbol, st.cashBalance);
+          let cashDeltaFromHoldings = 0;
+          if (hadExistingHoldings) {
+            const lastPriceBySymbol = new Map(
+              [...preImportStockMap.values()]
+                .filter((stock) => !isCashSymbol(stock.symbol))
+                .map((stock) => [stock.symbol.toUpperCase(), stock.lastPrice ?? 0] as const)
+            );
+            const cashByAccount = cashDeltasFromDetectedQtyChanges(
+              prePositionsByAccountSymbol,
+              postPositionsByAccountSymbol,
+              {
+                explicitSoldQtyBySymbol,
+                explicitSoldProceedsBySymbol: explicitSellProceedsBySymbol,
+                lastPriceBySymbol,
+              }
+            );
+            for (const { name, delta } of cashByAccount.values()) {
+              if (Math.abs(delta) <= 1e-6) continue;
+              cashDeltaFromHoldings += delta;
+              nextLots = applyCashDelta(nextLots, name, delta);
+            }
+          } else {
+            cashDeltaFromHoldings = 0;
+          }
 
           cashAdjustedBy = cashDeltaFromHoldings;
           const sortedStocks = [...stockMap.values()]
             .filter((stock) => !isCashSymbol(stock.symbol))
             .sort((a, b) => a.symbol.localeCompare(b.symbol));
-          const nextLots = applyCashDelta(
-            migrateCashLots(lotsBySymbol, st.cashBalance),
-            undefined,
-            cashDeltaFromHoldings
-          );
           const tradeJournal = buildTradeJournalFromLots(nextLots);
           const nextCashBalance = cashLotQuantity(nextLots[CASH_SYMBOL]);
           const derived = derivePortfolioState(sortedStocks, nextCashBalance, { ...ctx, lotsBySymbol: nextLots }, st);

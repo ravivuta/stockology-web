@@ -16,6 +16,8 @@ export type TickerHydrationPriceRow = {
   profit_margin?: number | null;
   trailing_pe?: number | null;
   debt_to_equity?: number | null;
+  dividend_yield?: number | null;
+  payout_ratio?: number | null;
   beta?: number | null;
   company_name?: string | null;
   is_etf?: boolean | null;
@@ -75,6 +77,14 @@ export function mapTickerHydrationPriceRowToPatch(
     const debtToEquity = Number(p.debt_to_equity);
     if (Number.isFinite(debtToEquity) && debtToEquity >= 0) patch.debtToEquity = debtToEquity;
   }
+  if (p.dividend_yield != null) {
+    const dividendYield = Number(p.dividend_yield);
+    if (Number.isFinite(dividendYield) && dividendYield > 0) patch.dividendYield = dividendYield;
+  }
+  if (p.payout_ratio != null) {
+    const payoutRatio = Number(p.payout_ratio);
+    if (Number.isFinite(payoutRatio) && payoutRatio >= 0) patch.payoutRatio = payoutRatio;
+  }
   if (p.beta != null) {
     const beta = Number(p.beta);
     if (Number.isFinite(beta)) patch.beta = beta;
@@ -111,7 +121,7 @@ export async function fetchTickerHydrationFromTables(
     supabase
       .from("ticker_data")
       .select(
-        "symbol, analyst_average, market_cap, peg_ratio, return_on_equity, profit_margin, trailing_pe, debt_to_equity, analyst_target, beta, company_name, consensus_conclusion, is_etf"
+        "symbol, analyst_average, market_cap, peg_ratio, return_on_equity, profit_margin, trailing_pe, debt_to_equity, dividend_yield, payout_ratio, analyst_target, beta, company_name, consensus_conclusion, is_etf"
       )
       .in("symbol", upper),
     supabase.from("ai_sentiment_scores").select("symbol, sentiment_score, last_updated").in("symbol", upper),
@@ -133,6 +143,8 @@ export async function fetchTickerHydrationFromTables(
     | "profit_margin"
     | "trailing_pe"
     | "debt_to_equity"
+    | "dividend_yield"
+    | "payout_ratio"
     | "analyst_target"
     | "beta"
     | "company_name"
@@ -155,6 +167,8 @@ export async function fetchTickerHydrationFromTables(
       profit_margin: f.profit_margin != null ? Number(f.profit_margin) : null,
       trailing_pe: f.trailing_pe != null ? Number(f.trailing_pe) : null,
       debt_to_equity: f.debt_to_equity != null ? Number(f.debt_to_equity) : null,
+      dividend_yield: f.dividend_yield != null ? Number(f.dividend_yield) : null,
+      payout_ratio: f.payout_ratio != null ? Number(f.payout_ratio) : null,
       analyst_target: f.analyst_target != null ? Number(f.analyst_target) : null,
       beta: f.beta != null ? Number(f.beta) : null,
       company_name: typeof f.company_name === "string" ? f.company_name : null,

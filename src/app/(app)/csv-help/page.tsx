@@ -14,8 +14,11 @@ export default function CsvHelpPage() {
           <code className="rounded bg-border/60 px-1 py-0.5 text-xs">account</code> is the account/profile name and{" "}
           <code className="rounded bg-border/60 px-1 py-0.5 text-xs">retirementAccount</code> accepts values like <code className="rounded bg-border/60 px-1 py-0.5 text-xs">yes</code>,{" "}
           <code className="rounded bg-border/60 px-1 py-0.5 text-xs">no</code>, <code className="rounded bg-border/60 px-1 py-0.5 text-xs">retirement</code>, or{" "}
-          <code className="rounded bg-border/60 px-1 py-0.5 text-xs">taxable</code>. Rows with SELL / SOLD in the transaction column are skipped on import. BUY rows are preserved as
-          separate lots so account metadata and purchase dates remain visible in stock details.
+          <code className="rounded bg-border/60 px-1 py-0.5 text-xs">taxable</code>. BUY rows are preserved as
+          separate lots so account metadata and purchase dates remain visible in stock details. SELL / SOLD / REDUCE
+          rows with quantity and price record a sale: cash is credited <code className="rounded bg-border/60 px-1 py-0.5 text-xs">qty × sale price</code>{" "}
+          to that account. If a holding is reduced or omitted without a SELL row, remaining sold shares are credited at the current last price. Example:{" "}
+          <code className="rounded bg-border/60 px-1 py-0.5 text-xs">2024-09-01,SELL,AAPL,20,190.00</code>.
         </p>
       </div>
 

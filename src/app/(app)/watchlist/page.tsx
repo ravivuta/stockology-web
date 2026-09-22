@@ -515,7 +515,10 @@ export default function WatchlistPage() {
         open={removeTarget != null}
         onClose={() => setRemoveTarget(null)}
         onConfirm={() => {
-          if (removeTarget) removeStock(removeTarget);
+          if (!removeTarget) return;
+          const sym = removeTarget.toUpperCase();
+          removeStock(sym);
+          void patchCurrentPortfolioSnapshotHoldings([sym]);
         }}
         title="Remove symbol?"
         description={

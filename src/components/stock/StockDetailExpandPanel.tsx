@@ -5,6 +5,8 @@ import Link from "next/link";
 import { CheckCircle2, Pencil, PlusCircle, Settings, Trash2, X, XCircle } from "lucide-react";
 import {
   computeRecommendationFactors,
+  dividendYieldPercent,
+  payoutRatioDecimal,
   rankInWatchlistScoreUniverse,
   recommendedWatchlistSize,
   scoreBreakdownRows,
@@ -1036,6 +1038,14 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                           value: stock.debtToEquity != null ? formatNumberMax2(stock.debtToEquity) : "—",
                         },
                         {
+                          label: "Dividend yield",
+                          value: stock.dividendYield != null ? formatPercent(dividendYieldPercent(stock.dividendYield)) : "—",
+                        },
+                        {
+                          label: "Payout ratio",
+                          value: stock.payoutRatio != null ? formatPercent(payoutRatioDecimal(stock.payoutRatio) * 100) : "—",
+                        },
+                        {
                           label: "Analyst avg",
                           value: stock.analystAvg?.trim() || "—",
                           valueClassName: analystRatingTone(stock.analystAvg),
@@ -1094,6 +1104,14 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                                 />
                               ))}
                             </>
+                          ) : null}
+                          {scoreRows.dividendBonusLine && scoreRows.dividendBonusPoints ? (
+                            <SnapshotRow
+                              compact={dense}
+                              label="Dividend bonus"
+                              value={scoreRows.dividendBonusLine}
+                              hint={scoreRows.dividendBonusPoints}
+                            />
                           ) : null}
                         </div>
                       ) : null}

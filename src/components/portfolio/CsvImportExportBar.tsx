@@ -172,6 +172,14 @@ function mapHydrationRowToPatch(row: TickerHydrationPriceRow): Partial<StockHold
     const debtToEquity = Number(row.debt_to_equity);
     if (Number.isFinite(debtToEquity) && debtToEquity >= 0) patch.debtToEquity = debtToEquity;
   }
+  if (row.dividend_yield != null) {
+    const dividendYield = Number(row.dividend_yield);
+    if (Number.isFinite(dividendYield) && dividendYield > 0) patch.dividendYield = dividendYield;
+  }
+  if (row.payout_ratio != null) {
+    const payoutRatio = Number(row.payout_ratio);
+    if (Number.isFinite(payoutRatio) && payoutRatio >= 0) patch.payoutRatio = payoutRatio;
+  }
   if (row.beta != null) {
     const beta = Number(row.beta);
     if (Number.isFinite(beta)) patch.beta = beta;
@@ -512,8 +520,9 @@ export function CsvImportExportBar({
     }
 
     updateImportProgress("Applying import", 58);
+    const defaultAccountName = defaults?.defaultAccountName?.trim();
     const normalizedWithDefaults =
-      defaults?.defaultRetirementAccount == null && !defaults?.defaultAccountName?.trim()
+      defaults?.defaultRetirementAccount == null && !defaultAccountName
         ? rows
         : rows.map((row) =>
             row.qty > 0
@@ -521,10 +530,17 @@ export function CsvImportExportBar({
                   ...row,
                   isRetirementAccount:
                     row.isRetirementAccount == null ? defaults?.defaultRetirementAccount : row.isRetirementAccount,
-                  account: row.account?.trim() || defaults?.defaultAccountName?.trim() || row.account,
+                  account: row.account?.trim() || defaultAccountName || row.account,
                 }
               : row
           );
+    const tradesWithDefaults =
+      !defaultAccountName
+        ? importedTrades
+        : importedTrades.map((trade) => ({
+            ...trade,
+            account: trade.account?.trim() || defaultAccountName,
+          }));
     const normalizedRows = importMode === "watchlist" ? dedupeSymbolRows(rows) : rows;
     const importRows =
       importMode === "watchlist"
@@ -533,7 +549,7 @@ export function CsvImportExportBar({
     const outcome = importCsvRows(
       importMode === "watchlist" ? importRows : normalizedWithDefaults,
       importMode,
-      importedTrades
+      tradesWithDefaults
     );
 
     let snapshotWarning: string | null = null;

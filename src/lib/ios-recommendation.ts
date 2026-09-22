@@ -37,6 +37,8 @@ export type IosStockInput = {
   returnOnEquity?: number;
   profitMargin?: number;
   debtToEquity?: number;
+  dividendYield?: number;
+  payoutRatio?: number;
   score?: number;
   aiSentimentScore?: number;
   aiSentimentLastUpdated?: string; // ISO8601 timestamp
@@ -89,6 +91,23 @@ function debtToEquityNormalized(debtToEquity: number): number {
   if (debtToEquity <= 3.0) return 0.4;
   if (debtToEquity <= 5.0) return 0.2;
   return 0.0;
+}
+
+export function dividendScoreBonus(yieldValue?: number | null, payoutValue?: number | null): number {
+  if (yieldValue == null || !Number.isFinite(yieldValue) || yieldValue <= 0) return 0;
+  if (payoutValue == null || !Number.isFinite(payoutValue)) return 0;
+  const payout = payoutValue > 2 ? payoutValue / 100 : payoutValue;
+  if (payout < 0 || payout >= 0.51) return 0;
+  const yieldPct = yieldValue > 1 ? yieldValue : yieldValue * 100;
+  return 4 * yieldPct;
+}
+
+export function dividendYieldPercent(value: number): number {
+  return value > 1 ? value : value * 100;
+}
+
+export function payoutRatioDecimal(value: number): number {
+  return value > 2 ? value / 100 : value;
 }
 
 export type IosRecOut = {
@@ -389,7 +408,11 @@ export function computeRiskReturnScore(stock: IosStockInput): number | undefined
     total += averageQuality * qualityWeight;
   }
 
-  return total;
+  if (!stock.isETF) {
+    total += dividendScoreBonus(stock.dividendYield, stock.payoutRatio);
+  }
+
+  return Math.min(100, total);
 }
 
 export function ratingTextForScore(score: number): string {
@@ -1117,6 +1140,8 @@ export function scoreBreakdownRows(stock: IosStockInput): {
   capPoints: string;
   qualityPoints: string;
   qualityMetrics: Array<{ label: string; value: string; points: string }>;
+  dividendBonusLine?: string;
+  dividendBonusPoints?: string;
 } {
   const qualityItems: Array<{ label: string; value: string; normalized: number }> = [];
   const peg = stock.peg ?? 0;
@@ -1179,6 +1204,8 @@ export function scoreBreakdownRows(stock: IosStockInput): {
     points: `${(item.normalized * perMetricWeight).toFixed(1)}/${perMetricWeight.toFixed(1)}`,
   }));
 
+  const dividendBonus = stock.isETF ? 0 : dividendScoreBonus(stock.dividendYield, stock.payoutRatio);
+
   return {
     analystLine: aa ? `${aa}/5.0` : "—",
     analystPoints: `${analystPoints.toFixed(1)}/${analystWeight}`,
@@ -1186,6 +1213,11 @@ export function scoreBreakdownRows(stock: IosStockInput): {
     capPoints: `${capScore.toFixed(1)}/${marketCapWeight}`,
     qualityPoints: `${qualityPoints.toFixed(1)}/${qualityWeight || 40}`,
     qualityMetrics,
+    dividendBonusLine:
+      dividendBonus > 0 && stock.dividendYield != null
+        ? `${dividendYieldPercent(stock.dividendYield).toFixed(1)}% yield`
+        : undefined,
+    dividendBonusPoints: dividendBonus > 0 ? `+${dividendBonus.toFixed(1)}` : undefined,
   };
 }
 

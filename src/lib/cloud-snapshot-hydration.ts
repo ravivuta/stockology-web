@@ -1,7 +1,7 @@
 import { computeRiskReturnScore } from "@/lib/ios-recommendation";
 import { parseStockPeg } from "@/lib/stock-metric-parse";
 import type { LotStatus, SoldLot, StockHolding, TradeLot } from "@/store/portfolioStore";
-import { CASH_SYMBOL, isCashSymbol, migrateCashLots, cashLotQuantity } from "@/lib/cash-accounts";
+import { CASH_SYMBOL, isCashSymbol, migrateCashLots } from "@/lib/cash-accounts";
 
 /** Raw holding JSON from iOS `user_portfolio_snapshots.holdings`. */
 type RawHolding = {
@@ -51,6 +51,10 @@ type RawHolding = {
   trailing_pe?: number | null;
   debtToEquity?: number | null;
   debt_to_equity?: number | null;
+  dividendYield?: number | null;
+  dividend_yield?: number | null;
+  payoutRatio?: number | null;
+  payout_ratio?: number | null;
   isETF?: boolean | null;
   is_etf?: boolean | null;
   lotHistory?: {
@@ -233,6 +237,12 @@ function parseRawHolding(raw: unknown): { stock: StockHolding; lots: { open: Tra
   const debtToEquity = optFiniteNumber(h.debtToEquity ?? h.debt_to_equity);
   if (debtToEquity != null && debtToEquity >= 0) stock.debtToEquity = debtToEquity;
 
+  const dividendYield = optFiniteNumber(h.dividendYield ?? h.dividend_yield);
+  if (dividendYield != null && dividendYield > 0) stock.dividendYield = dividendYield;
+
+  const payoutRatio = optFiniteNumber(h.payoutRatio ?? h.payout_ratio);
+  if (payoutRatio != null && payoutRatio >= 0) stock.payoutRatio = payoutRatio;
+
   if (h.isETF === true || h.is_etf === true) stock.isETF = true;
   else if (h.isETF === false || h.is_etf === false) stock.isETF = false;
 
@@ -249,6 +259,9 @@ function parseRawHolding(raw: unknown): { stock: StockHolding; lots: { open: Tra
       if (lot) open.push(lot);
     }
   }
+  if (quantity <= 1e-6) {
+    open.length = 0;
+  }
   if (lh && typeof lh === "object" && lh.soldLots && Array.isArray(lh.soldLots)) {
     for (const sl of lh.soldLots) {
       if (!isRecord(sl)) continue;
@@ -258,8 +271,8 @@ function parseRawHolding(raw: unknown): { stock: StockHolding; lots: { open: Tra
   }
 
   // Backward/stale snapshot safety: synthesize a single open lot from holding-level quantity/cost.
-  // This prevents position lots from disappearing when lotHistory is missing in the snapshot payload.
-  if (open.length === 0 && quantity > 0 && averageCost > 0) {
+  // Do not do this for $CASH — a missing lotHistory would collapse every account into Default Account.
+  if (open.length === 0 && quantity > 0 && averageCost > 0 && !isCashSymbol(symbol)) {
     open.push({
       id: `${symbol}_fallback_${Math.round(averageCost * 100)}_${Math.round(quantity * 1000)}`,
       quantity,
@@ -312,7 +325,7 @@ export function parseCloudSnapshotForStore(row: CloudSnapshotHydrationInput): {
   lotsBySymbol = migrateCashLots(lotsBySymbol, cashBalance);
   const cashLots = lotsBySymbol[CASH_SYMBOL];
   const cashFromLots = (cashLots?.open ?? []).reduce((sum, lot) => sum + Math.max(0, Number(lot.quantity) || 0), 0);
-  const resolvedCash = cashLots ? cashFromLots : cashBalance;
+  const resolvedCash = cashFromLots > 0.005 ? cashFromLots : cashBalance;
 
   stocks.sort((a, b) => a.symbol.localeCompare(b.symbol));
   return { cashBalance: resolvedCash, stocks, lotsBySymbol };

@@ -20,7 +20,7 @@ export const CSV_IMPORT_FIELDS: CsvImportField[] = [
   { key: "symbol", label: "Symbol", required: true, description: "Required ticker column." },
   { key: "qty", label: "Quantity", description: "Optional. Use with Price for holdings." },
   { key: "price", label: "Price", description: "Optional. Use with Quantity for holdings." },
-  { key: "transaction", label: "Transaction", description: "Optional BUY/SELL/ADD style action column." },
+  { key: "transaction", label: "Transaction", description: "Optional. BUY/ADD creates holdings. SELL/SOLD/REDUCE records a sale and credits qty × sale price to that account." },
   { key: "purchaseDate", label: "Purchase Date", description: "Optional lot purchase date." },
   { key: "account", label: "Account", description: "Optional account/profile name." },
   { key: "retirementAccount", label: "Retirement", description: "Optional tax-exempt yes/no column." },
@@ -760,7 +760,7 @@ export async function parsePortfolioCsv(
   const kSymLot = resolveMappedHeaderKey(headers, mapping, "symbol", ["symbol", "Symbol", "ticker"]);
   const kQtyLot = resolveMappedHeaderKey(headers, mapping, "qty", ["qty", "Qty", "quantity", "Quantity", "shares"]);
   const kTxnLot = resolveMappedHeaderKey(headers, mapping, "transaction", ["transaction", "Transaction", "side", "action"]);
-  /* Lot-style rows (iOS export): symbol + qty + transaction/side so we can skip SELL lines. */
+  /* Lot-style rows (iOS export): symbol + qty + transaction/side. SELL/SOLD rows become trades. */
   const isLot = kSymLot != null && kQtyLot != null && hasRecognizableTransactionValues(data, kTxnLot);
 
   if (isLot) {
@@ -818,6 +818,10 @@ export async function parsePortfolioCsv(
         continue;
       }
       if (isSell || qty < 0) {
+        if (!(Math.abs(qty) > 0) || !(price > 0)) {
+          validationErrors.push(`SELL for ${sym} requires both quantity and price.`);
+          continue;
+        }
         trades.push({
           symbol: sym,
           qty: Math.abs(qty),
@@ -840,7 +844,7 @@ export async function parsePortfolioCsv(
     if (out.length === 0) {
       if (trades.length > 0) return { ok: true, rows: [], trades, skipped };
       if (validationErrors.length > 0) return { ok: false, error: validationErrors.join(" ") };
-      return { ok: false, error: "No importable rows (all SELL, invalid symbols, or empty)." };
+      return { ok: false, error: "No importable rows (invalid symbols or empty)." };
     }
     return { ok: true, rows: out, trades, skipped };
   }
@@ -852,6 +856,7 @@ export async function parsePortfolioCsv(
   }
   const kQty = resolveMappedHeaderKey(headers, mapping, "qty", ["qty", "quantity", "Quantity", "shares", "Shares", "quantity."]);
   const kPrice = resolveMappedHeaderKey(headers, mapping, "price", CSV_IMPORT_CANDIDATES.price);
+  const kTxn = resolveMappedHeaderKey(headers, mapping, "transaction", ["transaction", "Transaction", "side", "action"]);
   const kDate = resolveMappedHeaderKey(headers, mapping, "purchaseDate", CSV_IMPORT_CANDIDATES.purchaseDate);
   const kAccount = resolveExplicitOptionalHeader("account", ["account", "Account", "profile", "profileName", "accountName"]);
   const kRetirement = resolveExplicitOptionalHeader("retirementAccount", ["retirementAccount", "retirement account", "accountType", "account type"]);
@@ -876,6 +881,9 @@ export async function parsePortfolioCsv(
 
     const qty = hasQty ? parseNumber(rawQty) ?? 0 : 0;
     const price = hasPrice ? perSharePriceFromCell(parseNumber(rawPrice) ?? 0, Math.abs(qty), kPrice) : 0;
+    const txn = kTxn ? getCell(row, kTxn) : "";
+    const isSell = txn ? isSellTransaction(txn) : false;
+    if (txn && !isSell && !isBuyTransaction(txn)) continue;
     const purchaseDate = normalizeImportedDate(getCell(row, kDate ?? ""));
     const account = normalizeImportedAccountName(getCell(row, kAccount ?? ""));
     const isRetirementAccount = parseRetirementAccountFlag(getCell(row, kRetirement ?? ""));
@@ -897,7 +905,11 @@ export async function parsePortfolioCsv(
       validationErrors.push(`Invalid price ${price} for ${sym}.`);
       continue;
     }
-    if (qty < 0) {
+    if (isSell || qty < 0) {
+      if (!(Math.abs(qty) > 0) || !(price > 0)) {
+        validationErrors.push(`SELL for ${sym} requires both quantity and price.`);
+        continue;
+      }
       trades.push({
         symbol: sym,
         qty: Math.abs(qty),
