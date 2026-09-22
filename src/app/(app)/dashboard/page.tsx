@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { appCtaButton, APP_CTA_FILL } from "@/lib/appCtaClasses";
-import { cn } from "@/lib/utils";
+import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { PortfolioDonut } from "@/components/dashboard/PortfolioDonut";
 import { StockDetailExpandPanel } from "@/components/stock/StockDetailExpandPanel";
@@ -48,8 +47,9 @@ export default function DashboardPage() {
   const stocks = usePortfolioStore((s) => s.stocks);
   const cash = usePortfolioStore((s) => s.cashBalance);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
-  const [bars, setBars] = useState(true);
+  const [bars, setBars] = useState(false);
   const [showCashEditor, setShowCashEditor] = useState(false);
+  const [allocationExpanded, setAllocationExpanded] = useState(false);
   const [dashStockDetail, setDashStockDetail] = useState<string | null>(null);
   const [summaryTab, setSummaryTab] = useState<"summary" | "performance">("summary");
   // Pre-seed from the same cache used by DashboardReturnComparison for instant today-value display
@@ -294,16 +294,14 @@ export default function DashboardPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: reduceMotion ? 0 : 0.05 }}
       >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold tracking-tight">Portfolio summary</h2>
-          <div
-            className="flex gap-1 rounded-lg border border-border bg-background/80 p-1 shadow-sm dark:bg-white/5"
+        <div
+            className="flex w-full gap-1 rounded-full border border-white/50 bg-white/25 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] backdrop-blur-xl dark:border-white/15 dark:bg-white/[0.07] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
             role="tablist"
-            aria-label="Portfolio summary section"
+            aria-label="Portfolio section"
           >
             {(
               [
-                { id: "summary", label: "Summary" },
+                { id: "summary", label: "Portfolio Summary" },
                 { id: "performance", label: "Performance" },
               ] as const
             ).map((tab) => (
@@ -315,15 +313,14 @@ export default function DashboardPage() {
                 onClick={() => setSummaryTab(tab.id)}
                 className={
                   summaryTab === tab.id
-                    ? cn(APP_CTA_FILL, "rounded-md px-2.5 py-1 text-[11px] font-semibold shadow-sm")
-                    : "rounded-md px-2.5 py-1 text-[11px] font-semibold text-subtle transition-colors hover:bg-muted/80 hover:text-foreground dark:hover:bg-white/10"
+                    ? "flex-1 rounded-full border border-white/70 bg-white/60 px-4 py-2 text-sm font-semibold text-foreground shadow-[0_6px_18px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-md dark:border-white/25 dark:bg-white/15 dark:shadow-[0_8px_20px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.22)]"
+                    : "flex-1 rounded-full px-4 py-2 text-sm font-semibold text-subtle transition-colors hover:bg-white/25 hover:text-foreground dark:hover:bg-white/10"
                 }
               >
                 {tab.label}
               </button>
             ))}
           </div>
-        </div>
         {summaryTab === "summary" ? (
         <>
         <div className="mt-5 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
@@ -453,6 +450,8 @@ export default function DashboardPage() {
         )}
       </motion.section>
 
+      <RecommendedActionsWidget stocks={stocks} />
+
       {accountBreakdown ? (
         <motion.section
           className="dashboard-panel p-5 text-foreground sm:p-6"
@@ -460,7 +459,24 @@ export default function DashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: reduceMotion ? 0 : 0.08 }}
         >
-          <h2 className="text-base font-semibold tracking-tight">Allocation by account</h2>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 text-left"
+            aria-expanded={allocationExpanded}
+            onClick={() => setAllocationExpanded((open) => !open)}
+          >
+            <h2 className="text-base font-semibold tracking-tight">Allocation by account</h2>
+            <svg
+              viewBox="0 0 20 20"
+              fill="none"
+              aria-hidden="true"
+              className={`h-4 w-4 shrink-0 text-subtle transition-transform ${allocationExpanded ? "rotate-90" : ""}`}
+            >
+              <path d="M7 5l6 5-6 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          {allocationExpanded ? (
+            <>
           <p className="mt-1 text-[11px] leading-relaxed text-subtle">
             Current holdings grouped by lot account, including cash in each account.
           </p>
@@ -572,10 +588,10 @@ export default function DashboardPage() {
               );
             })}
           </div>
+            </>
+          ) : null}
         </motion.section>
       ) : null}
-
-      <RecommendedActionsWidget stocks={stocks} />
 
       <motion.section
         className="dashboard-panel p-5 text-foreground sm:p-6"

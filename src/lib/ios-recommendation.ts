@@ -102,7 +102,7 @@ export function dividendScoreBonus(yieldValue?: number | null, payoutValue?: num
   const payout = payoutValue > 2 ? payoutValue / 100 : payoutValue;
   if (payout < 0 || payout >= 0.51) return 0;
   const yieldPct = yieldValue > 1 ? yieldValue : yieldValue * 100;
-  return 4 * yieldPct;
+  return 2 * yieldPct;
 }
 
 export function dividendYieldPercent(value: number): number {
