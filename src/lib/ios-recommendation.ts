@@ -81,7 +81,10 @@ function marginNormalized(margin: number): number {
   if (margin >= 0.3) return 0.6;
   if (margin >= 0.2) return 0.4;
   if (margin >= 0.1) return 0.2;
-  return 0.0;
+  if (margin >= 0) return 0.0;
+  if (margin >= -0.1) return -0.1;
+  if (margin >= -0.2) return -0.25;
+  return -0.5;
 }
 
 function debtToEquityNormalized(debtToEquity: number): number {

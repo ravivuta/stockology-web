@@ -89,8 +89,8 @@ export type StockHolding = {
   profitMargin?: number;
   trailingPE?: number;
   debtToEquity?: number;
-  dividendYield?: number;
-  payoutRatio?: number;
+  dividendYield?: number | null;
+  payoutRatio?: number | null;
   analystTarget?: number;
   analystAvg?: string;
   isETF?: boolean;

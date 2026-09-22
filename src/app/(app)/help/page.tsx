@@ -62,7 +62,7 @@ const SECTIONS: Section[] = [
   {
     category: "portfolio",
     title: "Composite Score",
-    body: "Stocks are ranked using analyst rating, market cap, and a quality bucket. Leftover upside vs the analyst target is not part of the score; it is a separate BUY/ADD gate (stocks need more than 25% expected return). When at least one quality metric is available (PEG, ROE, profit margin, debt/equity), weighting is Analyst 40, Market Cap 20, Quality 40. The quality bucket uses only available metrics. If none of those quality metrics are available or the symbol is an ETF, scoring falls back to Analyst 60, Market Cap 40.",
+    body: "Stocks are ranked using analyst rating, market cap, and a quality bucket. Leftover upside vs the analyst target is not part of the score; it is a separate BUY/ADD gate (stocks need more than 25% expected return). When at least one quality metric is available (PEG, ROE, profit margin, debt/equity), weighting is Analyst 40, Market Cap 20, Quality 40. The quality bucket uses only available metrics. Negative profit margin applies a small penalty (capped); negative ROE stays at zero so losses are not counted twice. If none of those quality metrics are available or the symbol is an ETF, scoring falls back to Analyst 60, Market Cap 40.",
   },
   {
     category: "portfolio",

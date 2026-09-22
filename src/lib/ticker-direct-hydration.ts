@@ -80,10 +80,16 @@ export function mapTickerHydrationPriceRowToPatch(
   if (p.dividend_yield != null) {
     const dividendYield = Number(p.dividend_yield);
     if (Number.isFinite(dividendYield) && dividendYield > 0) patch.dividendYield = dividendYield;
+    else patch.dividendYield = null;
+  } else if (Object.prototype.hasOwnProperty.call(p, "dividend_yield")) {
+    patch.dividendYield = null;
   }
   if (p.payout_ratio != null) {
     const payoutRatio = Number(p.payout_ratio);
     if (Number.isFinite(payoutRatio) && payoutRatio >= 0) patch.payoutRatio = payoutRatio;
+    else patch.payoutRatio = null;
+  } else if (Object.prototype.hasOwnProperty.call(p, "payout_ratio")) {
+    patch.payoutRatio = null;
   }
   if (p.beta != null) {
     const beta = Number(p.beta);

@@ -237,11 +237,8 @@ function parseRawHolding(raw: unknown): { stock: StockHolding; lots: { open: Tra
   const debtToEquity = optFiniteNumber(h.debtToEquity ?? h.debt_to_equity);
   if (debtToEquity != null && debtToEquity >= 0) stock.debtToEquity = debtToEquity;
 
-  const dividendYield = optFiniteNumber(h.dividendYield ?? h.dividend_yield);
-  if (dividendYield != null && dividendYield > 0) stock.dividendYield = dividendYield;
-
-  const payoutRatio = optFiniteNumber(h.payoutRatio ?? h.payout_ratio);
-  if (payoutRatio != null && payoutRatio >= 0) stock.payoutRatio = payoutRatio;
+  // Dividend yield / payout come from ticker_data, not snapshot holdings.
+  // Do not restore cached snapshot values; a later null from ticker_data must win.
 
   if (h.isETF === true || h.is_etf === true) stock.isETF = true;
   else if (h.isETF === false || h.is_etf === false) stock.isETF = false;

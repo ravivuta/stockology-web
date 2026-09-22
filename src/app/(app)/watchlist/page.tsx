@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
-import { recommendedWatchlistSize } from "@/lib/ios-recommendation";
+import { recommendedWatchlistSize, dividendYieldPercent } from "@/lib/ios-recommendation";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
 import { formatCurrency, formatDecimal, formatPercent } from "@/lib/numberFormat";
 import { recommendationActionDisplay } from "@/lib/recommendation";
@@ -15,7 +15,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
 import { patchCurrentPortfolioSnapshotHoldings } from "@/lib/portfolio-snapshot-client";
 
-type SortKey = "symbol" | "lastPrice" | "change" | "analyst" | "upside" | "score" | "signal";
+type SortKey = "symbol" | "lastPrice" | "change" | "analyst" | "upside" | "yield" | "score" | "signal";
 
 const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
   symbol: "asc",
@@ -23,6 +23,7 @@ const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
   change: "desc",
   analyst: "desc",
   upside: "desc",
+  yield: "desc",
   score: "desc",
   signal: "asc",
 };
@@ -185,6 +186,12 @@ export default function WatchlistPage() {
         case "upside":
           cmp = (upsideA ?? Number.NEGATIVE_INFINITY) - (upsideB ?? Number.NEGATIVE_INFINITY);
           break;
+        case "yield": {
+          const yieldA = a.dividendYield != null && a.dividendYield > 0 ? dividendYieldPercent(a.dividendYield) : Number.NEGATIVE_INFINITY;
+          const yieldB = b.dividendYield != null && b.dividendYield > 0 ? dividendYieldPercent(b.dividendYield) : Number.NEGATIVE_INFINITY;
+          cmp = yieldA - yieldB;
+          break;
+        }
         case "score":
           cmp = (a.score ?? Number.NEGATIVE_INFINITY) - (b.score ?? Number.NEGATIVE_INFINITY);
           break;
@@ -311,8 +318,9 @@ export default function WatchlistPage() {
             <col className="hidden md:table-column md:w-[10%]" />
             <col className="hidden md:table-column md:w-[10%]" />
             <col className="hidden sm:table-column sm:w-[10%] md:w-[10%]" />
-            <col className="w-[22%] md:w-[10%]" />
-            <col className="hidden sm:table-column sm:w-[12%] md:w-[12%]" />
+            <col className="w-[18%] md:w-[9%]" />
+            <col className="w-[14%] sm:w-[8%] md:w-[8%]" />
+            <col className="hidden sm:table-column sm:w-[10%] md:w-[10%]" />
             <col className="w-[34%] sm:w-[18%] md:w-[12%]" />
             <col className="hidden md:table-column md:w-[6%]" />
           </colgroup>
@@ -365,6 +373,7 @@ export default function WatchlistPage() {
                 </div>
               </th>
               <SortableHeaderCell label="Potential Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-1.5 py-2.5 sm:px-3 sm:py-3" />
+              <SortableHeaderCell label="Div%" column="yield" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-1 py-2.5 sm:px-2 sm:py-3" />
               <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 sm:table-cell sm:px-3" />
               <th scope="col" aria-sort={sort === "signal" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className="min-w-0 px-1.5 py-2.5 text-center sm:px-3 sm:py-3">
                 <div className="flex flex-col items-center gap-2">
@@ -396,10 +405,10 @@ export default function WatchlistPage() {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-subtle md:hidden">
+                <td colSpan={7} className="px-4 py-8 text-center text-subtle md:hidden">
                   No watchlist symbols yet. Add a symbol in the toolbar above or import a watchlist CSV.
                 </td>
-                <td colSpan={10} className="hidden px-4 py-8 text-center text-subtle md:table-cell sm:px-5">
+                <td colSpan={11} className="hidden px-4 py-8 text-center text-subtle md:table-cell sm:px-5">
                   No watchlist symbols yet. Add a symbol in the toolbar above or import a watchlist CSV.
                 </td>
               </tr>
@@ -475,6 +484,13 @@ export default function WatchlistPage() {
                       }
                     >
                       <span className="block truncate">{formatUpsidePct(upside)}</span>
+                    </td>
+                    <td className="min-w-0 px-1 py-2.5 text-center tabular-nums font-medium text-foreground sm:px-2 sm:py-3">
+                      <span className="block truncate">
+                        {s.dividendYield != null && s.dividendYield > 0
+                          ? `${dividendYieldPercent(s.dividendYield).toFixed(1)}%`
+                          : "—"}
+                      </span>
                     </td>
                     <td className={`hidden min-w-0 px-2 py-3 text-center tabular-nums font-medium sm:table-cell sm:px-3 ${scoreTextClass(s.score)}`}>
                       <span className="block truncate text-center">{s.score != null ? formatDecimal(s.score) : "—"}</span>

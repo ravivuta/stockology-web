@@ -1098,6 +1098,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                                   key={metric.label}
                                   compact={dense}
                                   indent
+                                  nested
                                   label={metric.label}
                                   value={metric.value}
                                   hint={metric.points}
@@ -1900,6 +1901,7 @@ function SnapshotRow({
   hint,
   compact,
   indent,
+  nested,
   valueClassName,
 }: {
   label: string;
@@ -1907,8 +1909,12 @@ function SnapshotRow({
   hint?: string;
   compact?: boolean;
   indent?: boolean;
+  nested?: boolean;
   valueClassName?: string;
 }) {
+  const labelSize = nested ? (compact ? "text-[10px]" : "text-xs") : compact ? "text-xs" : "text-sm";
+  const valueSize = nested ? (compact ? "text-[10px]" : "text-xs") : compact ? "text-xs" : "text-sm";
+  const hintSize = nested ? (compact ? "text-[9px]" : "text-[10px]") : compact ? "text-[10px]" : "text-xs";
   return (
     <li
       className={cn(
@@ -1918,12 +1924,13 @@ function SnapshotRow({
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-          <span className={cn("font-medium text-foreground/80", compact ? "text-xs" : "text-sm")}>{label}</span>
+          <span className={cn(nested ? "font-normal text-subtle" : "font-medium text-foreground/80", labelSize)}>{label}</span>
           {value ? (
             <span
               className={cn(
-                "font-semibold tabular-nums text-foreground",
-                compact ? "text-xs" : "text-sm",
+                "tabular-nums",
+                nested ? "font-medium text-subtle" : "font-semibold text-foreground",
+                valueSize,
                 valueClassName
               )}
             >
@@ -1932,7 +1939,7 @@ function SnapshotRow({
           ) : null}
         </div>
         {hint ? (
-          <span className={cn("shrink-0 text-subtle", compact ? "text-[10px]" : "text-xs")}>
+          <span className={cn("shrink-0 text-subtle", hintSize)}>
             {hint}
           </span>
         ) : null}
