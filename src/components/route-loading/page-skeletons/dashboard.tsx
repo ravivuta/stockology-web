@@ -4,7 +4,7 @@ import { routeBusy, Sk } from "@/components/route-loading/page-skeletons/_common
 
 /**
  * Mirrors `app/(app)/dashboard/page.tsx`: header actions, portfolio summary (donut + stats),
- * recommended actions, return comparison (range + chart), holdings gainers/losers grid.
+ * recommended actions, holdings gainers/losers grid.
  */
 export function DashboardPageSkeleton() {
   return (
@@ -18,7 +18,13 @@ export function DashboardPageSkeleton() {
       </div>
 
       <section className="dashboard-panel p-5 text-foreground sm:p-6">
-        <Sk className="h-4 w-40 rounded-md" />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Sk className="h-4 w-40 rounded-md" />
+          <div className="flex gap-1 rounded-lg border border-border bg-background/80 p-1 dark:bg-white/5">
+            <Sk className="h-7 w-16 rounded-md" />
+            <Sk className="h-7 w-20 rounded-md" />
+          </div>
+        </div>
         <div className="mt-5 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
           <div className="flex flex-wrap items-center justify-center gap-5 sm:gap-6 lg:min-w-0 lg:flex-1 lg:justify-start">
             <Sk className="h-[140px] w-[140px] shrink-0 rounded-full sm:h-[152px] sm:w-[152px]" />
@@ -62,30 +68,6 @@ export function DashboardPageSkeleton() {
             </li>
           ))}
         </ul>
-      </section>
-
-      <section className="dashboard-panel p-5 sm:p-6">
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-2">
-            <Sk className="h-4 w-44 rounded-md" />
-            <Sk className="h-3 w-64 max-w-full rounded-md" />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-background/80 p-1 dark:bg-white/5">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <Sk key={i} className="h-7 w-9 rounded-md" />
-              ))}
-            </div>
-            <Sk className="h-8 w-24 rounded-lg" />
-          </div>
-        </div>
-        <div className="relative h-[220px] overflow-hidden rounded-xl border border-border/80 bg-background/40 dark:border-white/[0.08] sm:h-[248px]">
-          <div className="absolute left-3 top-3 z-10 flex gap-3 rounded-lg px-2 py-1.5">
-            <Sk className="h-3 w-20 rounded" />
-            <Sk className="h-3 w-24 rounded" />
-          </div>
-          <Sk className="absolute bottom-8 left-4 right-4 top-14 rounded-lg opacity-80" />
-        </div>
       </section>
 
       <section className="dashboard-panel p-5 sm:p-6">

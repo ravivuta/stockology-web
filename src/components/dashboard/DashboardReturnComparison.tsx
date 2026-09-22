@@ -172,7 +172,7 @@ function lsSet(key: string, value: unknown) {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function DashboardReturnComparison() {
+export function DashboardReturnComparison({ embedded = false }: { embedded?: boolean }) {
   const reduceMotion = useReducedMotion();
   const chart = useDashboardChartTheme();
   const stocks = usePortfolioStore((s) => s.stocks);
@@ -475,12 +475,14 @@ export function DashboardReturnComparison() {
     [spyOnlyYDomain]
   );
 
-  return (
-    <section className="dashboard-panel p-5 text-foreground sm:p-6">
+  const chartShell = (
+    <>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold tracking-tight">Portfolio Performance</h2>
-          <p className="mt-0.5 text-xs text-subtle">
+          {embedded ? null : (
+            <h2 className="text-base font-semibold tracking-tight">Portfolio Performance</h2>
+          )}
+          <p className={embedded ? "text-xs text-subtle" : "mt-0.5 text-xs text-subtle"}>
             {showSpyOnlyChart
               ? "SPY price with 50 / 200 day moving averages"
               : vsSpy
@@ -840,6 +842,16 @@ export function DashboardReturnComparison() {
           </p>
         )}
       </div>
+    </>
+  );
+
+  if (embedded) {
+    return <div>{chartShell}</div>;
+  }
+
+  return (
+    <section className="dashboard-panel p-5 text-foreground sm:p-6">
+      {chartShell}
     </section>
   );
 }

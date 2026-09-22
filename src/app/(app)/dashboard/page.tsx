@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { appCtaButton } from "@/lib/appCtaClasses";
+import { appCtaButton, APP_CTA_FILL } from "@/lib/appCtaClasses";
+import { cn } from "@/lib/utils";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { PortfolioDonut } from "@/components/dashboard/PortfolioDonut";
 import { StockDetailExpandPanel } from "@/components/stock/StockDetailExpandPanel";
@@ -50,6 +51,7 @@ export default function DashboardPage() {
   const [bars, setBars] = useState(true);
   const [showCashEditor, setShowCashEditor] = useState(false);
   const [dashStockDetail, setDashStockDetail] = useState<string | null>(null);
+  const [summaryTab, setSummaryTab] = useState<"summary" | "performance">("summary");
   // Pre-seed from the same cache used by DashboardReturnComparison for instant today-value display
   const [cloudHistory, setCloudHistory] = useState<NetWorthPoint[] | null>(() => {
     try {
@@ -292,7 +294,38 @@ export default function DashboardPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: reduceMotion ? 0 : 0.05 }}
       >
-        <h2 className="text-base font-semibold tracking-tight">Portfolio summary</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-base font-semibold tracking-tight">Portfolio summary</h2>
+          <div
+            className="flex gap-1 rounded-lg border border-border bg-background/80 p-1 shadow-sm dark:bg-white/5"
+            role="tablist"
+            aria-label="Portfolio summary section"
+          >
+            {(
+              [
+                { id: "summary", label: "Summary" },
+                { id: "performance", label: "Performance" },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={summaryTab === tab.id}
+                onClick={() => setSummaryTab(tab.id)}
+                className={
+                  summaryTab === tab.id
+                    ? cn(APP_CTA_FILL, "rounded-md px-2.5 py-1 text-[11px] font-semibold shadow-sm")
+                    : "rounded-md px-2.5 py-1 text-[11px] font-semibold text-subtle transition-colors hover:bg-muted/80 hover:text-foreground dark:hover:bg-white/10"
+                }
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {summaryTab === "summary" ? (
+        <>
         <div className="mt-5 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
           <div className="flex flex-wrap items-center justify-center gap-5 sm:gap-6 lg:min-w-0 lg:flex-1 lg:justify-start">
             <motion.div
@@ -412,6 +445,12 @@ export default function DashboardPage() {
               ? "Loading quote deltas and portfolio history for today's change…"
               : "Today's change value is shown on U.S. trading days from 8:00 AM ET once live quote deltas or a prior portfolio snapshot is available."}
         </p>
+        </>
+        ) : (
+          <div className="mt-5">
+            <DashboardReturnComparison embedded />
+          </div>
+        )}
       </motion.section>
 
       {accountBreakdown ? (
@@ -537,14 +576,6 @@ export default function DashboardPage() {
       ) : null}
 
       <RecommendedActionsWidget stocks={stocks} />
-
-      <motion.div
-        initial={reduceMotion ? false : { opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: reduceMotion ? 0 : 0.1 }}
-      >
-        <DashboardReturnComparison />
-      </motion.div>
 
       <motion.section
         className="dashboard-panel p-5 text-foreground sm:p-6"
