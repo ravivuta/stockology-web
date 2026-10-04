@@ -1429,7 +1429,7 @@ export const usePortfolioStore = create<State>()(
           const journal = s.tradeJournal.slice(0, -1);
           const cashDelta = entry.cashBefore - s.cashBalance;
           if (entry.side === "BUY") {
-            let lots = applyCashDelta(migrateCashLots({ ...s.lotsBySymbol }, s.cashBalance), undefined, cashDelta);
+            const lots = applyCashDelta(migrateCashLots({ ...s.lotsBySymbol }, s.cashBalance), undefined, cashDelta);
             const newCash = cashLotQuantity(lots[CASH_SYMBOL]);
             const cur = { ...(lots[sym] || { open: [], sold: [] }) };
             if (entry.lotId) {
@@ -1475,7 +1475,7 @@ export const usePortfolioStore = create<State>()(
             };
           }
           /* undo SELL */
-          let lots = applyCashDelta(migrateCashLots({ ...s.lotsBySymbol }, s.cashBalance), undefined, cashDelta);
+          const lots = applyCashDelta(migrateCashLots({ ...s.lotsBySymbol }, s.cashBalance), undefined, cashDelta);
           const newCash = cashLotQuantity(lots[CASH_SYMBOL]);
           const cur = { ...(lots[sym] || { open: [], sold: [] }) };
           const [head, ...restSold] = cur.sold;

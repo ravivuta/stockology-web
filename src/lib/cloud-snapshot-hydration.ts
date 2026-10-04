@@ -1,7 +1,7 @@
 import { computeRiskReturnScore } from "@/lib/ios-recommendation";
 import { parseStockPeg } from "@/lib/stock-metric-parse";
 import type { LotStatus, SoldLot, StockHolding, TradeLot } from "@/store/portfolioStore";
-import { CASH_SYMBOL, isCashSymbol, migrateCashLots } from "@/lib/cash-accounts";
+import { CASH_SYMBOL, cashLotQuantity, isCashSymbol, migrateCashLots } from "@/lib/cash-accounts";
 import { fixedIncomeAccountNameFromSnapshotSymbol, isFixedIncomeSymbol } from "@/lib/fixed-income-accounts";
 
 /** Raw holding JSON from iOS `user_portfolio_snapshots.holdings`. */

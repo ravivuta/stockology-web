@@ -72,7 +72,7 @@ interface MSTicker {
   exchange_mic?: string;
 }
 
-function isUSListing(ticker: MSTicker, query?: string): boolean {
+function isUSListing(ticker: MSTicker): boolean {
   const currency = (ticker.currency ?? ticker.stock_exchange?.currency ?? "").toUpperCase();
   if (currency && currency !== "USD") return false;
 
@@ -158,7 +158,7 @@ export async function GET(req: NextRequest) {
     console.log(`[search-tickers] raw results for "${query}":`, allTickers.map(t => `${t.symbol} mic=${t.exchange_mic ?? t.stock_exchange?.mic ?? "nil"} country=${t.stock_exchange?.country_code ?? t.stock_exchange?.country ?? "nil"}`));
 
     const usResults = allTickers
-      .filter(t => isUSListing(t, query))
+      .filter(t => isUSListing(t))
       .slice(0, 20)
       .map((t) => ({
         symbol: t.symbol,

@@ -37,8 +37,8 @@ export type IosStockInput = {
   returnOnEquity?: number;
   profitMargin?: number;
   debtToEquity?: number;
-  dividendYield?: number;
-  payoutRatio?: number;
+  dividendYield?: number | null;
+  payoutRatio?: number | null;
   score?: number;
   aiSentimentScore?: number;
   aiSentimentLastUpdated?: string; // ISO8601 timestamp

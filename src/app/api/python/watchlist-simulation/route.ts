@@ -64,6 +64,43 @@ function sanitizeHistory(rows: HistoryRow[] | null | undefined) {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+function toIosStockInput(stock: StockHolding): IosStockInput {
+  return {
+    symbol: stock.symbol,
+    quantity: stock.quantity,
+    averageCost: stock.averageCost,
+    lastPrice: stock.lastPrice ?? undefined,
+    shortSMA: stock.shortSMA,
+    dynamicFactor: stock.dynamicFactor,
+    stockLimit: stock.stockLimit,
+    transactionLimit: stock.transactionLimit,
+    isETF: stock.isETF,
+    analystTarget: stock.analystTarget ?? undefined,
+    analystAvg: stock.analystAvg ?? undefined,
+    marketCap: stock.marketCap ?? undefined,
+    peg: stock.peg ?? undefined,
+    returnOnEquity: stock.returnOnEquity ?? undefined,
+    profitMargin: stock.profitMargin ?? undefined,
+    debtToEquity: stock.debtToEquity ?? undefined,
+    dividendYield: stock.dividendYield ?? undefined,
+    payoutRatio: stock.payoutRatio ?? undefined,
+    score: stock.score ?? undefined,
+    aiSentimentScore: stock.aiSentimentScore ?? undefined,
+    aiSentimentLastUpdated: stock.aiSentimentLastUpdated ?? undefined,
+    movingAvg: stock.movingAvg ?? undefined,
+    isShortlisted: stock.isShortlisted,
+    isInWatchlistSize: stock.isInWatchlistSize,
+    suppressTradeActions: stock.suppressTradeActions,
+    excludeFromShortlist: stock.excludeFromShortlist,
+    enableRSIReversalGate: stock.enableRSIReversalGate,
+    rsiPeriod: stock.rsiPeriod,
+    rsiOversoldThreshold: stock.rsiOversoldThreshold,
+    rsiOverboughtThreshold: stock.rsiOverboughtThreshold,
+    rsiHysteresisPoints: stock.rsiHysteresisPoints,
+    rsiMinRisingDays: stock.rsiMinRisingDays,
+  };
+}
+
 function buildUniverse(
   stocks: StockHolding[],
   settings: {
@@ -77,11 +114,12 @@ function buildUniverse(
   const scored: SimStock[] = stocks
     .filter((stock) => stock.excludeFromShortlist !== true)
     .map((stock) => {
-      const score = stock.isETF ? undefined : (stock.score ?? computeRiskReturnScore(stock));
+      const score = stock.isETF ? undefined : (stock.score ?? computeRiskReturnScore(toIosStockInput(stock)));
+      const iosStock = { ...toIosStockInput(stock), score };
       const isVisibleInRisk = !settings.enableRiskFilter
         || stock.isETF === true
         || stockPassesRiskAppetiteOnly(
-          { ...stock, score },
+          iosStock,
           settings.riskAppetite,
           upsidePercent(stock.lastPrice, stock.analystTarget)
         );
@@ -97,7 +135,8 @@ function buildUniverse(
 
   if (settings.limitWatchlistSize) {
     const etfs = scored.filter((stock) => stock.isETF === true);
-    const topN = rankedTopWatchlistCandidates(scored, {
+    const rankedInputs = scored.map((stock) => ({ ...toIosStockInput(stock), score: stock.score }));
+    const topN = rankedTopWatchlistCandidates(rankedInputs, {
       enableRiskFilter: settings.enableRiskFilter,
       riskAppetite: settings.riskAppetite,
     }).slice(0, idealWatchlistSize);
@@ -316,7 +355,7 @@ export async function POST(request: NextRequest) {
         stock.isETF === true ? undefined : stock.analystTarget != null && stock.analystTarget > 0 ? stock.analystTarget : undefined;
 
       const input: IosStockInput = {
-        ...stock,
+        ...toIosStockInput(stock),
         quantity: position?.shares ?? 0,
         averageCost: position?.avgCost ?? 0,
         lastPrice: current.close,

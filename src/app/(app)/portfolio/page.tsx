@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
@@ -218,13 +218,13 @@ export default function PortfolioPage() {
 
   const holdings = useMemo(() => stocks.filter((s) => s.quantity > 0 && s.symbol !== "$CASH"), [stocks]);
 
-  function stockMatchesAccount(symbol: string): boolean {
+  const stockMatchesAccount = useCallback((symbol: string): boolean => {
     if (selectedAccount === "__all__") return true;
     const target = displayAccount(selectedAccount).toLowerCase();
     const lots = lotsBySymbol[symbol];
     if (!lots || lots.open.length === 0) return displayAccount("").toLowerCase() === target;
     return lots.open.some((lot) => (Number(lot.quantity) || 0) > 0.005 && displayAccount(lot.account).toLowerCase() === target);
-  }
+  }, [selectedAccount, lotsBySymbol]);
   const portfolioCountText = holdings.length === 1 ? "1 holding" : `${holdings.length} holdings`;
 
   function isActionable(action: string | undefined): boolean {
@@ -300,7 +300,7 @@ export default function PortfolioPage() {
       return sortDirection === "asc" ? cmp : -cmp;
     });
     return r;
-  }, [holdings, lotsBySymbol, query, selectedAccount, showActionable, sort, sortDirection]);
+  }, [holdings, query, showActionable, sort, sortDirection, stockMatchesAccount]);
 
   const { assetsValue, totalGainLoss, totalGainLossPct, netWorth, portfolioTodayChange, fixedIncomeValue } = useMemo(() => {
     const assets = stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((a, s) => a + s.quantity * (s.lastPrice ?? 0), 0);
