@@ -317,12 +317,18 @@ function SettingsInner() {
       // Load cloud settings and apply to store on page open
       const cloudSettings = await loadGlobalSettingsForUser(supabase, resolved);
       if (cloudSettings && !cancelled) {
+        const combinedAiSetting =
+          cloudSettings.useAISentiment === true || cloudSettings.useMarketRegimeCashTilt === true
+            ? true
+            : cloudSettings.useAISentiment === false
+              ? false
+              : undefined;
         setSettings({
           ...(cloudSettings.etfProfitTarget != null && cloudSettings.etfProfitTarget > 0 ? { etfProfitTarget: cloudSettings.etfProfitTarget } : {}),
           ...(cloudSettings.stockProfitTarget != null && cloudSettings.stockProfitTarget > 0 ? { stockProfitTarget: cloudSettings.stockProfitTarget } : {}),
           ...(cloudSettings.riskAppetite != null ? { riskAppetite: cloudSettings.riskAppetite } : {}),
           ...(cloudSettings.enableRiskFilter != null ? { enableRiskFilter: cloudSettings.enableRiskFilter } : {}),
-          ...(cloudSettings.useAISentiment != null ? { useAISentimentForRecommendations: cloudSettings.useAISentiment } : {}),
+          ...(combinedAiSetting != null ? { useAISentimentForRecommendations: combinedAiSetting } : {}),
           ...(cloudSettings.useRSIGating != null ? { useRSIGatingForRecommendations: cloudSettings.useRSIGating } : {}),
           ...(cloudSettings.rsiPeriod != null ? { rsiPeriodForRecommendations: cloudSettings.rsiPeriod } : {}),
           ...(cloudSettings.rsiOversoldThreshold != null ? { rsiOversoldThresholdForRecommendations: cloudSettings.rsiOversoldThreshold } : {}),

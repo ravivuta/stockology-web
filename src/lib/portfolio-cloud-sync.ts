@@ -412,6 +412,7 @@ export type GlobalSettings = {
   riskAppetite?: "Low" | "Medium" | "High";
   enableRiskFilter?: boolean;
   useAISentiment?: boolean;
+  useMarketRegimeCashTilt?: boolean;
   useRSIGating?: boolean;
   rsiPeriod?: number;
   rsiOversoldThreshold?: number;
@@ -467,6 +468,14 @@ function numbersDiffer(a: number, b: number): boolean {
   return !Number.isFinite(a) || !Number.isFinite(b) || Math.abs(a - b) > 1e-9;
 }
 
+function resolveCombinedAiSetting(cloud: GlobalSettings): boolean | undefined {
+  const ai = cloud.useAISentiment;
+  const macro = cloud.useMarketRegimeCashTilt;
+  if (ai === true || macro === true) return true;
+  if (ai === false) return false;
+  return undefined;
+}
+
 /** Returns only fields that differ from local settings. Empty object means already in sync. */
 export function patchFromCloudGlobalSettings(
   current: CurrentGlobalSettings,
@@ -485,8 +494,9 @@ export function patchFromCloudGlobalSettings(
   if (cloud.enableRiskFilter != null && cloud.enableRiskFilter !== current.enableRiskFilter) {
     patch.enableRiskFilter = cloud.enableRiskFilter;
   }
-  if (cloud.useAISentiment != null && cloud.useAISentiment !== current.useAISentimentForRecommendations) {
-    patch.useAISentimentForRecommendations = cloud.useAISentiment;
+  const combinedAi = resolveCombinedAiSetting(cloud);
+  if (combinedAi != null && combinedAi !== current.useAISentimentForRecommendations) {
+    patch.useAISentimentForRecommendations = combinedAi;
   }
   if (cloud.useRSIGating != null && cloud.useRSIGating !== current.useRSIGatingForRecommendations) {
     patch.useRSIGatingForRecommendations = cloud.useRSIGating;
@@ -531,9 +541,27 @@ export async function saveGlobalSettingsForUser(
   userId: string,
   settings: GlobalSettings
 ): Promise<void> {
+  const { data: existingData, error: loadError } = await supabase.rpc("get_global_settings", {
+    p_user_id: userId,
+  });
+  if (loadError) {
+    console.warn("[saveGlobalSettings/loadExisting]", loadError.message);
+  }
+
+  const existing = existingData && typeof existingData === "object" ? (existingData as Record<string, unknown>) : {};
+  const nextSettings: GlobalSettings = {
+    ...(existing as GlobalSettings),
+    ...settings,
+  };
+
+  if (settings.useAISentiment != null) {
+    // iOS treats company AI sentiment + market-outlook cash tilt as one combined toggle.
+    nextSettings.useMarketRegimeCashTilt = settings.useAISentiment;
+  }
+
   const { error } = await supabase.rpc("set_global_settings", {
     p_user_id: userId,
-    p_settings: settings,
+    p_settings: nextSettings,
   });
   if (error) {
     console.warn("[saveGlobalSettings]", error.message);
