@@ -481,6 +481,7 @@ export function CsvImportExportBar({
     const state = usePortfolioStore.getState();
     const slice = {
       cashBalance: state.cashBalance,
+      fixedIncomeByAccount: state.fixedIncomeByAccount,
       stocks: state.stocks,
       lotsBySymbol: state.lotsBySymbol,
     };

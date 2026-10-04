@@ -2,6 +2,7 @@ import { computeRiskReturnScore } from "@/lib/ios-recommendation";
 import { parseStockPeg } from "@/lib/stock-metric-parse";
 import type { LotStatus, SoldLot, StockHolding, TradeLot } from "@/store/portfolioStore";
 import { CASH_SYMBOL, isCashSymbol, migrateCashLots } from "@/lib/cash-accounts";
+import { fixedIncomeAccountNameFromSnapshotSymbol, isFixedIncomeSymbol } from "@/lib/fixed-income-accounts";
 
 /** Raw holding JSON from iOS `user_portfolio_snapshots.holdings`. */
 type RawHolding = {
@@ -295,20 +296,34 @@ export function parseCloudSnapshotForStore(row: CloudSnapshotHydrationInput): {
   cashBalance: number;
   stocks: StockHolding[];
   lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }>;
+  fixedIncomeByAccount: Record<string, number>;
 } {
   const cashBalance = Number(row.cash_balance) || 0;
   const holdings = row.holdings;
   if (!Array.isArray(holdings)) {
     const lotsBySymbol = migrateCashLots({}, cashBalance);
-    return { cashBalance: cashLotQuantity(lotsBySymbol[CASH_SYMBOL]) || cashBalance, stocks: [], lotsBySymbol };
+    return {
+      cashBalance: cashLotQuantity(lotsBySymbol[CASH_SYMBOL]) || cashBalance,
+      stocks: [],
+      lotsBySymbol,
+      fixedIncomeByAccount: {},
+    };
   }
 
   const stocks: StockHolding[] = [];
   let lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }> = {};
+  const fixedIncomeByAccount: Record<string, number> = {};
 
   for (const item of holdings) {
     const parsed = parseRawHolding(item);
     if (!parsed) continue;
+    if (isFixedIncomeSymbol(parsed.stock.symbol)) {
+      const account = fixedIncomeAccountNameFromSnapshotSymbol(parsed.stock.symbol);
+      if (account) {
+        fixedIncomeByAccount[account] = (fixedIncomeByAccount[account] ?? 0) + Math.max(0, parsed.stock.quantity);
+      }
+      continue;
+    }
     if (isCashSymbol(parsed.stock.symbol)) {
       lotsBySymbol[CASH_SYMBOL] = parsed.lots;
       continue;
@@ -325,5 +340,5 @@ export function parseCloudSnapshotForStore(row: CloudSnapshotHydrationInput): {
   const resolvedCash = cashFromLots > 0.005 ? cashFromLots : cashBalance;
 
   stocks.sort((a, b) => a.symbol.localeCompare(b.symbol));
-  return { cashBalance: resolvedCash, stocks, lotsBySymbol };
+  return { cashBalance: resolvedCash, stocks, lotsBySymbol, fixedIncomeByAccount };
 }

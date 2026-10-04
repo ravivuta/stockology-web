@@ -1,9 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SoldLot, StockHolding, TradeLot } from "@/store/portfolioStore";
 import { cashHoldingPayload, isCashSymbol } from "@/lib/cash-accounts";
+import {
+  fixedIncomeSnapshotHoldings,
+  fixedIncomeTotal,
+  sanitizeFixedIncomeByAccount,
+} from "@/lib/fixed-income-accounts";
 
 export type PortfolioSlice = {
   cashBalance: number;
+  fixedIncomeByAccount: Record<string, number>;
   stocks: StockHolding[];
   lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }>;
 };
@@ -143,13 +149,14 @@ function totals(state: PortfolioSlice) {
     value += s.quantity * snapshotValuationPrice(s);
   }
   const unrealized = value - cost;
-  const totalPortfolio = value + state.cashBalance;
+  const totalPortfolio = value + state.cashBalance + fixedIncomeTotal(state.fixedIncomeByAccount);
   return { total_cost_basis: cost, total_portfolio_value: totalPortfolio, total_unrealized_gain: unrealized };
 }
 
 export function portfolioSyncFingerprint(state: PortfolioSlice): string {
   return JSON.stringify({
     c: state.cashBalance,
+    fi: Object.entries(sanitizeFixedIncomeByAccount(state.fixedIncomeByAccount)).sort(([a], [b]) => a.localeCompare(b)),
     st: state.stocks.map((s) => [
       s.symbol,
       s.quantity,
@@ -184,6 +191,7 @@ export function portfolioSyncFingerprint(state: PortfolioSlice): string {
 
 export function portfolioHoldingsIdentityFingerprint(state: PortfolioSlice): string {
   return JSON.stringify({
+    fi: Object.entries(sanitizeFixedIncomeByAccount(state.fixedIncomeByAccount)).sort(([a], [b]) => a.localeCompare(b)),
     st: state.stocks.map((s) => [
       s.symbol,
       s.quantity,
@@ -293,6 +301,7 @@ export async function patchPortfolioSnapshotHoldingsForCloudUser(
     .filter((stock) => !isCashSymbol(stock.symbol))
     .map((stock) => holdingIdentityPayload(stock, state.lotsBySymbol[stock.symbol]));
   holdings.push(cashHoldingPayload(state.lotsBySymbol["$CASH"]) as unknown as (typeof holdings)[number]);
+  holdings.push(...(fixedIncomeSnapshotHoldings(state.fixedIncomeByAccount) as unknown as (typeof holdings)));
   const { data, error } = await supabase.rpc("patch_portfolio_snapshot_holdings", {
     p_user_id: dataUserId,
     p_holdings: holdings,
@@ -307,6 +316,7 @@ export async function patchPortfolioSnapshotHoldingsForCloudUser(
 
 export function portfolioHoldingsStructuralFingerprint(state: PortfolioSlice): string {
   return JSON.stringify({
+    fi: Object.entries(sanitizeFixedIncomeByAccount(state.fixedIncomeByAccount)).sort(([a], [b]) => a.localeCompare(b)),
     st: state.stocks.map((s) => [
       s.symbol,
       s.quantity,
@@ -376,6 +386,7 @@ export async function upsertPortfolioSnapshotForCloudUser(
     .filter((stock) => !isCashSymbol(stock.symbol))
     .map((stock) => holdingPayload(stock, state.lotsBySymbol[stock.symbol]));
   holdings.push(cashHoldingPayload(state.lotsBySymbol["$CASH"]) as unknown as (typeof holdings)[number]);
+  holdings.push(...(fixedIncomeSnapshotHoldings(state.fixedIncomeByAccount) as unknown as (typeof holdings)));
   const t = totals(state);
 
   const { error } = await supabase.rpc("save_portfolio_snapshot", {

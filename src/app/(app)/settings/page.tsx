@@ -277,7 +277,10 @@ function SettingsInner() {
       });
       replaceFromCloudSync({
         ...parsed,
-        onboardingComplete: parsed.cashBalance > 0 || parsed.stocks.length > 0,
+        onboardingComplete:
+          parsed.cashBalance > 0 ||
+          Object.values(parsed.fixedIncomeByAccount).some((value) => Number(value) > 0.005) ||
+          parsed.stocks.length > 0,
       });
       // Push restored state as today's snapshot so other devices sync
       await flushCurrentPortfolioSnapshotNow(true);
@@ -722,9 +725,16 @@ function SettingsInner() {
                     onChange={(e) => persistSettingsPatch({ useAISentimentForRecommendations: e.target.checked })}
                   />
                   <span>
-                    <span className="block text-[12px] font-medium leading-snug text-foreground">Use AI sentiment gate</span>
+                    <span className="block text-[12px] font-medium leading-snug text-foreground">
+                      Leverage AI news &amp; market outlook in recommendations
+                    </span>
                     <span className="mt-px block text-[10px] leading-snug text-subtle">
-                      AI sentiment from the latest news digest can suppress BUY or ADD when sentiment is bearish. When disabled, AI data may still load but it does not block recommendations.
+                      Premium. Turns on stock AI scores and market-outlook rules together. Stock score below 50
+                      (fresh within ~3 days) pauses BUY/ADD; score 65+ can delay a target SELL while news looks
+                      constructive. Market outlook (macro + S&amp;P 500 / Russell 2000 vs 200-day avg + index RSI
+                      recovery) can pause new buys and push raise-cash rules when defensive — full cash-tilt on iOS;
+                      this web toggle applies the stock score gate. When off, scores/news may still load but do not
+                      change recommendations. See Help for details.
                     </span>
                   </span>
                 </label>

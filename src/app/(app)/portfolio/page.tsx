@@ -18,6 +18,8 @@ import { isUsMarketTradingDay } from "@/lib/market-hours";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
 import { patchCurrentPortfolioSnapshotHoldings } from "@/lib/portfolio-snapshot-client";
+import { cashByAccount, displayAccount, isCashSymbol } from "@/lib/cash-accounts";
+import { fixedIncomeTotal } from "@/lib/fixed-income-accounts";
 
 type SortKey = "symbol" | "quantity" | "averageCost" | "costBasis" | "lastPrice" | "value" | "gainLoss" | "upside" | "score" | "today" | "signal";
 
@@ -80,6 +82,7 @@ function actionableFilterClass(active: boolean) {
 
 function PortfolioSummaryTiles({
   cash,
+  fixedIncome,
   assetsValue,
   netWorth,
   totalGainLoss,
@@ -88,6 +91,7 @@ function PortfolioSummaryTiles({
   showPortfolioTodayChange,
 }: {
   cash: number;
+  fixedIncome: number;
   assetsValue: number;
   netWorth: number;
   totalGainLoss: number;
@@ -106,11 +110,12 @@ function PortfolioSummaryTiles({
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Assets value</p>
         <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">{formatCurrency(assetsValue)}</p>
         <p className="mt-0.5 text-[11px] text-subtle">Holdings at last price</p>
+        <p className="mt-1 text-[11px] text-subtle">Fixed income: {formatCurrency(fixedIncome)}</p>
       </div>
       <div className="rounded-xl border border-border/80 bg-elevated px-4 py-3 shadow-sm dark:border-white/[0.08]">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Net worth</p>
         <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">{formatCurrency(netWorth)}</p>
-        <p className="mt-0.5 text-[11px] text-subtle">Cash + assets</p>
+        <p className="mt-0.5 text-[11px] text-subtle">Cash + assets + fixed income</p>
       </div>
       <div className="rounded-xl border border-border/80 bg-elevated px-4 py-3 shadow-sm dark:border-white/[0.08]">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Total gain</p>
@@ -150,6 +155,8 @@ function PortfolioSummaryTiles({
 export default function PortfolioPage() {
   const stocks = usePortfolioStore((s) => s.stocks);
   const cash = usePortfolioStore((s) => s.cashBalance);
+  const fixedIncomeByAccount = usePortfolioStore((s) => s.fixedIncomeByAccount);
+  const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
   const addStock = usePortfolioStore((s) => s.addStock);
   const updateStock = usePortfolioStore((s) => s.updateStock);
 
@@ -157,6 +164,7 @@ export default function PortfolioPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION.symbol);
   const [query, setQuery] = useState("");
   const [showActionable, setShowActionable] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<string>("__all__");
   const [cloudHistory, setCloudHistory] = useState<NetWorthPoint[] | null>(null);
 
   useEffect(() => {
@@ -190,7 +198,33 @@ export default function PortfolioPage() {
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
 
   /** Portfolio page lists positions only; watchlist-only symbols (0 qty) stay in store for trading elsewhere. */
+  const accountOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const stock of stocks) {
+      const lots = lotsBySymbol[stock.symbol];
+      for (const lot of lots?.open ?? []) {
+        if ((Number(lot.quantity) || 0) <= 0.005) continue;
+        names.add(displayAccount(lot.account));
+      }
+    }
+    for (const account of Object.keys(cashByAccount(lotsBySymbol["$CASH"]))) {
+      names.add(displayAccount(account));
+    }
+    for (const [account, amount] of Object.entries(fixedIncomeByAccount)) {
+      if (Number(amount) > 0.005) names.add(displayAccount(account));
+    }
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [stocks, lotsBySymbol, fixedIncomeByAccount]);
+
   const holdings = useMemo(() => stocks.filter((s) => s.quantity > 0 && s.symbol !== "$CASH"), [stocks]);
+
+  function stockMatchesAccount(symbol: string): boolean {
+    if (selectedAccount === "__all__") return true;
+    const target = displayAccount(selectedAccount).toLowerCase();
+    const lots = lotsBySymbol[symbol];
+    if (!lots || lots.open.length === 0) return displayAccount("").toLowerCase() === target;
+    return lots.open.some((lot) => (Number(lot.quantity) || 0) > 0.005 && displayAccount(lot.account).toLowerCase() === target);
+  }
   const portfolioCountText = holdings.length === 1 ? "1 holding" : `${holdings.length} holdings`;
 
   function isActionable(action: string | undefined): boolean {
@@ -209,7 +243,7 @@ export default function PortfolioPage() {
   }
 
   const rows = useMemo(() => {
-    let r = [...holdings];
+    let r = [...holdings].filter((s) => stockMatchesAccount(s.symbol));
     const q = query.trim().toUpperCase();
     if (showActionable) r = r.filter((s) => isActionable(s.recommendation?.action));
     if (q) r = r.filter((s) => s.symbol.includes(q));
@@ -266,14 +300,15 @@ export default function PortfolioPage() {
       return sortDirection === "asc" ? cmp : -cmp;
     });
     return r;
-  }, [holdings, query, showActionable, sort, sortDirection]);
+  }, [holdings, lotsBySymbol, query, selectedAccount, showActionable, sort, sortDirection]);
 
-  const { assetsValue, totalGainLoss, totalGainLossPct, netWorth, portfolioTodayChange } = useMemo(() => {
-    const assets = stocks.filter((s) => s.symbol !== "$CASH").reduce((a, s) => a + s.quantity * (s.lastPrice ?? 0), 0);
-    const holdingsCostBasis = stocks.filter((s) => s.symbol !== "$CASH").reduce((a, s) => a + s.quantity * s.averageCost, 0);
+  const { assetsValue, totalGainLoss, totalGainLossPct, netWorth, portfolioTodayChange, fixedIncomeValue } = useMemo(() => {
+    const assets = stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((a, s) => a + s.quantity * (s.lastPrice ?? 0), 0);
+    const holdingsCostBasis = stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((a, s) => a + s.quantity * s.averageCost, 0);
+    const fixedIncomeValue = fixedIncomeTotal(fixedIncomeByAccount);
     const totalGainLoss = assets - holdingsCostBasis;
     const totalGainLossPct = holdingsCostBasis > 0 ? (totalGainLoss / holdingsCostBasis) * 100 : null;
-    const net = assets + cash;
+    const net = assets + cash + fixedIncomeValue;
     const liveQuoteChange = computeTodayChangeFromLiveQuotes(stocks, cash);
     // Prefer live-quote delta when non-trivial; fall back to snapshot when dailyChangePercent is
     // still at its default 0 (not yet refreshed) so Today shows as soon as cloud history loads.
@@ -282,8 +317,8 @@ export default function PortfolioPage() {
       liveQuoteChange.hasBaseline && Math.abs(liveQuoteChange.change) > 0.01
         ? liveQuoteChange
         : snapshotChange;
-    return { assetsValue: assets, holdingsCostBasis, totalGainLoss, totalGainLossPct, netWorth: net, portfolioTodayChange };
-  }, [stocks, cash, cloudHistory]);
+    return { assetsValue: assets, holdingsCostBasis, totalGainLoss, totalGainLossPct, netWorth: net, portfolioTodayChange, fixedIncomeValue };
+  }, [stocks, cash, fixedIncomeByAccount, cloudHistory]);
   const showPortfolioTodayChange = isUsMarketTradingDay() && portfolioTodayChange.hasBaseline && Math.abs(portfolioTodayChange.change) > 0.01;
 
   function addHolding() {
@@ -332,6 +367,7 @@ export default function PortfolioPage() {
       <div className="hidden gap-3 md:grid md:grid-cols-2 lg:grid-cols-4">
         <PortfolioSummaryTiles
           cash={cash}
+          fixedIncome={fixedIncomeValue}
           assetsValue={assetsValue}
           netWorth={netWorth}
           totalGainLoss={totalGainLoss}
@@ -348,6 +384,19 @@ export default function PortfolioPage() {
               <p className="text-base font-semibold text-foreground">Portfolio</p>
               <p className="text-xs text-subtle">{portfolioCountText}</p>
             </div>
+            <label className="ml-auto flex items-center gap-2 text-xs text-subtle md:ml-0">
+              <span className="font-medium">Account</span>
+              <select
+                value={selectedAccount}
+                onChange={(event) => setSelectedAccount(event.target.value)}
+                className="rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground"
+              >
+                <option value="__all__">All Accounts</option>
+                {accountOptions.map((account) => (
+                  <option key={account} value={account}>{account}</option>
+                ))}
+              </select>
+            </label>
             <div className="md:hidden">
               <button
                 type="button"
@@ -589,7 +638,7 @@ export default function PortfolioPage() {
             Market value by position and cash (largest slices first). Smaller positions may be grouped as Other.
           </p>
           <div className="mt-4">
-            <PortfolioAllocationChart stocks={stocks} cash={cash} />
+            <PortfolioAllocationChart stocks={stocks} cash={cash} fixedIncome={fixedIncomeValue} />
           </div>
         </section>
       </div>

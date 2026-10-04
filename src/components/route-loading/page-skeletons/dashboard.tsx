@@ -18,13 +18,10 @@ export function DashboardPageSkeleton() {
       </div>
 
       <section className="dashboard-panel p-5 text-foreground sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Sk className="h-4 w-40 rounded-md" />
-          <div className="flex gap-1 rounded-lg border border-border bg-background/80 p-1 dark:bg-white/5">
-            <Sk className="h-7 w-16 rounded-md" />
-            <Sk className="h-7 w-20 rounded-md" />
+        <div className="flex w-full gap-1 rounded-full border border-white/50 bg-white/25 p-1 dark:border-white/15 dark:bg-white/[0.07]">
+            <Sk className="h-9 flex-1 rounded-full" />
+            <Sk className="h-9 flex-1 rounded-full" />
           </div>
-        </div>
         <div className="mt-5 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
           <div className="flex flex-wrap items-center justify-center gap-5 sm:gap-6 lg:min-w-0 lg:flex-1 lg:justify-start">
             <Sk className="h-[140px] w-[140px] shrink-0 rounded-full sm:h-[152px] sm:w-[152px]" />

@@ -6,6 +6,7 @@ const PORTFOLIO_DRAFT_PREFIX = "stocks-pm-portfolio-draft:";
 
 type PortfolioDraft = {
   cashBalance: number;
+  fixedIncomeByAccount: ReturnType<typeof usePortfolioStore.getState>["fixedIncomeByAccount"];
   stocks: ReturnType<typeof usePortfolioStore.getState>["stocks"];
   lotsBySymbol: ReturnType<typeof usePortfolioStore.getState>["lotsBySymbol"];
   onboardingComplete: boolean;
@@ -18,6 +19,7 @@ function getPortfolioDraftKey(dataUserId: string): string {
 function hasMeaningfulPortfolioDraft(draft: PortfolioDraft): boolean {
   return (
     draft.cashBalance > 0 ||
+    Object.values(draft.fixedIncomeByAccount).some((value) => Number(value) > 0.005) ||
     draft.stocks.length > 0 ||
     draft.onboardingComplete ||
     Object.keys(draft.lotsBySymbol).length > 0
@@ -58,6 +60,7 @@ export function saveCurrentPortfolioDraftForUser(dataUserId?: string): void {
   const state = usePortfolioStore.getState();
   const draft: PortfolioDraft = {
     cashBalance: state.cashBalance,
+    fixedIncomeByAccount: state.fixedIncomeByAccount,
     stocks: state.stocks,
     lotsBySymbol: state.lotsBySymbol,
     onboardingComplete: state.onboardingComplete,
@@ -84,6 +87,10 @@ export function readPortfolioDraftForUser(dataUserId: string): PortfolioDraft | 
     if (!parsed || typeof parsed !== "object") return null;
     return {
       cashBalance: Number(parsed.cashBalance) || 0,
+      fixedIncomeByAccount:
+        parsed.fixedIncomeByAccount && typeof parsed.fixedIncomeByAccount === "object"
+          ? parsed.fixedIncomeByAccount
+          : {},
       stocks: Array.isArray(parsed.stocks) ? parsed.stocks : [],
       lotsBySymbol:
         parsed.lotsBySymbol && typeof parsed.lotsBySymbol === "object" ? parsed.lotsBySymbol : {},

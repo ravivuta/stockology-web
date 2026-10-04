@@ -107,7 +107,32 @@ const SECTIONS: Section[] = [
   {
     category: "signals",
     title: "Recommendations",
-    body: "High-level actions (BUY/ADD/SELL/REDUCE/WAIT) based on trend, targets, and position size versus limits. With RSI gating enabled, BUY is never blocked by RSI, ADD can be blocked only when holdings are already above Stock Limit, and some SELL signals can wait for overbought reversal confirmation.",
+    body: "High-level actions (BUY/ADD/SELL/REDUCE/WAIT) based on trend, targets, and position size versus limits. Sell strategy (Investor vs Trader) controls whether RSI and AI options are available. With RSI gating enabled in Trader mode, BUY is never blocked by RSI, ADD can be blocked only when holdings are already above Stock Limit, and some SELL signals can wait for overbought reversal confirmation.",
+  },
+  {
+    category: "signals",
+    title: "Sell strategy (Investor vs Trader)",
+    body: "Investor mode holds until analyst target — RSI gating and AI news & market outlook are forced off so they do not conflict with that hold. Trader mode unlocks RSI and AI options and can sell earlier on overbought RSI / weak multi-signal setups before the target is reached.",
+  },
+  {
+    category: "signals",
+    title: "AI news & market outlook — the setting",
+    body: "Available in Trader mode (Premium). One Settings toggle — “Leverage AI news & market outlook in recommendations” — turns on both company-level AI scores and market-outlook cash rules together (same as iOS Profile). When the toggle is off, Investor mode is selected, or without Premium, the Home market-outlook icon is hidden and those signals do not change BUY, ADD, SELL, or REDUCE. Scores and news may still load for display. Turning the setting off also stops OpenAI refresh for your holdings and shortlist on the server.",
+  },
+  {
+    category: "signals",
+    title: "Stock-specific AI score",
+    body: "Each non-ETF stock can have a 0–100 score from recent company news (and related event context). Only scores refreshed within about 3 days are used. When the setting is on: (1) BUY/ADD — if the score is below 50 (cautious to bearish), an otherwise valid buy becomes WAIT; (2) SELL at/near analyst target — if the score is 65 or higher (bullish), SELL can wait while news still looks constructive. Missing, zero, stale, or ETF scores do not block actions. See News and stock detail for the digest behind the score.",
+  },
+  {
+    category: "signals",
+    title: "Market outlook (indexes + macro)",
+    body: "Separately from per-stock scores, Stocks PM builds a shared market outlook from macro news plus S&P 500 and Russell 2000 vs their 200-day averages, with index RSI(14) as a recovery signal (oversold trough turning up). Prefer cash / Defensive are early warnings while markets can still be elevated; Severe is reserved for crisis-level news (≤20/100). Outlook labels map to suggested cash % of portfolio (editable on iOS Profile when the AI setting is on; defaults Favorable 10%, Mixed 30%, Prefer cash 50%, Defensive 70%, Severe 90%). On iOS Home, tap the icon on Recommended Actions to read the current outlook.",
+  },
+  {
+    category: "signals",
+    title: "How market outlook changes recommendations",
+    body: "When the AI setting is on and outlook is Prefer holding cash or Defensive: new BUY/ADD is paused only while your cash is still below the suggested cash % for that outlook. Once cash is at or above the target, buys can proceed (subject to the usual gates). The app can also push raise-cash SELL or REDUCE while under the cash target — but only for holdings outside the Top N shortlist with unrealized gain, names with little leftover upside, or oversized holdings that are still in profit. It does not force sells on shortlisted core names just to hit the cash target. When outlook is Favorable to buy (including after an index RSI bottom recovery with decent macro news), cash preference eases and new buys are allowed again. Full market-outlook cash tilt currently ships on iOS; web applies the stock AI score gate from the same setting.",
   },
   {
     category: "stock-detail",

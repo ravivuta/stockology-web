@@ -36,9 +36,19 @@ function sanitizeSlice(value: unknown): PortfolioSlice | null {
     .filter((stock) => stock.symbol.length > 0);
 
   const lotsBySymbol = isRecord(value.lotsBySymbol) ? value.lotsBySymbol : {};
+  const fixedIncomeByAccount: Record<string, number> = {};
+  if (isRecord(value.fixedIncomeByAccount)) {
+    for (const [account, amount] of Object.entries(value.fixedIncomeByAccount)) {
+      const normalizedAccount = account.trim();
+      const normalizedAmount = finiteNumber(amount);
+      if (!normalizedAccount || normalizedAmount <= 0.005) continue;
+      fixedIncomeByAccount[normalizedAccount] = normalizedAmount;
+    }
+  }
 
   return {
     cashBalance: finiteNumber(value.cashBalance),
+    fixedIncomeByAccount,
     stocks: stocks as PortfolioSlice["stocks"],
     lotsBySymbol: lotsBySymbol as PortfolioSlice["lotsBySymbol"],
   };

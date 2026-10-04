@@ -37,11 +37,13 @@ export type CloudSnapshotHydrationProps = {
 
 function sliceIsEmpty(slice: {
   cashBalance: number;
+  fixedIncomeByAccount: Record<string, number>;
   stocks: unknown[];
   lotsBySymbol: Record<string, unknown>;
 }) {
   return (
     Math.abs(slice.cashBalance) < 0.005 &&
+    Object.keys(slice.fixedIncomeByAccount).length === 0 &&
     slice.stocks.length === 0 &&
     Object.keys(slice.lotsBySymbol).length === 0
   );
@@ -49,12 +51,14 @@ function sliceIsEmpty(slice: {
 
 function hasMeaningfulSlice(slice: {
   cashBalance: number;
+  fixedIncomeByAccount: Record<string, number>;
   stocks: unknown[];
   lotsBySymbol: Record<string, unknown>;
   onboardingComplete?: boolean;
 }) {
   return (
     Math.abs(slice.cashBalance) >= 0.005 ||
+    Object.values(slice.fixedIncomeByAccount).some((value) => Number(value) > 0.005) ||
     slice.stocks.length > 0 ||
     Object.keys(slice.lotsBySymbol).length > 0 ||
     slice.onboardingComplete === true
@@ -149,6 +153,7 @@ export function PortfolioCloudBridge({
 
         const cloudSlice = {
           cashBalance: parsedCloud.cashBalance,
+          fixedIncomeByAccount: parsedCloud.fixedIncomeByAccount,
           stocks: mergedStocks,
           lotsBySymbol: mergedLots,
         };
@@ -165,9 +170,13 @@ export function PortfolioCloudBridge({
 
         usePortfolioStore.getState().replaceFromCloudSync({
           cashBalance: cloudSlice.cashBalance,
+          fixedIncomeByAccount: cloudSlice.fixedIncomeByAccount,
           stocks: mergedStocks,
           lotsBySymbol: mergedLots,
-          onboardingComplete: parsedCloud.cashBalance > 0 || mergedStocks.length > 0,
+          onboardingComplete:
+            parsedCloud.cashBalance > 0 ||
+            Object.values(parsedCloud.fixedIncomeByAccount).some((value) => Number(value) > 0.005) ||
+            mergedStocks.length > 0,
         });
         sessionStorage.setItem(key, "1");
         setSyncReady(true);
@@ -194,7 +203,12 @@ export function PortfolioCloudBridge({
 
     const pushCurrentSnapshot = () => {
       const state = usePortfolioStore.getState();
-      const slice = { cashBalance: state.cashBalance, stocks: state.stocks, lotsBySymbol: state.lotsBySymbol };
+      const slice = {
+        cashBalance: state.cashBalance,
+        fixedIncomeByAccount: state.fixedIncomeByAccount,
+        stocks: state.stocks,
+        lotsBySymbol: state.lotsBySymbol,
+      };
       void pushPortfolioSnapshotSlice(dataUserId, slice);
     };
 
@@ -219,8 +233,18 @@ export function PortfolioCloudBridge({
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     const unsub = usePortfolioStore.subscribe((state, prev) => {
-      const prevSlice = { cashBalance: prev.cashBalance, stocks: prev.stocks, lotsBySymbol: prev.lotsBySymbol };
-      const nextSlice = { cashBalance: state.cashBalance, stocks: state.stocks, lotsBySymbol: state.lotsBySymbol };
+      const prevSlice = {
+        cashBalance: prev.cashBalance,
+        fixedIncomeByAccount: prev.fixedIncomeByAccount,
+        stocks: prev.stocks,
+        lotsBySymbol: prev.lotsBySymbol,
+      };
+      const nextSlice = {
+        cashBalance: state.cashBalance,
+        fixedIncomeByAccount: state.fixedIncomeByAccount,
+        stocks: state.stocks,
+        lotsBySymbol: state.lotsBySymbol,
+      };
       const a = portfolioSyncFingerprint(prevSlice);
       const b = portfolioSyncFingerprint(nextSlice);
       if (a === b) return;

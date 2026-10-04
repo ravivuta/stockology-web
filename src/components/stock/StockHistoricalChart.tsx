@@ -34,6 +34,7 @@ type Props = {
   hideRangeSelector?: boolean;
   allowedRanges?: ChartRange[];
   leadingSlot?: ReactNode;
+  lineColor?: string;
 };
 
 function chartRangeLabel(range: ChartRange): string {
@@ -70,6 +71,7 @@ export function StockHistoricalChart({
   hideRangeSelector = false,
   allowedRanges,
   leadingSlot,
+  lineColor = "var(--chart-portfolio-line)",
 }: Props) {
   const chart = useDashboardChartTheme();
   const rangeOptions = useMemo(() => {
@@ -333,10 +335,10 @@ export function StockHistoricalChart({
               <Line
                 type="monotone"
                 dataKey="price"
-                stroke="var(--chart-portfolio-line)"
+                stroke={lineColor}
                 strokeWidth={2}
                 dot={false}
-                activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--chart-portfolio-line)" }}
+                activeDot={{ r: 4, strokeWidth: 2, stroke: lineColor }}
                 isAnimationActive={chart.ready}
               />
             </LineChart>
@@ -346,7 +348,7 @@ export function StockHistoricalChart({
 
       <div className={`flex flex-wrap gap-x-4 gap-y-1 text-foreground/75 ${compact ? "text-[10px] gap-x-3" : "text-xs gap-x-5 gap-y-2"}`}>
         <span className="flex items-center gap-2">
-          <span className="h-1 w-5 shrink-0 rounded-full" style={{ background: "var(--chart-portfolio-line)" }} />{" "}
+          <span className="h-1 w-5 shrink-0 rounded-full" style={{ background: lineColor }} />{" "}
           Close price
         </span>
         {smaValue != null && smaValue > 0 && (
