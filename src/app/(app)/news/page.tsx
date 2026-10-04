@@ -230,13 +230,12 @@ export default function NewsPage() {
           <StockHistoricalChart
             symbol="SPY"
             smaPeriod={200}
-            smaOptions={[50, 200]}
-            smaStorageKey="stocks-pm:news:spy-sma-period"
             points={spyPointsWithToday}
             loading={spyLoading}
             error={spyError}
             initialRange="5y"
             allowedRanges={["1w", "1mo", "3mo", "1y", "5y"]}
+            lineColor="var(--dashboard-chart-loss)"
             leadingSlot={
               <div className="min-w-0 pr-2">
                 <div className="flex flex-wrap items-end gap-x-3 gap-y-2">

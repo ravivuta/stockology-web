@@ -312,6 +312,7 @@ export async function flushCurrentPortfolioSnapshotNow(
   const state = usePortfolioStore.getState();
   const slice: PortfolioSlice = {
     cashBalance: state.cashBalance,
+    fixedIncomeByAccount: state.fixedIncomeByAccount,
     stocks: state.stocks,
     lotsBySymbol: state.lotsBySymbol,
   };
@@ -351,6 +352,7 @@ export async function patchCurrentPortfolioSnapshotCash(
       dataUserId,
       portfolioSyncFingerprint({
         cashBalance: state.cashBalance,
+        fixedIncomeByAccount: state.fixedIncomeByAccount,
         stocks: state.stocks,
         lotsBySymbol: state.lotsBySymbol,
       })
@@ -377,6 +379,7 @@ export async function patchCurrentPortfolioSnapshotHoldings(
   const state = usePortfolioStore.getState();
   const slice: PortfolioSlice = {
     cashBalance: state.cashBalance,
+    fixedIncomeByAccount: state.fixedIncomeByAccount,
     stocks: state.stocks,
     lotsBySymbol: state.lotsBySymbol,
   };

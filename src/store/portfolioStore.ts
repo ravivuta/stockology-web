@@ -17,6 +17,7 @@ import {
   migrateCashLots,
   replaceCashLots,
 } from "@/lib/cash-accounts";
+import { fixedIncomeTotal, sanitizeFixedIncomeByAccount } from "@/lib/fixed-income-accounts";
 
 export type LotStatus = "open" | "partiallySold" | "fullySold" | "washSaleRestricted";
 
@@ -108,6 +109,7 @@ export type StockHolding = {
 
 type State = {
   cashBalance: number;
+  fixedIncomeByAccount: Record<string, number>;
   portfolioSize: number;
   riskAppetite: "Low" | "Medium" | "High";
   enableRiskFilter: boolean;
@@ -135,6 +137,7 @@ type State = {
   clearCachesOnReset: () => void;
   setCash: (n: number) => void;
   applyCashLotsEdit: (amountsByAccount: Record<string, number>) => { previousCash: number; nextCash: number; markedPending: boolean };
+  applyFixedIncomeLotsEdit: (amountsByAccount: Record<string, number>) => { previousFixedIncome: number; nextFixedIncome: number; markedPending: boolean };
   setSettings: (p: Partial<Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "etfProfitTarget" | "stockProfitTarget" | "useAISentimentForRecommendations" | "useRSIGatingForRecommendations" | "rsiPeriodForRecommendations" | "rsiOversoldThresholdForRecommendations" | "rsiOverboughtThresholdForRecommendations" | "rsiHysteresisPointsForRecommendations" | "rsiMinRisingDaysForRecommendations" | "sellOnlyLongTermQualified" | "timezone" | "region">>) => void;
   addStock: (s: Partial<StockHolding> & { symbol: string }) => void;
   /** Merge fields into an existing symbol and rebuild recommendation. */
@@ -190,6 +193,7 @@ type State = {
   /** Replace local portfolio from a cloud snapshot (e.g. mobile sync). Recomputes recommendations. */
   replaceFromCloudSync: (payload: {
     cashBalance: number;
+    fixedIncomeByAccount: Record<string, number>;
     stocks: StockHolding[];
     lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }>;
     onboardingComplete: boolean;
@@ -336,7 +340,9 @@ type RecalcContext = {
   lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }>;
 };
 
-type ShortlistContext = Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize">;
+type ShortlistContext = Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize"> & {
+  fixedIncomeByAccount?: Record<string, number>;
+};
 type DeriveOptions = {
   shouldRecalculateLimits?: boolean;
   forceRecalculateAllHoldingLimits?: boolean;
@@ -630,7 +636,10 @@ function derivePortfolioState(
     const synced = { ...stock, quantity, averageCost };
     return { ...synced, score: synced.isETF ? undefined : computeRiskReturnScore(synced) };
   });
-  const portfolioSize = scoredStocks.reduce((sum, stock) => sum + stock.quantity * (stock.lastPrice ?? 0), 0) + cashBalance;
+  const portfolioSize =
+    scoredStocks.reduce((sum, stock) => sum + stock.quantity * (stock.lastPrice ?? 0), 0) +
+    cashBalance +
+    fixedIncomeTotal(shortlistCtx.fixedIncomeByAccount);
   const idealWatchlistSize = recommendedWatchlistSize(portfolioSize);
 
   let stocksWithLimits = scoredStocks;
@@ -767,6 +776,7 @@ export const usePortfolioStore = create<State>()(
   persist(
     (set, get) => ({
       cashBalance: 0,
+      fixedIncomeByAccount: {},
       portfolioSize: 0,
       riskAppetite: "Medium",
       enableRiskFilter: true,
@@ -813,8 +823,15 @@ export const usePortfolioStore = create<State>()(
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
             lotsBySymbol: lots,
           };
-          const currentPortfolioSize = st.stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) + st.cashBalance;
-          const newPortfolioSize = st.stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) + nextCash;
+          const fixedIncome = fixedIncomeTotal(st.fixedIncomeByAccount);
+          const currentPortfolioSize =
+            st.stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) +
+            st.cashBalance +
+            fixedIncome;
+          const newPortfolioSize =
+            st.stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) +
+            nextCash +
+            fixedIncome;
           const drift = currentPortfolioSize > 0 ? Math.abs(newPortfolioSize - currentPortfolioSize) / currentPortfolioSize : 0;
           const markPending = drift > 0.10;
           const derived = derivePortfolioState(st.stocks, nextCash, recalcCtx, st, {
@@ -853,8 +870,15 @@ export const usePortfolioStore = create<State>()(
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
             lotsBySymbol: lots,
           };
-          const currentPortfolioSize = st.stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) + st.cashBalance;
-          const newPortfolioSize = st.stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) + nextCash;
+          const fixedIncome = fixedIncomeTotal(st.fixedIncomeByAccount);
+          const currentPortfolioSize =
+            st.stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) +
+            st.cashBalance +
+            fixedIncome;
+          const newPortfolioSize =
+            st.stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) +
+            nextCash +
+            fixedIncome;
           const drift = currentPortfolioSize > 0 ? Math.abs(newPortfolioSize - currentPortfolioSize) / currentPortfolioSize : 0;
           markedPending = drift > 0.10;
           const derived = derivePortfolioState(st.stocks, nextCash, recalcCtx, st, {
@@ -872,6 +896,51 @@ export const usePortfolioStore = create<State>()(
           };
         });
         return { previousCash, nextCash, markedPending };
+      },
+      applyFixedIncomeLotsEdit: (amountsByAccount) => {
+        let previousFixedIncome = 0;
+        let nextFixedIncome = 0;
+        let markedPending = false;
+        set((st) => {
+          const mutationAt = new Date().toISOString();
+          previousFixedIncome = fixedIncomeTotal(st.fixedIncomeByAccount);
+          const normalizedFixedIncome = sanitizeFixedIncomeByAccount(amountsByAccount);
+          nextFixedIncome = fixedIncomeTotal(normalizedFixedIncome);
+          const recalcCtx: RecalcContext = {
+            etfProfitTarget: st.etfProfitTarget,
+            stockProfitTarget: st.stockProfitTarget,
+            useAISentimentForRecommendations: st.useAISentimentForRecommendations,
+            useRSIGatingForRecommendations: st.useRSIGatingForRecommendations,
+            rsiPeriodForRecommendations: st.rsiPeriodForRecommendations,
+            rsiOversoldThresholdForRecommendations: st.rsiOversoldThresholdForRecommendations,
+            rsiOverboughtThresholdForRecommendations: st.rsiOverboughtThresholdForRecommendations,
+            rsiHysteresisPointsForRecommendations: st.rsiHysteresisPointsForRecommendations,
+            rsiMinRisingDaysForRecommendations: st.rsiMinRisingDaysForRecommendations,
+            sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
+            lotsBySymbol: st.lotsBySymbol,
+          };
+          const equityPlusCash =
+            st.stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) +
+            st.cashBalance;
+          const currentPortfolioSize = equityPlusCash + previousFixedIncome;
+          const newPortfolioSize = equityPlusCash + nextFixedIncome;
+          const drift = currentPortfolioSize > 0 ? Math.abs(newPortfolioSize - currentPortfolioSize) / currentPortfolioSize : 0;
+          markedPending = drift > 0.10;
+          const derived = derivePortfolioState(st.stocks, st.cashBalance, recalcCtx, {
+            ...st,
+            fixedIncomeByAccount: normalizedFixedIncome,
+          }, {
+            shouldRecalculateLimits: true,
+            forceRecalculateAllHoldingLimits: drift > 0.10,
+          });
+          return {
+            fixedIncomeByAccount: normalizedFixedIncome,
+            stocks: markedPending ? derived.stocks.map((stock) => ({ ...stock, pendingOptimization: true })) : derived.stocks,
+            portfolioSize: derived.portfolioSize,
+            lastLocalMutationAt: mutationAt,
+          };
+        });
+        return { previousFixedIncome, nextFixedIncome, markedPending };
       },
       setSettings: (p) =>
         set((st) => {
@@ -1509,6 +1578,7 @@ export const usePortfolioStore = create<State>()(
           return {
             stocks: derived.stocks,
             lotsBySymbol,
+            fixedIncomeByAccount: {},
             tradeJournal: [],
             portfolioSize: derived.portfolioSize,
             lastLocalMutationAt: mutationAt,
@@ -1537,6 +1607,7 @@ export const usePortfolioStore = create<State>()(
         );
         set({
           cashBalance: 0,
+          fixedIncomeByAccount: {},
           portfolioSize: 0,
           stocks: watchlistStocks,
           lotsBySymbol: remainingLots,
@@ -2142,6 +2213,7 @@ export const usePortfolioStore = create<State>()(
       },
       replaceFromCloudSync: (payload) =>
         set((st) => {
+          const normalizedFixedIncome = sanitizeFixedIncomeByAccount(payload.fixedIncomeByAccount);
           const ctx: RecalcContext = {
             etfProfitTarget: st.etfProfitTarget,
             stockProfitTarget: st.stockProfitTarget,
@@ -2155,12 +2227,16 @@ export const usePortfolioStore = create<State>()(
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
             lotsBySymbol: payload.lotsBySymbol,
           };
-          const derived = derivePortfolioState(payload.stocks, payload.cashBalance, ctx, st, {
+          const derived = derivePortfolioState(payload.stocks, payload.cashBalance, ctx, {
+            ...st,
+            fixedIncomeByAccount: normalizedFixedIncome,
+          }, {
             shouldRecalculateLimits: false,
           });
           const inferredJournal = buildTradeJournalFromLots(payload.lotsBySymbol);
           return {
             cashBalance: payload.cashBalance,
+            fixedIncomeByAccount: normalizedFixedIncome,
             stocks: derived.stocks,
             lotsBySymbol: payload.lotsBySymbol,
             tradeJournal: inferredJournal,

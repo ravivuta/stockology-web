@@ -10,6 +10,7 @@ import { StockDetailExpandPanel } from "@/components/stock/StockDetailExpandPane
 import { RecommendedActionsWidget } from "@/components/dashboard/RecommendedActionsWidget";
 import { DashboardReturnComparison } from "@/components/dashboard/DashboardReturnComparison";
 import { CashAccountsEditor } from "@/components/dashboard/CashAccountsEditor";
+import { FixedIncomeAccountsEditor } from "@/components/dashboard/FixedIncomeAccountsEditor";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
 import {
@@ -21,11 +22,13 @@ import {
 import { isUsMarketTradingDay } from "@/lib/market-hours";
 import { formatAbsPercent, formatCompactCurrency, formatCompactNumber, formatCurrency, formatPercent } from "@/lib/numberFormat";
 import { cashByAccount, displayAccount, isCashSymbol } from "@/lib/cash-accounts";
+import { fixedIncomeTotal } from "@/lib/fixed-income-accounts";
 
 const CURRENT_VALUE_COLOR = "#14b8a6";
 
 const PALETTE = {
   cash: "var(--dashboard-chart-cash)",
+  fixedIncome: "#0f9aa7",
   costBasis: "var(--dashboard-chart-cost-basis)",
   gain: "var(--dashboard-chart-gain)",
   holdingsValue: CURRENT_VALUE_COLOR,
@@ -46,9 +49,11 @@ export default function DashboardPage() {
   const reduceMotion = useReducedMotion();
   const stocks = usePortfolioStore((s) => s.stocks);
   const cash = usePortfolioStore((s) => s.cashBalance);
+  const fixedIncomeByAccount = usePortfolioStore((s) => s.fixedIncomeByAccount);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
   const [bars, setBars] = useState(false);
   const [showCashEditor, setShowCashEditor] = useState(false);
+  const [showFixedIncomeEditor, setShowFixedIncomeEditor] = useState(false);
   const [allocationExpanded, setAllocationExpanded] = useState(false);
   const [dashStockDetail, setDashStockDetail] = useState<string | null>(null);
   const [summaryTab, setSummaryTab] = useState<"summary" | "performance">("summary");
@@ -65,8 +70,9 @@ export default function DashboardPage() {
   const held = useMemo(() => stocks.filter((s) => s.quantity > 0 && !isCashSymbol(s.symbol)), [stocks]);
   const holdingsValue = useMemo(() => held.reduce((a, s) => a + s.quantity * (s.lastPrice ?? 0), 0), [held]);
   const holdingsCostBasis = useMemo(() => held.reduce((a, s) => a + s.quantity * s.averageCost, 0), [held]);
+  const fixedIncomeValue = useMemo(() => fixedIncomeTotal(fixedIncomeByAccount), [fixedIncomeByAccount]);
   const holdingsPnL = holdingsValue - holdingsCostBasis;
-  const totalBalance = holdingsValue + cash;
+  const totalBalance = holdingsValue + cash + fixedIncomeValue;
   const isProfitable = holdingsPnL >= 0;
   const totalPnLPct = holdingsCostBasis > 0 ? (holdingsPnL / holdingsCostBasis) * 100 : 0;
   const todaySnapshotChange = useMemo(
@@ -74,8 +80,8 @@ export default function DashboardPage() {
     [cloudHistory, totalBalance]
   );
   const todayQuoteChange = useMemo(
-    () => computeTodayChangeFromLiveQuotes(stocks.filter((s) => !isCashSymbol(s.symbol)), cash),
-    [stocks, cash]
+    () => computeTodayChangeFromLiveQuotes(stocks.filter((s) => !isCashSymbol(s.symbol)), cash + fixedIncomeValue),
+    [stocks, cash, fixedIncomeValue]
   );
   // Prefer live-quote delta only when it's non-trivial (avoids using defaulted dailyChangePercent:0
   // blocking the snapshot fallback — stocks default to 0% until a real price refresh arrives).
@@ -95,28 +101,31 @@ export default function DashboardPage() {
       const tb = Math.max(totalBalance, 0.0001);
       return [
         { name: "Cash", value: cash / tb, color: PALETTE.cash },
+        { name: "Fixed Income", value: fixedIncomeValue / tb, color: PALETTE.fixedIncome },
         { name: "Cost", value: holdingsCostBasis / tb, color: PALETTE.costBasis },
         { name: "Gain", value: Math.max(holdingsPnL, 0) / tb, color: PALETTE.gain },
       ];
     }
-    const ref = Math.max(cash + holdingsCostBasis, 0.0001);
+    const ref = Math.max(cash + fixedIncomeValue + holdingsCostBasis, 0.0001);
     return [
       { name: "Cash", value: cash / ref, color: PALETTE.cash },
+      { name: "Fixed Income", value: fixedIncomeValue / ref, color: PALETTE.fixedIncome },
       { name: "Holdings", value: holdingsValue / ref, color: PALETTE.holdingsValue },
       { name: "Loss", value: Math.abs(holdingsPnL) / ref, color: PALETTE.loss },
     ];
-  }, [cash, holdingsValue, holdingsCostBasis, holdingsPnL, isProfitable, totalBalance]);
+  }, [cash, fixedIncomeValue, holdingsValue, holdingsCostBasis, holdingsPnL, isProfitable, totalBalance]);
 
   const accountBreakdown = useMemo(() => {
     const bySymbol = new Map(stocks.map((stock) => [stock.symbol, stock]));
-    const accountMap = new Map<string, { account: string; value: number; costBasis: number; cash: number }>();
+    const accountMap = new Map<string, { account: string; value: number; costBasis: number; cash: number; fixedIncome: number }>();
 
-    const addToAccount = (account: string, value = 0, costBasis = 0, cash = 0) => {
-      if (value <= 0 && costBasis <= 0 && cash <= 0) return;
-      const existing = accountMap.get(account) ?? { account, value: 0, costBasis: 0, cash: 0 };
+    const addToAccount = (account: string, value = 0, costBasis = 0, cash = 0, fixedIncome = 0) => {
+      if (value <= 0 && costBasis <= 0 && cash <= 0 && fixedIncome <= 0) return;
+      const existing = accountMap.get(account) ?? { account, value: 0, costBasis: 0, cash: 0, fixedIncome: 0 };
       existing.value += value;
       existing.costBasis += costBasis;
       existing.cash += cash;
+      existing.fixedIncome += fixedIncome;
       accountMap.set(account, existing);
     };
 
@@ -152,12 +161,19 @@ export default function DashboardPage() {
       addToAccount(account, 0, 0, amount);
     }
 
+    for (const [account, amount] of Object.entries(fixedIncomeByAccount)) {
+      const normalized = Number(amount);
+      if (!Number.isFinite(normalized) || normalized <= 0.005) continue;
+      addToAccount(displayAccount(account), 0, 0, 0, normalized);
+    }
+
     const allRows = Array.from(accountMap.values())
-      .filter((item) => item.value > 0 || item.costBasis > 0 || item.cash > 0)
-      .sort((a, b) => b.value + b.cash - (a.value + a.cash));
+      .filter((item) => item.value > 0 || item.costBasis > 0 || item.cash > 0 || item.fixedIncome > 0)
+      .sort((a, b) => b.value + b.cash + b.fixedIncome - (a.value + a.cash + a.fixedIncome));
 
     const total = allRows.reduce((sum, row) => sum + row.value, 0);
     const cashTotal = allRows.reduce((sum, row) => sum + row.cash, 0);
+    const fixedIncomeTotal = allRows.reduce((sum, row) => sum + row.fixedIncome, 0);
     if (allRows.length < 2) {
       return null;
     }
@@ -167,9 +183,10 @@ export default function DashboardPage() {
     const otherValue = remaining.reduce((sum, row) => sum + row.value, 0);
     const otherCost = remaining.reduce((sum, row) => sum + row.costBasis, 0);
     const otherCash = remaining.reduce((sum, row) => sum + row.cash, 0);
+    const otherFixedIncome = remaining.reduce((sum, row) => sum + row.fixedIncome, 0);
 
     const rows = remaining.length > 0
-      ? [...topRows, { account: "Other", value: otherValue, costBasis: otherCost, cash: otherCash }]
+      ? [...topRows, { account: "Other", value: otherValue, costBasis: otherCost, cash: otherCash, fixedIncome: otherFixedIncome }]
       : topRows;
 
     const segments = rows.map((row, index) => {
@@ -180,8 +197,8 @@ export default function DashboardPage() {
       };
     });
 
-    return { rows, segments, total, cashTotal };
-  }, [lotsBySymbol, stocks]);
+    return { rows, segments, total, cashTotal, fixedIncomeTotal };
+  }, [fixedIncomeByAccount, lotsBySymbol, stocks]);
 
   const gainers = useMemo(
     () =>
@@ -345,6 +362,8 @@ export default function DashboardPage() {
                 const segmentValue =
                   p.name === "Cash"
                     ? cash
+                    : p.name === "Fixed Income"
+                      ? fixedIncomeValue
                     : p.name === "Cost" || p.name === "Cost basis"
                       ? holdingsCostBasis
                       : p.name === "Gain"
@@ -389,6 +408,21 @@ export default function DashboardPage() {
               secondaryLabelClassName="text-[color:#14b8a6]"
               secondaryValueClassName="text-[color:#14b8a6]"
               secondarySeparator
+            />
+            <StatRow
+              label="Fixed income"
+              value={formatCurrency(fixedIncomeValue)}
+              labelClassName="text-[color:#0f9aa7]"
+              valueClassName="text-[color:#0f9aa7]"
+              labelAction={(
+                <button
+                  type="button"
+                  onClick={() => setShowFixedIncomeEditor(true)}
+                  className="ml-[2ch] rounded border border-current px-2 py-0.5 text-[11px] font-semibold leading-none text-[color:#0f9aa7] hover:bg-foreground/5"
+                >
+                  Edit
+                </button>
+              )}
             />
             {isProfitable ? (
               <>
@@ -478,17 +512,17 @@ export default function DashboardPage() {
           {allocationExpanded ? (
             <>
           <p className="mt-1 text-[11px] leading-relaxed text-subtle">
-            Current holdings grouped by lot account, including cash in each account.
+            Current holdings grouped by lot account, including cash and fixed income in each account.
           </p>
           <div className="mt-4 grid gap-3.5 md:grid-cols-2" aria-label="Account allocation breakdown">
             {accountBreakdown.rows.map((row, index) => {
-              const rowTotal = row.value + row.cash;
-              const pct = (rowTotal / Math.max(accountBreakdown.total + accountBreakdown.cashTotal, 0.0001)) * 100;
+              const rowTotal = row.value + row.cash + row.fixedIncome;
+              const pct = (rowTotal / Math.max(accountBreakdown.total + accountBreakdown.cashTotal + accountBreakdown.fixedIncomeTotal, 0.0001)) * 100;
               const pnl = row.value - row.costBasis;
               const pnlPct = row.costBasis > 0 ? (pnl / row.costBasis) * 100 : 0;
               const pnlClass = pnl >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]";
               const maxReference = Math.max(
-                ...accountBreakdown.rows.map((item) => Math.max(item.value, item.costBasis) + Math.max(0, item.cash)),
+                ...accountBreakdown.rows.map((item) => Math.max(item.value, item.costBasis) + Math.max(0, item.cash) + Math.max(0, item.fixedIncome)),
                 0.0001
               );
               const valueWidthPct = Math.max(0, (row.value / maxReference) * 100);
@@ -496,9 +530,11 @@ export default function DashboardPage() {
               const profitWidthPct = pnl > 0 ? (pnl / maxReference) * 100 : 0;
               const lossWidthPct = pnl < 0 ? (Math.abs(pnl) / maxReference) * 100 : 0;
               const cashWidthPct = Math.max(0, (row.cash / maxReference) * 100);
+              const fixedIncomeWidthPct = Math.max(0, (row.fixedIncome / maxReference) * 100);
               const holdingsSpanPct = Math.max(valueWidthPct, costWidthPct + profitWidthPct, valueWidthPct + lossWidthPct);
               const cashOriginPct = holdingsSpanPct;
-              const usedPct = Math.min(100, Math.max(0, holdingsSpanPct + cashWidthPct));
+              const fixedIncomeOriginPct = cashOriginPct + cashWidthPct;
+              const usedPct = Math.min(100, Math.max(0, holdingsSpanPct + cashWidthPct + fixedIncomeWidthPct));
               const innerScale = usedPct > 0.0001 ? 100 / usedPct : 1;
 
               return (
@@ -559,10 +595,21 @@ export default function DashboardPage() {
                         }}
                       />
                     ) : null}
+                    {fixedIncomeWidthPct > 0 ? (
+                      <div
+                        className="absolute inset-y-0 rounded-none"
+                        style={{
+                          left: `${Math.min(100, fixedIncomeOriginPct * innerScale)}%`,
+                          width: `${Math.min(100 - fixedIncomeOriginPct * innerScale, fixedIncomeWidthPct * innerScale)}%`,
+                          backgroundColor: "#0f9aa7",
+                        }}
+                      />
+                    ) : null}
                     {[
                       profitWidthPct > 0 ? costWidthPct * innerScale : null,
                       lossWidthPct > 0 ? valueWidthPct * innerScale : null,
                       cashWidthPct > 0 ? cashOriginPct * innerScale : null,
+                      fixedIncomeWidthPct > 0 ? fixedIncomeOriginPct * innerScale : null,
                     ]
                       .filter((mark): mark is number => mark != null && mark > 0 && mark < 100)
                       .map((mark, separatorIndex) => (
@@ -582,6 +629,8 @@ export default function DashboardPage() {
                     <span className={`${pnlClass} font-bold`}>P/L {formatCurrency(pnl)} ({`${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%`})</span>
                     {" · "}
                     <span className="font-bold text-[color:var(--dashboard-chart-cash)]">Cash {formatCurrency(row.cash)}</span>
+                    {" · "}
+                    <span className="font-bold text-[color:#0f9aa7]">Fixed {formatCurrency(row.fixedIncome)}</span>
                   </div>
 
                 </div>
@@ -650,6 +699,7 @@ export default function DashboardPage() {
         ) : null}
       </motion.section>
       <CashAccountsEditor open={showCashEditor} onClose={() => setShowCashEditor(false)} />
+      <FixedIncomeAccountsEditor open={showFixedIncomeEditor} onClose={() => setShowFixedIncomeEditor(false)} />
     </div>
   );
 }

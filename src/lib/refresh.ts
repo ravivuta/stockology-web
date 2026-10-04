@@ -149,6 +149,7 @@ export async function runRefreshPipeline(
             dataUserId,
             portfolioSyncFingerprint({
               cashBalance: parsed.cashBalance,
+              fixedIncomeByAccount: parsed.fixedIncomeByAccount,
               stocks: parsed.stocks,
               lotsBySymbol: parsed.lotsBySymbol,
             })

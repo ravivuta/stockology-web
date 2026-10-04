@@ -48,9 +48,10 @@ const BAR_COLORS_LIGHT = [
 type Props = {
   stocks: StockHolding[];
   cash: number;
+  fixedIncome?: number;
 };
 
-export function PortfolioAllocationChart({ stocks, cash }: Props) {
+export function PortfolioAllocationChart({ stocks, cash, fixedIncome = 0 }: Props) {
   const reduceMotion = useReducedMotion();
   const chart = useDashboardChartTheme();
 
@@ -61,6 +62,7 @@ export function PortfolioAllocationChart({ stocks, cash }: Props) {
       value: s.quantity * (s.lastPrice ?? 0),
     }));
     if (cash > 0) rows.push({ name: "Cash", value: cash });
+    if (fixedIncome > 0) rows.push({ name: "Fixed Income", value: fixedIncome });
     rows.sort((a, b) => b.value - a.value);
     if (rows.length <= MAX_SLICES) return rows;
     const head = rows.slice(0, MAX_SLICES - 1);
@@ -68,7 +70,7 @@ export function PortfolioAllocationChart({ stocks, cash }: Props) {
     const other = rest.reduce((a, r) => a + r.value, 0);
     if (other > 0) head.push({ name: `Other (${rest.length})`, value: other });
     return head;
-  }, [stocks, cash]);
+  }, [stocks, cash, fixedIncome]);
 
   const total = useMemo(() => data.reduce((a, r) => a + r.value, 0), [data]);
   const chartAnimate = !reduceMotion && chart.ready;
