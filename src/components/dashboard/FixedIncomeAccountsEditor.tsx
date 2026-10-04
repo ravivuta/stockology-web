@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { cashByAccount, knownCashAccounts, CASH_SYMBOL } from "@/lib/cash-accounts";
-import { patchCurrentPortfolioSnapshotHoldings } from "@/lib/portfolio-snapshot-client";
+import { patchCurrentPortfolioSnapshotCash, patchCurrentPortfolioSnapshotHoldings } from "@/lib/portfolio-snapshot-client";
 import { formatCurrency } from "@/lib/numberFormat";
 import { appCtaButton } from "@/lib/appCtaClasses";
 
@@ -57,9 +57,12 @@ export function FixedIncomeAccountsEditor({
     for (const account of accounts) {
       amounts[account] = parseAmount(values[account] ?? "0");
     }
-    applyFixedIncomeLotsEdit(amounts);
+    const result = applyFixedIncomeLotsEdit(amounts);
     recalc();
     await patchCurrentPortfolioSnapshotHoldings();
+    if (Math.abs(result.nextCash - result.previousCash) >= 0.005) {
+      await patchCurrentPortfolioSnapshotCash(result.markedPending);
+    }
     setDrafts(null);
     onClose();
   }

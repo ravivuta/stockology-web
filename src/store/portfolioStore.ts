@@ -137,7 +137,13 @@ type State = {
   clearCachesOnReset: () => void;
   setCash: (n: number) => void;
   applyCashLotsEdit: (amountsByAccount: Record<string, number>) => { previousCash: number; nextCash: number; markedPending: boolean };
-  applyFixedIncomeLotsEdit: (amountsByAccount: Record<string, number>) => { previousFixedIncome: number; nextFixedIncome: number; markedPending: boolean };
+  applyFixedIncomeLotsEdit: (amountsByAccount: Record<string, number>) => {
+    previousFixedIncome: number;
+    nextFixedIncome: number;
+    previousCash: number;
+    nextCash: number;
+    markedPending: boolean;
+  };
   setSettings: (p: Partial<Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "etfProfitTarget" | "stockProfitTarget" | "useAISentimentForRecommendations" | "useRSIGatingForRecommendations" | "rsiPeriodForRecommendations" | "rsiOversoldThresholdForRecommendations" | "rsiOverboughtThresholdForRecommendations" | "rsiHysteresisPointsForRecommendations" | "rsiMinRisingDaysForRecommendations" | "sellOnlyLongTermQualified" | "timezone" | "region">>) => void;
   addStock: (s: Partial<StockHolding> & { symbol: string }) => void;
   /** Merge fields into an existing symbol and rebuild recommendation. */
@@ -900,12 +906,30 @@ export const usePortfolioStore = create<State>()(
       applyFixedIncomeLotsEdit: (amountsByAccount) => {
         let previousFixedIncome = 0;
         let nextFixedIncome = 0;
+        let previousCash = 0;
+        let nextCash = 0;
         let markedPending = false;
         set((st) => {
           const mutationAt = new Date().toISOString();
           previousFixedIncome = fixedIncomeTotal(st.fixedIncomeByAccount);
+          previousCash = st.cashBalance;
           const normalizedFixedIncome = sanitizeFixedIncomeByAccount(amountsByAccount);
           nextFixedIncome = fixedIncomeTotal(normalizedFixedIncome);
+          // Match iOS Home behavior: fixed-income edits are treated as internal reallocation
+          // between cash and fixed income, so total portfolio value remains stable.
+          let nextLots = migrateCashLots(st.lotsBySymbol, st.cashBalance);
+          const allAccounts = new Set<string>([
+            ...Object.keys(st.fixedIncomeByAccount),
+            ...Object.keys(normalizedFixedIncome),
+          ]);
+          for (const account of allAccounts) {
+            const oldAmount = st.fixedIncomeByAccount[account] ?? 0;
+            const newAmount = normalizedFixedIncome[account] ?? 0;
+            const fixedDelta = newAmount - oldAmount;
+            if (Math.abs(fixedDelta) < 0.005) continue;
+            nextLots = applyCashDelta(nextLots, account, -fixedDelta);
+          }
+          nextCash = cashLotQuantity(nextLots[CASH_SYMBOL]);
           const recalcCtx: RecalcContext = {
             etfProfitTarget: st.etfProfitTarget,
             stockProfitTarget: st.stockProfitTarget,
@@ -917,16 +941,16 @@ export const usePortfolioStore = create<State>()(
             rsiHysteresisPointsForRecommendations: st.rsiHysteresisPointsForRecommendations,
             rsiMinRisingDaysForRecommendations: st.rsiMinRisingDaysForRecommendations,
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
-            lotsBySymbol: st.lotsBySymbol,
+            lotsBySymbol: nextLots,
           };
           const equityPlusCash =
             st.stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) +
-            st.cashBalance;
+            nextCash;
           const currentPortfolioSize = equityPlusCash + previousFixedIncome;
           const newPortfolioSize = equityPlusCash + nextFixedIncome;
           const drift = currentPortfolioSize > 0 ? Math.abs(newPortfolioSize - currentPortfolioSize) / currentPortfolioSize : 0;
           markedPending = drift > 0.10;
-          const derived = derivePortfolioState(st.stocks, st.cashBalance, recalcCtx, {
+          const derived = derivePortfolioState(st.stocks, nextCash, recalcCtx, {
             ...st,
             fixedIncomeByAccount: normalizedFixedIncome,
           }, {
@@ -934,13 +958,15 @@ export const usePortfolioStore = create<State>()(
             forceRecalculateAllHoldingLimits: drift > 0.10,
           });
           return {
+            cashBalance: nextCash,
+            lotsBySymbol: nextLots,
             fixedIncomeByAccount: normalizedFixedIncome,
             stocks: markedPending ? derived.stocks.map((stock) => ({ ...stock, pendingOptimization: true })) : derived.stocks,
             portfolioSize: derived.portfolioSize,
             lastLocalMutationAt: mutationAt,
           };
         });
-        return { previousFixedIncome, nextFixedIncome, markedPending };
+        return { previousFixedIncome, nextFixedIncome, previousCash, nextCash, markedPending };
       },
       setSettings: (p) =>
         set((st) => {
