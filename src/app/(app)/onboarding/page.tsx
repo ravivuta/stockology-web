@@ -21,6 +21,15 @@ const steps = [
   { title: "Disclaimer", body: "Educational companion only—not investment advice. Nothing here moves money or links a broker." },
 ];
 
+const STARTER_SYMBOL_OVERRIDES: Record<string, string> = {
+  SMNEY: "SMERY",
+};
+
+function normalizeStarterSymbol(symbol: string): string {
+  const raw = symbol.trim().toUpperCase();
+  return STARTER_SYMBOL_OVERRIDES[raw] ?? raw;
+}
+
 export default function OnboardingPage() {
   const [i, setI] = useState(0);
   const [cash, setCash] = useState("10000");
@@ -40,7 +49,7 @@ export default function OnboardingPage() {
       if (!Array.isArray(data)) return [];
 
       const symbols = data
-        .map((row) => (typeof row?.symbol === "string" ? row.symbol.trim().toUpperCase() : ""))
+        .map((row) => (typeof row?.symbol === "string" ? normalizeStarterSymbol(row.symbol) : ""))
         .filter(Boolean);
 
       return symbols.length > 0 ? [...new Set(symbols)] : [];
