@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import { ACTIVE_DATA_USER_KEY } from "@/lib/clear-portfolio-client-state";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
+import { snapshotSaveBlockReason, type PortfolioSlice } from "@/lib/portfolio-cloud-sync";
+import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
 import { pushPortfolioSnapshotSlice } from "@/lib/portfolio-snapshot-client";
 import { fetchTickerHydrationFromTables, type TickerHydrationPriceRow } from "@/lib/ticker-direct-hydration";
 import { getSupabaseEnv } from "@/lib/supabase/config";
@@ -464,23 +467,42 @@ export function CsvImportExportBar({
     }
   }
 
-  async function saveImportSnapshot(): Promise<string | null> {
+  async function saveImportSnapshot(
+    options?: { allowEmptyHoldings?: boolean },
+    sliceOverride?: PortfolioSlice
+  ): Promise<string | null> {
     if (!hasSupabaseConfig()) return null;
 
     const supabase = createClient();
-    const { data } = await supabase.auth.getUser();
-    const authUserId = data.user?.id;
-    if (!authUserId) return null;
-    const dataUserId = await resolveStocksPmDataUserId(supabase, authUserId);
-    const state = usePortfolioStore.getState();
-    const slice = {
+    let dataUserId = "";
+    try {
+      dataUserId = sessionStorage.getItem(ACTIVE_DATA_USER_KEY) ?? "";
+    } catch {
+      dataUserId = "";
+    }
+    if (!dataUserId) {
+      const { data } = await supabase.auth.getUser();
+      const authUserId = data.user?.id;
+      if (!authUserId) return "Not signed in, so the snapshot was not saved.";
+      dataUserId = await syncStocksPmAuthUser(supabase, authUserId);
+    }
+    const state = sliceOverride ?? usePortfolioStore.getState();
+    const slice: PortfolioSlice = {
       cashBalance: state.cashBalance,
       fixedIncomeByAccount: state.fixedIncomeByAccount,
       stocks: state.stocks,
       lotsBySymbol: state.lotsBySymbol,
     };
-    const saved = await pushPortfolioSnapshotSlice(dataUserId, slice, { force: true, supabase });
+    const saved = await pushPortfolioSnapshotSlice(dataUserId, slice, {
+      force: true,
+      allowEmptyHoldings: options?.allowEmptyHoldings,
+      supabase,
+    });
     if (saved.error) return `Cloud snapshot save failed: ${saved.error.message}`;
+    if (saved.skipped) {
+      const reason = snapshotSaveBlockReason(slice, options);
+      return reason ? `Cloud snapshot was not saved (${reason}).` : "Cloud snapshot was not saved.";
+    }
     return null;
   }
 
@@ -678,11 +700,22 @@ export function CsvImportExportBar({
 
   async function onDeleteHoldings() {
     clearAllHoldingsKeepingWatchlist();
-    recalc();
-    await saveImportSnapshot();
+    recalc({ shouldRecalculateLimits: false, recordMutation: false });
+    const cleared = usePortfolioStore.getState();
+    const snapshotError = await saveImportSnapshot(
+      { allowEmptyHoldings: true },
+      {
+        cashBalance: cleared.cashBalance,
+        fixedIncomeByAccount: cleared.fixedIncomeByAccount,
+        stocks: cleared.stocks,
+        lotsBySymbol: cleared.lotsBySymbol,
+      }
+    );
     setFlash({
-      kind: "ok",
-      text: "Deleted all holdings. Symbols were kept in your watchlist, while cash, chart history, and saved snapshots were preserved.",
+      kind: snapshotError ? "err" : "ok",
+      text: snapshotError
+        ? `Deleted all holdings and credited each account, but the snapshot did not save. ${snapshotError}`
+        : "Deleted all holdings. Each account was credited for those shares at the latest price, symbols stayed on your watchlist, and a snapshot was saved.",
     });
   }
 
@@ -1095,7 +1128,7 @@ export function CsvImportExportBar({
           void onDeleteHoldings();
         }}
         title="Delete all holdings?"
-        description="This clears all holdings quantities, cost basis, lot history, and trade history while keeping your tracked symbols in the watchlist. Cash, portfolio history, and chart data are preserved."
+        description="This clears holding quantities, cost basis, and lot history, and credits each account for those shares at the latest price. Tracked symbols stay on the watchlist. Fixed income is unchanged, and a snapshot is saved."
         confirmLabel="Delete Holdings"
         cancelLabel="Cancel"
         variant="danger"

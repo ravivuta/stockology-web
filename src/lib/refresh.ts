@@ -18,9 +18,6 @@ import { usePortfolioStore } from "@/store/portfolioStore";
 
 const MAX_REFRESH_SYMBOLS = 250;
 const MAX_SYMBOL_LEN = 16;
-/** iOS ignores a cloud snapshot only when a local save is newer and less than 90s old. */
-const SNAPSHOT_STALE_SKIP_MS = 90_000;
-
 type RefreshPipelineResponse = {
   ok: boolean;
   message?: string;
@@ -165,13 +162,12 @@ export async function runRefreshPipeline(
     if (options?.includeSnapshot === true && data.snapshot && !stateBeforeSnapshot.optimizing) {
       const localMutationAt = Date.parse(stateBeforeSnapshot.lastLocalMutationAt ?? "");
       const snapshotUpdatedAt = Date.parse(data.snapshot.updated_at ?? "");
+      // A missing timestamp is not proof the cloud row is newer. Applying it
+      // put deleted holdings back and the follow-up sync saved that old book.
       const snapshotIsNewerThanLocal =
-        !Number.isFinite(localMutationAt) ||
-        !Number.isFinite(snapshotUpdatedAt) ||
-        snapshotUpdatedAt >= localMutationAt;
-      const recentLocalSave =
-        Number.isFinite(localMutationAt) && Date.now() - localMutationAt < SNAPSHOT_STALE_SKIP_MS;
-      const skipStaleSnapshot = !snapshotIsNewerThanLocal && recentLocalSave;
+        Number.isFinite(snapshotUpdatedAt) &&
+        (!Number.isFinite(localMutationAt) || snapshotUpdatedAt >= localMutationAt);
+      const skipStaleSnapshot = !snapshotIsNewerThanLocal && Number.isFinite(localMutationAt);
 
       if (!skipStaleSnapshot) {
         const parsed = parseCloudSnapshotForStore(data.snapshot);

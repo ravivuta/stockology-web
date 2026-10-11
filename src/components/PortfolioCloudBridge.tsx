@@ -27,7 +27,15 @@ export type CloudSnapshotHydrationProps = {
   holdings: unknown;
   cash_balance: unknown;
   total_portfolio_value: unknown;
+  updated_at?: string | null;
 } | null;
+
+function cloudSnapshotIsOlderThanLocal(updatedAt: string | null | undefined): boolean {
+  const localMutationAt = Date.parse(usePortfolioStore.getState().lastLocalMutationAt ?? "");
+  if (!Number.isFinite(localMutationAt)) return false;
+  const snapshotUpdatedAt = Date.parse(updatedAt ?? "");
+  return !Number.isFinite(snapshotUpdatedAt) || localMutationAt > snapshotUpdatedAt;
+}
 
 function sliceIsEmpty(slice: {
   cashBalance: number;
@@ -152,6 +160,15 @@ export function PortfolioCloudBridge({
           lotsBySymbol: mergedLots,
         };
         const cloudLooksEmpty = !hasMeaningfulSlice(cloudSlice);
+
+        if (cloudSnapshotIsOlderThanLocal(cloudSnapshot.updated_at)) {
+          // Keep the local book. Quote refresh and a full reload were replacing
+          // a just-deleted portfolio with the previous snapshot, then saving it back.
+          sessionStorage.setItem(key, "1");
+          setSyncReady(true);
+          void flushCurrentPortfolioSnapshotNow(true, { allowEmptyHoldings: true });
+          return;
+        }
 
         if (cloudLooksEmpty && preferredDraft && hasMeaningfulSlice(preferredDraft)) {
           // Safety: if cloud payload is empty but we have a meaningful local draft for
