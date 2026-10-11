@@ -2,14 +2,13 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { recommendedWatchlistSize, dividendYieldPercent } from "@/lib/ios-recommendation";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
 import { formatCurrency, formatDecimal, formatPercent } from "@/lib/numberFormat";
 import { recommendationActionDisplay } from "@/lib/recommendation";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
-import { SymbolTradeCombobox } from "@/components/portfolio/SymbolTradeCombobox";
+import { AddAssetForm } from "@/components/portfolio/AddAssetForm";
 import { StockDetailModal } from "@/components/stock/StockDetailModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
@@ -87,9 +86,7 @@ export default function WatchlistPage() {
   const portfolioSize = usePortfolioStore((s) => s.portfolioSize);
   const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
   const removeStock = usePortfolioStore((s) => s.removeStock);
-  const addStock = usePortfolioStore((s) => s.addStock);
   const [query, setQuery] = useState("");
-  const [newSymbol, setNewSymbol] = useState("");
   const [showShortlisted, setShowShortlisted] = useState(false);
   const [showActionable, setShowActionable] = useState(false);
   const [sort, setSort] = useState<SortKey>("symbol");
@@ -210,14 +207,6 @@ export default function WatchlistPage() {
   const hasActiveFilters = showShortlisted || showActionable || query.trim().length > 0;
   const watchlistCountText = hasActiveFilters ? `Showing ${rows.length} of ${totalTrackedCount}` : `Total: ${totalTrackedCount}`;
 
-  function addWatchlistSymbol() {
-    const sym = newSymbol.trim().toUpperCase().replace(/[^A-Z0-9.-]/g, "");
-    if (!sym) return;
-    addStock({ symbol: sym, quantity: 0, averageCost: 0, lastPrice: 0 });
-    void patchCurrentPortfolioSnapshotHoldings();
-    setNewSymbol("");
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap justify-end gap-3">
@@ -287,23 +276,8 @@ export default function WatchlistPage() {
                 </span>
               </span>
             </Link>
-            <div className="flex flex-wrap items-end justify-end gap-2">
-              <label className="flex min-w-[9rem] flex-col gap-1 text-[11px] text-subtle">
-                Add Stock
-                <SymbolTradeCombobox
-                  id="watchlist-add-symbol"
-                  value={newSymbol}
-                  onChange={setNewSymbol}
-                  portfolioStocks={stocks}
-                />
-              </label>
-              <button
-                type="button"
-                onClick={addWatchlistSymbol}
-                className={appCtaButton("ui-hover-pop px-3 py-2 text-sm")}
-              >
-                Add
-              </button>
+            <div className="w-full min-w-[18rem] flex-1">
+              <AddAssetForm idPrefix="watchlist-add" />
             </div>
           </div>
         </div>

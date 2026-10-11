@@ -124,6 +124,7 @@ type State = {
   rsiHysteresisPointsForRecommendations: number;
   rsiMinRisingDaysForRecommendations: number;
   sellOnlyLongTermQualified: boolean;
+  traderModeEnabled: boolean;
   timezone: string;
   region: string;
   stocks: StockHolding[];
@@ -137,14 +138,14 @@ type State = {
   clearCachesOnReset: () => void;
   setCash: (n: number) => void;
   applyCashLotsEdit: (amountsByAccount: Record<string, number>) => { previousCash: number; nextCash: number; markedPending: boolean };
-  applyFixedIncomeLotsEdit: (amountsByAccount: Record<string, number>) => {
+  applyFixedIncomeLotsEdit: (amountsByAccount: Record<string, number>, options?: { adjustCash?: boolean }) => {
     previousFixedIncome: number;
     nextFixedIncome: number;
     previousCash: number;
     nextCash: number;
     markedPending: boolean;
   };
-  setSettings: (p: Partial<Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "etfProfitTarget" | "stockProfitTarget" | "useAISentimentForRecommendations" | "useRSIGatingForRecommendations" | "rsiPeriodForRecommendations" | "rsiOversoldThresholdForRecommendations" | "rsiOverboughtThresholdForRecommendations" | "rsiHysteresisPointsForRecommendations" | "rsiMinRisingDaysForRecommendations" | "sellOnlyLongTermQualified" | "timezone" | "region">>) => void;
+  setSettings: (p: Partial<Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "etfProfitTarget" | "stockProfitTarget" | "useAISentimentForRecommendations" | "useRSIGatingForRecommendations" | "rsiPeriodForRecommendations" | "rsiOversoldThresholdForRecommendations" | "rsiOverboughtThresholdForRecommendations" | "rsiHysteresisPointsForRecommendations" | "rsiMinRisingDaysForRecommendations" | "sellOnlyLongTermQualified" | "traderModeEnabled" | "timezone" | "region">>) => void;
   addStock: (s: Partial<StockHolding> & { symbol: string }) => void;
   /** Merge fields into an existing symbol and rebuild recommendation. */
   updateStock: (symbol: string, patch: Partial<StockHolding>) => void;
@@ -797,6 +798,7 @@ export const usePortfolioStore = create<State>()(
       rsiHysteresisPointsForRecommendations: 5,
       rsiMinRisingDaysForRecommendations: 2,
       sellOnlyLongTermQualified: false,
+      traderModeEnabled: false,
       timezone: "America/New_York",
       region: "US",
       stocks: [],
@@ -903,7 +905,7 @@ export const usePortfolioStore = create<State>()(
         });
         return { previousCash, nextCash, markedPending };
       },
-      applyFixedIncomeLotsEdit: (amountsByAccount) => {
+      applyFixedIncomeLotsEdit: (amountsByAccount, options) => {
         let previousFixedIncome = 0;
         let nextFixedIncome = 0;
         let previousCash = 0;
@@ -927,7 +929,9 @@ export const usePortfolioStore = create<State>()(
             const newAmount = normalizedFixedIncome[account] ?? 0;
             const fixedDelta = newAmount - oldAmount;
             if (Math.abs(fixedDelta) < 0.005) continue;
-            nextLots = applyCashDelta(nextLots, account, -fixedDelta);
+            if (options?.adjustCash !== false) {
+              nextLots = applyCashDelta(nextLots, account, -fixedDelta);
+            }
           }
           nextCash = cashLotQuantity(nextLots[CASH_SYMBOL]);
           const recalcCtx: RecalcContext = {

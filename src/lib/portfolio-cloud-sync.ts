@@ -420,6 +420,7 @@ export type GlobalSettings = {
   rsiHysteresisPoints?: number;
   rsiMinRisingDays?: number;
   sellOnlyLongTerm?: boolean;
+  traderModeEnabled?: boolean;
   limitWatchlistSize?: boolean;
   timezone?: string;
   region?: string;
@@ -438,6 +439,7 @@ export type AppliedGlobalSettings = {
   rsiHysteresisPointsForRecommendations?: number;
   rsiMinRisingDaysForRecommendations?: number;
   sellOnlyLongTermQualified?: boolean;
+  traderModeEnabled?: boolean;
   limitWatchlistSize?: boolean;
   timezone?: string;
   region?: string;
@@ -458,6 +460,7 @@ type CurrentGlobalSettings = Required<
     | "rsiHysteresisPointsForRecommendations"
     | "rsiMinRisingDaysForRecommendations"
     | "sellOnlyLongTermQualified"
+    | "traderModeEnabled"
     | "limitWatchlistSize"
     | "timezone"
     | "region"
@@ -518,6 +521,15 @@ export function patchFromCloudGlobalSettings(
   }
   if (cloud.sellOnlyLongTerm != null && cloud.sellOnlyLongTerm !== current.sellOnlyLongTermQualified) {
     patch.sellOnlyLongTermQualified = cloud.sellOnlyLongTerm;
+  }
+  if (cloud.traderModeEnabled === false) {
+    if (current.traderModeEnabled) patch.traderModeEnabled = false;
+    if (current.useAISentimentForRecommendations) patch.useAISentimentForRecommendations = false;
+    if (current.useRSIGatingForRecommendations) patch.useRSIGatingForRecommendations = false;
+  } else if (cloud.traderModeEnabled === true) {
+    if (!current.traderModeEnabled) patch.traderModeEnabled = true;
+  } else if ((combinedAi === true || cloud.useRSIGating === true) && !current.traderModeEnabled) {
+    patch.traderModeEnabled = true;
   }
   if (cloud.limitWatchlistSize != null && cloud.limitWatchlistSize !== current.limitWatchlistSize) {
     patch.limitWatchlistSize = cloud.limitWatchlistSize;

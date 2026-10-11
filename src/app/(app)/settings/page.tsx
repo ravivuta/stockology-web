@@ -25,6 +25,7 @@ import { flushCurrentPortfolioSnapshotNow, deleteAllPortfolioSnapshots } from "@
 import { deleteAllExternalCashFlows } from "@/lib/external-cash-flows";
 import { saveGlobalSettingsForUser, loadGlobalSettingsForUser } from "@/lib/portfolio-cloud-sync";
 import { isPaidSubscriptionTier } from "@/lib/subscription-state";
+import { hasPremiumFeatureAccess } from "@/lib/subscription-limits";
 import { APP_MANAGED_TRIAL_LABEL } from "@/lib/trial-config";
 import { cn } from "@/lib/utils";
 import { withAppBasePath } from "@/lib/base-path";
@@ -104,6 +105,7 @@ function SettingsInner() {
   const rsiHysteresisPointsForRecommendations = usePortfolioStore((s) => s.rsiHysteresisPointsForRecommendations);
   const rsiMinRisingDaysForRecommendations = usePortfolioStore((s) => s.rsiMinRisingDaysForRecommendations);
   const sellOnlyLongTermQualified = usePortfolioStore((s) => s.sellOnlyLongTermQualified);
+  const traderModeEnabled = usePortfolioStore((s) => s.traderModeEnabled);
   const timezone = usePortfolioStore((s) => s.timezone);
   const region = usePortfolioStore((s) => s.region);
   const setSettings = usePortfolioStore((s) => s.setSettings);
@@ -139,6 +141,8 @@ function SettingsInner() {
   const idealWatchlistSize = recommendedWatchlistSize(portfolioSize);
   const hasPaidPlan = isPaidSubscriptionTier(row?.subscription_tier);
   const hasBillingExempt = row?.billing_exempt === true;
+  const premiumFeatures = hasPremiumFeatureAccess(row ?? null);
+  const [aiGateNotice, setAiGateNotice] = useState(false);
 
   function persistSettingsPatch(
     patch: Parameters<typeof setSettings>[0]
@@ -161,6 +165,7 @@ function SettingsInner() {
         rsiHysteresisPoints: "rsiHysteresisPointsForRecommendations" in patch ? patch.rsiHysteresisPointsForRecommendations : store.rsiHysteresisPointsForRecommendations,
         rsiMinRisingDays: "rsiMinRisingDaysForRecommendations" in patch ? patch.rsiMinRisingDaysForRecommendations : store.rsiMinRisingDaysForRecommendations,
         sellOnlyLongTerm: "sellOnlyLongTermQualified" in patch ? patch.sellOnlyLongTermQualified : store.sellOnlyLongTermQualified,
+        traderModeEnabled: "traderModeEnabled" in patch ? patch.traderModeEnabled : store.traderModeEnabled,
         limitWatchlistSize: "limitWatchlistSize" in patch ? patch.limitWatchlistSize : store.limitWatchlistSize,
         timezone: "timezone" in patch ? patch.timezone : store.timezone,
         region: "region" in patch ? patch.region : store.region,
@@ -336,6 +341,11 @@ function SettingsInner() {
           ...(cloudSettings.rsiHysteresisPoints != null ? { rsiHysteresisPointsForRecommendations: cloudSettings.rsiHysteresisPoints } : {}),
           ...(cloudSettings.rsiMinRisingDays != null ? { rsiMinRisingDaysForRecommendations: cloudSettings.rsiMinRisingDays } : {}),
           ...(cloudSettings.sellOnlyLongTerm != null ? { sellOnlyLongTermQualified: cloudSettings.sellOnlyLongTerm } : {}),
+          ...(cloudSettings.traderModeEnabled != null ? { traderModeEnabled: cloudSettings.traderModeEnabled } : {}),
+          ...((combinedAiSetting === true || cloudSettings.useRSIGating === true) ? { traderModeEnabled: true } : {}),
+          ...(cloudSettings.traderModeEnabled === false
+            ? { traderModeEnabled: false, useAISentimentForRecommendations: false, useRSIGatingForRecommendations: false }
+            : {}),
           ...(cloudSettings.limitWatchlistSize != null ? { limitWatchlistSize: cloudSettings.limitWatchlistSize } : {}),
           ...(cloudSettings.timezone ? { timezone: cloudSettings.timezone } : {}),
           ...(cloudSettings.region ? { region: cloudSettings.region } : {}),
@@ -723,100 +733,154 @@ function SettingsInner() {
               </div>
 
               <div className="md:col-span-2 grid gap-2">
-                <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
-                    checked={useAISentimentForRecommendations}
-                    onChange={(e) => persistSettingsPatch({ useAISentimentForRecommendations: e.target.checked })}
-                  />
-                  <span>
-                    <span className="block text-[12px] font-medium leading-snug text-foreground">
-                      Leverage AI news &amp; market outlook in recommendations
-                    </span>
-                    <span className="mt-px block text-[10px] leading-snug text-subtle">
-                      Premium. Turns on stock AI scores and market-outlook rules together. Stock score below 50
-                      (fresh within ~3 days) pauses BUY/ADD; score 65+ can delay a target SELL while news looks
-                      constructive. Market outlook (macro + S&amp;P 500 / Russell 2000 vs 200-day avg + index RSI
-                      recovery) can pause new buys and push raise-cash rules when defensive — full cash-tilt on iOS;
-                      this web toggle applies the stock score gate. When off, scores/news may still load but do not
-                      change recommendations. See Help for details.
-                    </span>
-                  </span>
-                </label>
-                {useRSIGatingForRecommendations ? (
-                  <div className="grid gap-2 rounded-md border border-border/80 bg-background/40 p-2.5 dark:border-white/[0.08] dark:bg-white/[0.03] sm:grid-cols-2">
-                    <label className="block">
-                      <FieldLabel>RSI period</FieldLabel>
-                      <input
-                        type="number"
-                        min={2}
-                        max={30}
-                        value={rsiPeriodForRecommendations}
-                        onChange={(e) => persistSettingsPatch({ rsiPeriodForRecommendations: Math.max(2, Math.min(30, Number(e.target.value) || 14)) })}
-                        className={inputClass}
-                      />
-                    </label>
-                    <label className="block">
-                      <FieldLabel>RSI oversold threshold</FieldLabel>
-                      <input
-                        type="number"
-                        min={10}
-                        max={50}
-                        value={rsiOversoldThresholdForRecommendations}
-                        onChange={(e) => persistSettingsPatch({ rsiOversoldThresholdForRecommendations: Math.max(10, Math.min(50, Number(e.target.value) || 30)) })}
-                        className={inputClass}
-                      />
-                    </label>
-                    <label className="block">
-                      <FieldLabel>RSI overbought threshold</FieldLabel>
-                      <input
-                        type="number"
-                        min={50}
-                        max={90}
-                        value={rsiOverboughtThresholdForRecommendations}
-                        onChange={(e) => persistSettingsPatch({ rsiOverboughtThresholdForRecommendations: Math.max(50, Math.min(90, Number(e.target.value) || 70)) })}
-                        className={inputClass}
-                      />
-                    </label>
-                    <label className="block">
-                      <FieldLabel>RSI hysteresis points</FieldLabel>
-                      <input
-                        type="number"
-                        min={0}
-                        max={20}
-                        value={rsiHysteresisPointsForRecommendations}
-                        onChange={(e) => persistSettingsPatch({ rsiHysteresisPointsForRecommendations: Math.max(0, Math.min(20, Number(e.target.value) || 5)) })}
-                        className={inputClass}
-                      />
-                    </label>
-                    <label className="block sm:col-span-2">
-                      <FieldLabel>RSI min rising days</FieldLabel>
-                      <input
-                        type="number"
-                        min={1}
-                        max={5}
-                        value={rsiMinRisingDaysForRecommendations}
-                        onChange={(e) => persistSettingsPatch({ rsiMinRisingDaysForRecommendations: Math.max(1, Math.min(5, Number(e.target.value) || 2)) })}
-                        className={inputClass}
-                      />
-                    </label>
+                <div className="rounded-md border border-border/80 bg-background/40 px-2.5 py-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[12px] font-medium text-foreground">Recommendation mode</span>
+                    <div className="inline-flex rounded-lg border border-border p-0.5" role="tablist" aria-label="Recommendation mode">
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={!traderModeEnabled}
+                        onClick={() => {
+                          setAiGateNotice(false);
+                          persistSettingsPatch({
+                            traderModeEnabled: false,
+                            useAISentimentForRecommendations: false,
+                            useRSIGatingForRecommendations: false,
+                          });
+                        }}
+                        className={`rounded-md px-3 py-1 text-xs font-semibold ${!traderModeEnabled ? "bg-primary text-primary-foreground" : "text-subtle"}`}
+                      >
+                        Long-term
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={traderModeEnabled}
+                        onClick={() => persistSettingsPatch({ traderModeEnabled: true })}
+                        className={`rounded-md px-3 py-1 text-xs font-semibold ${traderModeEnabled ? "bg-primary text-primary-foreground" : "text-subtle"}`}
+                      >
+                        Active
+                      </button>
+                    </div>
                   </div>
+                  <p className="mt-1 text-[10px] leading-snug text-subtle">
+                    {traderModeEnabled
+                      ? "Active mode: enables RSI and AI guidance. SELL can trigger when RSI is overbought with low upside (<10%), or when score/RSI/AI are all weak with low upside (<15%)."
+                      : "Long-term mode: holds until analyst target. RSI and AI guidance are turned off to avoid conflicts."}
+                  </p>
+                </div>
+
+                {traderModeEnabled ? (
+                  <>
+                    <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
+                        checked={useAISentimentForRecommendations && premiumFeatures}
+                        onChange={(e) => {
+                          if (e.target.checked && !premiumFeatures) {
+                            setAiGateNotice(true);
+                            return;
+                          }
+                          setAiGateNotice(false);
+                          persistSettingsPatch({ useAISentimentForRecommendations: e.target.checked });
+                        }}
+                      />
+                      <span>
+                        <span className="block text-[12px] font-medium leading-snug text-foreground">
+                          Use AI to guide recommendations
+                          {!premiumFeatures ? <span className="ml-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Premium</span> : null}
+                        </span>
+                        <span className="mt-px block text-[10px] leading-snug text-subtle">
+                          Turns on stock AI scores and market-outlook rules together. A weak stock score can pause BUY/ADD, and a defensive outlook can pause new buys and suggest cash-equivalent building.
+                        </span>
+                      </span>
+                    </label>
+                    {aiGateNotice && !premiumFeatures ? (
+                      <p className="text-[10px] leading-snug text-subtle">
+                        Premium — AI can slow new buys and guide cash-equivalent-building steps when the outlook is weak.{" "}
+                        <Link href={withAppBasePath("/billing/start?next=/settings")} className="font-semibold text-primary underline-offset-2 hover:underline">
+                          Subscribe
+                        </Link>
+                      </p>
+                    ) : null}
+                    <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
+                        checked={useRSIGatingForRecommendations}
+                        onChange={(e) => persistSettingsPatch({ useRSIGatingForRecommendations: e.target.checked })}
+                      />
+                      <span>
+                        <span className="block text-[12px] font-medium leading-snug text-foreground">Use RSI signals for buy/add/sell timing</span>
+                        <span className="mt-px block text-[10px] leading-snug text-subtle">
+                          BUY is never RSI-gated. RSI can pause ADD when position size is already above Stock Limit, and can delay SELL until overbought RSI starts reversing. Off means no RSI impact on recommendations.
+                        </span>
+                      </span>
+                    </label>
+                    {useRSIGatingForRecommendations ? (
+                      <div className="grid gap-2 rounded-md border border-border/80 bg-background/40 p-2.5 dark:border-white/[0.08] dark:bg-white/[0.03] sm:grid-cols-2">
+                        <label className="block">
+                          <FieldLabel>RSI lookback period</FieldLabel>
+                          <input
+                            type="number"
+                            min={2}
+                            max={30}
+                            value={rsiPeriodForRecommendations}
+                            onChange={(e) => persistSettingsPatch({ rsiPeriodForRecommendations: Math.max(2, Math.min(30, Number(e.target.value) || 14)) })}
+                            className={inputClass}
+                          />
+                        </label>
+                        <label className="block">
+                          <FieldLabel>Buy trigger threshold (RSI oversold)</FieldLabel>
+                          <input
+                            type="number"
+                            min={10}
+                            max={50}
+                            value={rsiOversoldThresholdForRecommendations}
+                            onChange={(e) => persistSettingsPatch({ rsiOversoldThresholdForRecommendations: Math.max(10, Math.min(50, Number(e.target.value) || 30)) })}
+                            className={inputClass}
+                          />
+                        </label>
+                        <label className="block">
+                          <FieldLabel>Sell trigger threshold (RSI overbought)</FieldLabel>
+                          <input
+                            type="number"
+                            min={50}
+                            max={90}
+                            value={rsiOverboughtThresholdForRecommendations}
+                            onChange={(e) => persistSettingsPatch({ rsiOverboughtThresholdForRecommendations: Math.max(50, Math.min(90, Number(e.target.value) || 70)) })}
+                            className={inputClass}
+                          />
+                        </label>
+                        <label className="block">
+                          <FieldLabel>Signal buffer (RSI points)</FieldLabel>
+                          <input
+                            type="number"
+                            min={0}
+                            max={20}
+                            value={rsiHysteresisPointsForRecommendations}
+                            onChange={(e) => persistSettingsPatch({ rsiHysteresisPointsForRecommendations: Math.max(0, Math.min(20, Number(e.target.value) || 5)) })}
+                            className={inputClass}
+                          />
+                        </label>
+                        <label className="block sm:col-span-2">
+                          <FieldLabel>Min rising days</FieldLabel>
+                          <input
+                            type="number"
+                            min={1}
+                            max={5}
+                            value={rsiMinRisingDaysForRecommendations}
+                            onChange={(e) => persistSettingsPatch({ rsiMinRisingDaysForRecommendations: Math.max(1, Math.min(5, Number(e.target.value) || 2)) })}
+                            className={inputClass}
+                          />
+                        </label>
+                      </div>
+                    ) : null}
+                  </>
                 ) : null}
-                <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
-                    checked={useRSIGatingForRecommendations}
-                    onChange={(e) => persistSettingsPatch({ useRSIGatingForRecommendations: e.target.checked })}
-                  />
-                  <span>
-                    <span className="block text-[12px] font-medium leading-snug text-foreground">Use RSI reversal gating</span>
-                    <span className="mt-px block text-[10px] leading-snug text-subtle">
-                      BUY is never RSI-gated. RSI can block ADD only when holding size is already above Stock Limit, and can delay SELL at overbought peaks until reversal confirms. When disabled, RSI does not block recommendation actions.
-                    </span>
-                  </span>
-                </label>
+
                 <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
                   <input
                     type="checkbox"

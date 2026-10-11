@@ -2,22 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
 import { PortfolioAllocationChart } from "@/components/portfolio/PortfolioAllocationChart";
-import { SymbolTradeCombobox } from "@/components/portfolio/SymbolTradeCombobox";
+import { AddAssetForm } from "@/components/portfolio/AddAssetForm";
 import { StockDetailModal } from "@/components/stock/StockDetailModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
-import { isValidTicker } from "@/lib/csvPortfolio";
 import { formatCurrency, formatDecimal, formatNumberMax2, formatPercent, formatSignedCurrency, formatWholeCurrency } from "@/lib/numberFormat";
 import { recommendationActionDisplay } from "@/lib/recommendation";
 import { computeTodayChangeFromHistory, computeTodayChangeFromLiveQuotes, fetchCloudNetWorthHistory, type NetWorthPoint } from "@/lib/portfolio-net-worth-series";
 import { isUsMarketTradingDay } from "@/lib/market-hours";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
-import { patchCurrentPortfolioSnapshotHoldings } from "@/lib/portfolio-snapshot-client";
 import { cashByAccount, displayAccount, isCashSymbol } from "@/lib/cash-accounts";
 import { fixedIncomeTotal } from "@/lib/fixed-income-accounts";
 
@@ -157,9 +154,6 @@ export default function PortfolioPage() {
   const cash = usePortfolioStore((s) => s.cashBalance);
   const fixedIncomeByAccount = usePortfolioStore((s) => s.fixedIncomeByAccount);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
-  const addStock = usePortfolioStore((s) => s.addStock);
-  const updateStock = usePortfolioStore((s) => s.updateStock);
-
   const [sort, setSort] = useState<SortKey>("symbol");
   const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION.symbol);
   const [query, setQuery] = useState("");
@@ -191,9 +185,6 @@ export default function PortfolioPage() {
     void run();
     return () => { cancelled = true; };
   }, []);
-  const [newSymbol, setNewSymbol] = useState("");
-  const [newQuantity, setNewQuantity] = useState("1");
-  const [newAverageCost, setNewAverageCost] = useState("");
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
 
@@ -321,38 +312,6 @@ export default function PortfolioPage() {
   }, [stocks, cash, fixedIncomeByAccount, cloudHistory]);
   const showPortfolioTodayChange = isUsMarketTradingDay() && portfolioTodayChange.hasBaseline && Math.abs(portfolioTodayChange.change) > 0.01;
 
-  function addHolding() {
-    const sym = newSymbol.trim().toUpperCase().replace(/[^A-Z0-9.-]/g, "");
-    const quantity = parseFloat(newQuantity);
-    const averageCost = parseFloat(newAverageCost);
-    if (!isValidTicker(sym) || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(averageCost) || averageCost <= 0) return;
-
-    const existing = stocks.find((s) => s.symbol === sym);
-    const nextLastPrice = existing?.lastPrice && existing.lastPrice > 0 ? existing.lastPrice : averageCost;
-    if (existing) {
-      updateStock(sym, {
-        quantity,
-        averageCost,
-        lastPrice: nextLastPrice,
-        pendingOptimization: existing.pendingOptimization ?? true,
-      });
-    } else {
-      addStock({
-        symbol: sym,
-        quantity,
-        averageCost,
-        lastPrice: nextLastPrice,
-        pendingOptimization: true,
-      });
-    }
-
-    void patchCurrentPortfolioSnapshotHoldings();
-
-    setNewSymbol("");
-    setNewQuantity("1");
-    setNewAverageCost("");
-  }
-
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap justify-end gap-2">
@@ -405,51 +364,14 @@ export default function PortfolioPage() {
                 onClick={() => setMobileControlsOpen((open) => !open)}
                 className="rounded-xl border border-border bg-background px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
               >
-                {mobileControlsOpen ? "Hide add holding" : "Show add holding"}
+                {mobileControlsOpen ? "Hide add asset" : "Show add asset"}
               </button>
             </div>
             <div
               id="portfolio-mobile-controls"
-              className={`${mobileControlsOpen ? "mt-2 flex w-full" : "hidden"} flex-wrap items-end gap-2 md:mt-0 md:ml-auto md:flex md:w-auto`}
+              className={`${mobileControlsOpen ? "mt-2 flex w-full" : "hidden"} md:mt-2 md:flex md:w-full`}
             >
-              <div className="grid min-w-[18rem] flex-1 items-end gap-2 sm:grid-cols-[minmax(11rem,1.45fr)_7rem_6rem_auto] md:min-w-[34rem] md:flex-none">
-                <label className="flex min-w-0 flex-col gap-0.5 text-[10px] text-subtle">
-                  Add New Stock/Holding
-                  <SymbolTradeCombobox
-                    id="portfolio-add-holding-symbol"
-                    value={newSymbol}
-                    onChange={setNewSymbol}
-                    portfolioStocks={stocks}
-                  />
-                </label>
-                <label className="flex min-w-0 flex-col gap-0.5 text-[10px] text-subtle">
-                  Avg cost
-                  <input
-                    value={newAverageCost}
-                    onChange={(e) => setNewAverageCost(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addHolding()}
-                    placeholder="100"
-                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-                  />
-                </label>
-                <label className="flex min-w-0 flex-col gap-0.5 text-[10px] text-subtle">
-                  Qty
-                  <input
-                    value={newQuantity}
-                    onChange={(e) => setNewQuantity(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addHolding()}
-                    placeholder="1"
-                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={addHolding}
-                  className={appCtaButton("ui-hover-pop px-3 py-2 text-sm")}
-                >
-                  Add
-                </button>
-              </div>
+              <AddAssetForm idPrefix="portfolio-add" />
             </div>
           </div>
         </div>

@@ -55,6 +55,7 @@ function currentStoreSettings() {
     rsiHysteresisPointsForRecommendations: store.rsiHysteresisPointsForRecommendations,
     rsiMinRisingDaysForRecommendations: store.rsiMinRisingDaysForRecommendations,
     sellOnlyLongTermQualified: store.sellOnlyLongTermQualified,
+    traderModeEnabled: store.traderModeEnabled,
     limitWatchlistSize: store.limitWatchlistSize,
     timezone: store.timezone,
     region: store.region,

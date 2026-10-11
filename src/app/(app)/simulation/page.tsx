@@ -1,10 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { loadHistoricalPayloadBySymbol, loadHistoricalPayloadForSymbol } from "@/lib/historical-price-client";
 import { formatCurrency } from "@/lib/numberFormat";
 import { usePortfolioStore } from "@/store/portfolioStore";
+import { createClient } from "@/lib/supabase/client";
+import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
+import { useSubscriptionGate } from "@/hooks/useSubscriptionGate";
+import { hasPremiumFeatureAccess } from "@/lib/subscription-limits";
+import { withAppBasePath } from "@/lib/base-path";
 
 type SingleSimulationResponse = {
   ok?: boolean;
@@ -104,6 +110,9 @@ const prominentWatchlistButtonClass =
   "ui-hover-spotlight rounded-xl border border-primary/35 bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-[0_14px_30px_-16px_color-mix(in_srgb,var(--theme-primary)_60%,transparent)] hover:border-primary/40 hover:bg-primary/92 disabled:opacity-50 dark:bg-primary dark:text-[color-mix(in_srgb,var(--palette-alice)_92%,white)]";
 
 export default function SimulationPage() {
+  const [userId, setUserId] = useState<string | undefined>();
+  const { row, loading: subscriptionLoading } = useSubscriptionGate(userId);
+  const premiumSimulation = !subscriptionLoading && hasPremiumFeatureAccess(row ?? null);
   const [symbol, setSymbol] = useState("AAPL");
   const [capital, setCapital] = useState("10000");
   const [symbolYears, setSymbolYears] = useState("1");
@@ -127,7 +136,23 @@ export default function SimulationPage() {
     [stocks, symbol]
   );
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const supabase = createClient();
+      const { data } = await supabase.auth.getUser();
+      const uid = data.user?.id;
+      if (!uid || cancelled) return;
+      const resolved = await syncStocksPmAuthUser(supabase, uid);
+      if (!cancelled) setUserId(resolved);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function run() {
+    if (!premiumSimulation) return;
     setLoading(true);
     setResult(null);
     const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
@@ -176,6 +201,7 @@ export default function SimulationPage() {
   }
 
   async function runWatchlist() {
+    if (!premiumSimulation) return;
     setWatchlistLoading(true);
     setWatchlistResult(null);
     const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
@@ -211,6 +237,15 @@ export default function SimulationPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <h1 className="text-2xl font-bold text-foreground">Simulation</h1>
+      {!premiumSimulation ? (
+        <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+          Portfolio simulation is a premium feature.{" "}
+          <Link href={withAppBasePath("/billing/start?next=/simulation")} className="font-semibold underline-offset-2 hover:underline">
+            Subscribe
+          </Link>{" "}
+          to backtest with the same recommendation rules as the app.
+        </p>
+      ) : null}
       <p className="text-sm text-subtle">The single-symbol backtest already matched iOS simulation rules. This page now also includes the missing iOS-style watchlist simulation path with risk and shortlist filtering.</p>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
         <div className="ui-hover-lift space-y-4 rounded-2xl border border-border bg-elevated p-6">
@@ -243,7 +278,7 @@ export default function SimulationPage() {
           ) : null}
           <button
             type="button"
-            disabled={loading}
+            disabled={loading || !premiumSimulation}
             onClick={run}
             className={appCtaButton(prominentSimulationButtonClass)}
           >
@@ -362,7 +397,7 @@ export default function SimulationPage() {
             </div>
             <button
               type="button"
-              disabled={watchlistLoading || watchlistTrackedCount === 0}
+              disabled={watchlistLoading || watchlistTrackedCount === 0 || !premiumSimulation}
               onClick={runWatchlist}
               className={appCtaButton(prominentWatchlistButtonClass)}
             >
