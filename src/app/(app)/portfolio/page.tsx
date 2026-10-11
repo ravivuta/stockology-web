@@ -20,6 +20,29 @@ import { fixedIncomeTotal } from "@/lib/fixed-income-accounts";
 
 type SortKey = "symbol" | "quantity" | "averageCost" | "costBasis" | "lastPrice" | "value" | "gainLoss" | "upside" | "score" | "today" | "signal";
 
+type OpenLotLike = { quantity: number; costBasis: number; account?: string };
+
+/** Account filter uses that account's open lots, matching iOS `displayMetrics`. */
+function positionMetrics(
+  stock: { quantity: number; averageCost: number; lastPrice?: number },
+  openLots: OpenLotLike[] | undefined,
+  accountFilter: string
+): { quantity: number; averageCost: number; costBasis: number; value: number } {
+  const price = stock.lastPrice ?? 0;
+  if (accountFilter === "__all__") {
+    const costBasis = stock.quantity * stock.averageCost;
+    return { quantity: stock.quantity, averageCost: stock.averageCost, costBasis, value: stock.quantity * price };
+  }
+  const target = displayAccount(accountFilter).toLowerCase();
+  const scoped = (openLots ?? []).filter(
+    (lot) => (Number(lot.quantity) || 0) > 0.000001 && displayAccount(lot.account).toLowerCase() === target
+  );
+  const quantity = scoped.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0);
+  const costBasis = scoped.reduce((sum, lot) => sum + Math.max(0, lot.quantity) * Math.max(0, lot.costBasis), 0);
+  const averageCost = quantity > 0 ? costBasis / quantity : 0;
+  return { quantity, averageCost, costBasis, value: quantity * price };
+}
+
 const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
   symbol: "asc",
   quantity: "desc",
@@ -238,10 +261,12 @@ export default function PortfolioPage() {
     if (showActionable) r = r.filter((s) => isActionable(s.recommendation?.action));
     if (q) r = r.filter((s) => s.symbol.includes(q));
     r.sort((a, b) => {
-      const valueA = a.quantity * (a.lastPrice ?? 0);
-      const valueB = b.quantity * (b.lastPrice ?? 0);
-      const costBasisA = a.quantity * a.averageCost;
-      const costBasisB = b.quantity * b.averageCost;
+      const metricsA = positionMetrics(a, lotsBySymbol[a.symbol]?.open, selectedAccount);
+      const metricsB = positionMetrics(b, lotsBySymbol[b.symbol]?.open, selectedAccount);
+      const valueA = metricsA.value;
+      const valueB = metricsB.value;
+      const costBasisA = metricsA.costBasis;
+      const costBasisB = metricsB.costBasis;
       const gainLossA = valueA - costBasisA;
       const gainLossB = valueB - costBasisB;
       const upsideA = analystTargetUpsidePct(a.lastPrice, a.analystTarget);
@@ -255,10 +280,10 @@ export default function PortfolioPage() {
           cmp = a.symbol.localeCompare(b.symbol);
           break;
         case "quantity":
-          cmp = a.quantity - b.quantity;
+          cmp = metricsA.quantity - metricsB.quantity;
           break;
         case "averageCost":
-          cmp = a.averageCost - b.averageCost;
+          cmp = metricsA.averageCost - metricsB.averageCost;
           break;
         case "costBasis":
           cmp = costBasisA - costBasisB;
@@ -290,7 +315,7 @@ export default function PortfolioPage() {
       return sortDirection === "asc" ? cmp : -cmp;
     });
     return r;
-  }, [holdings, query, showActionable, sort, sortDirection, stockMatchesAccount]);
+  }, [holdings, lotsBySymbol, query, selectedAccount, showActionable, sort, sortDirection, stockMatchesAccount]);
 
   const { assetsValue, totalGainLoss, totalGainLossPct, netWorth, portfolioTodayChange, fixedIncomeValue } = useMemo(() => {
     const assets = stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((a, s) => a + s.quantity * (s.lastPrice ?? 0), 0);
@@ -439,8 +464,9 @@ export default function PortfolioPage() {
               </thead>
               <tbody>
                 {rows.flatMap((s) => {
-                  const value = s.quantity * (s.lastPrice ?? 0);
-                  const costBasis = s.quantity * s.averageCost;
+                  const metrics = positionMetrics(s, lotsBySymbol[s.symbol]?.open, selectedAccount);
+                  const value = metrics.value;
+                  const costBasis = metrics.costBasis;
                   const gainLoss = value - costBasis;
                   const gainLossPct = costBasis > 0 ? (gainLoss / costBasis) * 100 : null;
                   const upside = analystTargetUpsidePct(s.lastPrice, s.analystTarget);
@@ -491,8 +517,8 @@ export default function PortfolioPage() {
                       >
                         {d != null && Number.isFinite(d) ? formatPercent(d, true) : "—"}
                       </td>
-                      <td className="px-2 py-2.5 text-center tabular-nums text-foreground md:px-4 md:py-3">{formatNumberMax2(s.quantity)}</td>
-                      <td className="hidden px-3 py-2.5 text-center tabular-nums text-foreground sm:table-cell md:px-4 md:py-3">{formatCurrency(s.averageCost)}</td>
+                      <td className="px-2 py-2.5 text-center tabular-nums text-foreground md:px-4 md:py-3">{formatNumberMax2(metrics.quantity)}</td>
+                      <td className="hidden px-3 py-2.5 text-center tabular-nums text-foreground sm:table-cell md:px-4 md:py-3">{formatCurrency(metrics.averageCost)}</td>
                       <td className="hidden px-4 py-3 text-center tabular-nums text-foreground md:table-cell">{formatWholeCurrency(costBasis)}</td>
                       <td className="px-2 py-2.5 text-center tabular-nums md:px-4 md:py-3">
                         <span

@@ -16,6 +16,7 @@ import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-clien
 import { hasPremiumFeatureAccess, trackedStockLimitMessage } from "@/lib/subscription-limits";
 import { withAppBasePath } from "@/lib/base-path";
 import { appCtaButton } from "@/lib/appCtaClasses";
+import { fieldInputClass } from "@/lib/field-input";
 import { AppModal } from "@/components/ui/AppModal";
 
 type AssetKind = "stock" | "cash" | "fixedIncome";
@@ -251,7 +252,7 @@ export function AddAssetForm({ idPrefix }: { idPrefix: string }) {
     else await submitCashLike();
   }
 
-  const inputClass = "rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground";
+  const inputClass = `${fieldInputClass} rounded-lg px-3 py-2 text-sm`;
 
   return (
     <div className="w-full space-y-3">

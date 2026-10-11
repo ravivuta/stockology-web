@@ -866,7 +866,7 @@ function HoldingsHeatmap({
     });
   }, [gainers, losers]);
 
-  const tiles = useMemo(() => layoutHeatmapTiles(items, HEATMAP_SIDE_PX), [items]);
+  const tiles = useMemo(() => layoutHeatmapTiles(items, HEATMAP_SIDE_PX, 0), [items]);
 
   if (items.length === 0) {
     return <p className="text-xs text-subtle">No holdings to map.</p>;
@@ -882,19 +882,22 @@ function HoldingsHeatmap({
           const showPercent = tile.height >= 36 && tile.width >= 44;
           const showAmount = tile.height >= 54 && tile.width >= 56;
           const selected = selectedSymbol === tile.symbol;
+          // Overlap by 1 layout px so percentage rounding cannot open a seam.
+          const bleed = 1;
           return (
             <button
               key={tile.symbol}
               type="button"
               onClick={() => onToggleSymbol(tile.symbol)}
-              className={`absolute overflow-hidden p-1.5 text-left text-white ${
-                selected ? "z-10 ring-2 ring-white ring-offset-1 ring-offset-background" : ""
+              className={`no-ui-hover m-0 overflow-hidden border-0 p-1.5 text-left text-white ${
+                selected ? "z-10 ring-2 ring-white ring-inset" : ""
               }`}
               style={{
-                left: `${(tile.x / HEATMAP_SIDE_PX) * 100}%`,
-                top: `${(tile.y / HEATMAP_SIDE_PX) * 100}%`,
-                width: `${(tile.width / HEATMAP_SIDE_PX) * 100}%`,
-                height: `${(tile.height / HEATMAP_SIDE_PX) * 100}%`,
+                position: "absolute",
+                left: `${((tile.x - bleed) / HEATMAP_SIDE_PX) * 100}%`,
+                top: `${((tile.y - bleed) / HEATMAP_SIDE_PX) * 100}%`,
+                width: `${((tile.width + bleed * 2) / HEATMAP_SIDE_PX) * 100}%`,
+                height: `${((tile.height + bleed * 2) / HEATMAP_SIDE_PX) * 100}%`,
                 backgroundColor: `color-mix(in srgb, ${colorVar} ${mix}%, #111827)`,
               }}
             >

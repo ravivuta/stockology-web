@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { usePortfolioStore } from "@/store/portfolioStore";
-import { cashByAccount, knownCashAccounts, CASH_SYMBOL } from "@/lib/cash-accounts";
+import { cashByAccount, displayAccount, knownCashAccounts, CASH_SYMBOL } from "@/lib/cash-accounts";
 import { recordExternalCashFlow } from "@/lib/external-cash-flows";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { formatCurrency } from "@/lib/numberFormat";
 import { appCtaButton } from "@/lib/appCtaClasses";
+import { fieldInputClass } from "@/lib/field-input";
 
 export function CashAccountsEditor({
   open,
@@ -28,9 +29,10 @@ export function CashAccountsEditor({
   const [drafts, setDrafts] = useState<Record<string, string> | null>(null);
   const values = drafts ?? Object.fromEntries(
     accounts.map((account) => {
+      const accountKey = displayAccount(account).toLowerCase();
       const amount =
         startingCash[account] ??
-        Object.entries(startingCash).find(([name]) => name.toLowerCase() === account.toLowerCase())?.[1] ??
+        Object.entries(startingCash).find(([name]) => displayAccount(name).toLowerCase() === accountKey)?.[1] ??
         0;
       return [account, amount > 0.005 ? String(amount) : ""];
     })
@@ -90,7 +92,7 @@ export function CashAccountsEditor({
                 }}
                 onChange={(e) => setDrafts({ ...values, [account]: e.target.value })}
                 inputMode="decimal"
-                className="w-32 rounded-lg border border-border bg-background px-2.5 py-1.5 text-right text-sm tabular-nums text-foreground"
+                className={`${fieldInputClass} w-32 rounded-lg px-2.5 py-1.5 text-right text-sm tabular-nums`}
                 aria-label={`${account} cash`}
               />
             </label>

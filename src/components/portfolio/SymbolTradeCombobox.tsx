@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { searchTickers, type TickerSearchRow } from "@/lib/search-tickers";
 import type { StockHolding } from "@/store/portfolioStore";
+import { fieldInputClass } from "@/lib/field-input";
 
 type Suggestion = TickerSearchRow & { fromPortfolio?: boolean; qty?: number };
 
@@ -161,7 +162,7 @@ export function SymbolTradeCombobox({
         placeholder="Type ticker or name…"
         autoComplete="off"
         spellCheck={false}
-        className="min-w-[11rem] rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+        className={`${fieldInputClass} min-w-[11rem] rounded-lg px-3 py-2 text-sm`}
       />
       {showList ? (
         <ul

@@ -18,7 +18,7 @@ import {
   migrateCashLots,
   replaceCashLots,
 } from "@/lib/cash-accounts";
-import { fixedIncomeTotal, sanitizeFixedIncomeByAccount } from "@/lib/fixed-income-accounts";
+import { fixedIncomeTotal, isFixedIncomeSymbol, sanitizeFixedIncomeByAccount } from "@/lib/fixed-income-accounts";
 
 export type LotStatus = "open" | "partiallySold" | "fullySold" | "washSaleRestricted";
 
@@ -920,19 +920,20 @@ export const usePortfolioStore = create<State>()(
         let markedPending = false;
         set((st) => {
           const mutationAt = new Date().toISOString();
-          previousFixedIncome = fixedIncomeTotal(st.fixedIncomeByAccount);
+          const previousByAccount = sanitizeFixedIncomeByAccount(st.fixedIncomeByAccount);
+          previousFixedIncome = fixedIncomeTotal(previousByAccount);
           previousCash = st.cashBalance;
           const normalizedFixedIncome = sanitizeFixedIncomeByAccount(amountsByAccount);
           nextFixedIncome = fixedIncomeTotal(normalizedFixedIncome);
-          // Match iOS Home behavior: fixed-income edits are treated as internal reallocation
-          // between cash and fixed income, so total portfolio value remains stable.
+          // iOS Home treats this as a move between cash and fixed income for the same account.
+          // Trading limits stay as they are, and holdings are not marked pending.
           let nextLots = migrateCashLots(st.lotsBySymbol, st.cashBalance);
           const allAccounts = new Set<string>([
-            ...Object.keys(st.fixedIncomeByAccount),
+            ...Object.keys(previousByAccount),
             ...Object.keys(normalizedFixedIncome),
           ]);
           for (const account of allAccounts) {
-            const oldAmount = st.fixedIncomeByAccount[account] ?? 0;
+            const oldAmount = previousByAccount[account] ?? 0;
             const newAmount = normalizedFixedIncome[account] ?? 0;
             const fixedDelta = newAmount - oldAmount;
             if (Math.abs(fixedDelta) < 0.005) continue;
@@ -954,25 +955,18 @@ export const usePortfolioStore = create<State>()(
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
             lotsBySymbol: nextLots,
           };
-          const equityPlusCash =
-            st.stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((sum, s) => sum + s.quantity * (s.lastPrice ?? 0), 0) +
-            nextCash;
-          const currentPortfolioSize = equityPlusCash + previousFixedIncome;
-          const newPortfolioSize = equityPlusCash + nextFixedIncome;
-          const drift = currentPortfolioSize > 0 ? Math.abs(newPortfolioSize - currentPortfolioSize) / currentPortfolioSize : 0;
-          markedPending = drift > 0.10;
+          markedPending = false;
           const derived = derivePortfolioState(st.stocks, nextCash, recalcCtx, {
             ...st,
             fixedIncomeByAccount: normalizedFixedIncome,
           }, {
-            shouldRecalculateLimits: true,
-            forceRecalculateAllHoldingLimits: drift > 0.10,
+            shouldRecalculateLimits: false,
           });
           return {
             cashBalance: nextCash,
             lotsBySymbol: nextLots,
             fixedIncomeByAccount: normalizedFixedIncome,
-            stocks: markedPending ? derived.stocks.map((stock) => ({ ...stock, pendingOptimization: true })) : derived.stocks,
+            stocks: derived.stocks,
             portfolioSize: derived.portfolioSize,
             lastLocalMutationAt: mutationAt,
           };
@@ -1899,7 +1893,8 @@ export const usePortfolioStore = create<State>()(
 
           if (mode === "portfolio" && importedSymbolsByAccount.size > 0) {
             for (const [symbol, bundle] of Object.entries(lotsBySymbol)) {
-              if (!bundle.open.length) continue;
+              // Cash and fixed income are not stock rows. iOS never sells them as missing symbols.
+              if (!bundle.open.length || isCashSymbol(symbol) || isFixedIncomeSymbol(symbol)) continue;
               const keptOpen: TradeLot[] = [];
               const soldLots: SoldLot[] = [...bundle.sold];
               const groupedByAccount = new Map<string, TradeLot[]>();
@@ -1947,10 +1942,6 @@ export const usePortfolioStore = create<State>()(
             const imported = buildImportedOpenLots(symbolRows);
             const hasImportedHoldings = imported.totalQty > 0;
 
-            const preferredAccount =
-              symbolRows
-                .map((row) => row.account?.trim() ?? "")
-                .find((value) => value.length > 0) ?? "";
             const preferredRetirement =
               symbolRows
                 .map((row) => row.isRetirementAccount)
@@ -1976,7 +1967,6 @@ export const usePortfolioStore = create<State>()(
               const preservedOpenLots =
                 existingLots?.open.map((lot) => ({
                   ...cloneTradeLot(lot),
-                  account: lot.account?.trim() || preferredAccount,
                   isRetirementAccount:
                     lot.isRetirementAccount == null ? preferredRetirement : lot.isRetirementAccount,
                 })) ?? [];
@@ -2042,6 +2032,7 @@ export const usePortfolioStore = create<State>()(
                       mergedOpenLots.push({
                         ...importedLot,
                         quantity: deltaQty,
+                        initialQuantity: deltaQty,
                       });
                     }
                     continue;
@@ -2221,7 +2212,7 @@ export const usePortfolioStore = create<State>()(
             for (const { name, delta } of cashByAccount.values()) {
               if (Math.abs(delta) <= 1e-6) continue;
               cashDeltaFromHoldings += delta;
-              nextLots = applyCashDelta(nextLots, name, delta);
+              nextLots = applyCashDelta(nextLots, name, delta, { confineToAccount: true });
             }
           } else {
             cashDeltaFromHoldings = 0;

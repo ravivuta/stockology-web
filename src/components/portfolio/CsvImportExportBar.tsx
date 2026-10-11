@@ -7,6 +7,7 @@ import { pushPortfolioSnapshotSlice } from "@/lib/portfolio-snapshot-client";
 import { fetchTickerHydrationFromTables, type TickerHydrationPriceRow } from "@/lib/ticker-direct-hydration";
 import { getSupabaseEnv } from "@/lib/supabase/config";
 import { usePortfolioStore, type StockHolding } from "@/store/portfolioStore";
+import { fieldInputClass } from "@/lib/field-input";
 import {
   CSV_IMPORT_FIELDS,
   parsePortfolioCsv,
@@ -849,7 +850,7 @@ export function CsvImportExportBar({
                       setPendingMappingImport((current) => (current ? { ...current, defaultAccountName: value } : current));
                     }}
                     placeholder="Brokerage, IRA, Roth, Taxable…"
-                    className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
+                    className={`${fieldInputClass} w-full rounded-lg px-3 py-2 text-sm`}
                   />
                 </div>
                 <div className="grid gap-2 rounded-xl border border-border/80 bg-background/60 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
@@ -863,7 +864,7 @@ export function CsvImportExportBar({
                       const value = e.target.value as "no" | "yes" | "";
                       setPendingMappingImport((current) => (current ? { ...current, defaultRetirementAccount: value } : current));
                     }}
-                    className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
+                    className={`${fieldInputClass} w-full rounded-lg px-3 py-2 text-sm`}
                   >
                     <option value="">Select...</option>
                     <option value="no">Taxable</option>
@@ -912,7 +913,7 @@ export function CsvImportExportBar({
                           : current
                       );
                     }}
-                    className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground"
+                    className={`${fieldInputClass} w-full rounded-lg px-3 py-2 text-sm`}
                   >
                     <option value="none">None</option>
                     {(pendingMappingImport?.headers ?? [])

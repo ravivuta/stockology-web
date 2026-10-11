@@ -1,3 +1,5 @@
+import { displayAccount } from "@/lib/cash-accounts";
+
 export const FIXED_INCOME_SNAPSHOT_SYMBOL_PREFIX = "$FIXED_INCOME:";
 const EPSILON = 0.005;
 
@@ -12,7 +14,7 @@ export function fixedIncomeAccountNameFromSnapshotSymbol(symbol: string): string
   const raw = symbol.slice(idx + 1);
   const decoded = decodeURIComponent(raw);
   const trimmed = decoded.trim();
-  return trimmed.length > 0 ? trimmed : null;
+  return trimmed.length > 0 ? displayAccount(trimmed) : null;
 }
 
 export function fixedIncomeSnapshotSymbol(account: string): string {
@@ -25,13 +27,28 @@ export function sanitizeFixedIncomeByAccount(
   if (!input) return {};
   const out: Record<string, number> = {};
   for (const [account, amount] of Object.entries(input)) {
-    const name = account.trim();
-    if (!name) continue;
+    const name = displayAccount(account);
     const n = Number(amount);
     if (!Number.isFinite(n) || n <= EPSILON) continue;
-    out[name] = n;
+    out[name] = (out[name] ?? 0) + n;
   }
   return out;
+}
+
+/** Balance for one account, including iOS suffix aliases such as "Fidelity (Retirement)". */
+export function fixedIncomeAmountForAccount(
+  fixedIncomeByAccount: Record<string, number> | null | undefined,
+  account: string
+): number {
+  if (!fixedIncomeByAccount) return 0;
+  const key = displayAccount(account).toLowerCase();
+  let total = 0;
+  for (const [name, amount] of Object.entries(fixedIncomeByAccount)) {
+    if (displayAccount(name).toLowerCase() !== key) continue;
+    const n = Number(amount);
+    if (Number.isFinite(n) && n > 0) total += n;
+  }
+  return total;
 }
 
 export function fixedIncomeTotal(
@@ -67,10 +84,11 @@ export function fixedIncomeSnapshotHoldings(
     transactionLimit: number;
   }> = [];
 
-  for (const [account, amount] of Object.entries(fixedIncomeByAccount)) {
-    const name = account.trim();
+  const merged = sanitizeFixedIncomeByAccount(fixedIncomeByAccount);
+  for (const [account, amount] of Object.entries(merged)) {
+    const name = displayAccount(account);
     const n = Number(amount);
-    if (!name || !Number.isFinite(n) || n <= EPSILON) continue;
+    if (!Number.isFinite(n) || n <= EPSILON) continue;
     rows.push({
       symbol: fixedIncomeSnapshotSymbol(name),
       quantity: n,

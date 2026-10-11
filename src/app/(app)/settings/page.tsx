@@ -28,6 +28,7 @@ import { isPaidSubscriptionTier } from "@/lib/subscription-state";
 import { hasPremiumFeatureAccess } from "@/lib/subscription-limits";
 import { APP_MANAGED_TRIAL_LABEL } from "@/lib/trial-config";
 import { cn } from "@/lib/utils";
+import { fieldInputClass } from "@/lib/field-input";
 import { withAppBasePath } from "@/lib/base-path";
 import { parseCloudSnapshotForStore } from "@/lib/cloud-snapshot-hydration";
 import { SettingsPageSkeleton } from "@/components/route-loading/page-skeletons/settings";
@@ -384,8 +385,10 @@ function SettingsInner() {
     return () => obs.disconnect();
   }, []);
 
-  const inputClass =
-    "w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm text-foreground shadow-sm transition-[border-color,box-shadow] placeholder:text-subtle focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/25 dark:border-white/[0.1] dark:bg-yale/30";
+  const inputClass = cn(
+    fieldInputClass,
+    "w-full rounded-md px-2.5 py-1.5 text-sm transition-[border-color,box-shadow]"
+  );
 
   return (
     <div className="mx-auto max-w-6xl pb-4 lg:pb-5">

@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { usePortfolioStore } from "@/store/portfolioStore";
-import { cashByAccount, knownCashAccounts, CASH_SYMBOL } from "@/lib/cash-accounts";
+import { cashByAccount, displayAccount, knownCashAccounts, CASH_SYMBOL } from "@/lib/cash-accounts";
+import { fixedIncomeAmountForAccount } from "@/lib/fixed-income-accounts";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { formatCurrency } from "@/lib/numberFormat";
 import { appCtaButton } from "@/lib/appCtaClasses";
+import { fieldInputClass } from "@/lib/field-input";
 
 export function FixedIncomeAccountsEditor({
   open,
@@ -26,7 +28,7 @@ export function FixedIncomeAccountsEditor({
       names.add(account);
     }
     for (const account of Object.keys(fixedIncomeByAccount)) {
-      names.add(account);
+      names.add(displayAccount(account));
     }
     names.add("Default Account");
     return [...names].sort((a, b) => a.localeCompare(b));
@@ -35,7 +37,7 @@ export function FixedIncomeAccountsEditor({
   const [drafts, setDrafts] = useState<Record<string, string> | null>(null);
   const values = drafts ?? Object.fromEntries(
     accounts.map((account) => {
-      const amount = fixedIncomeByAccount[account] ?? 0;
+      const amount = fixedIncomeAmountForAccount(fixedIncomeByAccount, account);
       return [account, amount > 0.005 ? String(amount) : ""];
     })
   );
@@ -58,7 +60,7 @@ export function FixedIncomeAccountsEditor({
       amounts[account] = parseAmount(values[account] ?? "0");
     }
     applyFixedIncomeLotsEdit(amounts);
-    recalc();
+    recalc({ shouldRecalculateLimits: false, recordMutation: false });
     await flushCurrentPortfolioSnapshotNow(true);
     setDrafts(null);
     onClose();
@@ -85,7 +87,7 @@ export function FixedIncomeAccountsEditor({
                 }}
                 onChange={(e) => setDrafts({ ...values, [account]: e.target.value })}
                 inputMode="decimal"
-                className="w-32 rounded-lg border border-border bg-background px-2.5 py-1.5 text-right text-sm tabular-nums text-foreground"
+                className={`${fieldInputClass} w-32 rounded-lg px-2.5 py-1.5 text-right text-sm tabular-nums`}
                 aria-label={`${account} fixed income`}
               />
             </label>

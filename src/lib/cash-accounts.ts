@@ -13,11 +13,22 @@ export function isCashSymbol(symbol: string | null | undefined): boolean {
 export function displayAccount(account: string | null | undefined): string {
   const trimmed = (account ?? "").trim();
   if (!trimmed) return DEFAULT_ACCOUNT;
-  const key = trimmed.toLowerCase();
+
+  // iOS strips these UI suffixes so "Fidelity" and "Fidelity (Retirement)" stay one cash/lot bucket.
+  let normalized = trimmed;
+  const lower = trimmed.toLowerCase();
+  if (lower.endsWith("(retirement)")) {
+    normalized = trimmed.slice(0, -"(retirement)".length).trim();
+  } else if (lower.endsWith("(taxable)")) {
+    normalized = trimmed.slice(0, -"(taxable)".length).trim();
+  }
+  if (!normalized) return DEFAULT_ACCOUNT;
+
+  const key = normalized.toLowerCase();
   if (key === LEGACY_UNASSIGNED_ACCOUNT.toLowerCase() || key === DEFAULT_ACCOUNT.toLowerCase()) {
     return DEFAULT_ACCOUNT;
   }
-  return trimmed;
+  return normalized;
 }
 
 function accountKey(account: string | null | undefined): string {
@@ -140,7 +151,8 @@ export function replaceCashLots(
 export function applyCashDelta(
   lotsBySymbol: Record<string, CashLotBundle>,
   account: string | null | undefined,
-  signedDollars: number
+  signedDollars: number,
+  options?: { confineToAccount?: boolean }
 ): Record<string, CashLotBundle> {
   if (!Number.isFinite(signedDollars) || Math.abs(signedDollars) < EPSILON) return lotsBySymbol;
   const existing = lotsBySymbol[CASH_SYMBOL] ?? { open: [], sold: [] };
@@ -159,16 +171,19 @@ export function applyCashDelta(
   } else {
     let remaining = -signedDollars;
     remaining = debitPreferred(bundle, preferred, remaining);
-    if (remaining > EPSILON && accountKey(preferred) !== accountKey(UNASSIGNED_ACCOUNT)) {
-      remaining = debitPreferred(bundle, UNASSIGNED_ACCOUNT, remaining);
-    }
-    if (remaining > EPSILON) {
-      const order = bundle.open
-        .map((_, index) => index)
-        .sort((a, b) => bundle.open[b].quantity - bundle.open[a].quantity);
-      for (const index of order) {
-        remaining = debitAt(bundle, index, remaining);
-        if (remaining <= EPSILON) break;
+    // A one-account CSV import must not spend cash that belongs to other accounts.
+    if (!options?.confineToAccount) {
+      if (remaining > EPSILON && accountKey(preferred) !== accountKey(UNASSIGNED_ACCOUNT)) {
+        remaining = debitPreferred(bundle, UNASSIGNED_ACCOUNT, remaining);
+      }
+      if (remaining > EPSILON) {
+        const order = bundle.open
+          .map((_, index) => index)
+          .sort((a, b) => bundle.open[b].quantity - bundle.open[a].quantity);
+        for (const index of order) {
+          remaining = debitAt(bundle, index, remaining);
+          if (remaining <= EPSILON) break;
+        }
       }
     }
     bundle.open = bundle.open.filter((lot) => lot.quantity > EPSILON);
