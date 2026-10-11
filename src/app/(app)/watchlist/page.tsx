@@ -12,7 +12,10 @@ import { AddAssetButton } from "@/components/portfolio/AddAssetForm";
 import { StockDetailModal } from "@/components/stock/StockDetailModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
-import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
+import {
+  flushCurrentPortfolioSnapshotNow,
+  patchCurrentPortfolioSnapshotHoldings,
+} from "@/lib/portfolio-snapshot-client";
 
 type SortKey = "symbol" | "lastPrice" | "change" | "analyst" | "upside" | "yield" | "score" | "signal";
 
@@ -92,6 +95,7 @@ export default function WatchlistPage() {
   const [sort, setSort] = useState<SortKey>("symbol");
   const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION.symbol);
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
   const watchlistStocks = useMemo(() => stocks.filter((s) => s.quantity <= 0), [stocks]);
   const shortlistedSymbolsForWatchlistFilter = useMemo(() => {
@@ -203,11 +207,25 @@ export default function WatchlistPage() {
     return filtered;
   }, [query, shortlistedSymbolsForWatchlistFilter, showActionable, showShortlisted, sort, sortDirection, watchlistStocks]);
 
+  async function persistWatchlistRemoval(symbol: string) {
+    setRemoveError(null);
+    const saved = await flushCurrentPortfolioSnapshotNow(true, { allowEmptyHoldings: true });
+    if (!saved.error && !saved.skipped) return;
+    const patched = await patchCurrentPortfolioSnapshotHoldings([symbol]);
+    if (!patched.error && patched.patched) return;
+    setRemoveError(
+      saved.error?.message ??
+        patched.error?.message ??
+        `${symbol} was removed on this device, but the snapshot was not updated.`
+    );
+  }
+
   const hasActiveFilters = showShortlisted || showActionable || query.trim().length > 0;
   const watchlistCountText = hasActiveFilters ? `Showing ${rows.length} of ${totalTrackedCount}` : `Total: ${totalTrackedCount}`;
 
   return (
     <div className="space-y-6">
+      {removeError ? <p className="text-sm text-error">{removeError}</p> : null}
       <div className="flex flex-wrap justify-end gap-3">
         <CsvImportExportBar exportFilename="stocks-pm-watchlist.csv" importMode="watchlist" />
         <Link
@@ -455,7 +473,7 @@ export default function WatchlistPage() {
           if (!removeTarget) return;
           const sym = removeTarget.toUpperCase();
           removeStock(sym);
-          void flushCurrentPortfolioSnapshotNow(true);
+          void persistWatchlistRemoval(sym);
         }}
         title="Remove symbol?"
         description={
