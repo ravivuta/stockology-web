@@ -11,6 +11,7 @@ import { RecommendedActionsWidget } from "@/components/dashboard/RecommendedActi
 import { DashboardReturnComparison } from "@/components/dashboard/DashboardReturnComparison";
 import { CashAccountsEditor } from "@/components/dashboard/CashAccountsEditor";
 import { FixedIncomeAccountsEditor } from "@/components/dashboard/FixedIncomeAccountsEditor";
+import { setLocalStorageItem, shouldPersistRegenerableCache } from "@/lib/local-storage-quota";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
 import {
@@ -244,7 +245,7 @@ export default function DashboardPage() {
           const rows = await fetchCloudNetWorthHistory(supabase, cachedDataUserId);
           if (!cancelled) {
             setCloudHistory(rows);
-            try { localStorage.setItem("dash_chart_cloudPts", JSON.stringify(rows)); } catch { /* quota */ }
+            if (shouldPersistRegenerableCache()) setLocalStorageItem("dash_chart_cloudPts", JSON.stringify(rows));
           }
           return;
         }
@@ -258,7 +259,7 @@ export default function DashboardPage() {
         const rows = await fetchCloudNetWorthHistory(supabase, dataUserId);
         if (!cancelled) {
           setCloudHistory(rows);
-          try { localStorage.setItem("dash_chart_cloudPts", JSON.stringify(rows)); } catch { /* quota */ }
+          if (shouldPersistRegenerableCache()) setLocalStorageItem("dash_chart_cloudPts", JSON.stringify(rows));
         }
       } catch {
         // Keep cached data on error — don't blank today's change

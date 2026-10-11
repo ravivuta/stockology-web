@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { useReducedMotion } from "framer-motion";
+import { setLocalStorageItem, shouldPersistRegenerableCache } from "@/lib/local-storage-quota";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { useDashboardChartTheme } from "@/hooks/useDashboardChartTheme";
 import { hasSupabaseConfig, createClient } from "@/lib/supabase/client";
@@ -166,9 +167,8 @@ function lsGet<T>(key: string): T | null {
   }
 }
 function lsSet(key: string, value: unknown) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch { /* quota exceeded – silent */ }
+  if (!shouldPersistRegenerableCache()) return;
+  setLocalStorageItem(key, JSON.stringify(value));
 }
 // ─────────────────────────────────────────────────────────────────────────────
 

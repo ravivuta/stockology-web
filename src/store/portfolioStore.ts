@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
+import { setLocalStorageItem } from "@/lib/local-storage-quota";
 import { calculateTradingLimits, computeRiskReturnScore, rankedTopWatchlistCandidates, recommendedWatchlistSize, stockPassesRiskFilter, offloadHoldingOutsideShortlistIfNeeded } from "@/lib/ios-recommendation";
 import { getRecommendationHistoryCloses } from "@/lib/recommendation-history-cache";
 import { buildRecommendation } from "@/lib/recommendation";
@@ -2301,6 +2302,16 @@ export const usePortfolioStore = create<State>()(
     }),
     {
       name: "stocks-pm-portfolio",
+      storage: createJSONStorage(() => ({
+        getItem: (name) => (typeof window === "undefined" ? null : localStorage.getItem(name)),
+        setItem: (name, value) => {
+          setLocalStorageItem(name, value);
+        },
+        removeItem: (name) => {
+          if (typeof window === "undefined") return;
+          localStorage.removeItem(name);
+        },
+      })),
       merge: (persisted, current) => {
         const p = persisted as Partial<Pick<State, keyof State>> | undefined;
         return {

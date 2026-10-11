@@ -485,9 +485,9 @@ function SettingsInner() {
                       ? "This account is marked billing-exempt. Access stays active and Stripe billing is bypassed."
                       : allowed
                       ? hasPaidPlan
-                        ? "Your paid subscription is active from Stripe or a synced iOS subscription."
-                        : "Your app-managed free trial is active. Subscribe from Stripe anytime without losing access."
-                      : "You were redirected here because the rest of the app is locked until you start a subscription or an existing mobile subscription is synced."}
+                        ? "Your website subscription is active."
+                        : "Your website trial is active. Subscribe on the website when you want to keep access."
+                      : "The rest of the website stays locked until you subscribe here. An App Store subscription covers the iOS app only."}
                   </p>
                   {billingState === "admin_access" ? (
                     <p className="rounded-md border border-primary/25 bg-primary/10 px-2.5 py-2 text-[11px] text-primary">
@@ -516,7 +516,7 @@ function SettingsInner() {
                   ) : null}
                   {billingState === "portal_unavailable" ? (
                     <p className="rounded-md border border-amber-500/25 bg-amber-500/10 px-2.5 py-2 text-[11px] text-amber-700 dark:text-amber-200">
-                      No Stripe-managed subscription was found for this account. If your access comes from the iOS app, manage billing in Apple subscriptions; otherwise start the Stripe subscription first.
+                      No website subscription was found for this account. Subscribe here to use Stocks PM on the web. An App Store subscription covers the iOS app only.
                     </p>
                   ) : null}
                   {billingState === "portal_not_configured" ? (

@@ -51,7 +51,7 @@ export default function ContactPage() {
           <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6">
             <h2 className="mb-2 text-base font-semibold text-white">Subscription &amp; billing</h2>
             <p className="text-sm text-zinc-400">
-              Subscriptions are managed through the App Store. For billing issues, visit your{" "}
+              The website subscription is billed separately through Stripe and managed in Settings. An App Store subscription covers the iOS app only. For Apple billing, visit your{" "}
               <a href="https://support.apple.com/en-us/118223" target="_blank" rel="noopener noreferrer" className="text-emerald-400 no-underline hover:underline">
                 Apple subscription settings
               </a>

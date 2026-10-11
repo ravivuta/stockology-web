@@ -1,3 +1,4 @@
+import { setLocalStorageItem, shouldPersistRegenerableCache } from "@/lib/local-storage-quota";
 import { usePortfolioStore } from "@/store/portfolioStore";
 
 const ACTIVE_DATA_USER_KEY = "stocks-pm-active-data-user-id";
@@ -72,7 +73,8 @@ export function saveCurrentPortfolioDraftForUser(dataUserId?: string): void {
       localStorage.removeItem(key);
       return;
     }
-    localStorage.setItem(key, JSON.stringify(draft));
+    if (!shouldPersistRegenerableCache()) return;
+    setLocalStorageItem(key, JSON.stringify(draft));
   } catch {
     /* ignore blocked storage / private mode */
   }

@@ -1,3 +1,4 @@
+import { setLocalStorageItem, shouldPersistRegenerableCache } from "@/lib/local-storage-quota";
 import type { PricePoint } from "@/lib/stock-chart";
 
 const STORAGE_PREFIX = "stocks-pm-historical-price-cache:v2:";
@@ -104,10 +105,6 @@ export function setCachedHistoricalPricePoints(symbol: string, points: PricePoin
 
   historyBySymbol.set(normalized, entry);
 
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(storageKey(normalized), JSON.stringify(entry));
-  } catch {
-    // Ignore quota/storage errors and keep the in-memory cache.
-  }
+  if (typeof window === "undefined" || !shouldPersistRegenerableCache()) return;
+  setLocalStorageItem(storageKey(normalized), JSON.stringify(entry));
 }
