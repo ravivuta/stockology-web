@@ -35,14 +35,40 @@ import { SettingsPageSkeleton } from "@/components/route-loading/page-skeletons/
 
 const SECTIONS = [
   { id: "appearance", label: "Appearance", icon: Palette },
-  { id: "subscription", label: "Subscription", icon: CreditCard },
-  { id: "portfolio", label: "Portfolio", icon: Briefcase },
+  { id: "subscription", label: "Subscription Plan", icon: CreditCard },
+  { id: "portfolio", label: "Recommendation Filtering", icon: Briefcase },
 ] as const;
 
+const TIMEZONES: Record<string, string> = {
+  "America/New_York": "Eastern Time (ET)",
+  "America/Chicago": "Central Time (CT)",
+  "America/Denver": "Mountain Time (MT)",
+  "America/Los_Angeles": "Pacific Time (PT)",
+  "America/Anchorage": "Alaska Time (AKT)",
+  "Pacific/Honolulu": "Hawaii Time (HT)",
+  "Europe/London": "London (GMT/BST)",
+  "Europe/Paris": "Paris (CET/CEST)",
+  "Asia/Tokyo": "Tokyo (JST)",
+  "Asia/Shanghai": "Shanghai (CST)",
+  "Asia/Kolkata": "India (IST)",
+  "Australia/Sydney": "Sydney (AEDT/AEST)",
+};
+
+const REGIONS: { code: string; name: string }[] = [
+  { code: "US", name: "United States" },
+  { code: "CA", name: "Canada" },
+  { code: "GB", name: "United Kingdom" },
+  { code: "EU", name: "Eurozone" },
+  { code: "JP", name: "Japan" },
+  { code: "AU", name: "Australia" },
+  { code: "IN", name: "India" },
+  { code: "CN", name: "China" },
+];
+
 const RISK_APPETITE_DETAILS: Record<"Low" | "Medium" | "High", string> = {
-  Low: "Conservative. Holdings, ETFs, and large-cap stocks with roughly $100B+ market cap and 4.5+ analyst ratings.",
-  Medium: "Balanced. Includes low-risk names plus large-cap stocks around $50B+ market cap with 4.0+ analyst ratings.",
-  High: "Aggressive. Includes low and medium profiles plus smaller caps around $10B+ with 3.5+ analyst ratings or names showing 25%+ upside.",
+  Low: "Low Risk. Conservative: larger, higher-rated companies.",
+  Medium: "Medium Risk. Balanced: includes Low Risk plus more qualified large caps.",
+  High: "High Risk. Aggressive: widest universe, including smaller caps and higher-upside names.",
 };
 
 function SettingsCard({
@@ -83,7 +109,7 @@ function SettingsCard({
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-[0.12em] text-subtle">{children}</span>;
+  return <span className="mb-0.5 block text-xs font-medium text-foreground">{children}</span>;
 }
 
 function SettingsInner() {
@@ -115,6 +141,7 @@ function SettingsInner() {
   const markAllPendingOptimization = usePortfolioStore((s) => s.markAllPendingOptimization);
 
   const [activeSection, setActiveSection] = useState<string>(SECTIONS[0].id);
+  const [currentTime, setCurrentTime] = useState("");
   const [resetOpen, setResetOpen] = useState(false);
   const [refreshChartOpen, setRefreshChartOpen] = useState(false);
   const [isRefreshingChart, setIsRefreshingChart] = useState(false);
@@ -137,6 +164,25 @@ function SettingsInner() {
   const [restoring, setRestoring] = useState(false);
   const replaceFromCloudSync = usePortfolioStore((s) => s.replaceFromCloudSync);
   const supabaseRef = useRef(createClient());
+
+  useEffect(() => {
+    const tick = () => {
+      try {
+        setCurrentTime(
+          new Intl.DateTimeFormat(undefined, {
+            timeZone: timezone,
+            hour: "numeric",
+            minute: "2-digit",
+          }).format(new Date())
+        );
+      } catch {
+        setCurrentTime("");
+      }
+    };
+    tick();
+    const id = window.setInterval(tick, 30_000);
+    return () => window.clearInterval(id);
+  }, [timezone]);
   const billingState = searchParams.get("billing");
   const billingDetail = searchParams.get("billing_detail");
   const idealWatchlistSize = recommendedWatchlistSize(portfolioSize);
@@ -453,12 +499,11 @@ function SettingsInner() {
               id="appearance"
               icon={Palette}
               title="Appearance"
-              description="Choose light, dark, or auto mode for this device. Auto switches by time of day and your choice is remembered for future sessions."
             >
               <div className="flex flex-col gap-2">
                 <ThemeToggle />
                 <p className="text-[10px] leading-snug text-subtle">
-                  Light mode keeps the brighter silver surface treatment. Dark mode keeps the deeper blue and black presentation used across Stocks PM.
+                  Auto follows your system appearance. Dark mode keeps blue/black gradients. Light mode uses silver/gray gradients.
                 </p>
               </div>
             </SettingsCard>
@@ -466,8 +511,7 @@ function SettingsInner() {
             <SettingsCard
               id="subscription"
               icon={CreditCard}
-              title="Subscription"
-              description="Trial and subscription status from your account."
+              title="Subscription Plan"
             >
               {loading ? (
                 <p className="text-xs text-subtle">Checking…</p>
@@ -645,27 +689,9 @@ function SettingsInner() {
           <SettingsCard
             id="portfolio"
             icon={Briefcase}
-            title="Portfolio and Recommendations Settings"
-            description="Recommendation filters, profit targets, and locale fields aligned with the Stocks PM decision logic."
+            title="Recommendation Filtering"
           >
             <div className="grid gap-3 md:grid-cols-2">
-              <div className="self-start">
-                <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
-                    checked={enableRiskFilter}
-                    onChange={(e) => persistSettingsPatch({ enableRiskFilter: e.target.checked })}
-                  />
-                  <span>
-                    <span className="block text-[12px] font-medium leading-snug text-foreground">Filter by risk appetite</span>
-                    <span className="mt-px block text-[10px] leading-snug text-subtle">
-                      When enabled, non-holdings are screened by market cap, analyst rating, and upside rules before they can qualify for recommendations.
-                    </span>
-                  </span>
-                </label>
-              </div>
-
               <div className="self-start">
                 <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
                   <input
@@ -675,9 +701,26 @@ function SettingsInner() {
                     onChange={(e) => persistSettingsPatch({ limitWatchlistSize: e.target.checked })}
                   />
                   <span>
-                    <span className="block text-[12px] font-medium leading-snug text-foreground">Enforce ideal watchlist size</span>
+                    <span className="block text-[12px] font-medium leading-snug text-foreground">Shortlist & Limit stocks for Portfolio size</span>
                     <span className="mt-px block text-[10px] leading-snug text-subtle">
-                      Uses portfolio size to shortlist top-scored stocks. Recommendations are limited to that shortlist. Current ideal size: {idealWatchlistSize} of {stockCount} tracked symbols.
+                      Uses your portfolio size to set an ideal shortlist. BUY/ADD are limited to top-scored names (plus ETFs). Holdings outside the shortlist can still REDUCE/SELL. Current ideal watchlist size: {idealWatchlistSize} of {stockCount} stocks.
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              <div className="self-start">
+                <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
+                    checked={enableRiskFilter}
+                    onChange={(e) => persistSettingsPatch({ enableRiskFilter: e.target.checked })}
+                  />
+                  <span>
+                    <span className="block text-[12px] font-medium leading-snug text-foreground">Shortlist by Risk Appetite</span>
+                    <span className="mt-px block text-[10px] leading-snug text-subtle">
+                      Low Risk. Conservative: larger, higher-rated companies. Medium Risk. Balanced: includes Low Risk plus more qualified large caps. High Risk. Aggressive: widest universe, including smaller caps and higher-upside names.
                     </span>
                   </span>
                 </label>
@@ -686,7 +729,7 @@ function SettingsInner() {
               {enableRiskFilter ? (
                 <div className="self-start">
                   <label className="block">
-                    <FieldLabel>Investment risk appetite</FieldLabel>
+                    <FieldLabel>Investment Risk Appetite</FieldLabel>
                     <select
                       value={riskAppetite}
                       onChange={(e) => persistSettingsPatch({ riskAppetite: e.target.value as "Low" | "Medium" | "High" })}
@@ -699,41 +742,7 @@ function SettingsInner() {
                   </label>
                   <p className="mt-1 text-[10px] leading-snug text-subtle">{RISK_APPETITE_DETAILS[riskAppetite]}</p>
                 </div>
-              ) : (
-                <div className="self-start rounded-md border border-dashed border-border/80 bg-background/30 px-2.5 py-2 text-[10px] leading-snug text-subtle dark:border-white/[0.08] dark:bg-white/[0.02]">
-                  Risk appetite selection is hidden until the filter is enabled, matching iOS behavior.
-                </div>
-              )}
-
-              <div>
-                <label className="block">
-                  <FieldLabel>ETF profit target (%)</FieldLabel>
-                  <input
-                    type="number"
-                    value={etfProfitTarget}
-                    onChange={(e) => persistSettingsPatch({ etfProfitTarget: Number(e.target.value) })}
-                    className={inputClass}
-                  />
-                </label>
-                <p className="mt-1 text-[10px] leading-snug text-subtle">
-                  ETFs use this target directly. A SELL can trigger once ETF profit reaches this percentage.
-                </p>
-              </div>
-
-              <div>
-                <label className="block">
-                  <FieldLabel>Stock profit target (%)</FieldLabel>
-                  <input
-                    type="number"
-                    value={stockProfitTarget}
-                    onChange={(e) => persistSettingsPatch({ stockProfitTarget: Number(e.target.value) })}
-                    className={inputClass}
-                  />
-                </label>
-                <p className="mt-1 text-[10px] leading-snug text-subtle">
-                  Stocks use this only as fallback when no Analyst Target (Median) price is available.
-                </p>
-              </div>
+              ) : null}
 
               <div className="md:col-span-2 grid gap-2">
                 <div className="rounded-md border border-border/80 bg-background/40 px-2.5 py-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
@@ -796,7 +805,7 @@ function SettingsInner() {
                           {!premiumFeatures ? <span className="ml-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Premium</span> : null}
                         </span>
                         <span className="mt-px block text-[10px] leading-snug text-subtle">
-                          Turns on stock AI scores and market-outlook rules together. A weak stock score can pause BUY/ADD, and a defensive outlook can pause new buys and suggest cash-equivalent building.
+                          Premium. Uses stock-specific AI news digest scores and macroeconomic market-outlook factors to pause buys and suggest cash-building when risk rises. The Home outlook icon appears only when this is on. Scores may still be visible without changing recommendations.
                         </span>
                       </span>
                     </label>
@@ -818,7 +827,7 @@ function SettingsInner() {
                       <span>
                         <span className="block text-[12px] font-medium leading-snug text-foreground">Use RSI signals for buy/add/sell timing</span>
                         <span className="mt-px block text-[10px] leading-snug text-subtle">
-                          BUY is never RSI-gated. RSI can pause ADD when position size is already above Stock Limit, and can delay SELL until overbought RSI starts reversing. Off means no RSI impact on recommendations.
+                          RSI does not block the first BUY. It can pause ADD when position size is already above Stock Limit, and it can delay SELL until overbought RSI starts reversing. Off = no RSI impact on recommendations.
                         </span>
                       </span>
                     </label>
@@ -894,23 +903,82 @@ function SettingsInner() {
                   <span>
                     <span className="block text-[12px] font-medium leading-snug text-foreground">Tax consideration</span>
                     <span className="mt-px block text-[10px] leading-snug text-subtle">
-                      Suppress SELL recommendations for short-term holdings/lots in taxable accounts. REDUCE is still shown when retirement lots, taxable lots at a loss, or long-term taxable lots can cover the trim. Does not apply to Retirement accounts as those transactions are tax-free.
+                      Avoids SELL on short-term taxable lots (&lt;365 days). Retirement accounts are not affected. REDUCE can still appear when long-term, retirement, or loss lots can cover the trim.
                     </span>
                   </span>
                 </label>
               </div>
 
+              <div className="md:col-span-2">
+                <p className="text-sm font-semibold text-foreground">My Profit Target</p>
+              </div>
+              <div>
+                <label className="block">
+                  <FieldLabel>ETF Profit Target</FieldLabel>
+                  <input
+                    type="number"
+                    min={5}
+                    max={100}
+                    step={5}
+                    value={etfProfitTarget}
+                    onChange={(e) => persistSettingsPatch({ etfProfitTarget: Number(e.target.value) })}
+                    className={inputClass}
+                  />
+                </label>
+                <p className="mt-1 text-[10px] leading-snug text-subtle">Triggers SELL when ETF gain reaches this %.</p>
+              </div>
+              <div>
+                <label className="block">
+                  <FieldLabel>Stock Profit Target (Fallback)</FieldLabel>
+                  <input
+                    type="number"
+                    min={5}
+                    max={100}
+                    step={5}
+                    value={stockProfitTarget}
+                    onChange={(e) => persistSettingsPatch({ stockProfitTarget: Number(e.target.value) })}
+                    className={inputClass}
+                  />
+                </label>
+                <p className="mt-1 text-[10px] leading-snug text-subtle">Used only when an analyst target is unavailable.</p>
+              </div>
+
+              <div className="md:col-span-2">
+                <p className="text-sm font-semibold text-foreground">Timezone</p>
+              </div>
               <div>
                 <label className="block">
                   <FieldLabel>Timezone</FieldLabel>
-                  <input value={timezone} onChange={(e) => persistSettingsPatch({ timezone: e.target.value })} className={inputClass} placeholder="e.g. America/New_York" />
+                  <select
+                    value={timezone}
+                    onChange={(e) => persistSettingsPatch({ timezone: e.target.value })}
+                    className={cn(inputClass, "cursor-pointer")}
+                  >
+                    {!TIMEZONES[timezone] ? <option value={timezone}>{timezone}</option> : null}
+                    {Object.keys(TIMEZONES).sort().map((id) => (
+                      <option key={id} value={id}>{TIMEZONES[id]}</option>
+                    ))}
+                  </select>
                 </label>
+                <p className="mt-1 text-[10px] leading-snug text-subtle">Current Time: {currentTime || "—"}</p>
               </div>
 
+              <div className="md:col-span-2">
+                <p className="text-sm font-semibold text-foreground">Region</p>
+              </div>
               <div>
                 <label className="block">
-                  <FieldLabel>Region</FieldLabel>
-                  <input value={region} onChange={(e) => persistSettingsPatch({ region: e.target.value })} className={inputClass} placeholder="e.g. US" />
+                  <FieldLabel>Country/Region</FieldLabel>
+                  <select
+                    value={region}
+                    onChange={(e) => persistSettingsPatch({ region: e.target.value })}
+                    className={cn(inputClass, "cursor-pointer")}
+                  >
+                    {!REGIONS.some((item) => item.code === region) ? <option value={region}>{region}</option> : null}
+                    {REGIONS.map((item) => (
+                      <option key={item.code} value={item.code}>{item.name}</option>
+                    ))}
+                  </select>
                 </label>
               </div>
 
@@ -928,20 +996,19 @@ function SettingsInner() {
               </div>
               <div className="md:col-span-2">
                 <div className="flex flex-col rounded-md border border-error/30 bg-error-bg/80 p-2.5 dark:border-error/35 dark:bg-error-bg/50">
-                <p className="text-xs font-semibold text-error">Danger zone</p>
-                <p className="mt-0.5 text-[10px] leading-snug text-subtle">
-                  Clears local portfolio in this browser. Cloud sync may repopulate when signed in.
+                <p className="text-[10px] leading-snug text-error/80">
+                  Re-optimize on Next Refresh marks every tracked stock pendingOptimization without changing cash. The next app refresh will re-grid SMA and factor. Reset Chart Baseline clears old snapshot history and starts fresh from today&apos;s values. Holdings and watchlist are preserved. Restore rolls back to any of your last 7 saved snapshots. Reset permanently deletes all data.
                 </p>
                 {refreshChartSuccess && (
                   <div className="mt-2 flex items-start gap-1.5 rounded-md border border-green-500/30 bg-green-500/10 px-2.5 py-2 text-xs text-green-700 dark:border-green-400/25 dark:text-green-400">
                     <svg xmlns="http://www.w3.org/2000/svg" className="mt-0.5 h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="20 6 9 17 4 12"/></svg>
-                    <span>Chart history cleared. The chart will rebuild from today&apos;s values as a new baseline.</span>
+                    <span>Chart History Cleared. Your performance chart has been reset. It will now rebuild from today&apos;s portfolio values as a new baseline.</span>
                     <button type="button" onClick={() => setRefreshChartSuccess(false)} className="ml-auto shrink-0 opacity-60 hover:opacity-100" aria-label="Dismiss">✕</button>
                   </div>
                 )}
                 {pendingOptSuccessCount != null && (
                   <div className="mt-2 flex items-start gap-1.5 rounded-md border border-green-500/30 bg-green-500/10 px-2.5 py-2 text-xs text-green-700 dark:border-green-400/25 dark:text-green-400">
-                    <span>{pendingOptSuccessCount} stocks will be optimized on the next refresh. Cash was not changed.</span>
+                    <span>Marked for Optimization. {pendingOptSuccessCount} stocks will be optimized on the next refresh.</span>
                     <button type="button" onClick={() => setPendingOptSuccessCount(null)} className="ml-auto shrink-0 opacity-60 hover:opacity-100" aria-label="Dismiss">Dismiss</button>
                   </div>
                 )}
@@ -951,7 +1018,7 @@ function SettingsInner() {
                   className="ui-hover-surface mt-2 w-full rounded-md border border-primary/35 bg-background/90 px-2.5 py-1.5 text-xs font-semibold text-foreground dark:border-primary/28 dark:bg-yale/40 inline-flex items-center justify-center gap-1.5"
                 >
                   <History className="h-3.5 w-3.5 opacity-70" aria-hidden />
-                  Restore from backup
+                  Restore from Backup
                 </button>
                 <button
                   type="button"
@@ -964,7 +1031,7 @@ function SettingsInner() {
                   ) : (
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                   )}
-                  Refresh chart baseline
+                  Reset Chart Baseline
                 </button>
                 <button
                   type="button"
@@ -973,14 +1040,14 @@ function SettingsInner() {
                   className="ui-hover-surface mt-1.5 w-full rounded-md border border-primary/35 bg-background/90 px-2.5 py-1.5 text-xs font-semibold text-foreground dark:border-primary/28 dark:bg-yale/40 inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
                 >
                   <RefreshCw className="h-3.5 w-3.5 opacity-70" aria-hidden />
-                  Re-optimize on next refresh
+                  Re-optimize on Next Refresh
                 </button>
                 <button
                   type="button"
                   onClick={() => setResetOpen(true)}
                   className="ui-hover-surface mt-1.5 w-full rounded-md border border-error/45 bg-background/90 px-2.5 py-1.5 text-xs font-semibold text-error dark:border-error/40 dark:bg-yale/40"
                 >
-                  Reset local portfolio
+                  Reset App Data
                 </button>
                 </div>
               </div>
@@ -993,30 +1060,9 @@ function SettingsInner() {
         open={refreshChartOpen}
         onClose={() => setRefreshChartOpen(false)}
         onConfirm={handleRefreshChartBaseline}
-        title="Clear chart history?"
-        description={
-          <div className="space-y-2.5">
-            <p>Your entire performance chart history will be <strong className="text-foreground">permanently deleted</strong> and restarted from today&apos;s values.</p>
-            <div className="grid grid-cols-2 gap-2 rounded-md border border-border bg-surface px-3 py-2 text-xs">
-              <div>
-                <p className="mb-1 font-semibold text-error">Will be deleted</p>
-                <ul className="space-y-0.5 text-subtle">
-                  <li>• Chart snapshot history</li>
-                  <li>• Cash flow records</li>
-                </ul>
-              </div>
-              <div>
-                <p className="mb-1 font-semibold text-success">Not affected</p>
-                <ul className="space-y-0.5 text-subtle">
-                  <li>• Stocks &amp; holdings</li>
-                  <li>• Watchlist</li>
-                  <li>• Trade history</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        }
-        confirmLabel="Yes, clear history"
+        title="Clear Chart History?"
+        description="Your entire performance chart history will be permanently deleted and restarted from today's values. Will be deleted: all chart snapshot history and cash flow records. Will NOT be affected: your stocks and holdings, watchlist, and trade history."
+        confirmLabel="Yes, Clear History"
         cancelLabel="Cancel"
         variant="default"
       />
@@ -1025,9 +1071,9 @@ function SettingsInner() {
         open={pendingOptOpen}
         onClose={() => setPendingOptOpen(false)}
         onConfirm={handleMarkPendingOptimization}
-        title="Re-optimize on next refresh?"
+        title="Re-optimize on Next Refresh?"
         description="All tracked stocks will be marked so the next refresh runs auto-optimization. Cash, holdings, and current SMA/factor values are not changed."
-        confirmLabel="Mark for optimization"
+        confirmLabel="Mark for Optimization"
         cancelLabel="Cancel"
         variant="default"
       />
@@ -1036,9 +1082,9 @@ function SettingsInner() {
         open={resetOpen}
         onClose={() => setResetOpen(false)}
         onConfirm={handleResetConfirm}
-        title="Reset local portfolio?"
-        description="This clears all holdings, lots, and trade history. Watchlist-only symbols are preserved. Sign in again or import CSV to rebuild holdings."
-        confirmLabel="Reset"
+        title="Reset All App Data"
+        description="This will permanently delete all stocks, holdings, historical data, portfolio metrics, and saved settings. This action cannot be undone."
+        confirmLabel="Reset Everything"
         cancelLabel="Cancel"
         variant="danger"
       />
@@ -1063,7 +1109,7 @@ function SettingsInner() {
                   Loading snapshots…
                 </div>
               ) : snapshots.length === 0 ? (
-                <p className="py-8 text-center text-sm text-subtle">No saved snapshots found in the last 30 days.</p>
+                <p className="py-8 text-center text-sm text-subtle">No saved snapshots found. Snapshots are saved automatically when your portfolio changes.</p>
               ) : (
                 <ul className="divide-y divide-border/50 dark:divide-white/[0.06]">
                   {snapshots.map((s) => (
@@ -1096,7 +1142,7 @@ function SettingsInner() {
               )}
             </div>
             <div className="border-t border-border/60 px-4 py-3 text-[10px] text-subtle dark:border-white/[0.07]">
-              Restoring replaces your current local portfolio and saves the selected snapshot as today&apos;s version.
+              Restoring replaces your current portfolio with the selected snapshot and saves it as today&apos;s version.
             </div>
           </div>
         </div>
@@ -1106,8 +1152,8 @@ function SettingsInner() {
         open={restoreConfirmOpen}
         onClose={() => { setRestoreConfirmOpen(false); setRestoreTarget(null); }}
         onConfirm={() => void handleRestoreConfirm()}
-        title={`Restore ${formatSnapshotDate(restoreTarget?.et_calendar_date ?? null)} snapshot?`}
-        description="Your current portfolio will be replaced by the selected snapshot. This will also sync to your iOS app."
+        title="Restore this snapshot?"
+        description={`This will replace your current portfolio with the ${formatSnapshotDate(restoreTarget?.et_calendar_date ?? null)} snapshot. Your current state will be overwritten.`}
         confirmLabel={restoring ? "Restoring…" : "Restore"}
         cancelLabel="Cancel"
         variant="danger"

@@ -10,10 +10,10 @@ import {
   type AppearanceMode,
 } from "@/lib/theme-mode";
 
-const OPTIONS: { value: AppearanceMode; label: string; hint: string }[] = [
-  { value: "light", label: "Light", hint: "Always light" },
-  { value: "dark", label: "Dark", hint: "Always dark" },
-  { value: "auto", label: "Auto", hint: "Light by day, dark at night" },
+const OPTIONS: { value: AppearanceMode; label: string }[] = [
+  { value: "auto", label: "Auto" },
+  { value: "dark", label: "Dark" },
+  { value: "light", label: "Light" },
 ];
 
 export function ThemeToggle() {
@@ -52,15 +52,11 @@ export function ThemeToggle() {
               )}
               aria-pressed={active}
             >
-              <span className="block text-sm font-semibold">{option.label}</span>
-              <span className="mt-0.5 block text-[10px] leading-snug">{option.hint}</span>
+              <span className="block text-center text-sm font-semibold">{option.label}</span>
             </button>
           );
         })}
       </div>
-      <p className="text-[11px] leading-snug text-subtle">
-        Auto uses light mode from 7:00 AM to 6:59 PM and dark mode overnight on this device.
-      </p>
     </div>
   );
 }

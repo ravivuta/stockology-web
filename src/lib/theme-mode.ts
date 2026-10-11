@@ -11,10 +11,10 @@ export function isAppearanceMode(value: string | null | undefined): value is App
   return value === "light" || value === "dark" || value === "auto";
 }
 
-export function resolveAppearanceTheme(mode: AppearanceMode, now: Date = new Date()): ResolvedAppearanceTheme {
+export function resolveAppearanceTheme(mode: AppearanceMode): ResolvedAppearanceTheme {
   if (mode === "light" || mode === "dark") return mode;
-  const hour = now.getHours();
-  return hour >= 7 && hour < 19 ? "light" : "dark";
+  if (typeof window === "undefined") return "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 export function readStoredAppearanceMode(): AppearanceMode {

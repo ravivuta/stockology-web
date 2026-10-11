@@ -102,22 +102,22 @@ const SECTIONS: Section[] = [
   {
     category: "filters",
     title: "Stock Shortlisting Process",
-    body: "Stocks PM intelligently filters your watchlist to focus on high-quality opportunities. When Risk Appetite filtering is enabled in Profile settings, stocks are screened based on market capitalization and analyst ratings. Composite score ranking then uses the same score as the rest of the app: analyst rating, market cap, and quality metrics when available. Leftover upside is applied later as the 25% expected-return gate for BUY/ADD, not as a ranking factor. The same filters apply to both watchlist views and live recommendations for consistency. When 'Enforce Ideal Watchlist Size' is enabled, only the top-scoring stocks (up to your recommended watchlist size) receive BUY/SELL/ADD/REDUCE signals - others show as HOLD or no recommendation. When disabled, all qualifying stocks receive recommendations.",
+    body: "Stocks PM intelligently filters your watchlist to focus on high-quality opportunities. When Shortlist by Risk Appetite is enabled in Settings, stocks are screened based on market capitalization and analyst ratings. Composite score ranking then uses the same score as the rest of the app: analyst rating, market cap, and quality metrics when available. Leftover upside is applied later as the 25% expected-return gate for BUY/ADD, not as a ranking factor. The same filters apply to both watchlist views and live recommendations for consistency. When Shortlist & Limit stocks for Portfolio size is enabled, only the top-scoring stocks (up to your recommended watchlist size) receive BUY/SELL/ADD/REDUCE signals - others show as HOLD or no recommendation. When disabled, all qualifying stocks receive recommendations.",
   },
   {
     category: "signals",
     title: "Recommendations",
-    body: "High-level actions (BUY/ADD/SELL/REDUCE/WAIT) based on trend, targets, and position size versus limits. Sell strategy (Investor vs Trader) controls whether RSI and AI options are available. With RSI gating enabled in Trader mode, BUY is never blocked by RSI, ADD can be blocked only when holdings are already above Stock Limit, and some SELL signals can wait for overbought reversal confirmation.",
+    body: "High-level actions (BUY/ADD/SELL/REDUCE/WAIT) based on trend, targets, and position size versus limits. Recommendation mode (Long-term or Active) controls whether RSI and AI options are available. With RSI gating enabled in Active mode, BUY is never blocked by RSI, ADD can be blocked only when holdings are already above Stock Limit, and some SELL signals can wait for overbought reversal confirmation.",
   },
   {
     category: "signals",
-    title: "Sell strategy (Investor vs Trader)",
-    body: "Investor mode holds until analyst target — RSI gating and AI news & market outlook are forced off so they do not conflict with that hold. Trader mode unlocks RSI and AI options and can sell earlier on overbought RSI / weak multi-signal setups before the target is reached.",
+    title: "Recommendation mode",
+    body: "Long-term mode holds until analyst target. RSI and AI guidance are turned off to avoid conflicts. Active mode enables RSI and AI guidance. SELL can trigger when RSI is overbought with low upside (<10%), or when score/RSI/AI are all weak with low upside (<15%).",
   },
   {
     category: "signals",
-    title: "AI news & market outlook — the setting",
-    body: "Available in Trader mode (Premium). One Settings toggle — “Leverage AI news & market outlook in recommendations” — turns on both company-level AI scores and market-outlook cash rules together (same as iOS Profile). When the toggle is off, Investor mode is selected, or without Premium, the Home market-outlook icon is hidden and those signals do not change BUY, ADD, SELL, or REDUCE. Scores and news may still load for display. Turning the setting off also stops OpenAI refresh for your holdings and shortlist on the server.",
+    title: "Use AI to guide recommendations",
+    body: "Available in Active mode (Premium). One Settings toggle — “Use AI to guide recommendations” — turns on both company-level AI scores and market-outlook cash rules together. When the toggle is off, Long-term mode is selected, or without Premium, the Home market-outlook icon is hidden and those signals do not change BUY, ADD, SELL, or REDUCE. Scores and news may still load for display. Turning the setting off also stops OpenAI refresh for your holdings and shortlist on the server.",
   },
   {
     category: "signals",

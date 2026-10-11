@@ -33,8 +33,6 @@ function ThemeModeSync({ pathname }: { pathname: string }) {
       return;
     }
 
-    let timer: ReturnType<typeof setTimeout> | null = null;
-
     const applyMode = () => {
       const mode = readStoredAppearanceMode();
       const resolved = resolveAppearanceTheme(mode);
@@ -46,34 +44,16 @@ function ThemeModeSync({ pathname }: { pathname: string }) {
       }
     };
 
-    const scheduleNextAutoRefresh = () => {
-      if (timer) clearTimeout(timer);
-      if (readStoredAppearanceMode() !== "auto") return;
-
-      const now = new Date();
-      const next = new Date(now);
-      if (now.getHours() < 7) {
-        next.setHours(7, 0, 0, 0);
-      } else if (now.getHours() < 19) {
-        next.setHours(19, 0, 0, 0);
-      } else {
-        next.setDate(next.getDate() + 1);
-        next.setHours(7, 0, 0, 0);
-      }
-
-      timer = setTimeout(() => {
-        applyMode();
-        scheduleNextAutoRefresh();
-      }, Math.max(1000, next.getTime() - now.getTime()));
-    };
-
     const handleModeChange = () => {
       applyMode();
-      scheduleNextAutoRefresh();
     };
 
     applyMode();
-    scheduleNextAutoRefresh();
+    const appearanceQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleSystemAppearance = () => {
+      if (readStoredAppearanceMode() === "auto") applyMode();
+    };
+    appearanceQuery.addEventListener("change", handleSystemAppearance);
 
     const handleStorage = (event: StorageEvent) => {
       if (event.key !== THEME_MODE_STORAGE && event.key !== THEME_ACTIVE_STORAGE) return;
@@ -89,7 +69,7 @@ function ThemeModeSync({ pathname }: { pathname: string }) {
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      if (timer) clearTimeout(timer);
+      appearanceQuery.removeEventListener("change", handleSystemAppearance);
       window.removeEventListener("storage", handleStorage);
       window.removeEventListener(THEME_MODE_EVENT, handleModeChange as EventListener);
       document.removeEventListener("visibilitychange", handleVisibilityChange);

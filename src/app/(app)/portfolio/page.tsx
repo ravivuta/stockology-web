@@ -15,6 +15,7 @@ import { computeTodayChangeFromHistory, computeTodayChangeFromLiveQuotes, fetchC
 import { isUsMarketTradingDay } from "@/lib/market-hours";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
+import { fieldInputClass } from "@/lib/field-input";
 import { cashByAccount, displayAccount, isCashSymbol } from "@/lib/cash-accounts";
 import { fixedIncomeTotal } from "@/lib/fixed-income-accounts";
 
@@ -92,12 +93,11 @@ function upsideTextClass(upside: number | null | undefined): string {
   return "text-subtle";
 }
 
-function actionableFilterClass(active: boolean) {
-  const base =
-    "rounded-full border px-2.5 py-1 text-[10px] font-semibold normal-case tracking-normal transition-colors";
-  return active
-    ? `${base} border-[#c79400]/45 bg-[#f3c74a]/42 text-[#6b4b00] dark:border-[#f3c74a]/45 dark:bg-[#f3c74a]/24 dark:text-[#f6d97d]`
-    : `${base} border-[#d8b44a]/35 bg-[#f3c74a]/20 text-[#8a6500] hover:border-[#c79400]/35 hover:bg-[#f3c74a]/28 dark:border-[#f3c74a]/20 dark:bg-[#f3c74a]/14 dark:text-[#e7cb72] dark:hover:bg-[#f3c74a]/20`;
+function filterChipClass(active: boolean, tone: "green" | "gold") {
+  const base = "no-ui-hover inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold";
+  if (!active) return `${base} border-border bg-background text-foreground`;
+  if (tone === "green") return `${base} border-transparent bg-emerald-500/90 text-white`;
+  return `${base} border-transparent bg-[#f3c74a] text-black`;
 }
 
 function PortfolioSummaryTiles({
@@ -181,6 +181,7 @@ export default function PortfolioPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION.symbol);
   const [query, setQuery] = useState("");
   const [showActionable, setShowActionable] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<string>("__all__");
   const [cloudHistory, setCloudHistory] = useState<NetWorthPoint[] | null>(null);
 
@@ -362,28 +363,62 @@ export default function PortfolioPage() {
 
       <div className="space-y-8">
         <div className="ui-hover-lift rounded-2xl border border-border bg-elevated px-3 py-2.5">
-          <div className="flex flex-wrap items-center gap-3">
-            <div>
-              <p className="text-base font-semibold text-foreground">Portfolio</p>
-              <p className="text-xs text-subtle">{portfolioCountText}</p>
-            </div>
-            <div className="ml-auto flex items-center gap-2 md:ml-0">
-              <label className="flex items-center gap-2 text-xs text-subtle">
-                <span className="font-medium">Account</span>
-                <select
-                  value={selectedAccount}
-                  onChange={(event) => setSelectedAccount(event.target.value)}
-                  className="rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground"
-                >
-                  <option value="__all__">All Accounts</option>
-                  {accountOptions.map((account) => (
-                    <option key={account} value={account}>{account}</option>
-                  ))}
-                </select>
-              </label>
-              <AddAssetButton idPrefix="portfolio-add" />
-            </div>
+          <div>
+            <p className="text-base font-semibold text-foreground">Portfolio</p>
+            <p className="text-xs text-subtle">{portfolioCountText}</p>
           </div>
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+            <select
+              value={selectedAccount}
+              onChange={(event) => setSelectedAccount(event.target.value)}
+              aria-label="Account"
+              className={
+                selectedAccount === "__all__"
+                  ? filterChipClass(false, "green")
+                  : "inline-flex items-center rounded-full border border-transparent bg-[#3370c2] px-3 py-1 text-xs font-semibold text-white dark:bg-[#66abf5] dark:text-black"
+              }
+            >
+              <option value="__all__">All Accounts</option>
+              {accountOptions.map((account) => (
+                <option key={account} value={account}>{account}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setShowActionable((value) => !value)}
+              className={filterChipClass(showActionable, "green")}
+              aria-pressed={showActionable}
+            >
+              Actionable
+            </button>
+            <AddAssetButton idPrefix="portfolio-add" />
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className={`${filterChipClass(false, "green")} ${searchOpen ? "pointer-events-none invisible" : ""}`}
+              aria-hidden={searchOpen}
+              tabIndex={searchOpen ? -1 : 0}
+            >
+              Search
+            </button>
+          </div>
+          {searchOpen ? (
+            <div className="mt-2 flex justify-end">
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  setQuery(next);
+                  if (!next) setSearchOpen(false);
+                }}
+                placeholder="Filter"
+                className={`${fieldInputClass} w-40 rounded-lg px-3 py-1.5 text-sm`}
+                aria-label="Filter portfolio symbols"
+                autoFocus
+              />
+            </div>
+          ) : null}
         </div>
 
         <div className="ui-hover-lift overflow-x-auto rounded-2xl border border-border bg-elevated">
@@ -403,32 +438,7 @@ export default function PortfolioPage() {
               </colgroup>
               <thead className="border-b border-zinc-400/70 bg-zinc-300/95 text-subtle dark:border-zinc-600 dark:bg-zinc-700/85">
                 <tr>
-                  <th
-                    scope="col"
-                    aria-sort={sort === "symbol" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
-                    className="px-2 pb-2 pt-2.5 text-center text-xs font-semibold tracking-wide md:px-4 md:pt-3"
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleSort("symbol")}
-                        className="inline-flex items-center justify-center gap-1 transition-colors hover:text-foreground"
-                      >
-                        <span>Symbol</span>
-                        <span aria-hidden="true" className={`text-[10px] ${sort === "symbol" ? "text-foreground" : "text-subtle/70"}`}>
-                          {sort === "symbol" ? (sortDirection === "asc" ? "▲" : "▼") : "↕"}
-                        </span>
-                      </button>
-                      <input
-                        type="search"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Type to filter"
-                        className="w-full min-w-0 rounded-lg border border-border bg-background px-2.5 py-1.5 text-[11px] font-medium normal-case tracking-normal text-foreground placeholder:text-subtle"
-                        aria-label="Filter portfolio symbols"
-                      />
-                    </div>
-                  </th>
+                  <SortableHeaderCell label="Symbol" column="symbol" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 md:px-4 md:pt-3" />
                   <SortableHeaderCell label="Last / Chg" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 md:hidden" />
                   <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
                   <SortableHeaderCell label="Chg" column="today" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
@@ -438,28 +448,8 @@ export default function PortfolioPage() {
                   <SortableHeaderCell label="Gain" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 md:px-4 md:pt-3" />
                   <SortableHeaderCell label="Potential Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
                   <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
-                  <th scope="col" aria-sort={sort === "signal" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className="px-2 pb-2 pt-2.5 text-center text-xs font-semibold tracking-wide md:px-4 md:pt-3">
-                    <div className="flex flex-col items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleSort("signal")}
-                        className="inline-flex items-center justify-center gap-1 transition-colors hover:text-foreground"
-                      >
-                        <span className="sm:hidden">Rec</span>
-                        <span className="hidden sm:inline">Recommendation</span>
-                        <span aria-hidden="true" className={`text-[10px] ${sort === "signal" ? "text-foreground" : "text-subtle/70"}`}>
-                          {sort === "signal" ? (sortDirection === "asc" ? "▲" : "▼") : "↕"}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowActionable((value) => !value)}
-                        className={`${actionableFilterClass(showActionable)} hidden sm:inline-flex`}
-                      >
-                        {showActionable ? "Showing actionable" : "Filter actionable"}
-                      </button>
-                    </div>
-                  </th>
+                  <SortableHeaderCell label="Rec" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 sm:hidden" />
+                  <SortableHeaderCell label="Recommendation" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 sm:table-cell" />
                 </tr>
               </thead>
               <tbody>

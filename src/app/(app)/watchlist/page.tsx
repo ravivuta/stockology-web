@@ -12,6 +12,7 @@ import { AddAssetButton } from "@/components/portfolio/AddAssetForm";
 import { StockDetailModal } from "@/components/stock/StockDetailModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
+import { fieldInputClass } from "@/lib/field-input";
 import {
   flushCurrentPortfolioSnapshotNow,
   patchCurrentPortfolioSnapshotHoldings,
@@ -68,17 +69,11 @@ function analystRatingTextClass(value: string | null | undefined): string {
   return "text-red-600 dark:text-red-400";
 }
 
-function columnFilterClass(active: boolean, tone: "amber" | "emerald") {
-  const base =
-    "rounded-full border px-2.5 py-1 text-[10px] font-semibold normal-case tracking-normal transition-colors";
-  if (tone === "amber") {
-    return active
-      ? `${base} border-[#c79400]/45 bg-[#f3c74a]/42 text-[#6b4b00] dark:border-[#f3c74a]/45 dark:bg-[#f3c74a]/24 dark:text-[#f6d97d]`
-      : `${base} border-[#d8b44a]/35 bg-[#f3c74a]/20 text-[#8a6500] hover:border-[#c79400]/35 hover:bg-[#f3c74a]/28 dark:border-[#f3c74a]/20 dark:bg-[#f3c74a]/14 dark:text-[#e7cb72] dark:hover:bg-[#f3c74a]/20`;
-  }
-  return active
-    ? `${base} border-[#c79400]/45 bg-[#f3c74a]/42 text-[#6b4b00] dark:border-[#f3c74a]/45 dark:bg-[#f3c74a]/24 dark:text-[#f6d97d]`
-    : `${base} border-[#d8b44a]/35 bg-[#f3c74a]/20 text-[#8a6500] hover:border-[#c79400]/35 hover:bg-[#f3c74a]/28 dark:border-[#f3c74a]/20 dark:bg-[#f3c74a]/14 dark:text-[#e7cb72] dark:hover:bg-[#f3c74a]/20`;
+function filterChipClass(active: boolean, tone: "green" | "gold") {
+  const base = "no-ui-hover inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold";
+  if (!active) return `${base} border-border bg-background text-foreground`;
+  if (tone === "green") return `${base} border-transparent bg-emerald-500/90 text-black`;
+  return `${base} border-transparent bg-[#f3c74a] text-black`;
 }
 
 /**
@@ -92,6 +87,7 @@ export default function WatchlistPage() {
   const [query, setQuery] = useState("");
   const [showShortlisted, setShowShortlisted] = useState(false);
   const [showActionable, setShowActionable] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [sort, setSort] = useState<SortKey>("symbol");
   const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION.symbol);
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
@@ -237,15 +233,57 @@ export default function WatchlistPage() {
       </div>
 
       <div className="ui-hover-lift rounded-2xl border border-border bg-elevated p-3">
-        <div className="flex items-start gap-3">
-          <div className="min-w-0">
-            <p className="text-lg font-semibold text-foreground">Watchlist</p>
-            <p className="mt-1 text-xs text-subtle">{watchlistCountText}</p>
-          </div>
-          <div className="ml-auto shrink-0">
-            <AddAssetButton idPrefix="watchlist-add" />
-          </div>
+        <div>
+          <p className="text-lg font-semibold text-foreground">Watchlist</p>
+          <p className="mt-1 text-xs text-subtle">{watchlistCountText}</p>
         </div>
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+          {limitWatchlistSize ? (
+            <button
+              type="button"
+              onClick={() => setShowShortlisted((value) => !value)}
+              className={filterChipClass(showShortlisted, "gold")}
+              aria-pressed={showShortlisted}
+            >
+              Shortlisted
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setShowActionable((value) => !value)}
+            className={filterChipClass(showActionable, "green")}
+            aria-pressed={showActionable}
+          >
+            Actionable
+          </button>
+          <AddAssetButton idPrefix="watchlist-add" />
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            className={`${filterChipClass(false, "gold")} ${searchOpen ? "pointer-events-none invisible" : ""}`}
+            aria-hidden={searchOpen}
+            tabIndex={searchOpen ? -1 : 0}
+          >
+            Search
+          </button>
+        </div>
+        {searchOpen ? (
+          <div className="mt-2 flex justify-end">
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => {
+                const next = event.target.value;
+                setQuery(next);
+                if (!next) setSearchOpen(false);
+              }}
+              placeholder="Filter"
+              className={`${fieldInputClass} w-40 rounded-lg px-3 py-1.5 text-sm`}
+              aria-label="Filter watchlist symbols"
+              autoFocus
+            />
+          </div>
+        ) : null}
       </div>
 
       <div className="w-full overflow-x-auto rounded-2xl border border-border bg-elevated">
@@ -265,28 +303,7 @@ export default function WatchlistPage() {
           </colgroup>
           <thead className="border-b border-zinc-400/70 bg-zinc-300/95 text-xs font-semibold uppercase tracking-wide text-subtle dark:border-zinc-600 dark:bg-zinc-700/85">
             <tr>
-              <th scope="col" aria-sort={sort === "symbol" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className="px-1.5 py-2.5 text-center sm:px-3 sm:py-3">
-                <div className="flex flex-col items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleSort("symbol")}
-                    className="inline-flex items-center justify-center gap-1 transition-colors hover:text-foreground"
-                  >
-                    <span>Symbol</span>
-                    <span aria-hidden="true" className={`text-[10px] ${sort === "symbol" ? "text-foreground" : "text-subtle/70"}`}>
-                      {sort === "symbol" ? (sortDirection === "asc" ? "▲" : "▼") : "↕"}
-                    </span>
-                  </button>
-                  <input
-                    type="search"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Type to filter"
-                    className="w-full min-w-0 rounded-lg border border-border bg-background px-2.5 py-1.5 text-[11px] font-medium normal-case tracking-normal text-foreground placeholder:text-subtle"
-                    aria-label="Filter watchlist symbols"
-                  />
-                </div>
-              </th>
+              <SortableHeaderCell label="Symbol" column="symbol" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-1.5 py-2.5 sm:px-3 sm:py-3" />
               <SortableHeaderCell
                 label="Last / Chg"
                 column="lastPrice"
@@ -299,43 +316,14 @@ export default function WatchlistPage() {
               <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 md:table-cell md:px-3" />
               <SortableHeaderCell label="Today %" column="change" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 md:table-cell md:px-3" />
               <SortableHeaderCell label="Analyst Rating" column="analyst" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 md:table-cell md:px-3" />
-              <th scope="col" className="hidden px-2 py-3 text-center sm:table-cell sm:px-3">
-                <div className="flex flex-col items-center gap-2">
-                  <span>Shortlisted</span>
-                  <button
-                    type="button"
-                    onClick={() => setShowShortlisted((value) => !value)}
-                    className={columnFilterClass(showShortlisted, "amber")}
-                  >
-                    {showShortlisted ? "Showing Yes only" : "Filter Yes"}
-                  </button>
-                </div>
+              <th scope="col" className="hidden px-2 py-3 text-center text-xs font-semibold uppercase tracking-wide sm:table-cell sm:px-3">
+                Shortlisted
               </th>
               <SortableHeaderCell label="Potential Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-1.5 py-2.5 sm:px-3 sm:py-3" />
               <SortableHeaderCell label="Div%" column="yield" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-1 py-2.5 sm:px-2 sm:py-3" />
               <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 sm:table-cell sm:px-3" />
-              <th scope="col" aria-sort={sort === "signal" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className="min-w-0 px-1.5 py-2.5 text-center sm:px-3 sm:py-3">
-                <div className="flex flex-col items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleSort("signal")}
-                    className="inline-flex items-center justify-center gap-1 transition-colors hover:text-foreground"
-                  >
-                    <span className="sm:hidden">Rec</span>
-                    <span className="hidden sm:inline">Recommendation</span>
-                    <span aria-hidden="true" className={`text-[10px] ${sort === "signal" ? "text-foreground" : "text-subtle/70"}`}>
-                      {sort === "signal" ? (sortDirection === "asc" ? "▲" : "▼") : "↕"}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowActionable((value) => !value)}
-                    className={`${columnFilterClass(showActionable, "emerald")} hidden sm:inline-flex`}
-                  >
-                    {showActionable ? "Showing actionable" : "Filter actionable"}
-                  </button>
-                </div>
-              </th>
+              <SortableHeaderCell label="Rec" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="min-w-0 px-1.5 py-2.5 sm:hidden" />
+              <SortableHeaderCell label="Recommendation" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden min-w-0 px-3 py-3 sm:table-cell" />
               <th scope="col" className="hidden px-2 py-3 text-center md:table-cell md:px-3">
                 <span className="sr-only">Actions</span>
               </th>
