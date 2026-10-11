@@ -18,6 +18,8 @@ import { usePortfolioStore } from "@/store/portfolioStore";
 
 const MAX_REFRESH_SYMBOLS = 250;
 const MAX_SYMBOL_LEN = 16;
+/** iOS ignores a cloud snapshot only when a local save is newer and less than 90s old. */
+const SNAPSHOT_STALE_SKIP_MS = 90_000;
 
 type RefreshPipelineResponse = {
   ok: boolean;
@@ -81,6 +83,32 @@ async function syncCloudSettingsIfChanged(): Promise<boolean> {
   }
 }
 
+function keepLocalMarketFields(local: StockHolding, incoming: StockHolding): StockHolding {
+  const next: StockHolding = { ...incoming };
+  if ((next.lastPrice ?? 0) <= 0 && (local.lastPrice ?? 0) > 0) {
+    next.lastPrice = local.lastPrice;
+    next.dailyChangePercent = local.dailyChangePercent;
+  }
+  if (next.analystTarget == null && local.analystTarget != null) next.analystTarget = local.analystTarget;
+  if (next.analystAvg == null && local.analystAvg != null) next.analystAvg = local.analystAvg;
+  if (next.marketCap == null && local.marketCap != null) next.marketCap = local.marketCap;
+  if (next.peg == null && local.peg != null) next.peg = local.peg;
+  if (next.beta == null && local.beta != null) next.beta = local.beta;
+  if (next.returnOnEquity == null && local.returnOnEquity != null) next.returnOnEquity = local.returnOnEquity;
+  if (next.profitMargin == null && local.profitMargin != null) next.profitMargin = local.profitMargin;
+  if (next.trailingPE == null && local.trailingPE != null) next.trailingPE = local.trailingPE;
+  if (next.debtToEquity == null && local.debtToEquity != null) next.debtToEquity = local.debtToEquity;
+  if (next.dividendYield == null && local.dividendYield != null) next.dividendYield = local.dividendYield;
+  if (next.payoutRatio == null && local.payoutRatio != null) next.payoutRatio = local.payoutRatio;
+  if (next.aiSentimentScore == null && local.aiSentimentScore != null) {
+    next.aiSentimentScore = local.aiSentimentScore;
+    next.aiSentimentLastUpdated = local.aiSentimentLastUpdated;
+  }
+  if (!next.name && local.name) next.name = local.name;
+  if (next.isETF == null && local.isETF != null) next.isETF = local.isETF;
+  return next;
+}
+
 function sanitizeSymbols(symbols: string[]): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
@@ -131,32 +159,61 @@ export async function runRefreshPipeline(
 
     const dataUserId = data.data_user_id?.trim() ?? "";
 
-    if (options?.includeSnapshot === true && data.snapshot) {
-      const localMutationAt = Date.parse(usePortfolioStore.getState().lastLocalMutationAt ?? "");
+    const stateBeforeSnapshot = usePortfolioStore.getState();
+    let snapshotApplied = false;
+    let snapshotWritten = false;
+    if (options?.includeSnapshot === true && data.snapshot && !stateBeforeSnapshot.optimizing) {
+      const localMutationAt = Date.parse(stateBeforeSnapshot.lastLocalMutationAt ?? "");
       const snapshotUpdatedAt = Date.parse(data.snapshot.updated_at ?? "");
-      const snapshotIsStale =
-        Number.isFinite(localMutationAt) &&
-        Number.isFinite(snapshotUpdatedAt) &&
-        snapshotUpdatedAt < localMutationAt;
+      const snapshotIsNewerThanLocal =
+        !Number.isFinite(localMutationAt) ||
+        !Number.isFinite(snapshotUpdatedAt) ||
+        snapshotUpdatedAt >= localMutationAt;
+      const recentLocalSave =
+        Number.isFinite(localMutationAt) && Date.now() - localMutationAt < SNAPSHOT_STALE_SKIP_MS;
+      const skipStaleSnapshot = !snapshotIsNewerThanLocal && recentLocalSave;
 
-      if (!snapshotIsStale) {
+      if (!skipStaleSnapshot) {
         const parsed = parseCloudSnapshotForStore(data.snapshot);
+        const localBySymbol = new Map(
+          stateBeforeSnapshot.stocks.map((stock) => [stock.symbol.toUpperCase(), stock])
+        );
+        const stocks = parsed.stocks.map((stock) => {
+          const local = localBySymbol.get(stock.symbol.toUpperCase());
+          return local ? keepLocalMarketFields(local, stock) : stock;
+        });
         usePortfolioStore.getState().replaceFromCloudSync({
           ...parsed,
+          stocks,
           onboardingComplete: true,
         });
         if (dataUserId) {
+          const applied = usePortfolioStore.getState();
           markLastPushedPortfolioFingerprint(
             dataUserId,
             portfolioSyncFingerprint({
-              cashBalance: parsed.cashBalance,
-              fixedIncomeByAccount: parsed.fixedIncomeByAccount,
-              stocks: parsed.stocks,
-              lotsBySymbol: parsed.lotsBySymbol,
+              cashBalance: applied.cashBalance,
+              fixedIncomeByAccount: applied.fixedIncomeByAccount,
+              stocks: applied.stocks,
+              lotsBySymbol: applied.lotsBySymbol,
             })
           );
         }
+        snapshotWritten = true;
       }
+      snapshotApplied = true;
+    }
+
+    const portfolioSizeAfter = usePortfolioStore.getState().portfolioSize;
+    const portfolioSizeBefore = stateBeforeSnapshot.portfolioSize;
+    let recalculateLimits = !snapshotApplied;
+    if (
+      snapshotApplied &&
+      portfolioSizeBefore > 0 &&
+      portfolioSizeAfter > 0 &&
+      Math.abs(portfolioSizeAfter - portfolioSizeBefore) / portfolioSizeBefore > 0.1
+    ) {
+      recalculateLimits = true;
     }
 
     const prices = data.prices ?? {};
@@ -171,14 +228,16 @@ export async function runRefreshPipeline(
     }
 
     if (patches.length > 0) {
-      usePortfolioStore.getState().bulkUpdateStocks(patches);
+      usePortfolioStore.getState().bulkUpdateStocks(patches, { shouldRecalculateLimits: recalculateLimits });
+    } else if (!snapshotWritten || recalculateLimits || settingsChanged) {
+      usePortfolioStore.getState().recalcMetrics({
+        shouldRecalculateLimits: recalculateLimits,
+        recordMutation: false,
+      });
     }
 
     if (options?.optimizePending !== false) {
       await usePortfolioStore.getState().optimizePendingStocks();
-    }
-    if (settingsChanged) {
-      usePortfolioStore.getState().recalcMetrics();
     }
 
     usePortfolioStore.setState({

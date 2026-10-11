@@ -44,6 +44,7 @@ export function fixedIncomeTotal(
   }, 0);
 }
 
+/** Same keys iOS writes for `$FIXED_INCOME:` rows in `holdingsJSON`. */
 export function fixedIncomeSnapshotHoldings(
   fixedIncomeByAccount: Record<string, number> | null | undefined
 ): Array<{
@@ -52,24 +53,8 @@ export function fixedIncomeSnapshotHoldings(
   averageCost: number;
   lastPrice: number;
   pendingOptimization: boolean;
-  shortSMA: null;
-  dynamicFactor: null;
-  stockLimit: null;
-  transactionLimit: null;
-  targetPrice: null;
-  recommendation: null;
-  moving_avg: null;
-  isShortlisted: boolean;
-  lotHistory: null;
-  noAutoBuy: null;
-  excludeFromShortlist: null;
-  isETF: boolean;
-  enableRSIReversalGate: null;
-  rsiPeriod: null;
-  rsiOversoldThreshold: null;
-  rsiOverboughtThreshold: null;
-  rsiHysteresisPoints: null;
-  rsiMinRisingDays: null;
+  stockLimit: number;
+  transactionLimit: number;
 }> {
   if (!fixedIncomeByAccount) return [];
   const rows: Array<{
@@ -78,24 +63,8 @@ export function fixedIncomeSnapshotHoldings(
     averageCost: number;
     lastPrice: number;
     pendingOptimization: boolean;
-    shortSMA: null;
-    dynamicFactor: null;
-    stockLimit: null;
-    transactionLimit: null;
-    targetPrice: null;
-    recommendation: null;
-    moving_avg: null;
-    isShortlisted: boolean;
-    lotHistory: null;
-    noAutoBuy: null;
-    excludeFromShortlist: null;
-    isETF: boolean;
-    enableRSIReversalGate: null;
-    rsiPeriod: null;
-    rsiOversoldThreshold: null;
-    rsiOverboughtThreshold: null;
-    rsiHysteresisPoints: null;
-    rsiMinRisingDays: null;
+    stockLimit: number;
+    transactionLimit: number;
   }> = [];
 
   for (const [account, amount] of Object.entries(fixedIncomeByAccount)) {
@@ -108,24 +77,8 @@ export function fixedIncomeSnapshotHoldings(
       averageCost: 1,
       lastPrice: 1,
       pendingOptimization: false,
-      shortSMA: null,
-      dynamicFactor: null,
-      stockLimit: null,
-      transactionLimit: null,
-      targetPrice: null,
-      recommendation: null,
-      moving_avg: null,
-      isShortlisted: false,
-      lotHistory: null,
-      noAutoBuy: null,
-      excludeFromShortlist: null,
-      isETF: false,
-      enableRSIReversalGate: null,
-      rsiPeriod: null,
-      rsiOversoldThreshold: null,
-      rsiOverboughtThreshold: null,
-      rsiHysteresisPoints: null,
-      rsiMinRisingDays: null,
+      stockLimit: 10_000,
+      transactionLimit: 2_500,
     });
   }
 

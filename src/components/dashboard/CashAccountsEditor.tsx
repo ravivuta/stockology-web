@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { cashByAccount, knownCashAccounts, CASH_SYMBOL } from "@/lib/cash-accounts";
 import { recordExternalCashFlow } from "@/lib/external-cash-flows";
-import { patchCurrentPortfolioSnapshotCash, patchCurrentPortfolioSnapshotHoldings } from "@/lib/portfolio-snapshot-client";
+import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { formatCurrency } from "@/lib/numberFormat";
 import { appCtaButton } from "@/lib/appCtaClasses";
 
@@ -55,8 +55,7 @@ export function CashAccountsEditor({
     }
     const result = applyCashLotsEdit(amounts);
     recalc();
-    await patchCurrentPortfolioSnapshotHoldings();
-    await patchCurrentPortfolioSnapshotCash(result.markedPending);
+    await flushCurrentPortfolioSnapshotNow(true);
     const delta = result.nextCash - result.previousCash;
     if (Math.abs(delta) >= 0.005) {
       await recordExternalCashFlow({

@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
   }
 
-  const body = (await request.json().catch(() => null)) as { slice?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { slice?: unknown; allowEmptyHoldings?: boolean } | null;
   const slice = sanitizeSlice(body?.slice);
   if (!slice) {
     return NextResponse.json({ error: "Invalid portfolio snapshot payload." }, { status: 400 });
@@ -73,7 +73,13 @@ export async function POST(request: Request) {
 
   const dataUserId = await syncStocksPmAuthUser(supabase, user.id);
   const admin = createAdminClient();
-  const { error } = await upsertPortfolioSnapshotForCloudUser(admin, dataUserId, slice);
+  const { error, skipped } = await upsertPortfolioSnapshotForCloudUser(admin, dataUserId, slice, {
+    allowEmptyHoldings: body?.allowEmptyHoldings === true,
+  });
+
+  if (skipped) {
+    return NextResponse.json({ skipped: true });
+  }
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

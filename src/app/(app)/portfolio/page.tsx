@@ -6,7 +6,7 @@ import { usePortfolioStore } from "@/store/portfolioStore";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
 import { PortfolioAllocationChart } from "@/components/portfolio/PortfolioAllocationChart";
-import { AddAssetForm } from "@/components/portfolio/AddAssetForm";
+import { AddAssetButton } from "@/components/portfolio/AddAssetForm";
 import { StockDetailModal } from "@/components/stock/StockDetailModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
 import { formatCurrency, formatDecimal, formatNumberMax2, formatPercent, formatSignedCurrency, formatWholeCurrency } from "@/lib/numberFormat";
@@ -185,7 +185,6 @@ export default function PortfolioPage() {
     void run();
     return () => { cancelled = true; };
   }, []);
-  const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
 
   /** Portfolio page lists positions only; watchlist-only symbols (0 qty) stay in store for trading elsewhere. */
@@ -343,35 +342,21 @@ export default function PortfolioPage() {
               <p className="text-base font-semibold text-foreground">Portfolio</p>
               <p className="text-xs text-subtle">{portfolioCountText}</p>
             </div>
-            <label className="ml-auto flex items-center gap-2 text-xs text-subtle md:ml-0">
-              <span className="font-medium">Account</span>
-              <select
-                value={selectedAccount}
-                onChange={(event) => setSelectedAccount(event.target.value)}
-                className="rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground"
-              >
-                <option value="__all__">All Accounts</option>
-                {accountOptions.map((account) => (
-                  <option key={account} value={account}>{account}</option>
-                ))}
-              </select>
-            </label>
-            <div className="md:hidden">
-              <button
-                type="button"
-                aria-expanded={mobileControlsOpen}
-                aria-controls="portfolio-mobile-controls"
-                onClick={() => setMobileControlsOpen((open) => !open)}
-                className="rounded-xl border border-border bg-background px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
-              >
-                {mobileControlsOpen ? "Hide add asset" : "Show add asset"}
-              </button>
-            </div>
-            <div
-              id="portfolio-mobile-controls"
-              className={`${mobileControlsOpen ? "mt-2 flex w-full" : "hidden"} md:mt-2 md:flex md:w-full`}
-            >
-              <AddAssetForm idPrefix="portfolio-add" />
+            <div className="ml-auto flex items-center gap-2 md:ml-0">
+              <label className="flex items-center gap-2 text-xs text-subtle">
+                <span className="font-medium">Account</span>
+                <select
+                  value={selectedAccount}
+                  onChange={(event) => setSelectedAccount(event.target.value)}
+                  className="rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground"
+                >
+                  <option value="__all__">All Accounts</option>
+                  {accountOptions.map((account) => (
+                    <option key={account} value={account}>{account}</option>
+                  ))}
+                </select>
+              </label>
+              <AddAssetButton idPrefix="portfolio-add" />
             </div>
           </div>
         </div>

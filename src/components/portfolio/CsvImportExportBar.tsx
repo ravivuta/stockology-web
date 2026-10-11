@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
-import { patchCurrentPortfolioSnapshotHoldings, pushPortfolioSnapshotSlice } from "@/lib/portfolio-snapshot-client";
-import { patchPortfolioSnapshotHoldingsForCloudUser } from "@/lib/portfolio-cloud-sync";
+import { pushPortfolioSnapshotSlice } from "@/lib/portfolio-snapshot-client";
 import { fetchTickerHydrationFromTables, type TickerHydrationPriceRow } from "@/lib/ticker-direct-hydration";
 import { getSupabaseEnv } from "@/lib/supabase/config";
 import { usePortfolioStore, type StockHolding } from "@/store/portfolioStore";
@@ -465,18 +464,12 @@ export function CsvImportExportBar({
   }
 
   async function saveImportSnapshot(): Promise<string | null> {
-    // Holdings-only patch: keep existing SMA/factor/limits/cash/settings intact.
-    const patchResult = await patchCurrentPortfolioSnapshotHoldings();
-    if (!patchResult.error && patchResult.patched) return null;
-
     if (!hasSupabaseConfig()) return null;
 
     const supabase = createClient();
     const { data } = await supabase.auth.getUser();
     const authUserId = data.user?.id;
-    if (!authUserId) {
-      return patchResult.error ? `Cloud snapshot save failed: ${patchResult.error.message}` : null;
-    }
+    if (!authUserId) return null;
     const dataUserId = await resolveStocksPmDataUserId(supabase, authUserId);
     const state = usePortfolioStore.getState();
     const slice = {
@@ -485,20 +478,8 @@ export function CsvImportExportBar({
       stocks: state.stocks,
       lotsBySymbol: state.lotsBySymbol,
     };
-    const fallbackPatch = await patchPortfolioSnapshotHoldingsForCloudUser(supabase, dataUserId, slice);
-    if (!fallbackPatch.error && fallbackPatch.patched) return null;
-
-    // No snapshot row yet — create the first one. After that, identity patches are used.
-    const fallback = await pushPortfolioSnapshotSlice(dataUserId, slice, { force: true, supabase });
-
-    if (fallback.error) {
-      return `Cloud snapshot save failed: ${fallback.error.message}`;
-    }
-
-    if (patchResult.error) {
-      return `Cloud snapshot retry succeeded after initial failure: ${patchResult.error.message}`;
-    }
-
+    const saved = await pushPortfolioSnapshotSlice(dataUserId, slice, { force: true, supabase });
+    if (saved.error) return `Cloud snapshot save failed: ${saved.error.message}`;
     return null;
   }
 

@@ -8,11 +8,11 @@ import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
 import { formatCurrency, formatDecimal, formatPercent } from "@/lib/numberFormat";
 import { recommendationActionDisplay } from "@/lib/recommendation";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
-import { AddAssetForm } from "@/components/portfolio/AddAssetForm";
+import { AddAssetButton } from "@/components/portfolio/AddAssetForm";
 import { StockDetailModal } from "@/components/stock/StockDetailModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
-import { patchCurrentPortfolioSnapshotHoldings } from "@/lib/portfolio-snapshot-client";
+import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 
 type SortKey = "symbol" | "lastPrice" | "change" | "analyst" | "upside" | "yield" | "score" | "signal";
 
@@ -93,7 +93,6 @@ export default function WatchlistPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION.symbol);
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
-  const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
   const watchlistStocks = useMemo(() => stocks.filter((s) => s.quantity <= 0), [stocks]);
   const shortlistedSymbolsForWatchlistFilter = useMemo(() => {
     const eligible = watchlistStocks.filter((s) => s.excludeFromShortlist !== true);
@@ -220,65 +219,13 @@ export default function WatchlistPage() {
       </div>
 
       <div className="ui-hover-lift rounded-2xl border border-border bg-elevated p-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="min-w-[12rem]">
+        <div className="flex items-start gap-3">
+          <div className="min-w-0">
             <p className="text-lg font-semibold text-foreground">Watchlist</p>
             <p className="mt-1 text-xs text-subtle">{watchlistCountText}</p>
           </div>
-          <div className="md:hidden">
-            <button
-              type="button"
-              aria-expanded={mobileControlsOpen}
-              aria-controls="watchlist-mobile-controls"
-              onClick={() => setMobileControlsOpen((open) => !open)}
-              className="rounded-xl border border-border bg-background px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
-            >
-              {mobileControlsOpen ? "Hide add stock" : "Show add stock"}
-            </button>
-          </div>
-          <div
-            id="watchlist-mobile-controls"
-            className={`${mobileControlsOpen ? "mt-2 flex w-full" : "hidden"} flex-wrap items-end justify-between gap-3 md:mt-0 md:ml-auto md:flex md:w-auto`}
-          >
-            <Link
-              href="/simulation#watchlist-simulation"
-              aria-label="Simulate (App Strategy)"
-              title="Simulate (App Strategy)"
-              className="group flex items-center"
-            >
-              <span className="relative flex h-11 w-44 items-center justify-center overflow-hidden rounded-[1.25rem] border border-primary/20 bg-[linear-gradient(135deg,color-mix(in_srgb,var(--theme-primary)_16%,white),color-mix(in_srgb,var(--theme-primary)_6%,white)_44%,color-mix(in_srgb,var(--theme-primary)_18%,transparent))] shadow-[0_10px_24px_-18px_color-mix(in_srgb,var(--theme-primary)_65%,transparent)] transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 hover:border-primary/32 hover:shadow-[0_16px_28px_-18px_color-mix(in_srgb,var(--theme-primary)_72%,transparent)] dark:border-primary/25 dark:bg-[linear-gradient(135deg,color-mix(in_srgb,var(--theme-primary)_22%,#0f1726),color-mix(in_srgb,var(--theme-primary)_10%,#111827)_46%,color-mix(in_srgb,var(--theme-primary)_20%,#0f1726))]">
-                <span
-                  className="pointer-events-none absolute inset-0 opacity-90"
-                  aria-hidden
-                  style={{
-                    background:
-                      "radial-gradient(circle at 14% 26%, color-mix(in srgb, var(--theme-primary) 24%, transparent), transparent 44%), radial-gradient(circle at 82% 74%, color-mix(in srgb, var(--theme-primary) 18%, transparent), transparent 48%), linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.18) 33%, transparent 60%)",
-                  }}
-                />
-                <span className="relative text-primary/90 drop-shadow-[0_5px_14px_color-mix(in_srgb,var(--theme-primary)_28%,transparent)] dark:text-[color-mix(in_srgb,var(--theme-primary)_78%,white)]" aria-hidden>
-                  <svg viewBox="0 0 176 44" className="h-11 w-44" fill="none">
-                    <rect x="10" y="8" width="38" height="28" rx="10" fill="currentColor" fillOpacity="0.08" />
-                    <rect x="10" y="8" width="38" height="28" rx="10" stroke="currentColor" strokeOpacity="0.2" strokeWidth="1.4" />
-                    <path d="M17 29L24.5 22L29.5 25.5L38.5 15.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M34.5 15.5H38.5V19.5" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
-                    <circle cx="24.5" cy="22" r="2.1" fill="currentColor" />
-                    <circle cx="29.5" cy="25.5" r="2.1" fill="currentColor" fillOpacity="0.82" />
-                    <circle cx="38.5" cy="15.5" r="2.1" fill="currentColor" />
-                    <path d="M17 15.5H28" stroke="currentColor" strokeOpacity="0.2" strokeWidth="1.4" strokeLinecap="round" />
-                    <path d="M17 19.5H22.5" stroke="currentColor" strokeOpacity="0.16" strokeWidth="1.4" strokeLinecap="round" />
-                    <text x="56" y="18" fill="currentColor" fontSize="8.4" fontWeight="700" letterSpacing="1.25">SIMULATE</text>
-                    <text x="56" y="29.2" fill="currentColor" fillOpacity="0.92" fontSize="6.25" fontWeight="600" letterSpacing="0.9">APP STRATEGY</text>
-                    <rect x="134" y="12" width="28" height="20" rx="10" fill="currentColor" fillOpacity="0.08" />
-                    <rect x="134" y="12" width="28" height="20" rx="10" stroke="currentColor" strokeOpacity="0.18" strokeWidth="1.3" />
-                    <path d="M143 22H153" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-                    <path d="M149 17L154 22L149 27" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </span>
-              </span>
-            </Link>
-            <div className="w-full min-w-[18rem] flex-1">
-              <AddAssetForm idPrefix="watchlist-add" />
-            </div>
+          <div className="ml-auto shrink-0">
+            <AddAssetButton idPrefix="watchlist-add" />
           </div>
         </div>
       </div>
@@ -508,7 +455,7 @@ export default function WatchlistPage() {
           if (!removeTarget) return;
           const sym = removeTarget.toUpperCase();
           removeStock(sym);
-          void patchCurrentPortfolioSnapshotHoldings([sym]);
+          void flushCurrentPortfolioSnapshotNow(true);
         }}
         title="Remove symbol?"
         description={

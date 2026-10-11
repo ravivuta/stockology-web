@@ -162,21 +162,26 @@ export function markLastPushedPortfolioFingerprint(dataUserId: string, fingerpri
 
 async function savePortfolioSnapshotViaServer(
   dataUserId: string,
-  slice: PortfolioSlice
-): Promise<{ error: Error | null }> {
+  slice: PortfolioSlice,
+  options?: SnapshotPushOptions
+): Promise<{ error: Error | null; skipped?: boolean }> {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   try {
     const response = await fetch(`${basePath}/api/portfolio/snapshot`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dataUserId, slice }),
+      body: JSON.stringify({
+        dataUserId,
+        slice,
+        allowEmptyHoldings: !!options?.allowEmptyHoldings,
+      }),
       credentials: "same-origin",
     });
-    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    const payload = (await response.json().catch(() => null)) as { error?: string; skipped?: boolean } | null;
     if (!response.ok) {
       return { error: new Error(payload?.error || `Snapshot save failed with HTTP ${response.status}.`) };
     }
-    return { error: null };
+    return { error: null, skipped: payload?.skipped === true };
   } catch (error) {
     return { error: error instanceof Error ? error : new Error("Snapshot save failed.") };
   }
@@ -203,12 +208,23 @@ async function executePortfolioSnapshotSlice(
   }
 
   const supabase = options?.supabase ?? createClient();
-  let { error } = await upsertPortfolioSnapshotForCloudUser(supabase, dataUserId, slice);
+  let saved = await upsertPortfolioSnapshotForCloudUser(supabase, dataUserId, slice, {
+    allowEmptyHoldings: options?.allowEmptyHoldings,
+  });
+  let error = saved.error;
+
+  if (saved.skipped) {
+    return { error: null, skipped: true, fingerprint };
+  }
 
   if (error) {
     console.warn("[pushPortfolioSnapshotSlice] Direct Supabase save failed; retrying through server.", error.message);
-    const fallback = await savePortfolioSnapshotViaServer(dataUserId, slice);
+    const fallback = await savePortfolioSnapshotViaServer(dataUserId, slice, options);
     error = fallback.error;
+    saved = { error: fallback.error, skipped: fallback.skipped };
+    if (fallback.skipped) {
+      return { error: null, skipped: true, fingerprint };
+    }
   }
 
   if (!error) {

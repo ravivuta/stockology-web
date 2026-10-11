@@ -3,13 +3,8 @@
 import { useEffect, useState } from "react";
 import { parseCloudSnapshotForStore } from "@/lib/cloud-snapshot-hydration";
 import {
-  portfolioSyncFingerprint,
   portfolioHoldingsIdentityFingerprint,
   portfolioOptimizationFingerprint,
-  optimizationUpdatesFromSlice,
-  patchPortfolioSnapshotCashForCloudUser,
-  patchPortfolioSnapshotOptimizationForCloudUser,
-  patchPortfolioSnapshotHoldingsForCloudUser,
   loadGlobalSettingsForUser,
   patchFromCloudGlobalSettings,
 } from "@/lib/portfolio-cloud-sync";
@@ -23,7 +18,6 @@ import {
 } from "@/lib/clear-portfolio-client-state";
 import {
   flushCurrentPortfolioSnapshotNow,
-  markLastPushedPortfolioFingerprint,
   pushPortfolioSnapshotSlice,
   retryPendingPortfolioSnapshot,
 } from "@/lib/portfolio-snapshot-client";
@@ -201,17 +195,6 @@ export function PortfolioCloudBridge({
 
     retryPendingPortfolioSnapshot(dataUserId);
 
-    const pushCurrentSnapshot = () => {
-      const state = usePortfolioStore.getState();
-      const slice = {
-        cashBalance: state.cashBalance,
-        fixedIncomeByAccount: state.fixedIncomeByAccount,
-        stocks: state.stocks,
-        lotsBySymbol: state.lotsBySymbol,
-      };
-      void pushPortfolioSnapshotSlice(dataUserId, slice);
-    };
-
     const flushNow = () => {
       void flushCurrentPortfolioSnapshotNow(false);
     };
@@ -232,6 +215,7 @@ export function PortfolioCloudBridge({
     window.addEventListener("pagehide", flushNow);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
+    let deferredDuringOptimize = false;
     const unsub = usePortfolioStore.subscribe((state, prev) => {
       const prevSlice = {
         cashBalance: prev.cashBalance,
@@ -245,75 +229,25 @@ export function PortfolioCloudBridge({
         stocks: state.stocks,
         lotsBySymbol: state.lotsBySymbol,
       };
-      const a = portfolioSyncFingerprint(prevSlice);
-      const b = portfolioSyncFingerprint(nextSlice);
-      if (a === b) return;
+      const structuralChanged =
+        portfolioHoldingsIdentityFingerprint(prevSlice) !== portfolioHoldingsIdentityFingerprint(nextSlice) ||
+        prevSlice.cashBalance !== nextSlice.cashBalance ||
+        portfolioOptimizationFingerprint(prevSlice) !== portfolioOptimizationFingerprint(nextSlice);
+      if (state.optimizing) {
+        if (structuralChanged) deferredDuringOptimize = true;
+        return;
+      }
+      if (deferredDuringOptimize && prev.optimizing) {
+        deferredDuringOptimize = false;
+        void pushPortfolioSnapshotSlice(dataUserId, nextSlice, { force: true });
+        return;
+      }
+      if (!structuralChanged) return;
       const intentionalClear = !sliceIsEmpty(prevSlice) && sliceIsEmpty(nextSlice);
-      if (intentionalClear) {
-        void pushPortfolioSnapshotSlice(dataUserId, nextSlice, {
-          force: true,
-          allowEmptyHoldings: true,
-        });
-        return;
-      }
-      const identityChanged =
-        portfolioHoldingsIdentityFingerprint(prevSlice) !== portfolioHoldingsIdentityFingerprint(nextSlice);
-      if (identityChanged) {
-        const remaining = new Set(nextSlice.stocks.map((stock) => stock.symbol.toUpperCase()));
-        const removedSymbols = prevSlice.stocks
-          .map((stock) => stock.symbol.toUpperCase())
-          .filter((symbol) => !remaining.has(symbol));
-        const supabase = createClient();
-        void patchPortfolioSnapshotHoldingsForCloudUser(supabase, dataUserId, nextSlice, removedSymbols).then(
-          async (holdingsResult) => {
-            if (holdingsResult.error) return;
-            if (!holdingsResult.patched) {
-              pushCurrentSnapshot();
-              return;
-            }
-            const cashChanged = prevSlice.cashBalance !== nextSlice.cashBalance;
-            if (cashChanged) {
-              const prevPending = prevSlice.stocks.filter((stock) => stock.pendingOptimization).length;
-              const nextPending = nextSlice.stocks.filter((stock) => stock.pendingOptimization).length;
-              await patchPortfolioSnapshotCashForCloudUser(
-                supabase,
-                dataUserId,
-                nextSlice.cashBalance,
-                nextPending > prevPending
-              );
-            }
-            markLastPushedPortfolioFingerprint(dataUserId, portfolioSyncFingerprint(nextSlice));
-          }
-        );
-        return;
-      }
-      const cashChanged = prevSlice.cashBalance !== nextSlice.cashBalance;
-      if (cashChanged) {
-        const prevPending = prevSlice.stocks.filter((stock) => stock.pendingOptimization).length;
-        const nextPending = nextSlice.stocks.filter((stock) => stock.pendingOptimization).length;
-        void patchPortfolioSnapshotCashForCloudUser(
-          createClient(),
-          dataUserId,
-          nextSlice.cashBalance,
-          nextPending > prevPending
-        ).then((result) => {
-          if (!result.error && result.patched) {
-            markLastPushedPortfolioFingerprint(dataUserId, portfolioSyncFingerprint(nextSlice));
-          }
-        });
-        return;
-      }
-      if (portfolioOptimizationFingerprint(prevSlice) !== portfolioOptimizationFingerprint(nextSlice)) {
-        const updates = optimizationUpdatesFromSlice(nextSlice, prevSlice);
-        if (updates.length === 0) return;
-        void patchPortfolioSnapshotOptimizationForCloudUser(createClient(), dataUserId, updates).then((result) => {
-          if (!result.error && result.patched) {
-            markLastPushedPortfolioFingerprint(dataUserId, portfolioSyncFingerprint(nextSlice));
-          }
-        });
-        return;
-      }
-      // Derived-only changes (shortlist, lastPrice) stay local.
+      void pushPortfolioSnapshotSlice(dataUserId, nextSlice, {
+        force: true,
+        allowEmptyHoldings: intentionalClear,
+      });
     });
 
     return () => {

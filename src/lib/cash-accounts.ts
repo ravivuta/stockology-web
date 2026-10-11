@@ -29,6 +29,7 @@ export type CashLotBundle = { open: Array<{
   quantity: number;
   costBasis: number;
   purchaseDate: string;
+  initialQuantity?: number;
   account?: string;
   isRetirementAccount?: boolean | null;
   status: "open" | "partiallySold" | "fullySold" | "washSaleRestricted";
@@ -126,6 +127,7 @@ export function replaceCashLots(
     .map((entry) => ({
       id: uid(),
       quantity: entry.amount,
+      initialQuantity: entry.amount,
       costBasis: CASH_UNIT_PRICE,
       purchaseDate: new Date().toISOString(),
       account: entry.name,
@@ -184,6 +186,7 @@ function credit(bundle: CashLotBundle, accountName: string, amount: number) {
   bundle.open.push({
     id: uid(),
     quantity: amount,
+    initialQuantity: amount,
     costBasis: CASH_UNIT_PRICE,
     purchaseDate: new Date().toISOString(),
     account: accountName,
@@ -207,51 +210,3 @@ function debitAt(bundle: CashLotBundle, index: number, remaining: number): numbe
   return remaining - take;
 }
 
-export function cashHoldingPayload(lots: CashLotBundle | undefined) {
-  const open = lots?.open ?? [];
-  const sold = lots?.sold ?? [];
-  const quantity = cashLotQuantity(lots);
-  return {
-    symbol: CASH_SYMBOL,
-    quantity,
-    averageCost: CASH_UNIT_PRICE,
-    lastPrice: CASH_UNIT_PRICE,
-    pendingOptimization: false,
-    shortSMA: null,
-    dynamicFactor: null,
-    stockLimit: null,
-    transactionLimit: null,
-    targetPrice: null,
-    recommendation: null,
-    moving_avg: null,
-    isShortlisted: false,
-    noAutoBuy: null,
-    excludeFromShortlist: null,
-    isETF: false,
-    enableRSIReversalGate: null,
-    rsiPeriod: null,
-    rsiOversoldThreshold: null,
-    rsiOverboughtThreshold: null,
-    rsiHysteresisPoints: null,
-    rsiMinRisingDays: null,
-    lotHistory: {
-      symbol: CASH_SYMBOL,
-      openLots: open.map((lot) => ({
-        lotId: lot.id,
-        symbol: CASH_SYMBOL,
-        quantity: lot.quantity,
-        costBasis: lot.costBasis,
-        purchaseDate: lot.purchaseDate,
-        status: lot.status,
-        account: lot.account ?? null,
-        isRetirementAccount: lot.isRetirementAccount ?? null,
-      })),
-      soldLots: sold.map((lot) => ({
-        salePrice: lot.salePrice,
-        quantity: lot.quantity,
-        originalCostBasis: lot.salePrice - lot.realizedGainLoss / Math.max(lot.quantity, 1e-9),
-        saleDateIntervalSince1970: Date.parse(lot.saleDate) / 1000,
-      })),
-    },
-  };
-}

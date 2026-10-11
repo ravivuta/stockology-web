@@ -1,9 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SoldLot, StockHolding, TradeLot } from "@/store/portfolioStore";
-import { cashHoldingPayload, isCashSymbol } from "@/lib/cash-accounts";
+import { CASH_SYMBOL, CASH_UNIT_PRICE, cashLotQuantity, isCashSymbol } from "@/lib/cash-accounts";
 import {
   fixedIncomeSnapshotHoldings,
   fixedIncomeTotal,
+  isFixedIncomeSymbol,
   sanitizeFixedIncomeByAccount,
 } from "@/lib/fixed-income-accounts";
 
@@ -17,15 +18,6 @@ export type PortfolioSlice = {
 function finiteOrNull(value: unknown): number | null {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
-}
-
-function normalizeDateString(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const parsed = Date.parse(trimmed);
-  if (!Number.isFinite(parsed)) return null;
-  return new Date(parsed).toISOString();
 }
 
 function snapshotValuationPrice(stock: StockHolding): number {
@@ -42,109 +34,154 @@ function etCalendarDateString(d = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(d);
 }
 
-function holdingPayload(s: StockHolding, lots: { open: TradeLot[]; sold: SoldLot[] } | undefined) {
-  const openLots = (lots?.open ?? []).flatMap((lot) => {
-    const quantity = finiteOrNull(lot.quantity);
-    const costBasis = finiteOrNull(lot.costBasis);
-    const purchaseDate = normalizeDateString(lot.purchaseDate);
-    if (quantity == null || quantity <= 0 || costBasis == null || costBasis <= 0 || purchaseDate == null) {
-      return [];
-    }
+/** Swift `JSONEncoder.dateEncodingStrategy = .iso8601` (no fractional seconds). */
+function iosIso8601(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return `${trimmed}T00:00:00Z`;
+  const parsed = Date.parse(trimmed);
+  if (!Number.isFinite(parsed)) return null;
+  return new Date(parsed).toISOString().replace(/\.\d{3}Z$/, "Z");
+}
 
-    return [{
-      lotId: lot.id,
-      symbol: s.symbol,
-      quantity,
-      costBasis,
-      purchaseDate,
-      status: lot.status,
-      account: lot.account ?? null,
-      isRetirementAccount: lot.isRetirementAccount ?? null,
-    }];
-  });
-  const soldLots = (lots?.sold ?? []).flatMap((lot) => {
-    const salePrice = finiteOrNull(lot.salePrice);
-    const quantity = finiteOrNull(lot.quantity);
-    const realizedGainLoss = finiteOrNull(lot.realizedGainLoss);
-    const saleDateIso = normalizeDateString(lot.saleDate);
-    if (
-      salePrice == null ||
-      salePrice <= 0 ||
-      quantity == null ||
-      quantity <= 0 ||
-      realizedGainLoss == null ||
-      saleDateIso == null
-    ) {
-      return [];
-    }
+function encodeOpenLot(symbol: string, lot: TradeLot): Record<string, unknown> | null {
+  const quantity = finiteOrNull(lot.quantity);
+  const costBasis = finiteOrNull(lot.costBasis);
+  const purchaseDate = iosIso8601(lot.purchaseDate);
+  if (quantity == null || quantity <= 0 || costBasis == null || costBasis <= 0 || purchaseDate == null) {
+    return null;
+  }
+  const initialQuantity = finiteOrNull(lot.initialQuantity);
+  const payload: Record<string, unknown> = {
+    lotId: lot.id,
+    symbol,
+    purchaseDate,
+    costBasis,
+    quantity,
+    initialQuantity: initialQuantity != null && initialQuantity > 0 ? initialQuantity : quantity,
+    status: lot.status || "open",
+  };
+  const account = lot.account?.trim();
+  if (account) payload.account = account;
+  if (typeof lot.isRetirementAccount === "boolean") payload.isRetirementAccount = lot.isRetirementAccount;
+  return payload;
+}
 
-    const originalCostBasis = salePrice - realizedGainLoss / quantity;
-    if (!Number.isFinite(originalCostBasis)) {
-      return [];
-    }
-
-    return [{
-      salePrice,
-      quantity,
-      originalCostBasis,
-      saleDateIntervalSince1970: Date.parse(saleDateIso) / 1000,
-    }];
-  });
+function encodeSoldLot(symbol: string, lot: SoldLot): Record<string, unknown> | null {
+  const salePrice = finiteOrNull(lot.salePrice);
+  const quantity = finiteOrNull(lot.quantity);
+  const realizedGainLoss = finiteOrNull(lot.realizedGainLoss);
+  const saleDateIso = iosIso8601(lot.saleDate);
+  if (
+    salePrice == null ||
+    salePrice <= 0 ||
+    quantity == null ||
+    quantity <= 0 ||
+    realizedGainLoss == null ||
+    saleDateIso == null
+  ) {
+    return null;
+  }
+  const originalCostBasis = salePrice - realizedGainLoss / quantity;
+  if (!Number.isFinite(originalCostBasis)) return null;
   return {
-    symbol: s.symbol,
-    quantity: s.quantity,
-    averageCost: s.averageCost,
-    lastPrice: snapshotValuationPrice(s),
-    pendingOptimization: s.pendingOptimization,
-    shortSMA: s.shortSMA,
-    dynamicFactor: s.dynamicFactor,
-    stockLimit: s.stockLimit,
-    transactionLimit: s.transactionLimit,
-    targetPrice: s.targetPrice ?? null,
-    recommendation: s.recommendation?.action ?? null,
-    moving_avg: s.movingAvg ?? s.recommendation?.movingAvg ?? null,
-    isShortlisted: s.isShortlisted ?? false,
-    noAutoBuy: s.suppressTradeActions ?? null,
-    excludeFromShortlist: s.excludeFromShortlist ?? null,
-    enableRSIReversalGate: s.enableRSIReversalGate ?? true,
-    rsiPeriod: s.rsiPeriod ?? null,
-    rsiOversoldThreshold: s.rsiOversoldThreshold ?? null,
-    rsiOverboughtThreshold: s.rsiOverboughtThreshold ?? null,
-    rsiHysteresisPoints: s.rsiHysteresisPoints ?? null,
-    rsiMinRisingDays: s.rsiMinRisingDays ?? null,
-    lotHistory: {
-      symbol: s.symbol,
-      openLots,
-      soldLots,
-    },
+    symbol,
+    saleDateIntervalSince1970: Date.parse(saleDateIso) / 1000,
+    salePrice,
+    quantity,
+    originalCostBasis,
   };
 }
 
-function holdingIdentityPayload(s: StockHolding, lots: { open: TradeLot[]; sold: SoldLot[] } | undefined) {
-  const full = holdingPayload(s, lots);
-  return {
-    symbol: full.symbol,
-    quantity: full.quantity,
-    averageCost: full.averageCost,
-    lastPrice: full.lastPrice,
-    lotHistory: full.lotHistory,
-    isETF: s.isETF ?? null,
-    noAutoBuy: full.noAutoBuy,
-    excludeFromShortlist: full.excludeFromShortlist,
-    enableRSIReversalGate: full.enableRSIReversalGate,
-    rsiPeriod: full.rsiPeriod,
-    rsiOversoldThreshold: full.rsiOversoldThreshold,
-    rsiOverboughtThreshold: full.rsiOverboughtThreshold,
-    rsiHysteresisPoints: full.rsiHysteresisPoints,
-    rsiMinRisingDays: full.rsiMinRisingDays,
+function encodeLotHistory(
+  symbol: string,
+  lots: { open: TradeLot[]; sold: SoldLot[] } | undefined
+): Record<string, unknown> | null {
+  const openLots = (lots?.open ?? []).flatMap((lot) => {
+    const encoded = encodeOpenLot(symbol, lot);
+    return encoded ? [encoded] : [];
+  });
+  const soldLots = (lots?.sold ?? []).flatMap((lot) => {
+    const encoded = encodeSoldLot(symbol, lot);
+    return encoded ? [encoded] : [];
+  });
+  if (openLots.length === 0 && soldLots.length === 0) return null;
+  return { symbol, openLots, soldLots };
+}
+
+/**
+ * Matches iOS `UserPortfolioSnapshot.holdingsJSON` for one equity or watchlist row.
+ * Optional keys are omitted when iOS would omit them. `stockLimit` / `transactionLimit`
+ * always use the same 10000 / 2500 fallback.
+ */
+function holdingPayload(s: StockHolding, lots: { open: TradeLot[]; sold: SoldLot[] } | undefined) {
+  const symbol = s.symbol.trim().toUpperCase();
+  const hasPosition = Number.isFinite(s.quantity) && s.quantity > 0;
+  const payload: Record<string, unknown> = {
+    symbol,
+    quantity: hasPosition ? s.quantity : 0,
+    averageCost: hasPosition ? s.averageCost : 0,
+    pendingOptimization: s.pendingOptimization === true,
+    stockLimit: Number.isFinite(s.stockLimit) ? s.stockLimit : 10_000,
+    transactionLimit: Number.isFinite(s.transactionLimit) ? s.transactionLimit : 2_500,
   };
+  if ((s.lastPrice ?? 0) > 0) payload.lastPrice = s.lastPrice;
+  if (Number.isFinite(s.shortSMA)) payload.shortSMA = Math.round(s.shortSMA);
+  if (Number.isFinite(s.dynamicFactor)) payload.dynamicFactor = s.dynamicFactor;
+  if (s.targetPrice != null && Number.isFinite(s.targetPrice)) payload.targetPrice = s.targetPrice;
+  const movingAvg = s.movingAvg ?? s.recommendation?.movingAvg;
+  if (movingAvg != null && Number.isFinite(movingAvg)) payload.moving_avg = movingAvg;
+  const lotHistory = encodeLotHistory(symbol, lots);
+  if (lotHistory) payload.lotHistory = lotHistory;
+  if (s.suppressTradeActions === true) payload.noAutoBuy = true;
+  if (s.excludeFromShortlist === true) payload.excludeFromShortlist = true;
+  if (s.rsiPeriod != null && Number.isFinite(s.rsiPeriod)) payload.rsiPeriod = Math.round(s.rsiPeriod);
+  if (s.rsiOversoldThreshold != null && Number.isFinite(s.rsiOversoldThreshold)) {
+    payload.rsiOversoldThreshold = s.rsiOversoldThreshold;
+  }
+  if (s.rsiOverboughtThreshold != null && Number.isFinite(s.rsiOverboughtThreshold)) {
+    payload.rsiOverboughtThreshold = s.rsiOverboughtThreshold;
+  }
+  if (s.rsiHysteresisPoints != null && Number.isFinite(s.rsiHysteresisPoints)) {
+    payload.rsiHysteresisPoints = s.rsiHysteresisPoints;
+  }
+  if (s.rsiMinRisingDays != null && Number.isFinite(s.rsiMinRisingDays)) {
+    payload.rsiMinRisingDays = Math.round(s.rsiMinRisingDays);
+  }
+  if (typeof s.isETF === "boolean") payload.isETF = s.isETF;
+  return payload;
+}
+
+function cashSnapshotHolding(lots: { open: TradeLot[]; sold: SoldLot[] } | undefined): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    symbol: CASH_SYMBOL,
+    quantity: cashLotQuantity(lots),
+    averageCost: CASH_UNIT_PRICE,
+    lastPrice: CASH_UNIT_PRICE,
+    pendingOptimization: false,
+    stockLimit: 10_000,
+    transactionLimit: 2_500,
+    isETF: false,
+  };
+  const lotHistory = encodeLotHistory(CASH_SYMBOL, lots);
+  if (lotHistory) payload.lotHistory = lotHistory;
+  return payload;
+}
+
+function iosSnapshotHoldings(state: PortfolioSlice): Record<string, unknown>[] {
+  const holdings = state.stocks
+    .filter((stock) => !isCashSymbol(stock.symbol) && !isFixedIncomeSymbol(stock.symbol))
+    .map((stock) => holdingPayload(stock, state.lotsBySymbol[stock.symbol]));
+  holdings.push(cashSnapshotHolding(state.lotsBySymbol[CASH_SYMBOL]));
+  holdings.push(...fixedIncomeSnapshotHoldings(state.fixedIncomeByAccount));
+  return holdings;
 }
 
 function totals(state: PortfolioSlice) {
   let cost = 0;
   let value = 0;
   for (const s of state.stocks) {
-    if (isCashSymbol(s.symbol) || s.quantity <= 0) continue;
+    if (isCashSymbol(s.symbol) || isFixedIncomeSymbol(s.symbol) || s.quantity <= 0) continue;
     cost += s.quantity * s.averageCost;
     value += s.quantity * snapshotValuationPrice(s);
   }
@@ -297,11 +334,7 @@ export async function patchPortfolioSnapshotHoldingsForCloudUser(
   state: PortfolioSlice,
   removedSymbols: string[] = []
 ): Promise<{ error: Error | null; patched: boolean }> {
-  const holdings = state.stocks
-    .filter((stock) => !isCashSymbol(stock.symbol))
-    .map((stock) => holdingIdentityPayload(stock, state.lotsBySymbol[stock.symbol]));
-  holdings.push(cashHoldingPayload(state.lotsBySymbol["$CASH"]) as unknown as (typeof holdings)[number]);
-  holdings.push(...(fixedIncomeSnapshotHoldings(state.fixedIncomeByAccount) as unknown as (typeof holdings)));
+  const holdings = iosSnapshotHoldings(state);
   const { data, error } = await supabase.rpc("patch_portfolio_snapshot_holdings", {
     p_user_id: dataUserId,
     p_holdings: holdings,
@@ -377,16 +410,37 @@ export async function patchPortfolioSnapshotCashForCloudUser(
  * Uses `save_portfolio_snapshot` RPC (replaces direct table upsert — columns are
  * now bytea/AES-256-CBC encrypted and cannot be written directly from the client).
  */
+export function snapshotSaveBlockReason(
+  state: PortfolioSlice,
+  options?: { allowEmptyHoldings?: boolean }
+): string | null {
+  const equity = state.stocks.filter((stock) => !isCashSymbol(stock.symbol) && !isFixedIncomeSymbol(stock.symbol) && stock.quantity > 0);
+  const hasCash = Number.isFinite(state.cashBalance) && state.cashBalance >= 0.005;
+  const hasFixedIncome = fixedIncomeTotal(state.fixedIncomeByAccount) > 0.005;
+  if (equity.length === 0 && !hasCash && !hasFixedIncome && !options?.allowEmptyHoldings) {
+    return "empty";
+  }
+  const t = totals(state);
+  if (t.total_portfolio_value < 0) return "negative-total";
+  if (state.cashBalance < -100) return "negative-cash";
+  if (state.stocks.some((stock) => stock.stockLimit < -100)) return "negative-limits";
+  const pricesMissing =
+    equity.length > 0 &&
+    equity.every((stock) => (stock.lastPrice ?? 0) <= 0 && stock.averageCost <= 0);
+  if (pricesMissing) return "prices-not-loaded";
+  return null;
+}
+
 export async function upsertPortfolioSnapshotForCloudUser(
   supabase: SupabaseClient,
   dataUserId: string,
-  state: PortfolioSlice
-): Promise<{ error: Error | null }> {
-  const holdings = state.stocks
-    .filter((stock) => !isCashSymbol(stock.symbol))
-    .map((stock) => holdingPayload(stock, state.lotsBySymbol[stock.symbol]));
-  holdings.push(cashHoldingPayload(state.lotsBySymbol["$CASH"]) as unknown as (typeof holdings)[number]);
-  holdings.push(...(fixedIncomeSnapshotHoldings(state.fixedIncomeByAccount) as unknown as (typeof holdings)));
+  state: PortfolioSlice,
+  options?: { allowEmptyHoldings?: boolean }
+): Promise<{ error: Error | null; skipped?: boolean }> {
+  if (snapshotSaveBlockReason(state, options)) {
+    return { error: null, skipped: true };
+  }
+  const holdings = iosSnapshotHoldings(state);
   const t = totals(state);
 
   const { error } = await supabase.rpc("save_portfolio_snapshot", {

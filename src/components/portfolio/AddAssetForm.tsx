@@ -12,10 +12,11 @@ import { isValidTicker } from "@/lib/csvPortfolio";
 import { recordExternalCashFlow } from "@/lib/external-cash-flows";
 import { isFixedIncomeSymbol } from "@/lib/fixed-income-accounts";
 import { formatCurrency } from "@/lib/numberFormat";
-import { patchCurrentPortfolioSnapshotCash, patchCurrentPortfolioSnapshotHoldings } from "@/lib/portfolio-snapshot-client";
+import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { hasPremiumFeatureAccess, trackedStockLimitMessage } from "@/lib/subscription-limits";
 import { withAppBasePath } from "@/lib/base-path";
 import { appCtaButton } from "@/lib/appCtaClasses";
+import { AppModal } from "@/components/ui/AppModal";
 
 type AssetKind = "stock" | "cash" | "fixedIncome";
 
@@ -168,7 +169,7 @@ export function AddAssetForm({ idPrefix }: { idPrefix: string }) {
       });
     }
     recalc();
-    await patchCurrentPortfolioSnapshotHoldings();
+    await flushCurrentPortfolioSnapshotNow(true);
     setSaving(false);
     setStatus(hasQty ? `Added ${qty} ${sym} @ ${formatCurrency(price)}.` : `Added ${sym} without a holding.`);
     resetStockFields();
@@ -211,7 +212,7 @@ export function AddAssetForm({ idPrefix }: { idPrefix: string }) {
       applyFixedIncomeLotsEdit(nextFixed, { adjustCash: deductFromCash });
       rememberReturnRate(accountName, rate);
       recalc();
-      await patchCurrentPortfolioSnapshotHoldings();
+      await flushCurrentPortfolioSnapshotNow(true);
       setSaving(false);
       setStatus(
         deductFromCash
@@ -228,8 +229,7 @@ export function AddAssetForm({ idPrefix }: { idPrefix: string }) {
     setSaving(true);
     const result = applyCashLotsEdit(nextCash);
     recalc();
-    await patchCurrentPortfolioSnapshotHoldings();
-    await patchCurrentPortfolioSnapshotCash(result.markedPending);
+    await flushCurrentPortfolioSnapshotNow(true);
     const delta = result.nextCash - result.previousCash;
     if (Math.abs(delta) >= 0.005) {
       await recordExternalCashFlow({
@@ -254,7 +254,7 @@ export function AddAssetForm({ idPrefix }: { idPrefix: string }) {
   const inputClass = "rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground";
 
   return (
-    <div className="w-full space-y-3 rounded-xl border border-border/80 bg-background/40 p-3 dark:border-white/[0.08]">
+    <div className="w-full space-y-3">
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-subtle">What are you adding?</p>
         <div className="mt-1 inline-flex rounded-lg border border-border p-0.5" role="tablist" aria-label="Asset type">
@@ -375,5 +375,37 @@ export function AddAssetForm({ idPrefix }: { idPrefix: string }) {
         {saving ? "Saving..." : kind === "stock" ? "Add stock" : kind === "cash" ? "Add cash" : "Add fixed income"}
       </button>
     </div>
+  );
+}
+
+export function AddAssetButton({ idPrefix }: { idPrefix: string }) {
+  const [open, setOpen] = useState(false);
+  const titleId = `${idPrefix}-title`;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={appCtaButton("ui-hover-pop px-3 py-1.5 text-sm")}
+      >
+        Add stock
+      </button>
+      <AppModal open={open} onClose={() => setOpen(false)} size="lg" stagger={false} titleId={titleId}>
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <h2 id={titleId} className="text-base font-semibold text-foreground">Add asset</h2>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="rounded-lg px-2 py-1 text-sm text-subtle hover:bg-muted/60 hover:text-foreground"
+          >
+            Close
+          </button>
+        </div>
+        <div className="overflow-y-auto px-4 py-3">
+          <AddAssetForm idPrefix={idPrefix} />
+        </div>
+      </AppModal>
+    </>
   );
 }

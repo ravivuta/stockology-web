@@ -127,10 +127,12 @@ function mapOpenLot(raw: RawOpenLot, symbol: string): TradeLot | null {
   const cost = Number(raw.costBasis);
   const pd = parsePurchaseDate(raw.purchaseDate);
   if (!Number.isFinite(qty) || !Number.isFinite(cost) || !pd) return null;
+  const initialQuantity = Number(raw.initialQuantity);
   return {
     id: typeof raw.lotId === "string" && raw.lotId.trim() ? raw.lotId : `${symbol}_${pd}_${cost}`,
     quantity: qty,
     costBasis: cost,
+    initialQuantity: Number.isFinite(initialQuantity) && initialQuantity > 0 ? initialQuantity : qty,
     purchaseDate: pd,
     account: typeof raw.account === "string" ? raw.account : "",
     isRetirementAccount: typeof raw.isRetirementAccount === "boolean" ? raw.isRetirementAccount : null,

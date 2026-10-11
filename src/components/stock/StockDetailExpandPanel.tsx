@@ -19,7 +19,7 @@ import { buildRecommendation } from "@/lib/recommendation";
 import { formatCompactCurrency, formatCurrency, formatDecimal, formatNumberMax2, formatPercent } from "@/lib/numberFormat";
 import { safeHttpUrlForHref } from "@/lib/safe-external-url";
 import { createClient } from "@/lib/supabase/client";
-import { patchCurrentPortfolioSnapshotHoldings } from "@/lib/portfolio-snapshot-client";
+import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { parseSuggestedQuantity, suggestedTradeType } from "@/lib/tradePrefill";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { useSupabaseStockHistory } from "@/hooks/useSupabaseStockHistory";
@@ -757,7 +757,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   function confirmLotDelete() {
     if (!lotPendingDelete) return;
     removeOpenLot(symbol, lotPendingDelete.id);
-    void patchCurrentPortfolioSnapshotHoldings();
+    void flushCurrentPortfolioSnapshotNow(true);
     if (editingLot?.id === lotPendingDelete.id) {
       closeLotEditor();
     }
@@ -788,7 +788,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     }
 
     recordSellFromLot(symbol, sellingLot.id, enteredQty, enteredPrice, sellLotDate);
-    void patchCurrentPortfolioSnapshotHoldings();
+    void flushCurrentPortfolioSnapshotNow(true);
     closeLotSellDialog();
     closeLotEditor();
   }
@@ -812,7 +812,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       isRetirementAccount:
         lotAccountType === "unknown" ? null : lotAccountType === "retirement",
     });
-    void patchCurrentPortfolioSnapshotHoldings();
+    void flushCurrentPortfolioSnapshotNow(true);
     closeLotEditor();
   }
 
@@ -836,7 +836,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
           ? null
           : tradeAccountType === "retirement",
     });
-    void patchCurrentPortfolioSnapshotHoldings();
+    void flushCurrentPortfolioSnapshotNow(true);
     setTradeModalOpen(false);
     setQty("");
     setPrice("");
@@ -858,12 +858,12 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
 
   function handleSuppressTradeActionsChange(nextValue: boolean) {
     updateStock(symbol, { suppressTradeActions: nextValue });
-    void patchCurrentPortfolioSnapshotHoldings();
+    void flushCurrentPortfolioSnapshotNow(true);
   }
 
   function handleExcludeFromShortlistChange(nextValue: boolean) {
     updateStock(symbol, { excludeFromShortlist: nextValue });
-    void patchCurrentPortfolioSnapshotHoldings();
+    void flushCurrentPortfolioSnapshotNow(true);
   }
 
   return (

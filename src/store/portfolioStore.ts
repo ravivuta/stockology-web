@@ -26,6 +26,8 @@ export type TradeLot = {
   quantity: number;
   costBasis: number;
   purchaseDate: string;
+  /** Original purchased quantity. iOS keeps this after partial sells. */
+  initialQuantity?: number;
   account?: string;
   isRetirementAccount?: boolean | null;
   status: LotStatus;
@@ -149,7 +151,10 @@ type State = {
   addStock: (s: Partial<StockHolding> & { symbol: string }) => void;
   /** Merge fields into an existing symbol and rebuild recommendation. */
   updateStock: (symbol: string, patch: Partial<StockHolding>) => void;
-  bulkUpdateStocks: (patches: { symbol: string; patch: Partial<StockHolding> }[]) => void;
+  bulkUpdateStocks: (
+    patches: { symbol: string; patch: Partial<StockHolding> }[],
+    options?: { shouldRecalculateLimits?: boolean }
+  ) => void;
   editOpenLot: (
     symbol: string,
     lotId: string,
@@ -174,7 +179,7 @@ type State = {
   recordSellFromLot: (symbol: string, lotId: string, qty: number, price: number, date: string) => void;
   /** Reverses the last journal entry only. Returns false if nothing to undo. */
   undoLastTrade: () => boolean;
-  recalcMetrics: () => void;
+  recalcMetrics: (options?: { shouldRecalculateLimits?: boolean; recordMutation?: boolean }) => void;
   clearAllHoldingsKeepingWatchlist: () => void;
   resetAll: () => void;
   setOptimizing: (v: boolean) => void;
@@ -310,6 +315,7 @@ function buildImportedOpenLots(rows: CsvImportRow[]): {
       id: uid(),
       quantity: qty,
       costBasis: price,
+      initialQuantity: qty,
       purchaseDate: row.purchaseDate || defaultImportPurchaseDate(),
       account: displayAccount(row.account),
       isRetirementAccount: row.isRetirementAccount ?? null,
@@ -1041,7 +1047,7 @@ export const usePortfolioStore = create<State>()(
           const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st);
           return { stocks: derived.stocks, portfolioSize: derived.portfolioSize, lastLocalMutationAt: mutationAt };
         }),
-      bulkUpdateStocks: (patches) =>
+      bulkUpdateStocks: (patches, options) =>
         set((st) => {
           if (patches.length === 0) return {};
           const patchMap = new Map<string, Partial<StockHolding>>();
@@ -1071,7 +1077,9 @@ export const usePortfolioStore = create<State>()(
             if (!patch) return stock;
             return { ...stock, ...patch, symbol: stock.symbol };
           });
-          const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st);
+          const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st, {
+            shouldRecalculateLimits: options?.shouldRecalculateLimits !== false,
+          });
           return { stocks: derived.stocks, portfolioSize: derived.portfolioSize };
         }),
       editOpenLot: (symbol, lotId, updates) =>
@@ -1262,6 +1270,7 @@ export const usePortfolioStore = create<State>()(
                 id: lotId,
                 quantity: qty,
                 costBasis: price,
+                initialQuantity: qty,
                 purchaseDate: date,
                 account: options?.account?.trim() || "",
                 isRetirementAccount: options?.isRetirementAccount ?? null,
@@ -1561,8 +1570,9 @@ export const usePortfolioStore = create<State>()(
         });
         return true;
       },
-      recalcMetrics: () =>
+      recalcMetrics: (options) =>
         set((st) => {
+          const recordMutation = options?.recordMutation !== false;
           const mutationAt = new Date().toISOString();
           const ctx: RecalcContext = {
             etfProfitTarget: st.etfProfitTarget,
@@ -1577,8 +1587,14 @@ export const usePortfolioStore = create<State>()(
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
             lotsBySymbol: st.lotsBySymbol,
           };
-          const derived = derivePortfolioState(st.stocks, st.cashBalance, ctx, st);
-          return { stocks: derived.stocks, portfolioSize: derived.portfolioSize, lastLocalMutationAt: mutationAt };
+          const derived = derivePortfolioState(st.stocks, st.cashBalance, ctx, st, {
+            shouldRecalculateLimits: options?.shouldRecalculateLimits !== false,
+          });
+          return {
+            stocks: derived.stocks,
+            portfolioSize: derived.portfolioSize,
+            ...(recordMutation ? { lastLocalMutationAt: mutationAt } : {}),
+          };
         }),
       clearAllHoldingsKeepingWatchlist: () => {
         // Bump generation so any in-flight optimizePendingStocks loop aborts immediately.
@@ -1681,7 +1697,9 @@ export const usePortfolioStore = create<State>()(
               const stocks = st.stocks.map((item) =>
                 item.symbol === sym ? { ...item, pendingOptimization: false } : item
               );
-              const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st);
+              const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st, {
+                shouldRecalculateLimits: false,
+              });
               return { stocks: derived.stocks, portfolioSize: derived.portfolioSize };
             });
             return { ok: false, error: message };
@@ -1705,7 +1723,9 @@ export const usePortfolioStore = create<State>()(
             const stocks = st.stocks.map((item) =>
               item.symbol === sym ? { ...item, ...strategy } : item
             );
-            const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st);
+            const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st, {
+              shouldRecalculateLimits: false,
+            });
             return { stocks: derived.stocks, portfolioSize: derived.portfolioSize, lastLocalMutationAt: mutationAt };
           });
           return { ok: true };
@@ -1751,7 +1771,9 @@ export const usePortfolioStore = create<State>()(
                 const stocks = st.stocks.map((item) =>
                   item.symbol === symbol ? { ...item, ...strategy } : item
                 );
-                const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st);
+                const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st, {
+                  shouldRecalculateLimits: false,
+                });
                 return { stocks: derived.stocks, portfolioSize: derived.portfolioSize, lastLocalMutationAt: mutationAt };
               });
             } catch {
@@ -1772,7 +1794,9 @@ export const usePortfolioStore = create<State>()(
                 const stocks = st.stocks.map((item) =>
                   item.symbol === symbol ? { ...item, pendingOptimization: false } : item
                 );
-                const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st);
+                const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st, {
+                  shouldRecalculateLimits: false,
+                });
                 return { stocks: derived.stocks, portfolioSize: derived.portfolioSize };
               });
             }

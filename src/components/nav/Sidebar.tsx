@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { useShellRouteTransition } from "@/components/LandingViewTransition";
 import { AppLogo } from "@/components/AppLogo";
+import { PortfolioSimulateLink } from "@/components/nav/PortfolioSimulateLink";
 
 /** Primary tabs — aligned with iOS `HomeView` Dashboard + Portfolio plus Watchlist & News on web. */
 const primaryNav: { href: string; label: string; icon: ComponentType<{ size?: number; className?: string }> }[] = [
@@ -142,11 +143,12 @@ export default function Sidebar({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <div className="flex flex-shrink-0 items-center gap-3 overflow-hidden pl-4 pr-3 pb-4 pt-4">
+      <div className="flex flex-shrink-0 items-center gap-2 overflow-hidden pl-3 pr-2 pb-4 pt-4">
+        {pathname === "/portfolio" && isExpanded ? <PortfolioSimulateLink /> : null}
         <Link
             href="/dashboard"
             prefetch
-            className="no-ui-hover flex min-w-0 items-center gap-3"
+            className={`no-ui-hover flex min-w-0 items-center ${pathname === "/portfolio" ? "gap-1.5" : "gap-3"}`}
             style={{ transition: "transform 500ms cubic-bezier(0.25, 0.1, 0.25, 1)" }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = "scale(1.06)";
@@ -155,9 +157,9 @@ export default function Sidebar({
               e.currentTarget.style.transform = "scale(1)";
             }}
           >
-            <AppLogo size={36} rounded="rounded-lg" />
+            <AppLogo size={pathname === "/portfolio" ? 28 : 36} rounded="rounded-lg" />
             <span
-              className="whitespace-nowrap text-lg font-semibold text-foreground transition-all duration-300"
+              className={`whitespace-nowrap font-semibold text-foreground transition-all duration-300 ${pathname === "/portfolio" ? "text-sm" : "text-lg"}`}
               style={{
                 opacity: isExpanded ? 1 : 0,
                 maxWidth: isExpanded ? 200 : 0,
