@@ -12,12 +12,16 @@ import {
 import { usePortfolioStore } from "@/store/portfolioStore";
 
 const lastPushedFingerprintByUser = new Map<string, string>();
+const pendingLocalMutationAtByUser = new Map<string, string>();
 const DURABLE_PENDING_KEY = "stocks-pm-pending-portfolio-snapshots:v1";
+const SAVED_LOCAL_MUTATION_KEY = "stocks-pm-saved-local-mutation:v1";
 const durableRetryTimersByUser = new Map<string, number>();
 
 type SnapshotPushOptions = {
   force?: boolean;
   allowEmptyHoldings?: boolean;
+  /** Client `lastLocalMutationAt` captured with this slice. */
+  localMutationAt?: string;
   supabase?: ReturnType<typeof createClient>;
 };
 
@@ -51,6 +55,7 @@ function validateSnapshotSlice(
 type DurablePendingSnapshot = {
   slice: PortfolioSlice;
   allowEmptyHoldings: boolean;
+  localMutationAt?: string;
   fingerprint: string;
   updatedAt: string;
   retryCount: number;
@@ -97,6 +102,7 @@ function rememberDurablePendingSnapshot(
   pending[dataUserId] = {
     slice,
     allowEmptyHoldings: !!options?.allowEmptyHoldings,
+    localMutationAt: options?.localMutationAt,
     fingerprint,
     updatedAt: new Date().toISOString(),
     retryCount,
@@ -123,6 +129,7 @@ function scheduleDurableRetry(dataUserId: string, delayMs = 5000): void {
     void pushPortfolioSnapshotSlice(dataUserId, pending.slice, {
       force: true,
       allowEmptyHoldings: pending.allowEmptyHoldings,
+      localMutationAt: pending.localMutationAt,
     });
   }, delayMs);
 
@@ -135,6 +142,7 @@ export function retryPendingPortfolioSnapshot(dataUserId: string): void {
   void pushPortfolioSnapshotSlice(dataUserId, pending.slice, {
     force: true,
     allowEmptyHoldings: pending.allowEmptyHoldings,
+    localMutationAt: pending.localMutationAt,
   });
 }
 
@@ -158,6 +166,73 @@ export function getLastPushedPortfolioFingerprint(dataUserId: string): string {
 
 export function markLastPushedPortfolioFingerprint(dataUserId: string, fingerprint: string): void {
   lastPushedFingerprintByUser.set(dataUserId, fingerprint);
+}
+
+function readSavedLocalMutations(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(SAVED_LOCAL_MUTATION_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const saved: Record<string, string> = {};
+    for (const [userId, value] of Object.entries(parsed)) {
+      if (typeof value === "string" && value) saved[userId] = value;
+    }
+    return saved;
+  } catch {
+    return {};
+  }
+}
+
+function writeSavedLocalMutations(saved: Record<string, string>): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(SAVED_LOCAL_MUTATION_KEY, JSON.stringify(saved));
+  } catch {
+    // The portfolio store already handles quota pressure. Missing this marker
+    // only falls back to the snapshot timestamp check.
+  }
+}
+
+/** Record a local edit before its snapshot write finishes so refresh cannot replace it. */
+export function noteUnsavedLocalPortfolioMutation(dataUserId: string, localMutationAt: string | null | undefined): void {
+  if (!dataUserId || !localMutationAt) return;
+  const next = Date.parse(localMutationAt);
+  if (!Number.isFinite(next)) return;
+  const previous = Date.parse(pendingLocalMutationAtByUser.get(dataUserId) ?? "");
+  if (Number.isFinite(previous) && previous > next) return;
+  pendingLocalMutationAtByUser.set(dataUserId, localMutationAt);
+}
+
+function markSnapshotSavedLocalMutation(dataUserId: string, localMutationAt: string | undefined): void {
+  if (!dataUserId || !localMutationAt) return;
+  const next = Date.parse(localMutationAt);
+  if (!Number.isFinite(next)) return;
+  const saved = readSavedLocalMutations();
+  const previous = Date.parse(saved[dataUserId] ?? "");
+  if (!Number.isFinite(previous) || next >= previous) {
+    saved[dataUserId] = localMutationAt;
+    writeSavedLocalMutations(saved);
+  }
+  const pending = Date.parse(pendingLocalMutationAtByUser.get(dataUserId) ?? "");
+  if (!Number.isFinite(pending) || pending <= next) {
+    pendingLocalMutationAtByUser.delete(dataUserId);
+  }
+}
+
+/** True when this browser has a portfolio edit that has not been confirmed in the snapshot. */
+export function localPortfolioMutationIsUnsaved(
+  dataUserId: string,
+  lastLocalMutationAt: string | null | undefined
+): boolean {
+  if (!dataUserId) return false;
+  const savedMs = Date.parse(readSavedLocalMutations()[dataUserId] ?? "");
+  const pendingMs = Date.parse(pendingLocalMutationAtByUser.get(dataUserId) ?? "");
+  const localMs = Date.parse(lastLocalMutationAt ?? "");
+  if (Number.isFinite(pendingMs) && (!Number.isFinite(savedMs) || pendingMs > savedMs)) return true;
+  if (Number.isFinite(localMs) && Number.isFinite(savedMs) && localMs > savedMs) return true;
+  return false;
 }
 
 async function savePortfolioSnapshotViaServer(
@@ -229,6 +304,7 @@ async function executePortfolioSnapshotSlice(
 
   if (!error) {
     markLastPushedPortfolioFingerprint(dataUserId, fingerprint);
+    markSnapshotSavedLocalMutation(dataUserId, options?.localMutationAt);
     clearDurablePendingSnapshot(dataUserId, fingerprint);
   } else {
     const pending = readDurablePendingSnapshots()[dataUserId];
@@ -248,6 +324,14 @@ async function executePortfolioSnapshotSlice(
   return { error, skipped: false, fingerprint };
 }
 
+function newerLocalMutationAt(existing: string | undefined, incoming: string | undefined): string | undefined {
+  const existingMs = Date.parse(existing ?? "");
+  const incomingMs = Date.parse(incoming ?? "");
+  if (!Number.isFinite(existingMs)) return incoming;
+  if (!Number.isFinite(incomingMs)) return existing;
+  return incomingMs >= existingMs ? incoming : existing;
+}
+
 function mergeSnapshotPushOptions(
   existing: SnapshotPushOptions | undefined,
   incoming: SnapshotPushOptions | undefined
@@ -256,6 +340,7 @@ function mergeSnapshotPushOptions(
   return {
     force: !!existing?.force || !!incoming?.force,
     allowEmptyHoldings: !!existing?.allowEmptyHoldings || !!incoming?.allowEmptyHoldings,
+    localMutationAt: newerLocalMutationAt(existing?.localMutationAt, incoming?.localMutationAt),
     supabase: incoming?.supabase ?? existing?.supabase,
   };
 }
@@ -314,7 +399,7 @@ export async function flushCurrentPortfolioSnapshotNow(
   options?: { allowEmptyHoldings?: boolean }
 ): Promise<{ error: Error | null; skipped: boolean }> {
   if (typeof window === "undefined" || !hasSupabaseConfig()) {
-    return { error: null, skipped: true };
+    return { error: new Error("Cloud save is not configured."), skipped: true };
   }
 
   let dataUserId = "";
@@ -323,7 +408,7 @@ export async function flushCurrentPortfolioSnapshotNow(
   } catch {
     dataUserId = "";
   }
-  if (!dataUserId) return { error: null, skipped: true };
+  if (!dataUserId) return { error: new Error("Not signed in."), skipped: true };
 
   const state = usePortfolioStore.getState();
   const slice: PortfolioSlice = {
@@ -332,10 +417,12 @@ export async function flushCurrentPortfolioSnapshotNow(
     stocks: state.stocks,
     lotsBySymbol: state.lotsBySymbol,
   };
+  noteUnsavedLocalPortfolioMutation(dataUserId, state.lastLocalMutationAt);
 
   const result = await pushPortfolioSnapshotSlice(dataUserId, slice, {
     force,
     allowEmptyHoldings: options?.allowEmptyHoldings,
+    localMutationAt: state.lastLocalMutationAt ?? undefined,
   });
   return { error: result.error, skipped: result.skipped };
 }

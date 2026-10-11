@@ -18,6 +18,8 @@ import {
 } from "@/lib/clear-portfolio-client-state";
 import {
   flushCurrentPortfolioSnapshotNow,
+  localPortfolioMutationIsUnsaved,
+  noteUnsavedLocalPortfolioMutation,
   pushPortfolioSnapshotSlice,
   retryPendingPortfolioSnapshot,
 } from "@/lib/portfolio-snapshot-client";
@@ -161,7 +163,10 @@ export function PortfolioCloudBridge({
         };
         const cloudLooksEmpty = !hasMeaningfulSlice(cloudSlice);
 
-        if (cloudSnapshotIsOlderThanLocal(cloudSnapshot.updated_at)) {
+        if (
+          localPortfolioMutationIsUnsaved(dataUserId, usePortfolioStore.getState().lastLocalMutationAt) ||
+          cloudSnapshotIsOlderThanLocal(cloudSnapshot.updated_at)
+        ) {
           // Keep the local book. Quote refresh and a full reload were replacing
           // a just-deleted portfolio with the previous snapshot, then saving it back.
           sessionStorage.setItem(key, "1");
@@ -250,13 +255,19 @@ export function PortfolioCloudBridge({
         portfolioHoldingsIdentityFingerprint(prevSlice) !== portfolioHoldingsIdentityFingerprint(nextSlice) ||
         prevSlice.cashBalance !== nextSlice.cashBalance ||
         portfolioOptimizationFingerprint(prevSlice) !== portfolioOptimizationFingerprint(nextSlice);
+      if (structuralChanged) {
+        noteUnsavedLocalPortfolioMutation(dataUserId, state.lastLocalMutationAt);
+      }
       if (state.optimizing) {
         if (structuralChanged) deferredDuringOptimize = true;
         return;
       }
       if (deferredDuringOptimize && prev.optimizing) {
         deferredDuringOptimize = false;
-        void pushPortfolioSnapshotSlice(dataUserId, nextSlice, { force: true });
+        void pushPortfolioSnapshotSlice(dataUserId, nextSlice, {
+          force: true,
+          localMutationAt: state.lastLocalMutationAt ?? undefined,
+        });
         return;
       }
       if (!structuralChanged) return;
@@ -264,6 +275,7 @@ export function PortfolioCloudBridge({
       void pushPortfolioSnapshotSlice(dataUserId, nextSlice, {
         force: true,
         allowEmptyHoldings: intentionalClear,
+        localMutationAt: state.lastLocalMutationAt ?? undefined,
       });
     });
 

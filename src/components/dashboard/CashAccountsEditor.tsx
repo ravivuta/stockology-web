@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { cashByAccount, displayAccount, knownCashAccounts, CASH_SYMBOL } from "@/lib/cash-accounts";
 import { recordExternalCashFlow } from "@/lib/external-cash-flows";
+import { snapshotSaveBlockReason } from "@/lib/portfolio-cloud-sync";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { formatCurrency } from "@/lib/numberFormat";
 import { appCtaButton } from "@/lib/appCtaClasses";
@@ -27,6 +28,8 @@ export function CashAccountsEditor({
   );
   const startingCash = useMemo(() => cashByAccount(lotsBySymbol[CASH_SYMBOL]), [lotsBySymbol]);
   const [drafts, setDrafts] = useState<Record<string, string> | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const values = drafts ?? Object.fromEntries(
     accounts.map((account) => {
       const accountKey = displayAccount(account).toLowerCase();
@@ -50,14 +53,44 @@ export function CashAccountsEditor({
     return Number.isFinite(n) && n > 0 ? n : 0;
   }
 
+  function snapshotFailureText(reason: string | null): string | null {
+    if (reason === "prices-not-loaded") return "quotes are not loaded yet";
+    if (reason === "empty") return "the portfolio looked empty";
+    if (reason === "negative-total") return "the portfolio total was negative";
+    if (reason === "negative-cash") return "cash was too far below zero";
+    if (reason === "negative-limits") return "a holding limit was invalid";
+    return reason;
+  }
+
   async function save() {
     const amounts: Record<string, number> = {};
     for (const account of accounts) {
       amounts[account] = parseAmount(values[account] ?? "0");
     }
+    setSaving(true);
+    setSaveError(null);
     const result = applyCashLotsEdit(amounts);
     recalc();
-    await flushCurrentPortfolioSnapshotNow(true);
+    const saved = await flushCurrentPortfolioSnapshotNow(true);
+    if (saved.error || saved.skipped) {
+      const state = usePortfolioStore.getState();
+      const reason =
+        saved.error?.message ??
+        snapshotSaveBlockReason({
+          cashBalance: state.cashBalance,
+          fixedIncomeByAccount: state.fixedIncomeByAccount,
+          stocks: state.stocks,
+          lotsBySymbol: state.lotsBySymbol,
+        });
+      setSaving(false);
+      const detail = snapshotFailureText(reason)?.replace(/\.$/, "");
+      setSaveError(
+        detail
+          ? `Cash is updated on this device, but the snapshot was not saved: ${detail}.`
+          : "Cash is updated on this device, but the snapshot was not saved."
+      );
+      return;
+    }
     const delta = result.nextCash - result.previousCash;
     if (Math.abs(delta) >= 0.005) {
       await recordExternalCashFlow({
@@ -67,6 +100,7 @@ export function CashAccountsEditor({
         balanceAfter: result.nextCash,
       });
     }
+    setSaving(false);
     setDrafts(null);
     onClose();
   }
@@ -102,19 +136,21 @@ export function CashAccountsEditor({
           <span className="font-semibold text-foreground">Total</span>
           <span className="tabular-nums font-semibold text-[color:var(--dashboard-chart-cash)]">{formatCurrency(total)}</span>
         </div>
+        {saveError ? <p className="mt-3 text-sm text-error">{saveError}</p> : null}
         <div className="mt-4 flex justify-end gap-2">
           <button
             type="button"
             onClick={() => {
               setDrafts(null);
+              setSaveError(null);
               onClose();
             }}
             className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-subtle hover:text-foreground"
           >
             Cancel
           </button>
-          <button type="button" onClick={() => void save()} className={appCtaButton("px-3 py-1.5 text-sm")}>
-            Save
+          <button type="button" onClick={() => void save()} disabled={saving} className={appCtaButton("px-3 py-1.5 text-sm")}>
+            {saving ? "Saving..." : "Save"}
           </button>
         </div>
       </div>

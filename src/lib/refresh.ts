@@ -8,6 +8,7 @@ import {
 import { parseCloudSnapshotForStore } from "@/lib/cloud-snapshot-hydration";
 import type { PortfolioSnapshotRow } from "@/lib/cloud-portfolio";
 import {
+  localPortfolioMutationIsUnsaved,
   markLastPushedPortfolioFingerprint,
 } from "@/lib/portfolio-snapshot-client";
 import { portfolioSyncFingerprint, loadGlobalSettingsForUser, patchFromCloudGlobalSettings } from "@/lib/portfolio-cloud-sync";
@@ -167,7 +168,11 @@ export async function runRefreshPipeline(
       const snapshotIsNewerThanLocal =
         Number.isFinite(snapshotUpdatedAt) &&
         (!Number.isFinite(localMutationAt) || snapshotUpdatedAt >= localMutationAt);
-      const skipStaleSnapshot = !snapshotIsNewerThanLocal && Number.isFinite(localMutationAt);
+      const unsavedLocalEdit =
+        !!dataUserId &&
+        localPortfolioMutationIsUnsaved(dataUserId, stateBeforeSnapshot.lastLocalMutationAt);
+      const skipStaleSnapshot =
+        unsavedLocalEdit || (!snapshotIsNewerThanLocal && Number.isFinite(localMutationAt));
 
       if (!skipStaleSnapshot) {
         const parsed = parseCloudSnapshotForStore(data.snapshot);
