@@ -106,7 +106,7 @@ function parseSymbolOnlyText(text: string): { ok: true; rows: CsvImportRow[]; sk
   for (const cells of body) {
     const firstCell = cells[0]?.toUpperCase() ?? "";
     if (!firstCell) continue;
-    if (!isValidTicker(firstCell)) {
+    if (!isImportableEquitySymbol(firstCell)) {
       skipped.push(firstCell);
       continue;
     }
@@ -223,7 +223,50 @@ export function isValidTicker(symbol: string): boolean {
   if (!s || s.length < 1 || s.length > 10) return false;
   if (s.includes(" ") || s.startsWith("^")) return false;
   if (!/^[A-Z0-9]+(?:[.-][A-Z0-9]+)*$/.test(s)) return false;
-  if (s.includes("..") || s.includes("--")) return false;
+  if (s.includes("..") || s.includes("--") || s.includes(".-") || s.includes("-.")) return false;
+  if (isLikelyBondOrCUSIP(s)) return false;
+  return true;
+}
+
+/** Same rules as iOS `InvalidSymbolsFilter.isLikelyBondOrCUSIP`. */
+export function isLikelyBondOrCUSIP(symbol: string): boolean {
+  const s = symbol.trim().toUpperCase();
+  if (!s) return false;
+  if (s.startsWith("912") && s.length >= 8 && /^[A-Z0-9]+$/.test(s)) return true;
+  if (s.length === 9 && /^[A-Z0-9]{9}$/.test(s)) {
+    const digitCount = (s.match(/\d/g) ?? []).length;
+    if (digitCount >= 2) return true;
+  }
+  if (s.length === 12 && /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(s)) return true;
+  return false;
+}
+
+function isLikelyOptionContract(symbol: string): boolean {
+  const s = symbol.trim().toUpperCase();
+  if (!s) return false;
+  return /^[A-Z]{1,5}\d{6}[CP]\d{8}$/.test(s) || /^[A-Z]{1,5}\d{2,6}[CP]\d{4,8}$/.test(s);
+}
+
+const FIXED_INCOME_ROW_KEYWORDS = [
+  "treasury",
+  "t-bill",
+  "tbill",
+  "bond",
+  "cd",
+  "certificate of deposit",
+  "bill note",
+];
+
+/** CSV rows that are bonds, CUSIPs, ISINs, or option contracts — not US stock/ETF tickers. */
+export function isImportableEquitySymbol(rawSymbol: string): boolean {
+  const raw = rawSymbol.trim();
+  if (!raw) return false;
+  const lower = raw.toLowerCase();
+  if (FIXED_INCOME_ROW_KEYWORDS.some((keyword) => lower.includes(keyword))) return false;
+  if (/\b([A-Z0-9]{9}|[A-Z]{2}[A-Z0-9]{9}[0-9])\b/i.test(raw)) return false;
+  if (isLikelyBondOrCUSIP(raw)) return false;
+  if (!isValidTicker(raw)) return false;
+  if (isLikelyOptionContract(raw)) return false;
   return true;
 }
 
@@ -502,7 +545,7 @@ export function parseWatchlistCsv(
     const cells = splitCsvLine(line, delimiter).map((cell) => cell.replace(/^"+|"+$/g, "").trim());
     const symbol = (cells[symbolIndex] ?? "").toUpperCase();
     if (!symbol) continue;
-    if (!isValidTicker(symbol)) {
+    if (!isImportableEquitySymbol(symbol)) {
       skipped.push(symbol);
       continue;
     }
@@ -690,7 +733,7 @@ export async function parsePortfolioCsv(
     for (const row of data) {
       const sym = getCell(row, kSymbol).toUpperCase();
       if (!sym) continue;
-      if (!isValidTicker(sym)) {
+      if (!isImportableEquitySymbol(sym)) {
         skipped.push(sym);
         continue;
       }
@@ -775,7 +818,7 @@ export async function parsePortfolioCsv(
     for (const row of data) {
       const sym = getCell(row, kSym).toUpperCase();
       if (!sym) continue;
-      if (!isValidTicker(sym)) {
+      if (!isImportableEquitySymbol(sym)) {
         skipped.push(sym);
         continue;
       }
@@ -864,7 +907,7 @@ export async function parsePortfolioCsv(
   for (const row of data) {
     const sym = getCell(row, kSym).toUpperCase();
     if (!sym) continue;
-    if (!isValidTicker(sym)) {
+    if (!isImportableEquitySymbol(sym)) {
       skipped.push(sym);
       continue;
     }
