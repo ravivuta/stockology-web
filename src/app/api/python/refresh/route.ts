@@ -192,10 +192,21 @@ export async function POST(request: NextRequest) {
     ]);
 
     const missingSymbols = symbols.filter((symbol) => !prices[symbol]);
-    if (missingSymbols.length > 0) {
-      const fallback = await fetchTickerHydrationFromTables(supabase, missingSymbols);
-      Object.assign(prices, fallback.prices);
-      Object.assign(sentiment, fallback.sentiment);
+    const sentimentMissingDate = symbols.filter((symbol) => !sentiment[symbol]?.last_updated);
+    const tableSymbols = [...new Set([...missingSymbols, ...sentimentMissingDate])];
+    if (tableSymbols.length > 0) {
+      const fallback = await fetchTickerHydrationFromTables(supabase, tableSymbols);
+      for (const symbol of missingSymbols) {
+        if (fallback.prices[symbol]) prices[symbol] = fallback.prices[symbol];
+      }
+      for (const symbol of sentimentMissingDate) {
+        const row = fallback.sentiment[symbol];
+        if (!row) continue;
+        sentiment[symbol] = {
+          sentiment_score: sentiment[symbol]?.sentiment_score ?? row.sentiment_score,
+          last_updated: row.last_updated ?? sentiment[symbol]?.last_updated ?? null,
+        };
+      }
     }
 
     const { freshSymbols, staleSymbols } = summarizeFreshness(prices);

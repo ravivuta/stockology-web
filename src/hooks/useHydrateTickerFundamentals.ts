@@ -38,7 +38,8 @@ export function useHydrateTickerFundamentals(options?: { enabled?: boolean }) {
           !Number.isFinite(stock.lastPrice ?? Number.NaN) ||
           (stock.lastPrice ?? 0) <= 0 ||
           stock.analystTarget == null ||
-          stock.aiSentimentScore == null
+          stock.aiSentimentScore == null ||
+          (stock.aiSentimentScore != null && !stock.aiSentimentLastUpdated)
       ),
     [stocks]
   );
