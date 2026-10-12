@@ -70,7 +70,7 @@ function analystRatingTextClass(value: string | null | undefined): string {
 }
 
 function filterChipClass(active: boolean, tone: "green" | "gold") {
-  const base = "no-ui-hover inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold";
+  const base = "no-ui-hover inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold leading-tight";
   if (!active) return `${base} border-border bg-background text-foreground`;
   if (tone === "green") return `${base} border-transparent bg-emerald-500/90 text-black`;
   return `${base} border-transparent bg-[#f3c74a] text-black`;
@@ -232,12 +232,9 @@ export default function WatchlistPage() {
         </Link>
       </div>
 
-      <div className="ui-hover-lift rounded-2xl border border-border bg-elevated p-3">
-        <div>
-          <p className="text-lg font-semibold text-foreground">Watchlist</p>
-          <p className="mt-1 text-xs text-subtle">{watchlistCountText}</p>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+      <div className="ui-hover-lift rounded-2xl border border-border bg-elevated px-3 py-1.5">
+        <p className="text-xs text-subtle">{watchlistCountText}</p>
+        <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
           {limitWatchlistSize ? (
             <button
               type="button"

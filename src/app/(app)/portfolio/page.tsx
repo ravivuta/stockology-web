@@ -94,7 +94,7 @@ function upsideTextClass(upside: number | null | undefined): string {
 }
 
 function filterChipClass(active: boolean, tone: "green" | "gold") {
-  const base = "no-ui-hover inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold";
+  const base = "no-ui-hover inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold leading-tight";
   if (!active) return `${base} border-border bg-background text-foreground`;
   if (tone === "green") return `${base} border-transparent bg-emerald-500/90 text-white`;
   return `${base} border-transparent bg-[#f3c74a] text-black`;
@@ -363,12 +363,9 @@ export default function PortfolioPage() {
       </div>
 
       <div className="space-y-8">
-        <div className="ui-hover-lift rounded-2xl border border-border bg-elevated px-3 py-2.5">
-          <div>
-            <p className="text-base font-semibold text-foreground">Portfolio</p>
-            <p className="text-xs text-subtle">{portfolioCountText}</p>
-          </div>
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+        <div className="ui-hover-lift rounded-2xl border border-border bg-elevated px-3 py-1.5">
+          <p className="text-xs text-subtle">{portfolioCountText}</p>
+          <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
             <select
               value={selectedAccount}
               onChange={(event) => setSelectedAccount(event.target.value)}
@@ -376,7 +373,7 @@ export default function PortfolioPage() {
               className={
                 selectedAccount === "__all__"
                   ? filterChipClass(false, "green")
-                  : "inline-flex items-center rounded-full border border-transparent bg-[#3370c2] px-3 py-1 text-xs font-semibold text-white dark:bg-[#66abf5] dark:text-black"
+                  : "inline-flex items-center rounded-full border border-transparent bg-[#3370c2] px-2.5 py-0.5 text-xs font-semibold leading-tight text-white dark:bg-[#66abf5] dark:text-black"
               }
             >
               <option value="__all__">All Accounts</option>

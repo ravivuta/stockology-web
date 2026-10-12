@@ -45,6 +45,16 @@ export default function Sidebar({
   planVariant,
 }: SidebarProps) {
   const pathname = normalizeAppPathname(usePathname());
+  const mainPageTitle =
+    pathname === "/dashboard"
+      ? "Dashboard"
+      : pathname === "/portfolio"
+        ? "Portfolio"
+        : pathname === "/watchlist"
+          ? "Watchlist"
+          : pathname === "/news"
+            ? "News"
+            : null;
   const router = useRouter();
   const { replaceWithTransition } = useShellRouteTransition();
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -142,7 +152,19 @@ export default function Sidebar({
       onMouseLeave={handleMouseLeave}
     >
       <div className="flex flex-shrink-0 items-center gap-2 overflow-hidden pl-3 pr-2 pb-4 pt-4">
-        <Link
+        {mainPageTitle ? (
+          <p
+            className="whitespace-nowrap text-lg font-semibold text-foreground transition-all duration-300"
+            style={{
+              opacity: isExpanded ? 1 : 0,
+              maxWidth: isExpanded ? 200 : 0,
+              overflow: "hidden",
+            }}
+          >
+            {mainPageTitle}
+          </p>
+        ) : (
+          <Link
             href="/dashboard"
             prefetch
             className="no-ui-hover flex min-w-0 items-center gap-3"
@@ -166,6 +188,7 @@ export default function Sidebar({
               Stocks PM
             </span>
           </Link>
+        )}
       </div>
 
       <nav className="flex min-h-0 flex-col space-y-1 overflow-y-auto overflow-x-hidden px-3">{NavRows(primaryNav)}</nav>

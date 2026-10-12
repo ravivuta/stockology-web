@@ -42,11 +42,17 @@ function MobileHeader({ pathname }: { pathname: string }) {
     <header className="sticky top-0 z-30 border-b border-border/80 bg-background/92 backdrop-blur-md lg:hidden">
       <div className="flex items-center justify-between gap-3 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <div className="flex min-w-0 items-center gap-2.5">
-          <AppLogo size={30} rounded="rounded-lg" />
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold tracking-tight text-foreground">{pageTitleFromPath(pathname)}</p>
-            <p className="text-[11px] text-subtle">Stocks PM</p>
-          </div>
+          {["/dashboard", "/portfolio", "/watchlist", "/news"].includes(pathname) ? (
+            <p className="truncate text-lg font-semibold tracking-tight text-foreground">{pageTitleFromPath(pathname)}</p>
+          ) : (
+            <>
+              <AppLogo size={30} rounded="rounded-lg" />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold tracking-tight text-foreground">{pageTitleFromPath(pathname)}</p>
+                <p className="text-[11px] text-subtle">Stocks PM</p>
+              </div>
+            </>
+          )}
         </div>
         <Link
           href={pathname === "/settings" ? "/help" : "/settings"}
