@@ -363,9 +363,8 @@ export default function PortfolioPage() {
       </div>
 
       <div className="space-y-8">
-        <div className="ui-hover-lift rounded-2xl border border-border bg-elevated px-3 py-1.5">
-          <p className="text-xs text-subtle">{portfolioCountText}</p>
-          <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
+        <div className="ui-hover-lift rounded-2xl border border-border bg-elevated px-3 py-1">
+          <div className="flex flex-wrap items-center gap-1.5">
             <select
               value={selectedAccount}
               onChange={(event) => setSelectedAccount(event.target.value)}
@@ -399,6 +398,7 @@ export default function PortfolioPage() {
             >
               Search
             </button>
+            <p className="ml-auto shrink-0 text-xs text-subtle">{portfolioCountText}</p>
           </div>
           {searchOpen ? (
             <div className="mt-2 flex justify-end">

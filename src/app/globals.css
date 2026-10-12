@@ -47,6 +47,7 @@
   --dashboard-chart-tooltip-border: #3a7ca5;
   --dashboard-chart-center-text: #da8800;
   --dashboard-chart-cash: #da8800;
+  --dashboard-chart-fixed-income: #9e80d6;
   --dashboard-chart-cost-basis: #3370c2;
   --dashboard-chart-holdings: #4dccbf;
   --dashboard-chart-gain: #009900;
@@ -101,6 +102,7 @@
   --dashboard-chart-tooltip-border: #66abf5;
   --dashboard-chart-center-text: #facc15;
   --dashboard-chart-cash: #facc15;
+  --dashboard-chart-fixed-income: #e0c7ff;
   --dashboard-chart-cost-basis: #66abf5;
   --dashboard-chart-holdings: #4dccbf;
   --dashboard-chart-gain: #34c759;

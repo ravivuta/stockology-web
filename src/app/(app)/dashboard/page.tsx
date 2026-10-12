@@ -8,7 +8,6 @@ import { usePortfolioStore } from "@/store/portfolioStore";
 import { PortfolioDonut } from "@/components/dashboard/PortfolioDonut";
 import { StockDetailExpandPanel } from "@/components/stock/StockDetailExpandPanel";
 import { RecommendedActionsWidget } from "@/components/dashboard/RecommendedActionsWidget";
-import { PortfolioAllocationChart } from "@/components/portfolio/PortfolioAllocationChart";
 import { DashboardReturnComparison } from "@/components/dashboard/DashboardReturnComparison";
 import { CashAccountsEditor } from "@/components/dashboard/CashAccountsEditor";
 import { FixedIncomeAccountsEditor } from "@/components/dashboard/FixedIncomeAccountsEditor";
@@ -196,7 +195,7 @@ export default function DashboardPage() {
     const total = allRows.reduce((sum, row) => sum + row.value, 0);
     const cashTotal = allRows.reduce((sum, row) => sum + row.cash, 0);
     const fixedIncomeTotal = allRows.reduce((sum, row) => sum + row.fixedIncome, 0);
-    if (allRows.length < 2) {
+    if (allRows.length < 1) {
       return null;
     }
 
@@ -502,21 +501,6 @@ export default function DashboardPage() {
 
       <RecommendedActionsWidget stocks={stocks} />
 
-      <motion.section
-        className="dashboard-panel p-5 text-foreground sm:p-6"
-        initial={reduceMotion ? false : { opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: reduceMotion ? 0 : 0.08 }}
-      >
-        <h2 className="text-base font-semibold tracking-tight">Portfolio allocation</h2>
-        <p className="mt-1 text-[11px] leading-relaxed text-subtle">
-          Market value by position and cash, largest first. Smaller positions may be grouped as Other.
-        </p>
-        <div className="mt-4">
-          <PortfolioAllocationChart stocks={stocks} cash={cash} fixedIncome={fixedIncomeValue} />
-        </div>
-      </motion.section>
-
       {accountBreakdown ? (
         <motion.section
           className="dashboard-panel p-5 text-foreground sm:p-6"
@@ -524,7 +508,7 @@ export default function DashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: reduceMotion ? 0 : 0.1 }}
         >
-          <h2 className="text-base font-semibold tracking-tight">Allocation by account</h2>
+          <h2 className="text-base font-semibold tracking-tight">Portfolio allocation</h2>
           <p className="mt-1 text-[11px] leading-relaxed text-subtle">
             Holdings and cash grouped by account.
           </p>
@@ -552,8 +536,8 @@ export default function DashboardPage() {
               const etfLossPct = pnl < 0 ? Math.max(0, (Math.max(0, -etfPnl) / maxReference) * 100) : 0;
               const fixedIncomeOriginPct = holdingsSpanPct;
               const cashOriginPct = fixedIncomeOriginPct + fixedIncomeWidthPct;
-              const usedPct = Math.min(100, Math.max(0, holdingsSpanPct + fixedIncomeWidthPct + cashWidthPct));
-              const innerScale = usedPct > 0.0001 ? 100 / usedPct : 1;
+              const etfHatch =
+                "repeating-linear-gradient(-45deg, transparent 0 2px, color-mix(in srgb, var(--dashboard-chart-cost-basis) 70%, white) 2px 3.5px)";
 
               return (
                 <div key={`${row.account}-${index}`} className="text-sm">
@@ -566,39 +550,20 @@ export default function DashboardPage() {
                     </span>
                   </div>
 
-                  <div className="relative mt-1 h-3">
-                    {usedPct > 0 ? (
-                      <div className="relative h-3 overflow-hidden" style={{ width: `${usedPct}%` }}>
+                  <div className="relative mt-1 h-3 w-full">
                     <div
-                      className="absolute inset-y-0 left-0 rounded-none"
-                      style={{
-                        width: `${Math.min(100, valueWidthPct * innerScale)}%`,
-                        backgroundColor: CURRENT_VALUE_COLOR,
-                      }}
+                      className="absolute inset-y-0 left-0"
+                      style={{ width: `${valueWidthPct}%`, backgroundColor: "var(--dashboard-chart-cost-basis)" }}
                     />
                     {etfValuePct > 0 ? (
-                      <div
-                        className="absolute inset-y-0 left-0"
-                        style={{
-                          width: `${Math.min(100, etfValuePct * innerScale)}%`,
-                          backgroundImage:
-                            "repeating-linear-gradient(-45deg, transparent, transparent 2px, rgba(255,255,255,0.45) 2px, rgba(255,255,255,0.45) 3px)",
-                        }}
-                      />
+                      <div className="absolute inset-y-0 left-0" style={{ width: `${etfValuePct}%`, backgroundImage: etfHatch }} />
                     ) : null}
-                    <div
-                      className="absolute inset-y-0 left-0 rounded-none"
-                      style={{
-                        width: `${Math.min(100, costWidthPct * innerScale)}%`,
-                        backgroundColor: "var(--dashboard-chart-cost-basis)",
-                      }}
-                    />
                     {profitWidthPct > 0 ? (
                       <div
-                        className="absolute inset-y-0 rounded-none"
+                        className="absolute inset-y-0"
                         style={{
-                          left: `${Math.min(100, costWidthPct * innerScale)}%`,
-                          width: `${Math.min(100 - costWidthPct * innerScale, profitWidthPct * innerScale)}%`,
+                          left: `${costWidthPct}%`,
+                          width: `${profitWidthPct}%`,
                           backgroundColor: "var(--dashboard-chart-gain)",
                         }}
                       />
@@ -606,20 +571,15 @@ export default function DashboardPage() {
                     {etfProfitPct > 0 ? (
                       <div
                         className="absolute inset-y-0"
-                        style={{
-                          left: `${Math.min(100, costWidthPct * innerScale)}%`,
-                          width: `${Math.min(100 - costWidthPct * innerScale, etfProfitPct * innerScale)}%`,
-                          backgroundImage:
-                            "repeating-linear-gradient(-45deg, transparent, transparent 2px, rgba(255,255,255,0.45) 2px, rgba(255,255,255,0.45) 3px)",
-                        }}
+                        style={{ left: `${costWidthPct}%`, width: `${etfProfitPct}%`, backgroundImage: etfHatch }}
                       />
                     ) : null}
                     {lossWidthPct > 0 ? (
                       <div
-                        className="absolute inset-y-0 rounded-none"
+                        className="absolute inset-y-0"
                         style={{
-                          left: `${Math.min(100, valueWidthPct * innerScale)}%`,
-                          width: `${Math.min(100 - valueWidthPct * innerScale, lossWidthPct * innerScale)}%`,
+                          left: `${valueWidthPct}%`,
+                          width: `${lossWidthPct}%`,
                           backgroundColor: "var(--dashboard-chart-loss)",
                         }}
                       />
@@ -627,50 +587,43 @@ export default function DashboardPage() {
                     {etfLossPct > 0 ? (
                       <div
                         className="absolute inset-y-0"
-                        style={{
-                          left: `${Math.min(100, valueWidthPct * innerScale)}%`,
-                          width: `${Math.min(100 - valueWidthPct * innerScale, etfLossPct * innerScale)}%`,
-                          backgroundImage:
-                            "repeating-linear-gradient(-45deg, transparent, transparent 2px, rgba(255,255,255,0.45) 2px, rgba(255,255,255,0.45) 3px)",
-                        }}
+                        style={{ left: `${valueWidthPct}%`, width: `${etfLossPct}%`, backgroundImage: etfHatch }}
                       />
                     ) : null}
                     {fixedIncomeWidthPct > 0 ? (
                       <div
-                        className="absolute inset-y-0 rounded-none"
+                        className="absolute inset-y-0"
                         style={{
-                          left: `${Math.min(100, fixedIncomeOriginPct * innerScale)}%`,
-                          width: `${Math.min(100 - fixedIncomeOriginPct * innerScale, fixedIncomeWidthPct * innerScale)}%`,
-                          backgroundColor: "#0f9aa7",
+                          left: `${fixedIncomeOriginPct}%`,
+                          width: `${fixedIncomeWidthPct}%`,
+                          backgroundColor: "var(--dashboard-chart-fixed-income)",
                         }}
                       />
                     ) : null}
                     {cashWidthPct > 0 ? (
                       <div
-                        className="absolute inset-y-0 rounded-none"
+                        className="absolute inset-y-0"
                         style={{
-                          left: `${Math.min(100, cashOriginPct * innerScale)}%`,
-                          width: `${Math.min(100 - cashOriginPct * innerScale, cashWidthPct * innerScale)}%`,
+                          left: `${cashOriginPct}%`,
+                          width: `${cashWidthPct}%`,
                           backgroundColor: "var(--dashboard-chart-cash)",
                         }}
                       />
                     ) : null}
                     {[
-                      profitWidthPct > 0 ? costWidthPct * innerScale : null,
-                      lossWidthPct > 0 ? valueWidthPct * innerScale : null,
-                      fixedIncomeWidthPct > 0 ? fixedIncomeOriginPct * innerScale : null,
-                      cashWidthPct > 0 ? cashOriginPct * innerScale : null,
+                      profitWidthPct > 0 ? costWidthPct : null,
+                      lossWidthPct > 0 ? valueWidthPct : null,
+                      fixedIncomeWidthPct > 0 ? fixedIncomeOriginPct : null,
+                      cashWidthPct > 0 ? cashOriginPct : null,
                     ]
                       .filter((mark): mark is number => mark != null && mark > 0 && mark < 100)
                       .map((mark, separatorIndex) => (
                         <div
                           key={`separator-${separatorIndex}-${mark.toFixed(2)}`}
-                          className="absolute top-1/2 h-3 w-px -translate-y-1/2 bg-white/95 dark:bg-black/95"
+                          className="absolute inset-y-0 w-px bg-white/95 dark:bg-black/80"
                           style={{ left: `calc(${mark}% - 0.5px)` }}
                         />
                       ))}
-                      </div>
-                    ) : null}
                   </div>
 
                   <p className="mt-1.5 text-[11px] font-bold leading-snug tabular-nums">
@@ -684,7 +637,7 @@ export default function DashboardPage() {
                     {row.fixedIncome > 0 ? (
                       <>
                         <span className="text-subtle"> · </span>
-                        <span className="text-[color:#0f9aa7]">
+                        <span className="text-[color:var(--dashboard-chart-fixed-income)]">
                           Fixed Income {formatCurrency(row.fixedIncome)} ({shareOfRow(row.fixedIncome, rowTotal)})
                         </span>
                       </>
