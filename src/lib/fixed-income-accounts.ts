@@ -1,4 +1,4 @@
-import { canonicalAccount, displayAccount, preferredAccountLabel } from "@/lib/cash-accounts";
+import { displayAccount, preferredAccountLabel } from "@/lib/cash-accounts";
 
 export const FIXED_INCOME_SNAPSHOT_SYMBOL_PREFIX = "$FIXED_INCOME:";
 const EPSILON = 0.005;

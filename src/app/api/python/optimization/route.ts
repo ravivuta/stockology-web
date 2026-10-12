@@ -95,11 +95,10 @@ function simulateStrategyReturn(
       stockProfitTargetPercent: inputs.stockProfitTargetPercent,
       skipWashSaleCheck: true,
       relaxScoreRequirement: true,
+      // iOS OptimizationEngine leaves useRSIGating on and does not attach an AI score,
+      // so the SMA/factor search is not gated by those settings.
       useAISentiment: false,
-      // iOS OptimizationEngine leaves useRSIGating at its default (on) and does not
-    // attach an AI score, so the SMA/factor search is not gated by those settings.
-    useAISentiment: false,
-    useRSIGating: true,
+      useRSIGating: true,
       sellOnlyLongTermQualified: false,
     });
 

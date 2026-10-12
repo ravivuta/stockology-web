@@ -8,6 +8,7 @@ import {
 import { parseCloudSnapshotForStore } from "@/lib/cloud-snapshot-hydration";
 import type { PortfolioSnapshotRow } from "@/lib/cloud-portfolio";
 import {
+  flushCurrentPortfolioSnapshotNow,
   localPortfolioMutationIsUnsaved,
   markLastPushedPortfolioFingerprint,
 } from "@/lib/portfolio-snapshot-client";
@@ -238,7 +239,10 @@ export async function runRefreshPipeline(
     }
 
     if (options?.optimizePending !== false) {
-      await usePortfolioStore.getState().optimizePendingStocks();
+      const optimizedCount = await usePortfolioStore.getState().optimizePendingStocks();
+      if (optimizedCount > 0) {
+        await flushCurrentPortfolioSnapshotNow(true);
+      }
     }
 
     usePortfolioStore.setState({

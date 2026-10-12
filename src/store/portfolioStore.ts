@@ -187,7 +187,7 @@ type State = {
   setOptimizing: (v: boolean) => void;
   setOnboardingComplete: (v: boolean) => void;
   optimizeStock: (symbol: string) => Promise<{ ok: boolean; error?: string }>;
-  optimizePendingStocks: () => Promise<void>;
+  optimizePendingStocks: () => Promise<number>;
   markAllPendingOptimization: () => number;
   importCsvRows: (
     rows: CsvImportRow[],
@@ -1767,11 +1767,12 @@ export const usePortfolioStore = create<State>()(
       },
       optimizePendingStocks: async () => {
         const state = get();
-        if (state.optimizing) return;
+        if (state.optimizing) return 0;
         const pendingSymbols = state.stocks
           .filter((stock) => stock.pendingOptimization)
           .map((stock) => stock.symbol);
-        if (pendingSymbols.length === 0) return;
+        if (pendingSymbols.length === 0) return 0;
+        let optimizedCount = 0;
 
         const myGeneration = optimizationGeneration;
         get().setOptimizing(true);
@@ -1785,6 +1786,7 @@ export const usePortfolioStore = create<State>()(
 
             try {
               const strategy = await requestOptimizedStrategy(stock, latest);
+              optimizedCount += 1;
               set((st) => {
                 const mutationAt = new Date().toISOString();
                 const ctx: RecalcContext = {
@@ -1836,6 +1838,7 @@ export const usePortfolioStore = create<State>()(
         } finally {
           get().setOptimizing(false);
         }
+        return optimizedCount;
       },
       markAllPendingOptimization: () => {
         const mutationAt = new Date().toISOString();

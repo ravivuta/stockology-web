@@ -854,6 +854,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       return;
     }
     setOptimizationMessage("Parameters optimized from historical data.");
+    await flushCurrentPortfolioSnapshotNow(true);
   }
 
   function handleSuppressTradeActionsChange(nextValue: boolean) {
