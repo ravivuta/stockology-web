@@ -1292,7 +1292,9 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
   if (transactionLimit > 0 && numStock > 0) {
     numberPurchases = Math.round((numStock * avgPrice) / transactionLimit);
   }
-  const rawBuyFactor = numberPurchases === 0 ? 1 : 1 - dynamicFactor / 100 - (2 * numberPurchases) / 100;
+  const betaMultiplier = Math.max(0.5, stock.beta ?? (stock.isETF ? 1.25 : 1.75));
+  const purchasePenalty = numberPurchases === 0 ? 0 : (2 * betaMultiplier * numberPurchases) / 100;
+  const rawBuyFactor = 1 - dynamicFactor / 100 - purchasePenalty;
   const buyFactorSMA = Math.max(0.1, rawBuyFactor);
 
   const nextBuyPrice = numStock === 0 || avgPrice <= 0 ? movingAvg : movingAvg * buyFactorSMA;

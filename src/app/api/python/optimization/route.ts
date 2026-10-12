@@ -55,7 +55,7 @@ function simulateStrategyReturn(
   inputs: SimulationInputs,
   strategy: SimulationStrategy
 ): number {
-  const initialCash = Math.max(strategy.stockLimit * 2, strategy.transactionLimit, 1);
+  const initialCash = Math.max(strategy.stockLimit * 2, 1);
   let cash = initialCash;
   let shares = 0;
   let positionAvg: number | null = null;
@@ -105,46 +105,30 @@ function simulateStrategyReturn(
         ? ((inputs.analystTarget - current) / current) * 100 >= 25
         : true;
 
-    if (rec.action === "BUY" && positionAvg == null) {
-      const sharesToBuy = Math.floor(Math.min(cash, strategy.transactionLimit) / current);
-      if (sharesToBuy > 0 && hasEnoughUpside) {
-        shares = sharesToBuy;
-        cash -= sharesToBuy * current;
-        positionAvg = current;
-      }
-      continue;
-    }
-
-    if (rec.action === "ADD" && positionAvg != null && hasEnoughUpside) {
-      const sharesToBuy = Math.floor(Math.min(cash, strategy.transactionLimit) / current);
+    if ((rec.action === "BUY" || rec.action === "ADD") && hasEnoughUpside) {
+      const currentPositionValue = shares * current;
+      const remainingSpace = Math.max(0, strategy.stockLimit - currentPositionValue);
+      const maxToInvest = Math.min(cash, strategy.transactionLimit, remainingSpace);
+      const sharesToBuy = Math.floor(maxToInvest / current);
       if (sharesToBuy > 0) {
-        const totalCost: number = shares * positionAvg + sharesToBuy * current;
-        shares += sharesToBuy;
-        positionAvg = totalCost / shares;
-        cash -= sharesToBuy * current;
+        const investmentAmount = sharesToBuy * current;
+        if (positionAvg == null) {
+          shares = sharesToBuy;
+          positionAvg = current;
+        } else {
+          const oldCostBasis = shares * positionAvg;
+          shares += sharesToBuy;
+          positionAvg = (oldCostBasis + investmentAmount) / shares;
+        }
+        cash -= investmentAmount;
       }
       continue;
     }
 
-    if (rec.action === "SELL" && positionAvg != null && shares > 0) {
+    if ((rec.action === "SELL" || rec.action === "REDUCE") && positionAvg != null && shares > 0) {
       cash += shares * current;
       shares = 0;
       positionAvg = null;
-      continue;
-    }
-
-    if (rec.action === "REDUCE" && positionAvg != null && shares > 0) {
-      const costBasis = shares * positionAvg;
-      const unrealizedGain = (current - positionAvg) * shares;
-      const moneyToFree = costBasis - strategy.stockLimit;
-      const sharesToReduce =
-        moneyToFree > strategy.transactionLimit && unrealizedGain > moneyToFree
-          ? Math.floor(moneyToFree / current)
-          : 0;
-      if (sharesToReduce > 0 && sharesToReduce < shares) {
-        cash += sharesToReduce * current;
-        shares -= sharesToReduce;
-      }
     }
   }
 
@@ -287,7 +271,7 @@ export async function POST(request: NextRequest) {
   };
 
   const smaValues = [50, 200];
-  const dynamicFactorValues = [10, 15, 20, 25];
+  const dynamicFactorValues = [5, 10, 15, 20, 25];
   let bestReturn = Number.NEGATIVE_INFINITY;
   let bestParams: { shortSMA: number; dynamicFactor: number } | null = null;
 

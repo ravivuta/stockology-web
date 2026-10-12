@@ -1308,7 +1308,13 @@ export const usePortfolioStore = create<State>()(
                 const costBasis = q0 * avg0 + qty * price;
                 const q1 = q0 + qty;
                 const avg1 = q1 > 0 ? costBasis / q1 : 0;
-                return { ...s, quantity: q1, averageCost: avg1, excludeFromShortlist: false };
+                return {
+                  ...s,
+                  quantity: q1,
+                  averageCost: avg1,
+                  excludeFromShortlist: false,
+                  pendingOptimization: q0 > 0 ? s.pendingOptimization : true,
+                };
               });
             }
             const entry: TradeJournalEntry = { ...journalBase, side: "BUY", lotId };
