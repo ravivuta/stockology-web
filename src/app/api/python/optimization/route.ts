@@ -118,7 +118,8 @@ function simulateStrategyReturn(
           shares = sharesToBuy;
           positionAvg = current;
         } else {
-          const oldCostBasis = shares * positionAvg;
+          const priorAvg: number = positionAvg;
+          const oldCostBasis: number = shares * priorAvg;
           shares += sharesToBuy;
           positionAvg = (oldCostBasis + investmentAmount) / shares;
         }

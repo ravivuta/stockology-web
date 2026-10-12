@@ -34,6 +34,7 @@ export type IosStockInput = {
   analystAvg?: string;
   marketCap?: number;
   peg?: number;
+  beta?: number | null;
   returnOnEquity?: number;
   profitMargin?: number;
   debtToEquity?: number;

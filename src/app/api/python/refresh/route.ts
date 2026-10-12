@@ -140,7 +140,7 @@ async function fetchFreshTickerHydration(symbols: string[]) {
     if (Number.isFinite(score)) {
       sentiment[symbol] = {
         sentiment_score: score,
-        last_updated: typeof row.last_updated === "string" ? row.last_updated : null,
+        last_updated: typeof row.last_updated === "string" ? row.last_updated : undefined,
       };
     }
   }
@@ -204,7 +204,7 @@ export async function POST(request: NextRequest) {
         if (!row) continue;
         sentiment[symbol] = {
           sentiment_score: sentiment[symbol]?.sentiment_score ?? row.sentiment_score,
-          last_updated: row.last_updated ?? sentiment[symbol]?.last_updated ?? null,
+          last_updated: row.last_updated ?? sentiment[symbol]?.last_updated,
         };
       }
     }
