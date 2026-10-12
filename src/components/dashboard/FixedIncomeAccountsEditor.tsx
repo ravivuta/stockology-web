@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { usePortfolioStore } from "@/store/portfolioStore";
-import { cashByAccount, displayAccount, knownCashAccounts, CASH_SYMBOL } from "@/lib/cash-accounts";
+import { cashByAccount, knownCashAccounts, preferredAccountLabel, CASH_SYMBOL } from "@/lib/cash-accounts";
 import { fixedIncomeAmountForAccount } from "@/lib/fixed-income-accounts";
 import { snapshotSaveBlockReason } from "@/lib/portfolio-cloud-sync";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
@@ -24,15 +24,17 @@ export function FixedIncomeAccountsEditor({
   const recalc = usePortfolioStore((s) => s.recalcMetrics);
 
   const accounts = useMemo(() => {
-    const names = new Set<string>(knownCashAccounts(lotsBySymbol, stocks.map((stock) => stock.symbol)));
-    for (const account of Object.keys(cashByAccount(lotsBySymbol[CASH_SYMBOL]))) {
-      names.add(account);
-    }
-    for (const account of Object.keys(fixedIncomeByAccount)) {
-      names.add(displayAccount(account));
-    }
-    names.add("Default Account");
-    return [...names].sort((a, b) => a.localeCompare(b));
+    const names = new Map<string, string>();
+    const remember = (account: string) => {
+      const key = account.trim().toLowerCase();
+      if (!key) return;
+      names.set(key, preferredAccountLabel(names.get(key), account));
+    };
+    for (const account of knownCashAccounts(lotsBySymbol, stocks.map((stock) => stock.symbol))) remember(account);
+    for (const account of Object.keys(cashByAccount(lotsBySymbol[CASH_SYMBOL]))) remember(account);
+    for (const account of Object.keys(fixedIncomeByAccount)) remember(account);
+    remember("Default Account");
+    return [...names.values()].sort((a, b) => a.localeCompare(b));
   }, [lotsBySymbol, stocks, fixedIncomeByAccount]);
 
   const [drafts, setDrafts] = useState<Record<string, string> | null>(null);

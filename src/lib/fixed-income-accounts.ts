@@ -1,4 +1,4 @@
-import { displayAccount } from "@/lib/cash-accounts";
+import { canonicalAccount, displayAccount, preferredAccountLabel } from "@/lib/cash-accounts";
 
 export const FIXED_INCOME_SNAPSHOT_SYMBOL_PREFIX = "$FIXED_INCOME:";
 const EPSILON = 0.005;
@@ -25,12 +25,20 @@ export function sanitizeFixedIncomeByAccount(
   input: Record<string, number> | null | undefined
 ): Record<string, number> {
   if (!input) return {};
-  const out: Record<string, number> = {};
+  const labels = new Map<string, string>();
+  const totals = new Map<string, number>();
   for (const [account, amount] of Object.entries(input)) {
     const name = displayAccount(account);
+    const key = name.toLowerCase();
     const n = Number(amount);
     if (!Number.isFinite(n) || n <= EPSILON) continue;
-    out[name] = (out[name] ?? 0) + n;
+    labels.set(key, preferredAccountLabel(labels.get(key), name));
+    totals.set(key, (totals.get(key) ?? 0) + n);
+  }
+  const out: Record<string, number> = {};
+  for (const [key, amount] of totals) {
+    const name = labels.get(key);
+    if (name) out[name] = amount;
   }
   return out;
 }

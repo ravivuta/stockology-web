@@ -59,7 +59,7 @@ function isInsufficientHistoryComment(comment: string | undefined): boolean {
 
 function recommendationTone(action: string | undefined): string {
   const normalized = action?.toUpperCase() ?? "";
-  if (normalized === "SELL") return "border-red-500/30 bg-red-500/14 text-red-700 dark:text-red-200";
+  if (normalized === "SELL") return "border-red-600/25 bg-red-600/12 text-red-700 dark:border-red-300/30 dark:bg-red-400/18 dark:text-red-200";
   if (normalized === "REDUCE") return "border-amber-500/30 bg-amber-500/14 text-amber-800 dark:text-amber-200";
   if (normalized.startsWith("WAIT")) return "border-border/80 bg-background/75 text-subtle dark:border-white/[0.08] dark:bg-white/[0.05]";
   return "border-emerald-500/30 bg-emerald-500/14 text-emerald-700 dark:text-emerald-300";

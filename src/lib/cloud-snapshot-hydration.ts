@@ -1,8 +1,8 @@
 import { computeRiskReturnScore } from "@/lib/ios-recommendation";
 import { parseStockPeg } from "@/lib/stock-metric-parse";
 import type { LotStatus, SoldLot, StockHolding, TradeLot } from "@/store/portfolioStore";
-import { CASH_SYMBOL, cashLotQuantity, isCashSymbol, migrateCashLots } from "@/lib/cash-accounts";
-import { fixedIncomeAccountNameFromSnapshotSymbol, isFixedIncomeSymbol } from "@/lib/fixed-income-accounts";
+import { CASH_SYMBOL, canonicalAccount, cashLotQuantity, isCashSymbol, migrateCashLots } from "@/lib/cash-accounts";
+import { fixedIncomeAccountNameFromSnapshotSymbol, isFixedIncomeSymbol, sanitizeFixedIncomeByAccount } from "@/lib/fixed-income-accounts";
 
 /** Raw holding JSON from iOS `user_portfolio_snapshots.holdings`. */
 type RawHolding = {
@@ -342,5 +342,18 @@ export function parseCloudSnapshotForStore(row: CloudSnapshotHydrationInput): {
   const resolvedCash = cashFromLots > 0.005 ? cashFromLots : cashBalance;
 
   stocks.sort((a, b) => a.symbol.localeCompare(b.symbol));
-  return { cashBalance: resolvedCash, stocks, lotsBySymbol, fixedIncomeByAccount };
+  const knownAccounts = Object.values(lotsBySymbol).flatMap((bundle) =>
+    (bundle.open ?? []).map((lot) => lot.account ?? "")
+  );
+  for (const bundle of Object.values(lotsBySymbol)) {
+    for (const lot of bundle.open ?? []) {
+      lot.account = canonicalAccount(lot.account, knownAccounts);
+    }
+  }
+  const alignedFixedIncome: Record<string, number> = {};
+  for (const [account, amount] of Object.entries(sanitizeFixedIncomeByAccount(fixedIncomeByAccount))) {
+    const name = canonicalAccount(account, knownAccounts);
+    alignedFixedIncome[name] = (alignedFixedIncome[name] ?? 0) + amount;
+  }
+  return { cashBalance: resolvedCash, stocks, lotsBySymbol, fixedIncomeByAccount: alignedFixedIncome };
 }

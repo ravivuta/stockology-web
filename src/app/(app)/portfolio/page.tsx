@@ -61,7 +61,7 @@ const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
 function recBadgeClass(action: string): string {
   const u = action.toUpperCase();
   if (u === "SELL")
-    return "bg-error/15 text-error dark:bg-error/25 dark:text-[color-mix(in_srgb,var(--palette-alice)_88%,white)]";
+    return "bg-red-600/12 text-red-700 dark:bg-red-400/18 dark:text-red-200";
   if (u === "REDUCE") return "bg-amber-500/15 text-amber-800 dark:bg-amber-400/20 dark:text-amber-200";
   if (u.startsWith("WAIT")) return "bg-muted/80 text-subtle dark:bg-white/[0.08]";
   return "bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary";

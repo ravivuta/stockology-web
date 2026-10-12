@@ -22,7 +22,7 @@ import {
 } from "@/lib/portfolio-net-worth-series";
 import { isUsMarketTradingDay } from "@/lib/market-hours";
 import { formatAbsPercent, formatCompactCurrency, formatCompactNumber, formatCurrency, formatPercent } from "@/lib/numberFormat";
-import { cashByAccount, displayAccount, isCashSymbol } from "@/lib/cash-accounts";
+import { cashByAccount, displayAccount, isCashSymbol, preferredAccountLabel } from "@/lib/cash-accounts";
 import { fixedIncomeTotal } from "@/lib/fixed-income-accounts";
 
 const CURRENT_VALUE_COLOR = "#14b8a6";
@@ -119,7 +119,8 @@ export default function DashboardPage() {
       etfCostBasis = 0
     ) => {
       if (value <= 0 && costBasis <= 0 && cash <= 0 && fixedIncome <= 0 && etfValue <= 0 && etfCostBasis <= 0) return;
-      const existing = accountMap.get(account) ?? {
+      const key = account.trim().toLowerCase();
+      const existing = accountMap.get(key) ?? {
         account,
         value: 0,
         costBasis: 0,
@@ -134,7 +135,8 @@ export default function DashboardPage() {
       existing.etfCostBasis += etfCostBasis;
       existing.cash += cash;
       existing.fixedIncome += fixedIncome;
-      accountMap.set(account, existing);
+      existing.account = preferredAccountLabel(existing.account, account);
+      accountMap.set(key, existing);
     };
 
     for (const [symbol, lots] of Object.entries(lotsBySymbol)) {

@@ -13,6 +13,7 @@ import {
   DEFAULT_ACCOUNT,
   applyCashDelta,
   cashLotQuantity,
+  canonicalAccount,
   displayAccount,
   isCashSymbol,
   migrateCashLots,
@@ -1924,6 +1925,12 @@ export const usePortfolioStore = create<State>()(
             if (openQty > 0) preImportQtyBySymbol.set(stock.symbol, openQty);
           }
 
+          const knownAccounts: string[] = [];
+          for (const bundle of Object.values(st.lotsBySymbol)) {
+            for (const lot of bundle.open) knownAccounts.push(displayAccount(lot.account));
+          }
+          for (const account of Object.keys(st.fixedIncomeByAccount ?? {})) knownAccounts.push(account);
+
           const keepExisting = st.stocks;
 
           const stockMap = new Map(keepExisting.map((stock) => [stock.symbol, stock] as const));
@@ -1983,7 +1990,9 @@ export const usePortfolioStore = create<State>()(
             const existing = stockMap.get(symbol);
             const existingLots = lotsBySymbol[symbol];
             const hasExistingLotHistory = !!existingLots && (existingLots.open.length > 0 || existingLots.sold.length > 0);
-            const imported = buildImportedOpenLots(symbolRows);
+            const imported = buildImportedOpenLots(
+              symbolRows.map((row) => ({ ...row, account: canonicalAccount(row.account, knownAccounts) }))
+            );
             const hasImportedHoldings = imported.totalQty > 0;
 
             const preferredRetirement =
@@ -2233,6 +2242,12 @@ export const usePortfolioStore = create<State>()(
             }
           }
 
+          for (const bundle of Object.values(lotsBySymbol)) {
+            for (const lot of bundle.open) {
+              lot.account = canonicalAccount(lot.account, knownAccounts);
+            }
+          }
+
           // Incremental CSV snapshots move cash from detected SOLD/BUY quantity
           // changes per account. First-time seed leaves independently set cash alone.
           const postPositionsByAccountSymbol = positionsByAccountSymbol(stockMap, lotsBySymbol);
@@ -2256,7 +2271,7 @@ export const usePortfolioStore = create<State>()(
             for (const { name, delta } of cashByAccount.values()) {
               if (Math.abs(delta) <= 1e-6) continue;
               cashDeltaFromHoldings += delta;
-              nextLots = applyCashDelta(nextLots, name, delta, { confineToAccount: true });
+              nextLots = applyCashDelta(nextLots, name, delta);
             }
           } else {
             cashDeltaFromHoldings = 0;

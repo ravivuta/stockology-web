@@ -27,7 +27,7 @@ function ActionBadge({ action }: { action: string }) {
     <span
       className={`inline-flex shrink-0 rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
         sell
-          ? "bg-error/15 text-error dark:bg-error/25 dark:text-[color-mix(in_srgb,var(--palette-alice)_88%,white)]"
+          ? "bg-red-600/12 text-red-700 dark:bg-red-400/18 dark:text-red-200"
           : reduce
             ? "bg-amber-500/15 text-amber-800 dark:bg-amber-400/20 dark:text-amber-200"
             : "bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary"

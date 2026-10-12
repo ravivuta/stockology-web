@@ -35,6 +35,33 @@ function accountKey(account: string | null | undefined): string {
   return displayAccount(account).toLowerCase();
 }
 
+function isShoutedAccount(name: string): boolean {
+  return name === name.toUpperCase() && /[A-Z]/.test(name);
+}
+
+/** Prefer the account label already used by holdings when CSV or fixed income only differs by case. */
+export function preferredAccountLabel(current: string | undefined, candidate: string): string {
+  const next = displayAccount(candidate);
+  if (!current) return next;
+  const existing = displayAccount(current);
+  if (accountKey(existing) !== accountKey(next)) return existing;
+  if (isShoutedAccount(existing) && !isShoutedAccount(next)) return next;
+  if (!isShoutedAccount(existing) && isShoutedAccount(next)) return existing;
+  return existing;
+}
+
+export function canonicalAccount(account: string | null | undefined, known: Iterable<string>): string {
+  const displayed = displayAccount(account);
+  const key = accountKey(displayed);
+  let chosen: string | undefined;
+  for (const name of known) {
+    const label = displayAccount(name);
+    if (accountKey(label) !== key) continue;
+    chosen = preferredAccountLabel(chosen, label);
+  }
+  return chosen ?? displayed;
+}
+
 export type CashLotBundle = { open: Array<{
   id: string;
   quantity: number;
@@ -83,9 +110,7 @@ export function knownCashAccounts(
   const remember = (account: string | null | undefined) => {
     const name = displayAccount(account);
     const key = accountKey(name);
-    if (!names.has(key) || names.get(key) === UNASSIGNED_ACCOUNT) {
-      names.set(key, name);
-    }
+    names.set(key, preferredAccountLabel(names.get(key), name));
   };
 
   for (const lot of lotsBySymbol[CASH_SYMBOL]?.open ?? []) {
