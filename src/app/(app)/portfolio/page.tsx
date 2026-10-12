@@ -5,8 +5,8 @@ import Link from "next/link";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
-import { PortfolioAllocationChart } from "@/components/portfolio/PortfolioAllocationChart";
 import { AddAssetButton } from "@/components/portfolio/AddAssetForm";
+import { PortfolioSimulateLink } from "@/components/nav/PortfolioSimulateLink";
 import { StockDetailModal } from "@/components/stock/StockDetailModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
 import { formatCurrency, formatDecimal, formatNumberMax2, formatPercent, formatSignedCurrency, formatWholeCurrency } from "@/lib/numberFormat";
@@ -339,7 +339,8 @@ export default function PortfolioPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <PortfolioSimulateLink />
         <div className="flex flex-wrap gap-2">
           <CsvImportExportBar exportFilename="stocks-pm-portfolio.csv" compact importMode="portfolio" />
           <Link href="/csv-help" className="ui-hover-pop rounded-lg border border-primary/30 px-3 py-2 text-sm text-foreground dark:border-primary/25">
@@ -555,15 +556,6 @@ export default function PortfolioPage() {
             )}
         </div>
 
-        <section className="ui-hover-lift hidden rounded-2xl border border-border bg-elevated p-4 sm:p-5 md:block">
-          <h2 className="text-lg font-semibold text-foreground">Portfolio allocation</h2>
-          <p className="mt-1 text-sm text-subtle">
-            Market value by position and cash (largest slices first). Smaller positions may be grouped as Other.
-          </p>
-          <div className="mt-4">
-            <PortfolioAllocationChart stocks={stocks} cash={cash} fixedIncome={fixedIncomeValue} />
-          </div>
-        </section>
       </div>
 
       <StockDetailModal symbol={detailSymbol} onClose={() => setDetailSymbol(null)} />

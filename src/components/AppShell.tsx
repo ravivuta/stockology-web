@@ -15,7 +15,6 @@ import { PageLoading } from "@/components/ui/PageLoading";
 import { useHydrateTickerFundamentals } from "@/hooks/useHydrateTickerFundamentals";
 import { isPaidSubscriptionTier } from "@/lib/subscription-state";
 import { AppLogo } from "@/components/AppLogo";
-import { PortfolioSimulateLink } from "@/components/nav/PortfolioSimulateLink";
 import { cn } from "@/lib/utils";
 
 const MOBILE_NAV_ITEMS = [
@@ -43,7 +42,6 @@ function MobileHeader({ pathname }: { pathname: string }) {
     <header className="sticky top-0 z-30 border-b border-border/80 bg-background/92 backdrop-blur-md lg:hidden">
       <div className="flex items-center justify-between gap-3 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <div className="flex min-w-0 items-center gap-2.5">
-          {pathname === "/portfolio" ? <PortfolioSimulateLink /> : null}
           <AppLogo size={30} rounded="rounded-lg" />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold tracking-tight text-foreground">{pageTitleFromPath(pathname)}</p>

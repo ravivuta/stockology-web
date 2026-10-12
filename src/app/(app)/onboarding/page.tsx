@@ -30,6 +30,41 @@ function normalizeStarterSymbol(symbol: string): string {
   return STARTER_SYMBOL_OVERRIDES[raw] ?? raw;
 }
 
+/** A few share lots plus fixed income, paid from starter cash, so a new account is not an empty watchlist. */
+function seedSampleBook() {
+  const store = usePortfolioStore.getState();
+  const hasHolding = store.stocks.some((stock) => stock.quantity > 0.005);
+  const fixedIncome = Object.values(store.fixedIncomeByAccount).reduce((sum, value) => sum + (Number(value) || 0), 0);
+  if (hasHolding || fixedIncome > 0.5 || store.cashBalance < 1000) return;
+
+  const priced = store.stocks.filter((stock) => (stock.lastPrice ?? 0) > 0);
+  const etf = priced.find((stock) => stock.isETF === true);
+  const picks = [...(etf ? [etf] : []), ...priced.filter((stock) => stock.isETF !== true)].slice(0, 3);
+  const costFactors = [0.88, 1.08, 0.95];
+  const tradeDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  const accountOne = "BrokerageAccount#1";
+  const accountTwo = "BrokerageAccount#2";
+  picks.forEach((stock, index) => {
+    const live = usePortfolioStore.getState();
+    const price = stock.lastPrice ?? 0;
+    const cost = Math.round(price * costFactors[index % costFactors.length] * 100) / 100;
+    if (cost <= 0 || live.cashBalance <= cost) return;
+    const target = Math.min(3000, live.cashBalance * 0.2);
+    const shares = Math.max(1, Math.floor(target / cost));
+    if (shares * cost > live.cashBalance * 0.35) return;
+    live.recordTrade(stock.symbol, "BUY", shares, cost, tradeDate, {
+      account: index === 0 ? accountOne : accountTwo,
+    });
+  });
+
+  const cashNow = usePortfolioStore.getState().cashBalance;
+  const fixedAmount = Math.min(5000, Math.floor(cashNow * 0.2));
+  if (fixedAmount >= 500) {
+    usePortfolioStore.getState().applyFixedIncomeLotsEdit({ [accountOne]: fixedAmount });
+  }
+}
+
 export default function OnboardingPage() {
   const [i, setI] = useState(0);
   const [cash, setCash] = useState("10000");
@@ -127,6 +162,8 @@ export default function OnboardingPage() {
           console.warn("[onboarding starter hydration]", refreshResult.message);
         }
       }
+
+      seedSampleBook();
 
       setOnboardingComplete(true);
       await flushCurrentPortfolioSnapshotNow(true);

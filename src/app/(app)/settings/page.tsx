@@ -21,10 +21,11 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { recommendedWatchlistSize } from "@/lib/ios-recommendation";
 import { formatCurrency } from "@/lib/numberFormat";
-import { flushCurrentPortfolioSnapshotNow, deleteAllPortfolioSnapshots } from "@/lib/portfolio-snapshot-client";
+import { flushCurrentPortfolioSnapshotNow, deleteAllPortfolioSnapshots, setAccountDeletionBlocksSnapshotPush } from "@/lib/portfolio-snapshot-client";
+import { wipePortfolioAfterAccountDeletion } from "@/lib/clear-portfolio-client-state";
 import { deleteAllExternalCashFlows } from "@/lib/external-cash-flows";
 import { saveGlobalSettingsForUser, loadGlobalSettingsForUser } from "@/lib/portfolio-cloud-sync";
-import { isPaidSubscriptionTier } from "@/lib/subscription-state";
+import { isPaidSubscriptionTier, paidSubscriptionIsActive } from "@/lib/subscription-state";
 import { hasPremiumFeatureAccess } from "@/lib/subscription-limits";
 import { APP_MANAGED_TRIAL_LABEL } from "@/lib/trial-config";
 import { cn } from "@/lib/utils";
@@ -162,6 +163,11 @@ function SettingsInner() {
   const [restoreTarget, setRestoreTarget] = useState<typeof snapshots[0] | null>(null);
   const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  const [accountDeletedOpen, setAccountDeletedOpen] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
+  const deletedAccountSignOutStarted = useRef(false);
   const replaceFromCloudSync = usePortfolioStore((s) => s.replaceFromCloudSync);
   const supabaseRef = useRef(createClient());
 
@@ -187,6 +193,7 @@ function SettingsInner() {
   const billingDetail = searchParams.get("billing_detail");
   const idealWatchlistSize = recommendedWatchlistSize(portfolioSize);
   const hasPaidPlan = isPaidSubscriptionTier(row?.subscription_tier);
+  const canDeleteAccount = !loading && !paidSubscriptionIsActive(row ?? null);
   const hasBillingExempt = row?.billing_exempt === true;
   const premiumFeatures = hasPremiumFeatureAccess(row ?? null);
   const [aiGateNotice, setAiGateNotice] = useState(false);
@@ -354,6 +361,55 @@ function SettingsInner() {
     if (etDate === fmt(today)) return "Today";
     if (etDate === fmt(yesterday)) return "Yesterday";
     return d.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+  }
+
+  const deletedAccountMessage =
+    "Holdings, watchlist, cash, fixed income, and saved snapshots are deleted. Signing in again with the same Apple or Google account starts an empty account. An App Store subscription, if you have one, stays with Apple until you cancel it in Settings, Apple ID, Subscriptions.";
+
+  async function handleDeleteAccount() {
+    if (!canDeleteAccount) {
+      setDeleteAccountError("Cancel your subscription before deleting this account.");
+      setDeleteAccountOpen(false);
+      return;
+    }
+    setDeletingAccount(true);
+    setDeleteAccountError(null);
+    setAccountDeletionBlocksSnapshotPush(true);
+    try {
+      const supabase = supabaseRef.current;
+      const { data } = await supabase.auth.getUser();
+      const email = data.user?.email ?? "";
+      const id = userId || data.user?.id || "";
+      if (!id) throw new Error("Could not find this account.");
+      const { error } = await supabase.rpc("delete_stocks_pm_account", {
+        p_user_id: id,
+        p_email: email,
+      });
+      if (error) {
+        if (error.message.includes("active_subscription")) {
+          throw new Error("Cancel your subscription before deleting this account.");
+        }
+        throw new Error(error.message);
+      }
+      wipePortfolioAfterAccountDeletion();
+      setDeleteAccountOpen(false);
+      setAccountDeletedOpen(true);
+    } catch (err) {
+      setAccountDeletionBlocksSnapshotPush(false);
+      setDeleteAccountError(err instanceof Error ? err.message : "Failed to delete account.");
+      setDeleteAccountOpen(false);
+    } finally {
+      setDeletingAccount(false);
+    }
+  }
+
+  async function finishDeletedAccountSignOut() {
+    if (deletedAccountSignOutStarted.current) return;
+    deletedAccountSignOutStarted.current = true;
+    setAccountDeletedOpen(false);
+    await supabaseRef.current.auth.signOut();
+    setAccountDeletionBlocksSnapshotPush(false);
+    router.replace("/");
   }
 
   useEffect(() => {
@@ -680,6 +736,16 @@ function SettingsInner() {
                     <p className="text-[10px] leading-snug text-subtle">
                       Website signup now grants a {APP_MANAGED_TRIAL_LABEL} app-managed trial with no credit card required. Stripe Checkout is only used when you choose to start a paid subscription.
                     </p>
+                  ) : null}
+                  {deleteAccountError ? <p className="text-[11px] leading-snug text-error">{deleteAccountError}</p> : null}
+                  {canDeleteAccount ? (
+                    <button
+                      type="button"
+                      onClick={() => setDeleteAccountOpen(true)}
+                      className="ui-hover-pop w-fit rounded-lg border border-error/45 px-3 py-2 text-sm font-medium text-error"
+                    >
+                      Delete Account
+                    </button>
                   ) : null}
                 </div>
               )}
@@ -1055,6 +1121,36 @@ function SettingsInner() {
           </SettingsCard>
         </div>
       </div>
+
+      <ConfirmModal
+        open={deleteAccountOpen}
+        onClose={() => {
+          if (!deletingAccount) setDeleteAccountOpen(false);
+        }}
+        onConfirm={() => {
+          void handleDeleteAccount();
+        }}
+        title="Delete Account"
+        description="This deletes your Stocks PM holdings, watchlist, cash, fixed income, and saved snapshots. This cannot be undone."
+        confirmLabel={deletingAccount ? "Deleting..." : "Delete Account"}
+        cancelLabel="Cancel"
+        variant="danger"
+      />
+
+      <ConfirmModal
+        open={accountDeletedOpen}
+        onClose={() => {
+          void finishDeletedAccountSignOut();
+        }}
+        onConfirm={() => {
+          void finishDeletedAccountSignOut();
+        }}
+        title="Account data deleted"
+        description={deletedAccountMessage}
+        confirmLabel="OK"
+        cancelLabel="OK"
+        variant="default"
+      />
 
       <ConfirmModal
         open={refreshChartOpen}

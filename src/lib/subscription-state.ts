@@ -15,6 +15,16 @@ export function isPaidSubscriptionTier(value: string | null | undefined) {
   return tier !== "" && tier !== "free" && tier !== "trial";
 }
 
+/** Paid plan still in force. Trials and billing-exempt access do not count. */
+export function paidSubscriptionIsActive(row: SubscriptionRow) {
+  if (!row || row.is_active === false || row.billing_exempt === true) return false;
+  const tier = (row.subscription_tier ?? "").trim().toLowerCase();
+  if (tier === "billing_exempt") return false;
+  if (!isPaidSubscriptionTier(row.subscription_tier)) return false;
+  if (!row.subscription_expires_at) return true;
+  return new Date(row.subscription_expires_at).getTime() > Date.now();
+}
+
 export function subscriptionAllowsAccess(row: SubscriptionRow) {
   if (!row) return false;
   if (row.billing_exempt === true) return true;

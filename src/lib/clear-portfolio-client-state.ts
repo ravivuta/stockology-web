@@ -120,4 +120,41 @@ export function clearPortfolioClientState(): void {
   clearPortfolioSessionStorageFlags();
 }
 
+/** Empty the on-device book after the cloud account row is gone. Does not keep a watchlist draft. */
+export function wipePortfolioAfterAccountDeletion(): void {
+  usePortfolioStore.setState({
+    cashBalance: 0,
+    portfolioSize: 0,
+    fixedIncomeByAccount: {},
+    stocks: [],
+    lotsBySymbol: {},
+    tradeJournal: [],
+    onboardingComplete: false,
+    lastRefreshAt: null,
+    lastLocalMutationAt: null,
+  });
+  if (typeof window === "undefined") return;
+  try {
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      if (
+        key === "stocks-pm-portfolio" ||
+        key.startsWith("stocks-pm-portfolio-draft:") ||
+        key.startsWith("stocks-pm-pending-portfolio-snapshots") ||
+        key.startsWith("stocks-pm-saved-local-mutation")
+      ) {
+        toRemove.push(key);
+      }
+    }
+    toRemove.forEach((key) => localStorage.removeItem(key));
+    sessionStorage.removeItem(ACTIVE_DATA_USER_KEY);
+    sessionStorage.removeItem(ACTIVE_AUTH_USER_KEY);
+  } catch {
+    /* ignore quota / private mode */
+  }
+  clearPortfolioSessionStorageFlags();
+}
+
 export { ACTIVE_AUTH_USER_KEY, ACTIVE_DATA_USER_KEY };

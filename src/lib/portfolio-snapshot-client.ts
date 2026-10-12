@@ -16,6 +16,7 @@ const pendingLocalMutationAtByUser = new Map<string, string>();
 const DURABLE_PENDING_KEY = "stocks-pm-pending-portfolio-snapshots:v1";
 const SAVED_LOCAL_MUTATION_KEY = "stocks-pm-saved-local-mutation:v1";
 const durableRetryTimersByUser = new Map<string, number>();
+let accountDeletionBlocksSnapshotPush = false;
 
 type SnapshotPushOptions = {
   force?: boolean;
@@ -39,6 +40,25 @@ type SnapshotPushQueueState = {
 };
 
 const snapshotPushQueueByUser = new Map<string, SnapshotPushQueueState>();
+
+/** Stop snapshot writes while an account delete removes the cloud user. */
+export function setAccountDeletionBlocksSnapshotPush(blocked: boolean) {
+  accountDeletionBlocksSnapshotPush = blocked;
+  if (!blocked) return;
+  snapshotPushQueueByUser.clear();
+  pendingLocalMutationAtByUser.clear();
+  for (const timer of durableRetryTimersByUser.values()) {
+    window.clearTimeout(timer);
+  }
+  durableRetryTimersByUser.clear();
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(DURABLE_PENDING_KEY);
+    window.localStorage.removeItem(SAVED_LOCAL_MUTATION_KEY);
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
 
 function validateSnapshotSlice(
   slice: PortfolioSlice,
@@ -366,6 +386,9 @@ export async function pushPortfolioSnapshotSlice(
   slice: PortfolioSlice,
   options?: SnapshotPushOptions
 ): Promise<SnapshotPushResult> {
+  if (accountDeletionBlocksSnapshotPush) {
+    return { error: null, skipped: true, fingerprint: "" };
+  }
   return await new Promise<SnapshotPushResult>((resolve) => {
     let queue = snapshotPushQueueByUser.get(dataUserId);
     if (!queue) {
