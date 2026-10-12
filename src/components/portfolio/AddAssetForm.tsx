@@ -13,7 +13,7 @@ import { recordExternalCashFlow } from "@/lib/external-cash-flows";
 import { isFixedIncomeSymbol } from "@/lib/fixed-income-accounts";
 import { formatCurrency } from "@/lib/numberFormat";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
-import { hasPremiumFeatureAccess, trackedStockLimitMessage } from "@/lib/subscription-limits";
+import { hasPremiumFeatureAccess, trackedStockLimit, trackedStockLimitMessage } from "@/lib/subscription-limits";
 import { withAppBasePath } from "@/lib/base-path";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { fieldInputClass } from "@/lib/field-input";
@@ -56,6 +56,7 @@ export function AddAssetForm({ idPrefix }: { idPrefix: string }) {
   const recalc = usePortfolioStore((s) => s.recalcMetrics);
 
   const [userId, setUserId] = useState<string | undefined>();
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
   const { row } = useSubscriptionGate(userId);
   const [kind, setKind] = useState<AssetKind>("stock");
   const [symbol, setSymbol] = useState("");
@@ -79,6 +80,7 @@ export function AddAssetForm({ idPrefix }: { idPrefix: string }) {
       const { data } = await supabase.auth.getUser();
       const uid = data.user?.id;
       if (!uid || cancelled) return;
+      if (!cancelled) setAccountEmail(data.user?.email ?? null);
       const resolved = await syncStocksPmAuthUser(supabase, uid);
       if (!cancelled) setUserId(resolved);
     })();
@@ -148,8 +150,8 @@ export function AddAssetForm({ idPrefix }: { idPrefix: string }) {
 
     const tracked = stocks.filter((stock) => !isCashSymbol(stock.symbol) && !isFixedIncomeSymbol(stock.symbol));
     const exists = tracked.some((stock) => stock.symbol.toUpperCase() === sym);
-    if (!exists && tracked.length >= (hasPremiumFeatureAccess(row ?? null) ? 200 : 25)) {
-      setError(trackedStockLimitMessage(tracked.length, row ?? null));
+    if (!exists && tracked.length >= trackedStockLimit(row ?? null, accountEmail)) {
+      setError(trackedStockLimitMessage(tracked.length, row ?? null, accountEmail));
       return;
     }
 
@@ -362,7 +364,7 @@ export function AddAssetForm({ idPrefix }: { idPrefix: string }) {
       </div>
       <p className="text-[10px] leading-snug text-subtle">Account and type map balances into the account allocation summary.</p>
 
-      {!hasPremiumFeatureAccess(row ?? null) && kind === "stock" ? (
+      {!hasPremiumFeatureAccess(row ?? null, accountEmail) && kind === "stock" ? (
         <p className="text-[10px] leading-snug text-subtle">
           Free plan tracks up to 25 companies.{" "}
           <Link href={withAppBasePath("/billing/start?next=/portfolio")} className="font-semibold text-primary underline-offset-2 hover:underline">

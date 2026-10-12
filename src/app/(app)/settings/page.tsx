@@ -117,6 +117,7 @@ function SettingsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [userId, setUserId] = useState<string | undefined>();
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
   const { row, loading, allowed } = useSubscriptionGate(userId);
   const portfolioSize = usePortfolioStore((s) => s.portfolioSize);
   const stockCount = usePortfolioStore((s) => s.stocks.length);
@@ -195,7 +196,7 @@ function SettingsInner() {
   const hasPaidPlan = isPaidSubscriptionTier(row?.subscription_tier);
   const canDeleteAccount = !loading && !paidSubscriptionIsActive(row ?? null);
   const hasBillingExempt = row?.billing_exempt === true;
-  const premiumFeatures = hasPremiumFeatureAccess(row ?? null);
+  const premiumFeatures = hasPremiumFeatureAccess(row ?? null, accountEmail);
   const [aiGateNotice, setAiGateNotice] = useState(false);
 
   function persistSettingsPatch(
@@ -419,6 +420,7 @@ function SettingsInner() {
       const { data } = await supabase.auth.getUser();
       const uid = data.user?.id;
       if (!uid || cancelled) return;
+      if (!cancelled) setAccountEmail(data.user?.email ?? null);
       const resolved = await syncStocksPmAuthUser(supabase, uid);
       if (!cancelled) setUserId(resolved);
       if (!resolved || cancelled) return;

@@ -111,8 +111,9 @@ const prominentWatchlistButtonClass =
 
 export default function SimulationPage() {
   const [userId, setUserId] = useState<string | undefined>();
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
   const { row, loading: subscriptionLoading } = useSubscriptionGate(userId);
-  const premiumSimulation = !subscriptionLoading && hasPremiumFeatureAccess(row ?? null);
+  const premiumSimulation = !subscriptionLoading && hasPremiumFeatureAccess(row ?? null, accountEmail);
   const [symbol, setSymbol] = useState("AAPL");
   const [capital, setCapital] = useState("10000");
   const [symbolYears, setSymbolYears] = useState("1");
@@ -143,6 +144,7 @@ export default function SimulationPage() {
       const { data } = await supabase.auth.getUser();
       const uid = data.user?.id;
       if (!uid || cancelled) return;
+      if (!cancelled) setAccountEmail(data.user?.email ?? null);
       const resolved = await syncStocksPmAuthUser(supabase, uid);
       if (!cancelled) setUserId(resolved);
     })();

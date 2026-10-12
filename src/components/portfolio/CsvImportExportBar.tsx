@@ -11,6 +11,8 @@ import { fetchTickerHydrationFromTables, type TickerHydrationPriceRow } from "@/
 import { getSupabaseEnv } from "@/lib/supabase/config";
 import { usePortfolioStore, type StockHolding } from "@/store/portfolioStore";
 import { fieldInputClass } from "@/lib/field-input";
+import { useSubscriptionGate } from "@/hooks/useSubscriptionGate";
+import { trackedStockLimit, trackedStockLimitMessage } from "@/lib/subscription-limits";
 import {
   CSV_IMPORT_FIELDS,
   parsePortfolioCsv,
@@ -35,7 +37,6 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { parseStockPeg } from "@/lib/stock-metric-parse";
 import { formatCurrency, formatNumberMax2 } from "@/lib/numberFormat";
 
-const MAX_TRACKED_STOCKS = 200;
 const HIDDEN_MAPPING_FIELDS = new Set<CsvColumnStandard>(["name", "account", "retirementAccount"]);
 const FIELD_LABELS: Partial<Record<CsvColumnStandard, string>> = {
   qty: "Qty",
@@ -307,6 +308,9 @@ export function CsvImportExportBar({
   const recalc = usePortfolioStore((s) => s.recalcMetrics);
   const updateStock = usePortfolioStore((s) => s.updateStock);
   const storeStocks = usePortfolioStore((s) => s.stocks);
+  const [userId, setUserId] = useState<string | undefined>();
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
+  const { row } = useSubscriptionGate(userId);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
   const toExport = exportStocks ?? storeStocks;
   const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -320,6 +324,23 @@ export function CsvImportExportBar({
   // importCsvRows already cancels any in-flight optimizePendingStocks via optimizationGeneration,
   // so blocking import on `optimizing` just locks the button during normal post-load auto-optimize.
   const importBusy = progress.active;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const supabase = createClient();
+      const { data } = await supabase.auth.getUser();
+      if (cancelled) return;
+      setAccountEmail(data.user?.email ?? null);
+      const uid = data.user?.id;
+      if (!uid) return;
+      const resolved = await syncStocksPmAuthUser(supabase, uid);
+      if (!cancelled) setUserId(resolved);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function normalizeCloudPreset(item: CloudCsvMappingPresetRow): SavedCsvMappingPreset | null {
     const name = typeof item.name === "string" ? item.name.trim() : "";
@@ -515,11 +536,11 @@ export function CsvImportExportBar({
     const importedSymbols = [...new Set(rows.map((row) => row.symbol.toUpperCase()))];
     const currentSymbols = new Set(storeStocks.map((stock) => stock.symbol.toUpperCase()));
     const newSymbols = importedSymbols.filter((symbol) => !currentSymbols.has(symbol));
-    if (currentSymbols.size + newSymbols.length > MAX_TRACKED_STOCKS) {
-      const overflow = currentSymbols.size + newSymbols.length - MAX_TRACKED_STOCKS;
+    const stockCap = trackedStockLimit(row ?? null, accountEmail);
+    if (currentSymbols.size + newSymbols.length > stockCap) {
       setFlash({
         kind: "err",
-        text: `Cannot import: ${newSymbols.length} new stocks in this file would exceed the maximum tracked-stock limit of ${MAX_TRACKED_STOCKS} (currently have ${currentSymbols.size}). Remove at least ${overflow} stock(s) before importing.`,
+        text: trackedStockLimitMessage(currentSymbols.size, row ?? null, accountEmail),
       });
       return;
     }
