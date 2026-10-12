@@ -129,6 +129,29 @@ body {
     color 220ms ease;
 }
 
+/* Form values stay dark on a light field. The class lives outside Tailwind's scan
+   paths, so these colors are set here instead of dark: utilities. */
+.field-input {
+  background-color: #ffffff;
+  color: #18181b;
+  border-color: #d4d4d8;
+  color-scheme: light;
+}
+
+.field-input::placeholder {
+  color: #71717a;
+}
+
+.dark .field-input {
+  background-color: #d5dde8;
+  color: #0b1220;
+  border-color: #9aabc0;
+}
+
+.dark .field-input::placeholder {
+  color: #3d4d63;
+}
+
 /* Mono / code: keep default spacing — IBM Plex Sans -7% is for UI copy only */
 :where(.font-mono, code, kbd, samp, pre) {
   letter-spacing: normal;
