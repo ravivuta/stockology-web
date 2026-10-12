@@ -32,6 +32,7 @@ type EdgeTickerPrice = {
 
 type EdgeTickerSentiment = {
   sentiment_score: number;
+  last_updated?: string | null;
 };
 
 type EdgeTickerDataResponse = {
@@ -137,7 +138,10 @@ async function fetchFreshTickerHydration(symbols: string[]) {
   for (const [symbol, row] of Object.entries(data.sentiment ?? {})) {
     const score = Number(row.sentiment_score);
     if (Number.isFinite(score)) {
-      sentiment[symbol] = { sentiment_score: score };
+      sentiment[symbol] = {
+        sentiment_score: score,
+        last_updated: typeof row.last_updated === "string" ? row.last_updated : null,
+      };
     }
   }
 

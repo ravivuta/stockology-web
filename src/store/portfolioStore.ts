@@ -278,6 +278,7 @@ function preserveImportedMetadata(existing: StockHolding | undefined) {
     isVisibleInRisk: existing.isVisibleInRisk,
     isInWatchlistSize: existing.isInWatchlistSize,
     aiSentimentScore: existing.aiSentimentScore,
+    aiSentimentLastUpdated: existing.aiSentimentLastUpdated,
     beta: existing.beta,
     marketCap: existing.marketCap,
     peg: existing.peg,
@@ -661,22 +662,7 @@ function derivePortfolioState(
   if (shouldRecalculateLimits) {
     const recommendedWatchlistSizeForLimits = shortlistCtx.limitWatchlistSize
       ? idealWatchlistSize
-      : Math.max(
-          stocksWithLimits.filter((stock) => {
-            if (stock.excludeFromShortlist === true) return false;
-            if (stock.quantity > 0 || stock.isETF === true) return true;
-            if (shortlistCtx.enableRiskFilter) {
-              return stockPassesRiskFilter(
-                stock,
-                shortlistCtx.riskAppetite,
-                shortlistCtx.enableRiskFilter,
-                analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)
-              );
-            }
-            return true;
-          }).length,
-          1
-        );
+      : Math.max(stocksWithLimits.filter((stock) => stock.excludeFromShortlist !== true).length, 1);
 
     stocksWithLimits = stocksWithLimits.map((stock) => {
       const limits = calculateTradingLimits(

@@ -481,6 +481,9 @@ export function CsvImportExportBar({
         if (sent?.sentiment_score != null && Number.isFinite(Number(sent.sentiment_score))) {
           patch.aiSentimentScore = Number(sent.sentiment_score);
         }
+        if (sent?.last_updated) {
+          patch.aiSentimentLastUpdated = sent.last_updated;
+        }
         if (Object.keys(patch).length > 0) {
           updateStock(sym, patch);
         }

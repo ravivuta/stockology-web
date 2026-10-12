@@ -931,8 +931,11 @@ export function computeRecommendationFactors(
           } else {
             // Stale sentiment - ignore for gating
             aiPass = true;
-            const age = lastUpdated ? Math.floor((Date.now() - lastUpdated.getTime()) / (24 * 60 * 60 * 1000)) : 99;
-            detail = `${aiScore.toFixed(0)}/100 — Stale (${age}d old), not used`;
+            const ageMs = lastUpdated ? Date.now() - lastUpdated.getTime() : Number.NaN;
+            const age = Number.isFinite(ageMs) ? Math.floor(ageMs / (24 * 60 * 60 * 1000)) : null;
+            detail = age == null
+              ? `${aiScore.toFixed(0)}/100 — Updated time missing, not used`
+              : `${aiScore.toFixed(0)}/100 — Stale (${age}d old), not used`;
           }
         } else {
           // No sentiment available
@@ -1005,8 +1008,11 @@ export function computeRecommendationFactors(
           } else {
             // Stale sentiment - ignore for gating
             aiPass = true;
-            const age = lastUpdated ? Math.floor((Date.now() - lastUpdated.getTime()) / (24 * 60 * 60 * 1000)) : 99;
-            detail = `${aiScore.toFixed(0)}/100 — Stale (${age}d old), not used`;
+            const ageMs = lastUpdated ? Date.now() - lastUpdated.getTime() : Number.NaN;
+            const age = Number.isFinite(ageMs) ? Math.floor(ageMs / (24 * 60 * 60 * 1000)) : null;
+            detail = age == null
+              ? `${aiScore.toFixed(0)}/100 — Updated time missing, not used`
+              : `${aiScore.toFixed(0)}/100 — Stale (${age}d old), not used`;
           }
         } else {
           // No sentiment available

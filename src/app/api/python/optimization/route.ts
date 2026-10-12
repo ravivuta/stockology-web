@@ -96,7 +96,10 @@ function simulateStrategyReturn(
       skipWashSaleCheck: true,
       relaxScoreRequirement: true,
       useAISentiment: false,
-      useRSIGating: inputs.useRSIGating,
+      // iOS OptimizationEngine leaves useRSIGating at its default (on) and does not
+    // attach an AI score, so the SMA/factor search is not gated by those settings.
+    useAISentiment: false,
+    useRSIGating: true,
       sellOnlyLongTermQualified: false,
     });
 
