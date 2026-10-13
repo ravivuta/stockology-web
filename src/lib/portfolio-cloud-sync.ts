@@ -493,6 +493,7 @@ export type AppliedGlobalSettings = {
   rsiHysteresisPointsForRecommendations?: number;
   rsiMinRisingDaysForRecommendations?: number;
   sellOnlyLongTermQualified?: boolean;
+  useMarketRegimeCashTilt?: boolean;
   traderModeEnabled?: boolean;
   limitWatchlistSize?: boolean;
   timezone?: string;
@@ -514,6 +515,7 @@ type CurrentGlobalSettings = Required<
     | "rsiHysteresisPointsForRecommendations"
     | "rsiMinRisingDaysForRecommendations"
     | "sellOnlyLongTermQualified"
+    | "useMarketRegimeCashTilt"
     | "traderModeEnabled"
     | "limitWatchlistSize"
     | "timezone"
@@ -525,11 +527,9 @@ function numbersDiffer(a: number, b: number): boolean {
   return !Number.isFinite(a) || !Number.isFinite(b) || Math.abs(a - b) > 1e-9;
 }
 
-function resolveCombinedAiSetting(cloud: GlobalSettings): boolean | undefined {
-  const ai = cloud.useAISentiment;
-  const macro = cloud.useMarketRegimeCashTilt;
-  if (ai === true || macro === true) return true;
-  if (ai === false) return false;
+function resolveAiSetting(cloud: GlobalSettings): boolean | undefined {
+  if (cloud.useAISentiment === true) return true;
+  if (cloud.useAISentiment === false) return false;
   return undefined;
 }
 
@@ -551,7 +551,7 @@ export function patchFromCloudGlobalSettings(
   if (cloud.enableRiskFilter != null && cloud.enableRiskFilter !== current.enableRiskFilter) {
     patch.enableRiskFilter = cloud.enableRiskFilter;
   }
-  const combinedAi = resolveCombinedAiSetting(cloud);
+  const combinedAi = resolveAiSetting(cloud);
   if (combinedAi != null && combinedAi !== current.useAISentimentForRecommendations) {
     patch.useAISentimentForRecommendations = combinedAi;
   }
@@ -575,6 +575,11 @@ export function patchFromCloudGlobalSettings(
   }
   if (cloud.sellOnlyLongTerm != null && cloud.sellOnlyLongTerm !== current.sellOnlyLongTermQualified) {
     patch.sellOnlyLongTermQualified = cloud.sellOnlyLongTerm;
+  }
+  if (cloud.useMarketRegimeCashTilt != null && cloud.useMarketRegimeCashTilt !== current.useMarketRegimeCashTilt) {
+    patch.useMarketRegimeCashTilt = cloud.useMarketRegimeCashTilt;
+  } else if (cloud.useMarketRegimeCashTilt == null && cloud.useAISentiment === true && current.useMarketRegimeCashTilt !== true) {
+    patch.useMarketRegimeCashTilt = true;
   }
   if (cloud.traderModeEnabled === false) {
     if (current.traderModeEnabled) patch.traderModeEnabled = false;
@@ -619,11 +624,6 @@ export async function saveGlobalSettingsForUser(
     ...(existing as GlobalSettings),
     ...settings,
   };
-
-  if (settings.useAISentiment != null) {
-    // iOS treats company AI sentiment + market-outlook cash tilt as one combined toggle.
-    nextSettings.useMarketRegimeCashTilt = settings.useAISentiment;
-  }
 
   const { error } = await supabase.rpc("set_global_settings", {
     p_user_id: userId,

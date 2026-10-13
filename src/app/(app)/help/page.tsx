@@ -116,8 +116,8 @@ const SECTIONS: Section[] = [
   },
   {
     category: "signals",
-    title: "Use AI to guide recommendations",
-    body: "Available in Active mode (Premium). One Settings toggle — “Use AI to guide recommendations” — turns on both company-level AI scores and market-outlook cash rules together. When the toggle is off, Long-term mode is selected, or without Premium, the Home market-outlook icon is hidden and those signals do not change BUY, ADD, SELL, or REDUCE. Scores and news may still load for display. Turning the setting off also stops OpenAI refresh for your holdings and shortlist on the server.",
+    title: "Use AI (sentiment score) for recommendations",
+    body: "Available in Active mode (Premium). “Use AI (sentiment score) for recommendations” applies company-level AI news scores. Market outlook is a separate Premium setting and can stay on in Long-term mode. When that outlook setting is off, the dashboard outlook control is hidden and outlook does not change BUY or ADD.",
   },
   {
     category: "signals",
@@ -127,7 +127,7 @@ const SECTIONS: Section[] = [
   {
     category: "signals",
     title: "Market outlook (indexes + macro)",
-    body: "Separately from per-stock scores, Stocks PM builds a shared market outlook from macro news plus S&P 500 and Russell 2000 vs their 200-day averages, with index RSI(14) as a recovery signal (oversold trough turning up). Prefer cash / Defensive are early warnings while markets can still be elevated; Severe is reserved for crisis-level news (≤20/100). Outlook labels map to suggested cash % of portfolio (editable on iOS Profile when the AI setting is on; defaults Favorable 10%, Mixed 30%, Prefer cash 50%, Defensive 70%, Severe 90%). On iOS Home, tap the icon on Recommended Actions to read the current outlook.",
+    body: "Separately from per-stock scores, Stocks PM builds a shared market outlook from macro news plus S&P 500 and Russell 2000 vs their 200-day averages, with index RSI(14) as a recovery signal (oversold trough turning up). Prefer cash / Defensive are early warnings while markets can still be elevated; Severe is reserved for crisis-level news (≤20/100). Outlook labels map to suggested cash % of portfolio (editable on iOS Profile when Use market outlook is on; defaults Favorable 10%, Mixed 30%, Prefer cash 50%, Defensive 70%, Severe 90%). On the dashboard Recommended Actions header, and on iOS Home, open the outlook control to read the current outlook.",
   },
   {
     category: "signals",

@@ -620,27 +620,35 @@ export function CsvImportExportBar({
     const buyUpdates = outcome.netUpdates.filter((update) => update.action === "BUY" && !beforeImportSymbols.has(update.symbol));
     const addUpdates = outcome.netUpdates.filter((update) => update.action === "BUY" && beforeImportSymbols.has(update.symbol));
     const soldUpdates = outcome.netUpdates.filter((update) => update.action === "SELL");
-    const describeUpdates = (updates: Array<{ symbol: string; qty: number }>, sign: "+" | "-") =>
-      updates.map((update) => `${update.symbol} ${sign}${formatNumberMax2(update.qty)}`).join(", ");
+    const describeUpdates = (updates: Array<{ symbol: string; qty: number; account?: string }>, sign: "+" | "-") =>
+      updates
+        .map((update) => {
+          const account = update.account ? ` (${update.account})` : "";
+          return `${update.symbol} ${sign}${formatNumberMax2(update.qty)}${account}`;
+        })
+        .join("\n  ");
 
     const hasDeltaUpdates = buyUpdates.length + addUpdates.length + soldUpdates.length > 0;
     const cashAdjustmentNote =
       Math.abs(outcome.cashAdjustedBy) > 1e-6
-        ? ` Cash ${outcome.cashAdjustedBy > 0 ? "increased" : "decreased"} by ${formatCurrency(Math.abs(outcome.cashAdjustedBy))} from CSV holdings updates.`
+        ? `Cash ${outcome.cashAdjustedBy > 0 ? "increased" : "decreased"} by ${formatCurrency(Math.abs(outcome.cashAdjustedBy))} from CSV holdings updates.`
         : "";
 
     const summaryText = hasDeltaUpdates
       ? [
           "CSV updates applied.",
-          `Buy: ${buyUpdates.length}${buyUpdates.length > 0 ? ` (${describeUpdates(buyUpdates, "+")})` : ""}.`,
-          `Add: ${addUpdates.length}${addUpdates.length > 0 ? ` (${describeUpdates(addUpdates, "+")})` : ""}.`,
-          `Sold: ${soldUpdates.length}${soldUpdates.length > 0 ? ` (${describeUpdates(soldUpdates, "-")})` : ""}.`,
-        ].join(" ")
+          `Buy: ${buyUpdates.length}${buyUpdates.length > 0 ? `\n  ${describeUpdates(buyUpdates, "+")}` : ""}`,
+          `Add: ${addUpdates.length}${addUpdates.length > 0 ? `\n  ${describeUpdates(addUpdates, "+")}` : ""}`,
+          `Sold: ${soldUpdates.length}${soldUpdates.length > 0 ? `\n  ${describeUpdates(soldUpdates, "-")}` : ""}`,
+          cashAdjustmentNote,
+        ]
+          .filter(Boolean)
+          .join("\n")
       : "No updates detected from CSV.";
 
     setFlash({
       kind: "ok",
-      text: `${summaryText}${prunedNote}${cashAdjustmentNote}${invalidNote}${snapshotWarning ? ` ${snapshotWarning}` : ""}`,
+      text: [summaryText, prunedNote.trim(), invalidNote.trim(), snapshotWarning ?? ""].filter(Boolean).join("\n"),
     });
   }
 
@@ -1077,7 +1085,7 @@ export function CsvImportExportBar({
         <ModalSection className="px-5 py-4">
           <p
             id="csv-import-status-description"
-            className={`text-sm leading-relaxed ${flash?.kind === "err" ? "text-error" : "text-subtle"}`}
+            className={`whitespace-pre-line text-sm leading-relaxed ${flash?.kind === "err" ? "text-error" : "text-subtle"}`}
             role="status"
           >
             {flash?.text}

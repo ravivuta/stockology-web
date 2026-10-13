@@ -313,6 +313,7 @@ export function PortfolioCloudBridge({
           rsiHysteresisPointsForRecommendations: usePortfolioStore.getState().rsiHysteresisPointsForRecommendations,
           rsiMinRisingDaysForRecommendations: usePortfolioStore.getState().rsiMinRisingDaysForRecommendations,
           sellOnlyLongTermQualified: usePortfolioStore.getState().sellOnlyLongTermQualified,
+          useMarketRegimeCashTilt: usePortfolioStore.getState().useMarketRegimeCashTilt,
           traderModeEnabled: usePortfolioStore.getState().traderModeEnabled,
           limitWatchlistSize: usePortfolioStore.getState().limitWatchlistSize,
           timezone: usePortfolioStore.getState().timezone,

@@ -20,6 +20,7 @@ import {
   replaceCashLots,
 } from "@/lib/cash-accounts";
 import { fixedIncomeTotal, isFixedIncomeSymbol, sanitizeFixedIncomeByAccount } from "@/lib/fixed-income-accounts";
+import type { MarketOutlook } from "@/lib/market-outlook";
 
 export type LotStatus = "open" | "partiallySold" | "fullySold" | "washSaleRestricted";
 
@@ -128,6 +129,8 @@ type State = {
   rsiHysteresisPointsForRecommendations: number;
   rsiMinRisingDaysForRecommendations: number;
   sellOnlyLongTermQualified: boolean;
+  useMarketRegimeCashTilt: boolean;
+  marketOutlook: MarketOutlook | null;
   traderModeEnabled: boolean;
   timezone: string;
   region: string;
@@ -149,7 +152,7 @@ type State = {
     nextCash: number;
     markedPending: boolean;
   };
-  setSettings: (p: Partial<Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "etfProfitTarget" | "stockProfitTarget" | "useAISentimentForRecommendations" | "useRSIGatingForRecommendations" | "rsiPeriodForRecommendations" | "rsiOversoldThresholdForRecommendations" | "rsiOverboughtThresholdForRecommendations" | "rsiHysteresisPointsForRecommendations" | "rsiMinRisingDaysForRecommendations" | "sellOnlyLongTermQualified" | "traderModeEnabled" | "timezone" | "region">>) => void;
+  setSettings: (p: Partial<Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "etfProfitTarget" | "stockProfitTarget" | "useAISentimentForRecommendations" | "useRSIGatingForRecommendations" | "rsiPeriodForRecommendations" | "rsiOversoldThresholdForRecommendations" | "rsiOverboughtThresholdForRecommendations" | "rsiHysteresisPointsForRecommendations" | "rsiMinRisingDaysForRecommendations" | "sellOnlyLongTermQualified" | "useMarketRegimeCashTilt" | "traderModeEnabled" | "timezone" | "region">>) => void;
   addStock: (s: Partial<StockHolding> & { symbol: string }) => void;
   /** Merge fields into an existing symbol and rebuild recommendation. */
   updateStock: (symbol: string, patch: Partial<StockHolding>) => void;
@@ -200,7 +203,7 @@ type State = {
     addedCount: number;
     prunedWatchlistCount: number;
     importedTradeCount: number;
-    netUpdates: Array<{ symbol: string; action: "BUY" | "SELL"; qty: number }>;
+    netUpdates: Array<{ symbol: string; action: "BUY" | "SELL"; qty: number; account?: string }>;
     liquidationCashCredited: number;
     cashAdjustedBy: number;
   };
@@ -353,11 +356,17 @@ type RecalcContext = {
   rsiHysteresisPointsForRecommendations: number;
   rsiMinRisingDaysForRecommendations: number;
   sellOnlyLongTermQualified: boolean;
+  useMarketRegimeCashTilt?: boolean;
+  marketOutlookCashTargetPct?: number;
+  marketOutlookLabel?: string;
+  cashSharePct?: number;
   lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }>;
 };
 
 type ShortlistContext = Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize"> & {
   fixedIncomeByAccount?: Record<string, number>;
+  useMarketRegimeCashTilt?: boolean;
+  marketOutlook?: MarketOutlook | null;
 };
 type DeriveOptions = {
   shouldRecalculateLimits?: boolean;
@@ -499,7 +508,9 @@ function positionsByAccountSymbol(
   for (const symbol of symbols) {
     if (isCashSymbol(symbol)) continue;
     const openLots = lotsBySymbol[symbol]?.open;
-    if (openLots && openLots.length > 0) {
+    // An empty lot book means the position was sold. Do not recreate it from a stale
+    // holding quantity, or the cash credit is clawed back as a buy in Default Account.
+    if (openLots) {
       for (const lot of openLots) {
         const qty = Math.max(0, lot.quantity);
         add(lot.account, symbol, qty, qty * Math.max(0, lot.costBasis));
@@ -619,6 +630,10 @@ function recalcHolding(
       etfProfitTarget: ctx.etfProfitTarget,
       stockProfitTarget: ctx.stockProfitTarget,
       useAISentiment: ctx.useAISentimentForRecommendations,
+      useMarketRegimeCashTilt: ctx.useMarketRegimeCashTilt === true,
+      marketOutlookCashTargetPct: ctx.marketOutlookCashTargetPct,
+      marketOutlookLabel: ctx.marketOutlookLabel,
+      cashSharePct: ctx.cashSharePct,
       useRSIGating: ctx.useRSIGatingForRecommendations,
       rsiPeriod: ctx.rsiPeriodForRecommendations,
       rsiOversoldThreshold: ctx.rsiOversoldThresholdForRecommendations,
@@ -681,7 +696,15 @@ function derivePortfolioState(
     });
   }
 
-  const recalcedStocks = stocksWithLimits.map((s) => recalcHolding(s, recalcCtx));
+  const cashEquivalent = cashBalance + fixedIncomeTotal(shortlistCtx.fixedIncomeByAccount);
+  const outlookCtx: RecalcContext = {
+    ...recalcCtx,
+    useMarketRegimeCashTilt: shortlistCtx.useMarketRegimeCashTilt === true && shortlistCtx.marketOutlook?.preferCash === true,
+    marketOutlookCashTargetPct: shortlistCtx.marketOutlook?.cashTargetPct,
+    marketOutlookLabel: shortlistCtx.marketOutlook?.label,
+    cashSharePct: portfolioSize > 0 ? (cashEquivalent / portfolioSize) * 100 : 100,
+  };
+  const recalcedStocks = stocksWithLimits.map((s) => recalcHolding(s, outlookCtx));
 
   const stocksWithRisk = recalcedStocks.map((stock) => ({
     ...stock,
@@ -792,6 +815,8 @@ export const usePortfolioStore = create<State>()(
       rsiHysteresisPointsForRecommendations: 5,
       rsiMinRisingDaysForRecommendations: 2,
       sellOnlyLongTermQualified: false,
+      useMarketRegimeCashTilt: false,
+      marketOutlook: null,
       traderModeEnabled: false,
       timezone: "America/New_York",
       region: "US",
@@ -1879,6 +1904,7 @@ export const usePortfolioStore = create<State>()(
         let cashAdjustedBy = 0;
         const importedSymbolsByAccount = new Map<string, Set<string>>();
         const netUpdatesMap = new Map<string, number>();
+        const accountSaleEvents: Array<{ symbol: string; account: string; qty: number }> = [];
         const explicitSoldQtyBySymbol = new Map<string, number>();
         const explicitSellProceedsBySymbol = new Map<string, number>();
 
@@ -1964,6 +1990,7 @@ export const usePortfolioStore = create<State>()(
                 const removedBasis = openLotCostBasis(accountLots);
                 const averageCost = removedQty > 0 ? removedBasis / removedQty : 0;
                 liquidationCashCredited += removedBasis;
+                const accountName = displayAccount(accountLots[0]?.account);
 
                 soldLots.unshift({
                   saleDate: defaultImportPurchaseDate(),
@@ -1971,6 +1998,7 @@ export const usePortfolioStore = create<State>()(
                   salePrice: averageCost,
                   realizedGainLoss: 0,
                 });
+                accountSaleEvents.push({ symbol, account: accountName, qty: removedQty });
               }
 
               keptOpen.sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate));
@@ -1978,6 +2006,15 @@ export const usePortfolioStore = create<State>()(
                 open: keptOpen,
                 sold: soldLots,
               };
+              const lotSummary = summarizeOpenLots(keptOpen);
+              const existingStock = stockMap.get(symbol);
+              if (existingStock) {
+                stockMap.set(symbol, {
+                  ...existingStock,
+                  quantity: lotSummary.quantity,
+                  averageCost: lotSummary.quantity > 0 ? lotSummary.averageCost : 0,
+                });
+              }
             }
           }
 
@@ -2174,7 +2211,14 @@ export const usePortfolioStore = create<State>()(
                 (explicitSellProceedsBySymbol.get(symbol) ?? 0) + qty * Math.max(0, salePrice)
               );
 
-              if (holdingsSymbols.has(symbol)) continue;
+              if (holdingsSymbols.has(symbol)) {
+                accountSaleEvents.push({
+                  symbol,
+                  account: displayAccount(accountForImportedSell(trade, prePositionsByAccountSymbol)),
+                  qty,
+                });
+                continue;
+              }
 
               const bundle = lotsBySymbol[symbol] ?? { open: [], sold: [] };
               const openBefore = bundle.open.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0);
@@ -2187,6 +2231,11 @@ export const usePortfolioStore = create<State>()(
                   quantity: soldQty,
                   salePrice: Math.max(0, salePrice),
                   realizedGainLoss: 0,
+                });
+                accountSaleEvents.push({
+                  symbol,
+                  account: displayAccount(accountForImportedSell(trade, prePositionsByAccountSymbol)),
+                  qty: soldQty,
                 });
               }
               lotsBySymbol[symbol] = bundle;
@@ -2297,7 +2346,19 @@ export const usePortfolioStore = create<State>()(
             symbol,
             action: delta > 0 ? ("BUY" as const) : ("SELL" as const),
             qty: Math.abs(delta),
+            account: undefined as string | undefined,
           }));
+        if (accountSaleEvents.length > 0) {
+          const seen = new Set(netUpdates.filter((update) => update.action === "SELL").map((update) => update.symbol));
+          for (const event of accountSaleEvents) {
+            if (seen.has(event.symbol)) {
+              const match = netUpdates.find((update) => update.action === "SELL" && update.symbol === event.symbol && !update.account);
+              if (match && !match.account) match.account = event.account;
+              continue;
+            }
+            netUpdates.push({ symbol: event.symbol, action: "SELL", qty: event.qty, account: event.account });
+          }
+        }
 
         return {
           importType,

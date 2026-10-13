@@ -135,6 +135,7 @@ function SettingsInner() {
   const rsiMinRisingDaysForRecommendations = usePortfolioStore((s) => s.rsiMinRisingDaysForRecommendations);
   const sellOnlyLongTermQualified = usePortfolioStore((s) => s.sellOnlyLongTermQualified);
   const traderModeEnabled = usePortfolioStore((s) => s.traderModeEnabled);
+  const useMarketRegimeCashTilt = usePortfolioStore((s) => s.useMarketRegimeCashTilt);
   const timezone = usePortfolioStore((s) => s.timezone);
   const region = usePortfolioStore((s) => s.region);
   const setSettings = usePortfolioStore((s) => s.setSettings);
@@ -213,6 +214,7 @@ function SettingsInner() {
         riskAppetite: "riskAppetite" in patch ? patch.riskAppetite : store.riskAppetite,
         enableRiskFilter: "enableRiskFilter" in patch ? patch.enableRiskFilter : store.enableRiskFilter,
         useAISentiment: "useAISentimentForRecommendations" in patch ? patch.useAISentimentForRecommendations : store.useAISentimentForRecommendations,
+        useMarketRegimeCashTilt: "useMarketRegimeCashTilt" in patch ? patch.useMarketRegimeCashTilt : store.useMarketRegimeCashTilt,
         useRSIGating: "useRSIGatingForRecommendations" in patch ? patch.useRSIGatingForRecommendations : store.useRSIGatingForRecommendations,
         rsiPeriod: "rsiPeriodForRecommendations" in patch ? patch.rsiPeriodForRecommendations : store.rsiPeriodForRecommendations,
         rsiOversoldThreshold: "rsiOversoldThresholdForRecommendations" in patch ? patch.rsiOversoldThresholdForRecommendations : store.rsiOversoldThresholdForRecommendations,
@@ -428,7 +430,7 @@ function SettingsInner() {
       const cloudSettings = await loadGlobalSettingsForUser(supabase, resolved);
       if (cloudSettings && !cancelled) {
         const combinedAiSetting =
-          cloudSettings.useAISentiment === true || cloudSettings.useMarketRegimeCashTilt === true
+          cloudSettings.useAISentiment === true
             ? true
             : cloudSettings.useAISentiment === false
               ? false
@@ -439,6 +441,11 @@ function SettingsInner() {
           ...(cloudSettings.riskAppetite != null ? { riskAppetite: cloudSettings.riskAppetite } : {}),
           ...(cloudSettings.enableRiskFilter != null ? { enableRiskFilter: cloudSettings.enableRiskFilter } : {}),
           ...(combinedAiSetting != null ? { useAISentimentForRecommendations: combinedAiSetting } : {}),
+          ...(cloudSettings.useMarketRegimeCashTilt != null
+            ? { useMarketRegimeCashTilt: cloudSettings.useMarketRegimeCashTilt }
+            : cloudSettings.useAISentiment === true
+              ? { useMarketRegimeCashTilt: true }
+              : {}),
           ...(cloudSettings.useRSIGating != null ? { useRSIGatingForRecommendations: cloudSettings.useRSIGating } : {}),
           ...(cloudSettings.rsiPeriod != null ? { rsiPeriodForRecommendations: cloudSettings.rsiPeriod } : {}),
           ...(cloudSettings.rsiOversoldThreshold != null ? { rsiOversoldThresholdForRecommendations: cloudSettings.rsiOversoldThreshold } : {}),
@@ -847,9 +854,34 @@ function SettingsInner() {
                   <p className="mt-1 text-[10px] leading-snug text-subtle">
                     {traderModeEnabled
                       ? "Active mode: enables RSI and AI guidance. SELL can trigger when RSI is overbought with low upside (<10%), or when score/RSI/AI are all weak with low upside (<15%)."
-                      : "Long-term mode: holds until analyst target. RSI and AI guidance are turned off to avoid conflicts."}
+                      : "Long-term mode: holds until analyst target. RSI and AI news guidance are turned off. Market outlook can stay on."}
                   </p>
                 </div>
+
+                <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03] md:col-span-2">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
+                    checked={useMarketRegimeCashTilt && premiumFeatures}
+                    onChange={(e) => {
+                      if (e.target.checked && !premiumFeatures) {
+                        setAiGateNotice(true);
+                        return;
+                      }
+                      setAiGateNotice(false);
+                      persistSettingsPatch({ useMarketRegimeCashTilt: e.target.checked });
+                    }}
+                  />
+                  <span>
+                    <span className="block text-[12px] font-medium leading-snug text-foreground">
+                      Use market outlook
+                      {!premiumFeatures ? <span className="ml-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Premium</span> : null}
+                    </span>
+                    <span className="mt-px block text-[10px] leading-snug text-subtle">
+                      A weak outlook can pause new buys and suggest cash-equivalent-building steps. This does not turn on company AI news scores.
+                    </span>
+                  </span>
+                </label>
 
                 {traderModeEnabled ? (
                   <>
@@ -869,11 +901,11 @@ function SettingsInner() {
                       />
                       <span>
                         <span className="block text-[12px] font-medium leading-snug text-foreground">
-                          Use AI to guide recommendations
+                          Use AI (sentiment score) for recommendations
                           {!premiumFeatures ? <span className="ml-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Premium</span> : null}
                         </span>
                         <span className="mt-px block text-[10px] leading-snug text-subtle">
-                          Premium. Uses stock-specific AI news digest scores and macroeconomic market-outlook factors to pause buys and suggest cash-building when risk rises. The Home outlook icon appears only when this is on. Scores may still be visible without changing recommendations.
+                          Premium. Uses stock-specific AI news digest scores to pause buys when that company's news is weak. Market outlook is a separate setting.
                         </span>
                       </span>
                     </label>

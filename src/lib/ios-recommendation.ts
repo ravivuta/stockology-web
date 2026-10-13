@@ -137,6 +137,10 @@ export type IosRecOptions = {
   rsiMinRisingDays?: number;
   sellOnlyLongTermQualified?: boolean;
   useTraderMode?: boolean;
+  useMarketRegimeCashTilt?: boolean;
+  marketOutlookCashTargetPct?: number;
+  marketOutlookLabel?: string;
+  cashSharePct?: number;
 };
 
 export type WashSaleInfo = {
@@ -1247,6 +1251,10 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
     rsiMinRisingDays = 2,
     sellOnlyLongTermQualified = false,
     useTraderMode = false,
+    useMarketRegimeCashTilt = false,
+    marketOutlookCashTargetPct,
+    marketOutlookLabel,
+    cashSharePct,
   } = options;
 
   const currentPrice = stock.lastPrice ?? 0;
@@ -1539,6 +1547,21 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
           expectedReturnPct,
         };
       }
+    }
+
+    if (
+      useMarketRegimeCashTilt &&
+      marketOutlookLabel &&
+      marketOutlookCashTargetPct != null &&
+      (cashSharePct ?? 100) + 0.5 < marketOutlookCashTargetPct
+    ) {
+      return {
+        action: numStock === 0 ? "WAIT_BUY" : "WAIT_ADD",
+        comments: `Market outlook is ${marketOutlookLabel}. Cash equivalents are ${(cashSharePct ?? 0).toFixed(0)}% and the target is ${marketOutlookCashTargetPct.toFixed(0)}%, so new buys are paused for now.`,
+        nextBuyPrice,
+        movingAvg,
+        expectedReturnPct,
+      };
     }
 
     if (numStock === 0) {

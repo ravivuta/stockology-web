@@ -18,6 +18,10 @@ export type BuildRecommendationOptions = Pick<IosRecOptions, "closes"> & {
   rsiHysteresisPoints?: number;
   rsiMinRisingDays?: number;
   sellOnlyLongTermQualified?: boolean;
+  useMarketRegimeCashTilt?: boolean;
+  marketOutlookCashTargetPct?: number;
+  marketOutlookLabel?: string;
+  cashSharePct?: number;
   openLots?: IosStockInput["openLots"];
   soldLots?: IosStockInput["soldLots"];
 };
@@ -47,6 +51,10 @@ export function buildRecommendation(stock: RecInput, options?: BuildRecommendati
       rsiHysteresisPoints: options?.rsiHysteresisPoints,
       rsiMinRisingDays: options?.rsiMinRisingDays,
       sellOnlyLongTermQualified: options?.sellOnlyLongTermQualified ?? false,
+      useMarketRegimeCashTilt: options?.useMarketRegimeCashTilt ?? false,
+      marketOutlookCashTargetPct: options?.marketOutlookCashTargetPct,
+      marketOutlookLabel: options?.marketOutlookLabel,
+      cashSharePct: options?.cashSharePct,
     }
   );
 }
