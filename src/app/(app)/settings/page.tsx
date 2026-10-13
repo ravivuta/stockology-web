@@ -905,7 +905,7 @@ function SettingsInner() {
                           {!premiumFeatures ? <span className="ml-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Premium</span> : null}
                         </span>
                         <span className="mt-px block text-[10px] leading-snug text-subtle">
-                          Premium. Uses stock-specific AI news digest scores to pause buys when that company's news is weak. Market outlook is a separate setting.
+                          Premium. Uses stock-specific AI news digest scores to pause buys when that company&apos;s news is weak. Market outlook is a separate setting.
                         </span>
                       </span>
                     </label>
