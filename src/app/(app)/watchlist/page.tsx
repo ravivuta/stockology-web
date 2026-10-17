@@ -46,15 +46,15 @@ function scoreTextClass(score: number | null | undefined): string {
   if (score >= 80) return "text-emerald-600/90 dark:text-emerald-300";
   if (score >= 70) return "text-primary dark:text-primary";
   if (score >= 60) return "text-amber-600 dark:text-amber-300";
-  if (score >= 50) return "text-red-600/85 dark:text-red-300";
-  return "text-red-600 dark:text-red-400";
+  if (score >= 50) return "text-red-600/85 dark:text-[#ff6157]";
+  return "text-red-600 dark:text-[#ff6157]";
 }
 
 function upsideTextClass(upside: number | null | undefined): string {
   if (upside == null || !Number.isFinite(upside)) return "text-subtle";
   if (upside > 50) return "text-emerald-600 dark:text-emerald-400";
   if (upside >= 25) return "text-orange-600 dark:text-orange-400";
-  return "text-red-600 dark:text-red-400";
+  return "text-red-600 dark:text-[#ff6157]";
   return "text-subtle";
 }
 
@@ -65,8 +65,8 @@ function analystRatingTextClass(value: string | null | undefined): string {
   if (rating >= 4.0) return "text-emerald-600/90 dark:text-emerald-300";
   if (rating >= 3.5) return "text-primary dark:text-primary";
   if (rating >= 3.0) return "text-amber-600 dark:text-amber-300";
-  if (rating >= 2.5) return "text-red-600/85 dark:text-red-300";
-  return "text-red-600 dark:text-red-400";
+  if (rating >= 2.5) return "text-red-600/85 dark:text-[#ff6157]";
+  return "text-red-600 dark:text-[#ff6157]";
 }
 
 function filterChipClass(active: boolean, tone: "green" | "gold") {
@@ -129,7 +129,7 @@ export default function WatchlistPage() {
 
   function recSymbolTextClass(action: string | undefined): string {
     const normalized = action?.toUpperCase() ?? "";
-    if (normalized === "SELL") return "text-error dark:text-red-300";
+    if (normalized === "SELL") return "text-error dark:text-[#ff6157]";
     if (normalized === "REDUCE") return "text-amber-700 dark:text-amber-200";
     if (normalized === "BUY" || normalized === "ADD") return "text-primary dark:text-primary";
     return "text-foreground dark:text-white";
@@ -346,7 +346,7 @@ export default function WatchlistPage() {
                     className="cursor-pointer transition-colors duration-150 hover:bg-muted/50 dark:hover:bg-white/[0.04]"
                     onClick={() => setDetailSymbol(s.symbol)}
                   >
-                    <td className="min-w-0 px-1.5 py-2.5 align-middle font-medium text-foreground sm:px-3 sm:py-3">
+                    <td className="min-w-[5.5rem] px-1.5 py-2.5 align-middle font-medium text-foreground sm:min-w-[6.5rem] sm:px-3 sm:py-3">
                       <button
                         type="button"
                         onClick={(event) => {
@@ -368,7 +368,7 @@ export default function WatchlistPage() {
                               : s.dailyChangePercent > 0
                                 ? "text-[11px] font-medium text-emerald-700 dark:text-emerald-400"
                                 : s.dailyChangePercent < 0
-                                  ? "text-[11px] font-medium text-red-700 dark:text-red-400"
+                                  ? "text-[11px] font-medium text-red-700 dark:text-[#ff6157]"
                                   : "text-[11px] text-subtle"
                           }
                         >
@@ -384,7 +384,7 @@ export default function WatchlistPage() {
                           : s.dailyChangePercent > 0
                             ? "text-emerald-700 dark:text-emerald-400"
                             : s.dailyChangePercent < 0
-                              ? "text-red-700 dark:text-red-400"
+                              ? "text-red-700 dark:text-[#ff6157]"
                               : "text-subtle"
                       }`}
                     >

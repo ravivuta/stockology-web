@@ -1304,15 +1304,23 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                           {recommendationActionFactors.filter((factor) => factor.passes).length}/{recommendationActionFactors.length} passed
                         </span>
                       </div>
-                      <div className={cn(dense ? "mt-3 space-y-1.5" : "mt-3 space-y-1.5")}>
-                        {recommendationActionFactors.map((factor) => (
-                          <FactorFlagRow
-                            key={`${factor.label}-${factor.detail}`}
-                            compact={dense}
-                            label={factor.label}
-                            detail={factor.detail}
-                            passes={factor.passes}
-                          />
+                      <div className="mt-3 space-y-2">
+                        {recommendationFactorGroups(rec?.action ?? "", recommendationActionFactors, (stock?.quantity ?? 0) > 0).map((group) => (
+                          <details key={group.title} className="rounded-md border border-border/70 px-2 py-1 dark:border-white/[0.08]">
+                            <summary className="cursor-pointer text-xs font-semibold text-subtle">{group.title}</summary>
+                            {group.description ? <p className="mt-1 text-[11px] text-subtle">{group.description}</p> : null}
+                            <div className="mt-2 space-y-1.5">
+                              {group.factors.map((factor) => (
+                                <FactorFlagRow
+                                  key={`${group.title}-${factor.label}-${factor.detail}`}
+                                  compact={dense}
+                                  label={factor.label}
+                                  detail={factor.detail}
+                                  passes={factor.passes}
+                                />
+                              ))}
+                            </div>
+                          </details>
                         ))}
                       </div>
                     </div>
@@ -1862,6 +1870,68 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       />
     </div>
   );
+}
+
+const ADD_FACTOR_LABELS = new Set([
+  "Price below",
+  "Min Score > 50",
+  "Expected return > 25%",
+  "AI sentiment",
+  "RSI gate",
+  "RSI reversal",
+  "RSI overbought",
+  "RSI not blocking",
+  "Holding size within limits",
+  "Wash sale clear",
+  "Eligible to ADD",
+  "Cash for at least 1 share",
+]);
+
+const REDUCE_FACTOR_LABELS = new Set([
+  "Cost basis above limit",
+  "Excess investment is significant (> Transaction limit)?",
+  "Unrealized gain sufficient to reduce",
+  "Score < 70",
+]);
+
+function labelIn(set: Set<string>, label: string): boolean {
+  for (const prefix of set) {
+    if (label === prefix || label.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
+function recommendationFactorGroups(action: string, factors: { label: string; detail: string; passes: boolean }[], hasPosition: boolean) {
+  const normalized = action.toUpperCase();
+  if (normalized === "BUY" || normalized === "ADD" || normalized === "SELL" || normalized === "REDUCE") {
+    const title = normalized === "BUY" ? "Buy path" : normalized === "ADD" ? "Add path" : normalized === "SELL" ? "Sell path" : "Reduce path";
+    return [{ title, description: null as string | null, factors }];
+  }
+  if (normalized === "WAIT_ADD" || normalized === "WAIT_REDUCE") {
+    const groups = [];
+    const common = factors.filter((factor) => !labelIn(ADD_FACTOR_LABELS, factor.label) && !REDUCE_FACTOR_LABELS.has(factor.label));
+    const addPath = factors.filter((factor) => labelIn(ADD_FACTOR_LABELS, factor.label));
+    const reducePath = hasPosition ? factors.filter((factor) => REDUCE_FACTOR_LABELS.has(factor.label)) : [];
+    if (common.length > 0) {
+      groups.push({ title: "Common gates", description: "Shared checks that apply regardless of price direction.", factors: common });
+    }
+    if (addPath.length > 0) {
+      groups.push({
+        title: "For Adding more stocks (price weakness)",
+        description: "Averaging-down checks used when price pulls back to your buy zone.",
+        factors: addPath,
+      });
+    }
+    if (reducePath.length > 0) {
+      groups.push({
+        title: "For reducing holding size (oversize + profit)",
+        description: "Trim checks used when position size is high and gains are sufficient.",
+        factors: reducePath,
+      });
+    }
+    return groups;
+  }
+  return [{ title: "Active path", description: null as string | null, factors }];
 }
 
 function FactorFlagRow({

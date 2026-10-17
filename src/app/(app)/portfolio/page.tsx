@@ -69,7 +69,7 @@ function recBadgeClass(action: string): string {
 
 function recSymbolTextClass(action: string | undefined): string {
   const u = action?.toUpperCase() ?? "";
-  if (u === "SELL") return "text-error dark:text-red-300";
+  if (u === "SELL") return "text-error dark:text-[#ff6157]";
   if (u === "REDUCE") return "text-amber-700 dark:text-amber-200";
   if (u === "BUY" || u === "ADD") return "text-primary dark:text-primary";
   return "text-foreground dark:text-white";
@@ -81,15 +81,15 @@ function scoreTextClass(score: number | null | undefined): string {
   if (score >= 80) return "text-emerald-600/90 dark:text-emerald-300";
   if (score >= 70) return "text-primary dark:text-primary";
   if (score >= 60) return "text-amber-600 dark:text-amber-300";
-  if (score >= 50) return "text-red-600/85 dark:text-red-300";
-  return "text-red-600 dark:text-red-400";
+  if (score >= 50) return "text-red-600/85 dark:text-[#ff6157]";
+  return "text-red-600 dark:text-[#ff6157]";
 }
 
 function upsideTextClass(upside: number | null | undefined): string {
   if (upside == null || !Number.isFinite(upside)) return "text-subtle";
   if (upside > 50) return "text-emerald-600 dark:text-emerald-400";
   if (upside >= 25) return "text-orange-600 dark:text-orange-400";
-  return "text-red-600 dark:text-red-400";
+  return "text-red-600 dark:text-[#ff6157]";
   return "text-subtle";
 }
 
@@ -144,7 +144,7 @@ function PortfolioSummaryTiles({
             totalGainLoss > 0
               ? "text-emerald-600 dark:text-primary"
               : totalGainLoss < 0
-                ? "text-red-600 dark:text-red-400"
+                ? "text-red-600 dark:text-[#ff6157]"
                 : "text-foreground"
           }`}
         >
@@ -158,7 +158,7 @@ function PortfolioSummaryTiles({
               portfolioTodayChange.change > 0
                 ? "text-emerald-600 dark:text-primary"
                 : portfolioTodayChange.change < 0
-                  ? "text-red-600 dark:text-red-400"
+                  ? "text-red-600 dark:text-[#ff6157]"
                   : "text-foreground"
             }`}
           >
@@ -489,7 +489,7 @@ export default function PortfolioPage() {
                                 : d > 0
                                   ? "text-[11px] font-medium text-emerald-700 dark:text-primary"
                                   : d < 0
-                                    ? "text-[11px] font-medium text-red-700 dark:text-red-400"
+                                    ? "text-[11px] font-medium text-red-700 dark:text-[#ff6157]"
                                     : "text-[11px] text-subtle"
                             }
                           >
@@ -500,7 +500,7 @@ export default function PortfolioPage() {
                       <td className="hidden px-4 py-3 text-center tabular-nums text-foreground md:table-cell">{formatCurrency(s.lastPrice ?? 0)}</td>
                       <td
                         className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${
-                          d == null ? "text-subtle" : d > 0 ? "text-emerald-700 dark:text-primary" : d < 0 ? "text-red-700 dark:text-red-400" : "text-subtle"
+                          d == null ? "text-subtle" : d > 0 ? "text-emerald-700 dark:text-primary" : d < 0 ? "text-red-700 dark:text-[#ff6157]" : "text-subtle"
                         }`}
                       >
                         {d != null && Number.isFinite(d) ? formatPercent(d, true) : "—"}
@@ -514,7 +514,7 @@ export default function PortfolioPage() {
                             gainLoss > 0
                               ? "text-emerald-700 dark:text-primary"
                               : gainLoss < 0
-                                ? "text-red-700 dark:text-red-400"
+                                ? "text-red-700 dark:text-[#ff6157]"
                                 : "text-subtle"
                           }`}
                         >

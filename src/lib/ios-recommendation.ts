@@ -44,6 +44,9 @@ export type IosStockInput = {
   aiSentimentScore?: number;
   aiSentimentLastUpdated?: string; // ISO8601 timestamp
   movingAvg?: number;
+  /** Calendar day (YYYY-MM-DD) and SMA period of `movingAvg`. History is static during the day. */
+  movingAvgComputedOn?: string;
+  movingAvgPeriod?: number;
   isShortlisted?: boolean;
   isInWatchlistSize?: boolean;
   suppressTradeActions?: boolean;
@@ -153,6 +156,12 @@ export type WashSaleInfo = {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const UNKNOWN_PURCHASE_DATE_MAX_MS = 2 * DAY_MS;
+
+export function localCalendarDay(date = new Date()): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
 
 export function sma(values: number[], window: number): number {
   if (window <= 0 || values.length === 0) return 0;
@@ -1276,9 +1285,18 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
   let movingAvg: number;
   let actualSmaPeriod: number;
   const pre = stock.movingAvg;
+  const today = localCalendarDay();
+  const cachedForToday =
+    pre != null &&
+    pre > 0 &&
+    stock.movingAvgPeriod === shortSMAPeriod &&
+    stock.movingAvgComputedOn === today;
   const canComputePreferredSMA = closes.length >= shortSMAPeriod;
 
-  if (canComputePreferredSMA) {
+  if (cachedForToday) {
+    movingAvg = pre;
+    actualSmaPeriod = shortSMAPeriod;
+  } else if (canComputePreferredSMA) {
     movingAvg = sma(closes, shortSMAPeriod);
     actualSmaPeriod = shortSMAPeriod;
   } else if (pre != null && pre > 0) {

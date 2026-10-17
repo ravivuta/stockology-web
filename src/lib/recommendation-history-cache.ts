@@ -1,7 +1,5 @@
 import { getCachedHistoricalPricePoints } from "@/lib/historical-price-cache";
 
-const HISTORY_FRESH_MS = 24 * 60 * 60 * 1000;
-
 type RecommendationHistoryEntry = {
   closes: number[];
   fetchedAt: number;
@@ -18,7 +16,7 @@ function loadFromPersistentCache(symbol: string): RecommendationHistoryEntry | n
   if (!cached) return null;
   const entry: RecommendationHistoryEntry = {
     closes: cached.points.map((point) => point.close),
-    fetchedAt: Date.now(),
+    fetchedAt: cached.isFresh ? Date.now() : 0,
   };
   historyBySymbol.set(normalizeSymbol(symbol), entry);
   return entry;
@@ -41,7 +39,7 @@ export function getRecommendationHistoryCloses(symbol: string): number[] | undef
 
 export function hasFreshRecommendationHistory(symbol: string, minDays = 25): boolean {
   const normalized = normalizeSymbol(symbol);
-  const entry = historyBySymbol.get(normalized) ?? loadFromPersistentCache(normalized);
-  if (!entry || entry.closes.length < minDays) return false;
-  return Date.now() - entry.fetchedAt < HISTORY_FRESH_MS;
+  const cached = getCachedHistoricalPricePoints(normalized, minDays);
+  if (!cached || cached.points.length < minDays) return false;
+  return cached.isFresh;
 }

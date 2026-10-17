@@ -12,6 +12,7 @@ import {
   localPortfolioMutationIsUnsaved,
   markLastPushedPortfolioFingerprint,
 } from "@/lib/portfolio-snapshot-client";
+import { localCalendarDay } from "@/lib/ios-recommendation";
 import { portfolioSyncFingerprint, loadGlobalSettingsForUser, patchFromCloudGlobalSettings } from "@/lib/portfolio-cloud-sync";
 import { createClient } from "@/lib/supabase/client";
 import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
@@ -106,6 +107,16 @@ function keepLocalMarketFields(local: StockHolding, incoming: StockHolding): Sto
   }
   if (!next.name && local.name) next.name = local.name;
   if (next.isETF == null && local.isETF != null) next.isETF = local.isETF;
+  const today = localCalendarDay();
+  if (
+    local.movingAvgComputedOn === today &&
+    local.movingAvgPeriod === (local.shortSMA ?? 50) &&
+    (local.movingAvg ?? 0) > 0
+  ) {
+    next.movingAvg = local.movingAvg;
+    next.movingAvgComputedOn = local.movingAvgComputedOn;
+    next.movingAvgPeriod = local.movingAvgPeriod;
+  }
   return next;
 }
 
@@ -209,7 +220,8 @@ export async function runRefreshPipeline(
 
     const portfolioSizeAfter = usePortfolioStore.getState().portfolioSize;
     const portfolioSizeBefore = stateBeforeSnapshot.portfolioSize;
-    let recalculateLimits = !snapshotApplied;
+    // Limits stay on the book. Recalculate only when a newer snapshot changed portfolio size.
+    let recalculateLimits = false;
     if (
       snapshotApplied &&
       portfolioSizeBefore > 0 &&
@@ -250,8 +262,8 @@ export async function runRefreshPipeline(
       lastRefreshAt: data.refreshed_at ?? new Date().toISOString(),
     });
 
-    // Refresh is pull-only. Optimize/import/settings persist via their own mutation flush.
-    // Do not rewrite today's snapshot from a price hydrate.
+    // Prices, cost, gain, and recommendations are calculated here. They are not
+    // read back from the snapshot, and a price refresh does not write a snapshot.
 
     return {
       ok: true,

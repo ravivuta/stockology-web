@@ -79,7 +79,7 @@ export function useHydrateTickerFundamentals(options?: { enabled?: boolean }) {
       try {
         const result = await runRefreshPipeline(symbols, {
           optimizePending,
-          includeSnapshot: true,
+          includeSnapshot: reason === "init" || reason === "visible",
         });
         if (result.ok && optimizePending) {
           lastAutoOptimizeAtRef.current = Date.now();

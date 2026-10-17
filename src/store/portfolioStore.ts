@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { setLocalStorageItem } from "@/lib/local-storage-quota";
-import { calculateTradingLimits, computeRiskReturnScore, rankedTopWatchlistCandidates, recommendedWatchlistSize, stockPassesRiskFilter, offloadHoldingOutsideShortlistIfNeeded } from "@/lib/ios-recommendation";
+import { calculateTradingLimits, computeRiskReturnScore, localCalendarDay, rankedTopWatchlistCandidates, recommendedWatchlistSize, stockPassesRiskFilter, offloadHoldingOutsideShortlistIfNeeded } from "@/lib/ios-recommendation";
 import { getRecommendationHistoryCloses } from "@/lib/recommendation-history-cache";
 import { buildRecommendation } from "@/lib/recommendation";
 import type { CsvImportRow, CsvImportTrade } from "@/lib/csvPortfolio";
@@ -100,8 +100,10 @@ export type StockHolding = {
   analystTarget?: number;
   analystAvg?: string;
   isETF?: boolean;
-  /** Precomputed SMA for user's period (e.g. from iOS snapshot `moving_avg`). */
+  /** SMA for the saved period. Computed once per calendar day from closes, then reused. */
   movingAvg?: number;
+  movingAvgComputedOn?: string;
+  movingAvgPeriod?: number;
   suppressTradeActions?: boolean;
   excludeFromShortlist?: boolean;
   enableRSIReversalGate?: boolean;
@@ -623,9 +625,7 @@ function recalcHolding(
   const score = s.isETF ? undefined : computeRiskReturnScore(s);
   const next = { ...s, score };
   const lots = ctx.lotsBySymbol[s.symbol] ?? { open: [], sold: [] };
-  return {
-    ...next,
-    recommendation: buildRecommendation(next, {
+  const recommendation = buildRecommendation(next, {
       closes: getRecommendationHistoryCloses(next.symbol),
       etfProfitTarget: ctx.etfProfitTarget,
       stockProfitTarget: ctx.stockProfitTarget,
@@ -643,7 +643,18 @@ function recalcHolding(
       sellOnlyLongTermQualified: ctx.sellOnlyLongTermQualified,
       openLots: lots.open,
       soldLots: lots.sold,
-    }),
+    });
+  const period = next.shortSMA ?? 50;
+  const today = localCalendarDay();
+  const alreadyToday =
+    (next.movingAvg ?? 0) > 0 && next.movingAvgPeriod === period && next.movingAvgComputedOn === today;
+  const movingAvg = alreadyToday ? next.movingAvg : recommendation.movingAvg > 0 ? recommendation.movingAvg : next.movingAvg;
+  return {
+    ...next,
+    movingAvg,
+    movingAvgPeriod: (movingAvg ?? 0) > 0 ? period : next.movingAvgPeriod,
+    movingAvgComputedOn: alreadyToday ? today : recommendation.movingAvg > 0 ? today : next.movingAvgComputedOn,
+    recommendation,
   };
 }
 

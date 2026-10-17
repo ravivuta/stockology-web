@@ -85,9 +85,10 @@ export async function fetchHistoricalPricePoints(
     return { points: cached.points, error: null };
   }
 
-  // Web uses one master per-symbol history cache. Fetch the full stored horizon once,
-  // then serve shorter ranges locally for charts, recommendations, and simulations.
-  const requestDays = MASTER_CACHE_DAYS;
+  // A saved series is reused. Only the latest sessions are fetched and appended.
+  // The full horizon is downloaded when this symbol has no local history yet.
+  const savedSeries = getCachedHistoricalPricePoints(sym, 1);
+  const requestDays = savedSeries && savedSeries.points.length >= 60 ? 10 : MASTER_CACHE_DAYS;
 
   // Single DB signature (text, int). Named args must not be split across two overloads.
   const { data, error } = await supabase.rpc("get_historical_prices", {
