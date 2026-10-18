@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { recommendedWatchlistSize, dividendYieldPercent } from "@/lib/ios-recommendation";
@@ -85,7 +85,12 @@ export default function WatchlistPage() {
   const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
   const removeStock = usePortfolioStore((s) => s.removeStock);
   const [query, setQuery] = useState("");
-  const [showShortlisted, setShowShortlisted] = useState(false);
+  const [showShortlisted, setShowShortlisted] = useState(limitWatchlistSize);
+
+  useEffect(() => {
+    if (limitWatchlistSize) setShowShortlisted(true);
+    else setShowShortlisted(false);
+  }, [limitWatchlistSize]);
   const [showActionable, setShowActionable] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [sort, setSort] = useState<SortKey>("symbol");
