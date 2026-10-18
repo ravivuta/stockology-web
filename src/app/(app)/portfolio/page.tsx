@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
@@ -9,15 +9,10 @@ import { AddAssetButton } from "@/components/portfolio/AddAssetForm";
 import { PortfolioSimulateLink } from "@/components/nav/PortfolioSimulateLink";
 import { StockDetailModal } from "@/components/stock/StockDetailModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
-import { formatCurrency, formatDecimal, formatNumberMax2, formatPercent, formatSignedCurrency, formatWholeCurrency } from "@/lib/numberFormat";
+import { formatCurrency, formatDecimal, formatNumberMax2, formatPercent, formatWholeCurrency } from "@/lib/numberFormat";
 import { recommendationActionDisplay } from "@/lib/recommendation";
-import { computeTodayChangeFromHistory, computeTodayChangeFromLiveQuotes, fetchCloudNetWorthHistory, type NetWorthPoint } from "@/lib/portfolio-net-worth-series";
-import { isUsMarketTradingDay } from "@/lib/market-hours";
-import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
-import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
 import { fieldInputClass } from "@/lib/field-input";
 import { cashByAccount, displayAccount, isCashSymbol } from "@/lib/cash-accounts";
-import { fixedIncomeTotal } from "@/lib/fixed-income-accounts";
 
 type SortKey = "symbol" | "quantity" | "averageCost" | "costBasis" | "lastPrice" | "value" | "gainLoss" | "upside" | "score" | "today" | "signal";
 
@@ -100,81 +95,8 @@ function filterChipClass(active: boolean, tone: "green" | "gold") {
   return `${base} border-transparent bg-[#f3c74a] text-black`;
 }
 
-function PortfolioSummaryTiles({
-  cash,
-  fixedIncome,
-  assetsValue,
-  netWorth,
-  totalGainLoss,
-  totalGainLossPct,
-  portfolioTodayChange,
-  showPortfolioTodayChange,
-}: {
-  cash: number;
-  fixedIncome: number;
-  assetsValue: number;
-  netWorth: number;
-  totalGainLoss: number;
-  totalGainLossPct: number | null;
-  portfolioTodayChange: { change: number; percent: number; hasBaseline: boolean };
-  showPortfolioTodayChange: boolean;
-}) {
-  return (
-    <>
-      <div className="rounded-xl border border-border/80 bg-elevated px-4 py-3 shadow-sm dark:border-white/[0.08]">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Cash balance</p>
-        <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">{formatCurrency(cash)}</p>
-        <p className="mt-0.5 text-[11px] text-subtle">Edit per account from Dashboard</p>
-      </div>
-      <div className="rounded-xl border border-border/80 bg-elevated px-4 py-3 shadow-sm dark:border-white/[0.08]">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Assets value</p>
-        <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">{formatCurrency(assetsValue)}</p>
-        <p className="mt-0.5 text-[11px] text-subtle">Holdings at last price</p>
-        <p className="mt-1 text-[11px] text-subtle">Fixed income: {formatCurrency(fixedIncome)}</p>
-      </div>
-      <div className="rounded-xl border border-border/80 bg-elevated px-4 py-3 shadow-sm dark:border-white/[0.08]">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Net worth</p>
-        <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">{formatCurrency(netWorth)}</p>
-        <p className="mt-0.5 text-[11px] text-subtle">Cash + assets + fixed income</p>
-      </div>
-      <div className="rounded-xl border border-border/80 bg-elevated px-4 py-3 shadow-sm dark:border-white/[0.08]">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Total gain</p>
-        <p
-          className={`mt-1 text-lg font-semibold tabular-nums ${
-            totalGainLoss > 0
-              ? "text-emerald-600 dark:text-primary"
-              : totalGainLoss < 0
-                ? "text-red-600 dark:text-[#ff6157]"
-                : "text-foreground"
-          }`}
-        >
-          {formatSignedCurrency(totalGainLoss)}
-          {totalGainLossPct != null ? ` (${formatPercent(totalGainLossPct, true)})` : ""}
-        </p>
-        <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">Today&apos;s chg</p>
-        {showPortfolioTodayChange ? (
-          <p
-            className={`mt-1 text-sm font-medium tabular-nums ${
-              portfolioTodayChange.change > 0
-                ? "text-emerald-600 dark:text-primary"
-                : portfolioTodayChange.change < 0
-                  ? "text-red-600 dark:text-[#ff6157]"
-                  : "text-foreground"
-            }`}
-          >
-            {formatSignedCurrency(portfolioTodayChange.change)} ({formatPercent(portfolioTodayChange.percent, true)})
-          </p>
-        ) : (
-          <p className="mt-1 text-sm font-medium tabular-nums text-subtle">—</p>
-        )}
-      </div>
-    </>
-  );
-}
-
 export default function PortfolioPage() {
   const stocks = usePortfolioStore((s) => s.stocks);
-  const cash = usePortfolioStore((s) => s.cashBalance);
   const fixedIncomeByAccount = usePortfolioStore((s) => s.fixedIncomeByAccount);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
   const [sort, setSort] = useState<SortKey>("symbol");
@@ -183,32 +105,6 @@ export default function PortfolioPage() {
   const [showActionable, setShowActionable] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<string>("__all__");
-  const [cloudHistory, setCloudHistory] = useState<NetWorthPoint[] | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function run() {
-      if (!hasSupabaseConfig()) { if (!cancelled) setCloudHistory([]); return; }
-      try {
-        const supabase = createClient();
-        const cachedDataUserId = typeof sessionStorage !== "undefined"
-          ? sessionStorage.getItem("stocks-pm-active-data-user-id") : null;
-        if (cachedDataUserId) {
-          const rows = await fetchCloudNetWorthHistory(supabase, cachedDataUserId);
-          if (!cancelled) setCloudHistory(rows);
-          return;
-        }
-        const { data: auth } = await supabase.auth.getUser();
-        const uid = auth.user?.id;
-        if (!uid) { if (!cancelled) setCloudHistory([]); return; }
-        const dataUserId = await resolveStocksPmDataUserId(supabase, uid);
-        const rows = await fetchCloudNetWorthHistory(supabase, dataUserId);
-        if (!cancelled) setCloudHistory(rows);
-      } catch { if (!cancelled) setCloudHistory([]); }
-    }
-    void run();
-    return () => { cancelled = true; };
-  }, []);
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
 
   /** Portfolio page lists positions only; watchlist-only symbols (0 qty) stay in store for trading elsewhere. */
@@ -318,27 +214,8 @@ export default function PortfolioPage() {
     return r;
   }, [holdings, lotsBySymbol, query, selectedAccount, showActionable, sort, sortDirection, stockMatchesAccount]);
 
-  const { assetsValue, totalGainLoss, totalGainLossPct, netWorth, portfolioTodayChange, fixedIncomeValue } = useMemo(() => {
-    const assets = stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((a, s) => a + s.quantity * (s.lastPrice ?? 0), 0);
-    const holdingsCostBasis = stocks.filter((s) => !isCashSymbol(s.symbol)).reduce((a, s) => a + s.quantity * s.averageCost, 0);
-    const fixedIncomeValue = fixedIncomeTotal(fixedIncomeByAccount);
-    const totalGainLoss = assets - holdingsCostBasis;
-    const totalGainLossPct = holdingsCostBasis > 0 ? (totalGainLoss / holdingsCostBasis) * 100 : null;
-    const net = assets + cash + fixedIncomeValue;
-    const liveQuoteChange = computeTodayChangeFromLiveQuotes(stocks, cash);
-    // Prefer live-quote delta when non-trivial; fall back to snapshot when dailyChangePercent is
-    // still at its default 0 (not yet refreshed) so Today shows as soon as cloud history loads.
-    const snapshotChange = computeTodayChangeFromHistory(cloudHistory ?? [], net);
-    const portfolioTodayChange =
-      liveQuoteChange.hasBaseline && Math.abs(liveQuoteChange.change) > 0.01
-        ? liveQuoteChange
-        : snapshotChange;
-    return { assetsValue: assets, holdingsCostBasis, totalGainLoss, totalGainLossPct, netWorth: net, portfolioTodayChange, fixedIncomeValue };
-  }, [stocks, cash, fixedIncomeByAccount, cloudHistory]);
-  const showPortfolioTodayChange = isUsMarketTradingDay() && portfolioTodayChange.hasBaseline && Math.abs(portfolioTodayChange.change) > 0.01;
-
   return (
-    <div className="space-y-8">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <PortfolioSimulateLink />
         <div className="flex flex-wrap gap-2">
@@ -349,20 +226,7 @@ export default function PortfolioPage() {
         </div>
       </div>
 
-      <div className="hidden gap-3 md:grid md:grid-cols-2 lg:grid-cols-4">
-        <PortfolioSummaryTiles
-          cash={cash}
-          fixedIncome={fixedIncomeValue}
-          assetsValue={assetsValue}
-          netWorth={netWorth}
-          totalGainLoss={totalGainLoss}
-          totalGainLossPct={totalGainLossPct}
-          portfolioTodayChange={portfolioTodayChange}
-          showPortfolioTodayChange={showPortfolioTodayChange}
-        />
-      </div>
-
-      <div className="space-y-8">
+      <div className="space-y-3">
         <div className="ui-hover-lift rounded-2xl border border-border bg-elevated px-3 py-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <select
