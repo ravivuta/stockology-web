@@ -68,6 +68,14 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
     onClose();
   }
 
+  const score = stock.score;
+  const addBasisSentence =
+    score != null && score < 85
+      ? `Adds for this stock use the average holding price because the score is ${Math.round(score)}, below 85.`
+      : score != null
+        ? `Adds for this stock use the moving average because the score is ${Math.round(score)}.`
+        : "Adds use the moving average until this stock has a score below 85.";
+
   return (
     <AppModal open={open} onClose={onClose} size="md" titleId="strategy-modal-title">
       <ModalSection className="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-elevated px-4 py-3 dark:border-foreground/10">
@@ -81,7 +89,7 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
 
       <ModalSection className="min-h-0 shrink-0 space-y-4 px-4 py-4 text-sm text-subtle">
         <p className="leading-relaxed">
-          Entry uses an SMA trend filter; adds trigger near your dynamic factor below average cost. Limits cap position and trade size. Use Optimize on the stock details screen
+          Entry uses an SMA trend filter. {addBasisSentence} Limits cap position and trade size. Use Optimize on the stock details screen
           to run the same web-side parameter search against cached historical data.
         </p>
 

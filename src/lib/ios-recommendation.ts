@@ -1330,7 +1330,9 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
   const rawBuyFactor = 1 - dynamicFactor / 100 - purchasePenalty;
   const buyFactorSMA = Math.max(0.1, rawBuyFactor);
 
-  const nextBuyPrice = numStock === 0 || avgPrice <= 0 ? movingAvg : movingAvg * buyFactorSMA;
+  const scoreForAddBasis = stock.score ?? 100;
+  const addBasis = scoreForAddBasis < 85 && avgPrice > 0 ? avgPrice : movingAvg;
+  const nextBuyPrice = numStock === 0 || avgPrice <= 0 ? movingAvg : addBasis * buyFactorSMA;
 
   let targetPrice: number | undefined;
   if (stock.analystTarget != null && stock.analystTarget > 0) {
