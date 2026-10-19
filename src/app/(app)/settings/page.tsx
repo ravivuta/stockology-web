@@ -873,181 +873,187 @@ function SettingsInner() {
                   </p>
                 </div>
 
-                <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03] md:col-span-2">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
-                    checked={useMarketRegimeCashTilt && premiumFeatures}
-                    onChange={(e) => {
-                      if (e.target.checked && !premiumFeatures) {
-                        setAiGateNotice(true);
-                        return;
-                      }
-                      setAiGateNotice(false);
-                      persistSettingsPatch({ useMarketRegimeCashTilt: e.target.checked });
-                    }}
-                  />
-                  <span>
-                    <span className="block text-[12px] font-medium leading-snug text-foreground">
-                      Use market outlook
-                      {!premiumFeatures ? <span className="ml-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Premium</span> : null}
+                <div className="rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                  <label className="flex w-full cursor-pointer items-start gap-2">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
+                      checked={useMarketRegimeCashTilt && premiumFeatures}
+                      onChange={(e) => {
+                        if (e.target.checked && !premiumFeatures) {
+                          setAiGateNotice(true);
+                          return;
+                        }
+                        setAiGateNotice(false);
+                        persistSettingsPatch({ useMarketRegimeCashTilt: e.target.checked });
+                      }}
+                    />
+                    <span>
+                      <span className="block text-[12px] font-medium leading-snug text-foreground">
+                        Use market outlook
+                        {!premiumFeatures ? <span className="ml-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Premium</span> : null}
+                      </span>
+                      <span className="mt-px block text-[10px] leading-snug text-subtle">
+                        A weak outlook can pause new buys and suggest cash-equivalent-building steps. This does not turn on company AI news scores.
+                      </span>
                     </span>
-                    <span className="mt-px block text-[10px] leading-snug text-subtle">
-                      A weak outlook can pause new buys and suggest cash-equivalent-building steps. This does not turn on company AI news scores.
-                    </span>
-                  </span>
-                </label>
-                {useMarketRegimeCashTilt && premiumFeatures ? (
-                  <div className="rounded-md border border-border/80 bg-background/40 px-2.5 py-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
-                    <p className="text-[12px] font-medium text-foreground">Cash-equivalent target by market outlook (%)</p>
-                    <p className="mt-1 text-[10px] leading-snug text-subtle">
-                      The active outlook uses that row&apos;s target. Cash-equivalent-building sells only appear when your cash equivalents are below it.
-                    </p>
-                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                      {(
-                        [
-                          ["Favorable to buy", "marketOutlookCashTargetRiskOn", marketOutlookCashTargetRiskOn, 0, 20],
-                          ["Mixed", "marketOutlookCashTargetNeutral", marketOutlookCashTargetNeutral, 0, 30],
-                          ["Prefer holding cash equivalents", "marketOutlookCashTargetElevated", marketOutlookCashTargetElevated, 10, 50],
-                          ["Defensive — raise cash equivalents", "marketOutlookCashTargetRiskOff", marketOutlookCashTargetRiskOff, 15, 75],
-                          ["Severe", "marketOutlookCashTargetSevere", marketOutlookCashTargetSevere, 20, 95],
-                        ] as const
-                      ).map(([label, key, value, min, max]) => (
-                        <label key={key} className="flex items-center justify-between gap-2 text-[11px] text-foreground">
-                          <span>{label}</span>
-                          <input
-                            type="number"
-                            min={min}
-                            max={max}
-                            value={value}
-                            onChange={(event) => {
-                              const next = Math.min(max, Math.max(min, Number(event.target.value)));
-                              if (!Number.isFinite(next)) return;
-                              const patch = { [key]: next } as Parameters<typeof persistSettingsPatch>[0];
-                              const elevated = key === "marketOutlookCashTargetElevated" ? next : marketOutlookCashTargetElevated;
-                              const riskOff = key === "marketOutlookCashTargetRiskOff" ? next : marketOutlookCashTargetRiskOff;
-                              const severe = key === "marketOutlookCashTargetSevere" ? next : marketOutlookCashTargetSevere;
-                              if (riskOff < elevated) patch.marketOutlookCashTargetRiskOff = elevated;
-                              if (severe < (patch.marketOutlookCashTargetRiskOff ?? riskOff)) {
-                                patch.marketOutlookCashTargetSevere = patch.marketOutlookCashTargetRiskOff ?? riskOff;
-                              }
-                              persistSettingsPatch(patch);
-                            }}
-                            className={`${fieldInputClass} w-16 rounded-md px-2 py-1 text-right text-xs`}
-                          />
-                        </label>
-                      ))}
+                  </label>
+                  {useMarketRegimeCashTilt && premiumFeatures ? (
+                    <div className="mt-2 border-t border-border/70 pt-2 dark:border-white/[0.08]">
+                      <p className="text-[12px] font-medium text-foreground">Cash-equivalent target by market outlook (%)</p>
+                      <p className="mt-1 text-[10px] leading-snug text-subtle">
+                        The active outlook uses that row&apos;s target. Cash-equivalent-building sells only appear when your cash equivalents are below it.
+                      </p>
+                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                        {(
+                          [
+                            ["Favorable to buy", "marketOutlookCashTargetRiskOn", marketOutlookCashTargetRiskOn, 0, 20],
+                            ["Mixed", "marketOutlookCashTargetNeutral", marketOutlookCashTargetNeutral, 0, 30],
+                            ["Prefer holding cash equivalents", "marketOutlookCashTargetElevated", marketOutlookCashTargetElevated, 10, 50],
+                            ["Defensive — raise cash equivalents", "marketOutlookCashTargetRiskOff", marketOutlookCashTargetRiskOff, 15, 75],
+                            ["Severe", "marketOutlookCashTargetSevere", marketOutlookCashTargetSevere, 20, 95],
+                          ] as const
+                        ).map(([label, key, value, min, max]) => (
+                          <label key={key} className="flex items-center justify-between gap-2 text-[11px] text-foreground">
+                            <span>{label}</span>
+                            <input
+                              type="number"
+                              min={min}
+                              max={max}
+                              value={value}
+                              onChange={(event) => {
+                                const next = Math.min(max, Math.max(min, Number(event.target.value)));
+                                if (!Number.isFinite(next)) return;
+                                const patch = { [key]: next } as Parameters<typeof persistSettingsPatch>[0];
+                                const elevated = key === "marketOutlookCashTargetElevated" ? next : marketOutlookCashTargetElevated;
+                                const riskOff = key === "marketOutlookCashTargetRiskOff" ? next : marketOutlookCashTargetRiskOff;
+                                const severe = key === "marketOutlookCashTargetSevere" ? next : marketOutlookCashTargetSevere;
+                                if (riskOff < elevated) patch.marketOutlookCashTargetRiskOff = elevated;
+                                if (severe < (patch.marketOutlookCashTargetRiskOff ?? riskOff)) {
+                                  patch.marketOutlookCashTargetSevere = patch.marketOutlookCashTargetRiskOff ?? riskOff;
+                                }
+                                persistSettingsPatch(patch);
+                              }}
+                              className={`${fieldInputClass} w-16 rounded-md px-2 py-1 text-right text-xs`}
+                            />
+                          </label>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ) : null}
+                  ) : null}
+                </div>
 
                 {traderModeEnabled ? (
                   <>
-                    <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
-                      <input
-                        type="checkbox"
-                        className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
-                        checked={useAISentimentForRecommendations && premiumFeatures}
-                        onChange={(e) => {
-                          if (e.target.checked && !premiumFeatures) {
-                            setAiGateNotice(true);
-                            return;
-                          }
-                          setAiGateNotice(false);
-                          persistSettingsPatch({ useAISentimentForRecommendations: e.target.checked });
-                        }}
-                      />
-                      <span>
-                        <span className="block text-[12px] font-medium leading-snug text-foreground">
-                          Use AI (sentiment score) for recommendations
-                          {!premiumFeatures ? <span className="ml-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Premium</span> : null}
+                    <div className="rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                      <label className="flex w-full cursor-pointer items-start gap-2">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
+                          checked={useRSIGatingForRecommendations}
+                          onChange={(e) => persistSettingsPatch({ useRSIGatingForRecommendations: e.target.checked })}
+                        />
+                        <span>
+                          <span className="block text-[12px] font-medium leading-snug text-foreground">Use RSI signals for buy/add/sell timing</span>
+                          <span className="mt-px block text-[10px] leading-snug text-subtle">
+                            RSI does not block the first BUY. It can pause ADD when position size is already above Stock Limit, and it can delay SELL until overbought RSI starts reversing. Off = no RSI impact on recommendations.
+                          </span>
                         </span>
-                        <span className="mt-px block text-[10px] leading-snug text-subtle">
-                          Premium. Uses stock-specific AI news digest scores to pause buys when that company&apos;s news is weak. Market outlook is a separate setting.
+                      </label>
+                      {useRSIGatingForRecommendations ? (
+                        <div className="mt-2 grid gap-2 border-t border-border/70 pt-2 dark:border-white/[0.08] sm:grid-cols-2">
+                          <label className="block">
+                            <FieldLabel>RSI lookback period</FieldLabel>
+                            <input
+                              type="number"
+                              min={2}
+                              max={30}
+                              value={rsiPeriodForRecommendations}
+                              onChange={(e) => persistSettingsPatch({ rsiPeriodForRecommendations: Math.max(2, Math.min(30, Number(e.target.value) || 14)) })}
+                              className={inputClass}
+                            />
+                          </label>
+                          <label className="block">
+                            <FieldLabel>Buy trigger threshold (RSI oversold)</FieldLabel>
+                            <input
+                              type="number"
+                              min={10}
+                              max={50}
+                              value={rsiOversoldThresholdForRecommendations}
+                              onChange={(e) => persistSettingsPatch({ rsiOversoldThresholdForRecommendations: Math.max(10, Math.min(50, Number(e.target.value) || 30)) })}
+                              className={inputClass}
+                            />
+                          </label>
+                          <label className="block">
+                            <FieldLabel>Sell trigger threshold (RSI overbought)</FieldLabel>
+                            <input
+                              type="number"
+                              min={50}
+                              max={90}
+                              value={rsiOverboughtThresholdForRecommendations}
+                              onChange={(e) => persistSettingsPatch({ rsiOverboughtThresholdForRecommendations: Math.max(50, Math.min(90, Number(e.target.value) || 70)) })}
+                              className={inputClass}
+                            />
+                          </label>
+                          <label className="block">
+                            <FieldLabel>Signal buffer (RSI points)</FieldLabel>
+                            <input
+                              type="number"
+                              min={0}
+                              max={20}
+                              value={rsiHysteresisPointsForRecommendations}
+                              onChange={(e) => persistSettingsPatch({ rsiHysteresisPointsForRecommendations: Math.max(0, Math.min(20, Number(e.target.value) || 5)) })}
+                              className={inputClass}
+                            />
+                          </label>
+                          <label className="block sm:col-span-2">
+                            <FieldLabel>Min rising days</FieldLabel>
+                            <input
+                              type="number"
+                              min={1}
+                              max={5}
+                              value={rsiMinRisingDaysForRecommendations}
+                              onChange={(e) => persistSettingsPatch({ rsiMinRisingDaysForRecommendations: Math.max(1, Math.min(5, Number(e.target.value) || 2)) })}
+                              className={inputClass}
+                            />
+                          </label>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                      <label className="flex w-full cursor-pointer items-start gap-2">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
+                          checked={useAISentimentForRecommendations && premiumFeatures}
+                          onChange={(e) => {
+                            if (e.target.checked && !premiumFeatures) {
+                              setAiGateNotice(true);
+                              return;
+                            }
+                            setAiGateNotice(false);
+                            persistSettingsPatch({ useAISentimentForRecommendations: e.target.checked });
+                          }}
+                        />
+                        <span>
+                          <span className="block text-[12px] font-medium leading-snug text-foreground">
+                            Use AI (sentiment score) for recommendations
+                            {!premiumFeatures ? <span className="ml-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Premium</span> : null}
+                          </span>
+                          <span className="mt-px block text-[10px] leading-snug text-subtle">
+                            Premium. Uses stock-specific AI news digest scores to pause buys when that company&apos;s news is weak. Market outlook is a separate setting.
+                          </span>
                         </span>
-                      </span>
-                    </label>
-                    {aiGateNotice && !premiumFeatures ? (
-                      <p className="text-[10px] leading-snug text-subtle">
-                        Premium — AI can slow new buys and guide cash-equivalent-building steps when the outlook is weak.{" "}
-                        <Link href={withAppBasePath("/billing/start?next=/settings")} className="font-semibold text-primary underline-offset-2 hover:underline">
-                          Subscribe
-                        </Link>
-                      </p>
-                    ) : null}
-                    <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
-                      <input
-                        type="checkbox"
-                        className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
-                        checked={useRSIGatingForRecommendations}
-                        onChange={(e) => persistSettingsPatch({ useRSIGatingForRecommendations: e.target.checked })}
-                      />
-                      <span>
-                        <span className="block text-[12px] font-medium leading-snug text-foreground">Use RSI signals for buy/add/sell timing</span>
-                        <span className="mt-px block text-[10px] leading-snug text-subtle">
-                          RSI does not block the first BUY. It can pause ADD when position size is already above Stock Limit, and it can delay SELL until overbought RSI starts reversing. Off = no RSI impact on recommendations.
-                        </span>
-                      </span>
-                    </label>
-                    {useRSIGatingForRecommendations ? (
-                      <div className="grid gap-2 rounded-md border border-border/80 bg-background/40 p-2.5 dark:border-white/[0.08] dark:bg-white/[0.03] sm:grid-cols-2">
-                        <label className="block">
-                          <FieldLabel>RSI lookback period</FieldLabel>
-                          <input
-                            type="number"
-                            min={2}
-                            max={30}
-                            value={rsiPeriodForRecommendations}
-                            onChange={(e) => persistSettingsPatch({ rsiPeriodForRecommendations: Math.max(2, Math.min(30, Number(e.target.value) || 14)) })}
-                            className={inputClass}
-                          />
-                        </label>
-                        <label className="block">
-                          <FieldLabel>Buy trigger threshold (RSI oversold)</FieldLabel>
-                          <input
-                            type="number"
-                            min={10}
-                            max={50}
-                            value={rsiOversoldThresholdForRecommendations}
-                            onChange={(e) => persistSettingsPatch({ rsiOversoldThresholdForRecommendations: Math.max(10, Math.min(50, Number(e.target.value) || 30)) })}
-                            className={inputClass}
-                          />
-                        </label>
-                        <label className="block">
-                          <FieldLabel>Sell trigger threshold (RSI overbought)</FieldLabel>
-                          <input
-                            type="number"
-                            min={50}
-                            max={90}
-                            value={rsiOverboughtThresholdForRecommendations}
-                            onChange={(e) => persistSettingsPatch({ rsiOverboughtThresholdForRecommendations: Math.max(50, Math.min(90, Number(e.target.value) || 70)) })}
-                            className={inputClass}
-                          />
-                        </label>
-                        <label className="block">
-                          <FieldLabel>Signal buffer (RSI points)</FieldLabel>
-                          <input
-                            type="number"
-                            min={0}
-                            max={20}
-                            value={rsiHysteresisPointsForRecommendations}
-                            onChange={(e) => persistSettingsPatch({ rsiHysteresisPointsForRecommendations: Math.max(0, Math.min(20, Number(e.target.value) || 5)) })}
-                            className={inputClass}
-                          />
-                        </label>
-                        <label className="block sm:col-span-2">
-                          <FieldLabel>Min rising days</FieldLabel>
-                          <input
-                            type="number"
-                            min={1}
-                            max={5}
-                            value={rsiMinRisingDaysForRecommendations}
-                            onChange={(e) => persistSettingsPatch({ rsiMinRisingDaysForRecommendations: Math.max(1, Math.min(5, Number(e.target.value) || 2)) })}
-                            className={inputClass}
-                          />
-                        </label>
-                      </div>
-                    ) : null}
+                      </label>
+                      {aiGateNotice && !premiumFeatures ? (
+                        <p className="mt-1 text-[10px] leading-snug text-subtle">
+                          Premium — AI can slow new buys and guide cash-equivalent-building steps when the outlook is weak.{" "}
+                          <Link href={withAppBasePath("/billing/start?next=/settings")} className="font-semibold text-primary underline-offset-2 hover:underline">
+                            Subscribe
+                          </Link>
+                        </p>
+                      ) : null}
+                    </div>
                   </>
                 ) : null}
 
