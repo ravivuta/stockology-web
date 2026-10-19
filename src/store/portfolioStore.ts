@@ -20,7 +20,7 @@ import {
   replaceCashLots,
 } from "@/lib/cash-accounts";
 import { fixedIncomeTotal, isFixedIncomeSymbol, sanitizeFixedIncomeByAccount } from "@/lib/fixed-income-accounts";
-import type { MarketOutlook } from "@/lib/market-outlook";
+import { effectiveOutlookCashTargetPct, type MarketOutlook } from "@/lib/market-outlook";
 
 export type LotStatus = "open" | "partiallySold" | "fullySold" | "washSaleRestricted";
 
@@ -132,6 +132,11 @@ type State = {
   rsiMinRisingDaysForRecommendations: number;
   sellOnlyLongTermQualified: boolean;
   useMarketRegimeCashTilt: boolean;
+  marketOutlookCashTargetRiskOn: number;
+  marketOutlookCashTargetNeutral: number;
+  marketOutlookCashTargetElevated: number;
+  marketOutlookCashTargetRiskOff: number;
+  marketOutlookCashTargetSevere: number;
   marketOutlook: MarketOutlook | null;
   traderModeEnabled: boolean;
   timezone: string;
@@ -154,7 +159,7 @@ type State = {
     nextCash: number;
     markedPending: boolean;
   };
-  setSettings: (p: Partial<Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "etfProfitTarget" | "stockProfitTarget" | "useAISentimentForRecommendations" | "useRSIGatingForRecommendations" | "rsiPeriodForRecommendations" | "rsiOversoldThresholdForRecommendations" | "rsiOverboughtThresholdForRecommendations" | "rsiHysteresisPointsForRecommendations" | "rsiMinRisingDaysForRecommendations" | "sellOnlyLongTermQualified" | "useMarketRegimeCashTilt" | "traderModeEnabled" | "timezone" | "region">>) => void;
+  setSettings: (p: Partial<Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "etfProfitTarget" | "stockProfitTarget" | "useAISentimentForRecommendations" | "useRSIGatingForRecommendations" | "rsiPeriodForRecommendations" | "rsiOversoldThresholdForRecommendations" | "rsiOverboughtThresholdForRecommendations" | "rsiHysteresisPointsForRecommendations" | "rsiMinRisingDaysForRecommendations" | "sellOnlyLongTermQualified" | "useMarketRegimeCashTilt" | "marketOutlookCashTargetRiskOn" | "marketOutlookCashTargetNeutral" | "marketOutlookCashTargetElevated" | "marketOutlookCashTargetRiskOff" | "marketOutlookCashTargetSevere" | "traderModeEnabled" | "timezone" | "region">>) => void;
   addStock: (s: Partial<StockHolding> & { symbol: string }) => void;
   /** Merge fields into an existing symbol and rebuild recommendation. */
   updateStock: (symbol: string, patch: Partial<StockHolding>) => void;
@@ -365,7 +370,7 @@ type RecalcContext = {
   lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }>;
 };
 
-type ShortlistContext = Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize"> & {
+type ShortlistContext = Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "marketOutlookCashTargetRiskOn" | "marketOutlookCashTargetNeutral" | "marketOutlookCashTargetElevated" | "marketOutlookCashTargetRiskOff" | "marketOutlookCashTargetSevere"> & {
   fixedIncomeByAccount?: Record<string, number>;
   useMarketRegimeCashTilt?: boolean;
   marketOutlook?: MarketOutlook | null;
@@ -711,7 +716,15 @@ function derivePortfolioState(
   const outlookCtx: RecalcContext = {
     ...recalcCtx,
     useMarketRegimeCashTilt: shortlistCtx.useMarketRegimeCashTilt === true && shortlistCtx.marketOutlook?.preferCash === true,
-    marketOutlookCashTargetPct: shortlistCtx.marketOutlook?.cashTargetPct,
+    marketOutlookCashTargetPct: shortlistCtx.marketOutlook
+      ? effectiveOutlookCashTargetPct(shortlistCtx.marketOutlook, {
+          riskOn: shortlistCtx.marketOutlookCashTargetRiskOn ?? 10,
+          neutral: shortlistCtx.marketOutlookCashTargetNeutral ?? 30,
+          elevated: shortlistCtx.marketOutlookCashTargetElevated ?? 50,
+          riskOff: shortlistCtx.marketOutlookCashTargetRiskOff ?? 70,
+          severe: shortlistCtx.marketOutlookCashTargetSevere ?? 90,
+        })
+      : undefined,
     marketOutlookLabel: shortlistCtx.marketOutlook?.label,
     cashSharePct: portfolioSize > 0 ? (cashEquivalent / portfolioSize) * 100 : 100,
   };
@@ -827,6 +840,11 @@ export const usePortfolioStore = create<State>()(
       rsiMinRisingDaysForRecommendations: 2,
       sellOnlyLongTermQualified: false,
       useMarketRegimeCashTilt: false,
+      marketOutlookCashTargetRiskOn: 10,
+      marketOutlookCashTargetNeutral: 30,
+      marketOutlookCashTargetElevated: 50,
+      marketOutlookCashTargetRiskOff: 70,
+      marketOutlookCashTargetSevere: 90,
       marketOutlook: null,
       traderModeEnabled: false,
       timezone: "America/New_York",

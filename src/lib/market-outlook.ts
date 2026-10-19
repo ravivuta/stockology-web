@@ -15,6 +15,38 @@ export type MarketOutlook = {
 
 const STALE_MS = 3 * 24 * 60 * 60 * 1000;
 
+export const defaultOutlookCashTargets = {
+  riskOn: 10,
+  neutral: 30,
+  elevated: 50,
+  riskOff: 70,
+  severe: 90,
+};
+
+export function effectiveOutlookCashTargetPct(
+  outlook: Pick<MarketOutlook, "regime" | "score" | "cashTargetPct">,
+  targets: {
+    riskOn: number;
+    neutral: number;
+    elevated: number;
+    riskOff: number;
+    severe: number;
+  }
+): number {
+  const severe = outlook.regime === "risk_off" && outlook.score <= 20;
+  const value =
+    outlook.regime === "risk_on"
+      ? targets.riskOn
+      : outlook.regime === "neutral"
+        ? targets.neutral
+        : outlook.regime === "elevated"
+          ? targets.elevated
+          : severe
+            ? targets.severe
+            : targets.riskOff;
+  return Math.min(95, Math.max(0, Number.isFinite(value) ? value : outlook.cashTargetPct));
+}
+
 function asNumber(value: unknown): number | null {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;

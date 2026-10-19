@@ -465,6 +465,11 @@ export type GlobalSettings = {
   enableRiskFilter?: boolean;
   useAISentiment?: boolean;
   useMarketRegimeCashTilt?: boolean;
+  marketOutlookCashTargetRiskOn?: number;
+  marketOutlookCashTargetNeutral?: number;
+  marketOutlookCashTargetElevated?: number;
+  marketOutlookCashTargetRiskOff?: number;
+  marketOutlookCashTargetSevere?: number;
   useRSIGating?: boolean;
   rsiPeriod?: number;
   rsiOversoldThreshold?: number;
@@ -492,6 +497,11 @@ export type AppliedGlobalSettings = {
   rsiMinRisingDaysForRecommendations?: number;
   sellOnlyLongTermQualified?: boolean;
   useMarketRegimeCashTilt?: boolean;
+  marketOutlookCashTargetRiskOn?: number;
+  marketOutlookCashTargetNeutral?: number;
+  marketOutlookCashTargetElevated?: number;
+  marketOutlookCashTargetRiskOff?: number;
+  marketOutlookCashTargetSevere?: number;
   traderModeEnabled?: boolean;
   limitWatchlistSize?: boolean;
   timezone?: string;
@@ -514,6 +524,11 @@ type CurrentGlobalSettings = Required<
     | "rsiMinRisingDaysForRecommendations"
     | "sellOnlyLongTermQualified"
     | "useMarketRegimeCashTilt"
+    | "marketOutlookCashTargetRiskOn"
+    | "marketOutlookCashTargetNeutral"
+    | "marketOutlookCashTargetElevated"
+    | "marketOutlookCashTargetRiskOff"
+    | "marketOutlookCashTargetSevere"
     | "traderModeEnabled"
     | "limitWatchlistSize"
     | "timezone"
@@ -578,6 +593,21 @@ export function patchFromCloudGlobalSettings(
     patch.useMarketRegimeCashTilt = cloud.useMarketRegimeCashTilt;
   } else if (cloud.useMarketRegimeCashTilt == null && cloud.useAISentiment === true && current.useMarketRegimeCashTilt !== true) {
     patch.useMarketRegimeCashTilt = true;
+  }
+  if (cloud.marketOutlookCashTargetRiskOn != null && numbersDiffer(current.marketOutlookCashTargetRiskOn, cloud.marketOutlookCashTargetRiskOn)) {
+    patch.marketOutlookCashTargetRiskOn = cloud.marketOutlookCashTargetRiskOn;
+  }
+  if (cloud.marketOutlookCashTargetNeutral != null && numbersDiffer(current.marketOutlookCashTargetNeutral, cloud.marketOutlookCashTargetNeutral)) {
+    patch.marketOutlookCashTargetNeutral = cloud.marketOutlookCashTargetNeutral;
+  }
+  if (cloud.marketOutlookCashTargetElevated != null && numbersDiffer(current.marketOutlookCashTargetElevated, cloud.marketOutlookCashTargetElevated)) {
+    patch.marketOutlookCashTargetElevated = cloud.marketOutlookCashTargetElevated;
+  }
+  if (cloud.marketOutlookCashTargetRiskOff != null && numbersDiffer(current.marketOutlookCashTargetRiskOff, cloud.marketOutlookCashTargetRiskOff)) {
+    patch.marketOutlookCashTargetRiskOff = cloud.marketOutlookCashTargetRiskOff;
+  }
+  if (cloud.marketOutlookCashTargetSevere != null && numbersDiffer(current.marketOutlookCashTargetSevere, cloud.marketOutlookCashTargetSevere)) {
+    patch.marketOutlookCashTargetSevere = cloud.marketOutlookCashTargetSevere;
   }
   if (cloud.traderModeEnabled === false) {
     if (current.traderModeEnabled) patch.traderModeEnabled = false;

@@ -136,6 +136,11 @@ function SettingsInner() {
   const sellOnlyLongTermQualified = usePortfolioStore((s) => s.sellOnlyLongTermQualified);
   const traderModeEnabled = usePortfolioStore((s) => s.traderModeEnabled);
   const useMarketRegimeCashTilt = usePortfolioStore((s) => s.useMarketRegimeCashTilt);
+  const marketOutlookCashTargetRiskOn = usePortfolioStore((s) => s.marketOutlookCashTargetRiskOn);
+  const marketOutlookCashTargetNeutral = usePortfolioStore((s) => s.marketOutlookCashTargetNeutral);
+  const marketOutlookCashTargetElevated = usePortfolioStore((s) => s.marketOutlookCashTargetElevated);
+  const marketOutlookCashTargetRiskOff = usePortfolioStore((s) => s.marketOutlookCashTargetRiskOff);
+  const marketOutlookCashTargetSevere = usePortfolioStore((s) => s.marketOutlookCashTargetSevere);
   const timezone = usePortfolioStore((s) => s.timezone);
   const region = usePortfolioStore((s) => s.region);
   const setSettings = usePortfolioStore((s) => s.setSettings);
@@ -215,6 +220,11 @@ function SettingsInner() {
         enableRiskFilter: "enableRiskFilter" in patch ? patch.enableRiskFilter : store.enableRiskFilter,
         useAISentiment: "useAISentimentForRecommendations" in patch ? patch.useAISentimentForRecommendations : store.useAISentimentForRecommendations,
         useMarketRegimeCashTilt: "useMarketRegimeCashTilt" in patch ? patch.useMarketRegimeCashTilt : store.useMarketRegimeCashTilt,
+        marketOutlookCashTargetRiskOn: "marketOutlookCashTargetRiskOn" in patch ? patch.marketOutlookCashTargetRiskOn : store.marketOutlookCashTargetRiskOn,
+        marketOutlookCashTargetNeutral: "marketOutlookCashTargetNeutral" in patch ? patch.marketOutlookCashTargetNeutral : store.marketOutlookCashTargetNeutral,
+        marketOutlookCashTargetElevated: "marketOutlookCashTargetElevated" in patch ? patch.marketOutlookCashTargetElevated : store.marketOutlookCashTargetElevated,
+        marketOutlookCashTargetRiskOff: "marketOutlookCashTargetRiskOff" in patch ? patch.marketOutlookCashTargetRiskOff : store.marketOutlookCashTargetRiskOff,
+        marketOutlookCashTargetSevere: "marketOutlookCashTargetSevere" in patch ? patch.marketOutlookCashTargetSevere : store.marketOutlookCashTargetSevere,
         useRSIGating: "useRSIGatingForRecommendations" in patch ? patch.useRSIGatingForRecommendations : store.useRSIGatingForRecommendations,
         rsiPeriod: "rsiPeriodForRecommendations" in patch ? patch.rsiPeriodForRecommendations : store.rsiPeriodForRecommendations,
         rsiOversoldThreshold: "rsiOversoldThresholdForRecommendations" in patch ? patch.rsiOversoldThresholdForRecommendations : store.rsiOversoldThresholdForRecommendations,
@@ -446,6 +456,11 @@ function SettingsInner() {
             : cloudSettings.useAISentiment === true
               ? { useMarketRegimeCashTilt: true }
               : {}),
+          ...(cloudSettings.marketOutlookCashTargetRiskOn != null ? { marketOutlookCashTargetRiskOn: cloudSettings.marketOutlookCashTargetRiskOn } : {}),
+          ...(cloudSettings.marketOutlookCashTargetNeutral != null ? { marketOutlookCashTargetNeutral: cloudSettings.marketOutlookCashTargetNeutral } : {}),
+          ...(cloudSettings.marketOutlookCashTargetElevated != null ? { marketOutlookCashTargetElevated: cloudSettings.marketOutlookCashTargetElevated } : {}),
+          ...(cloudSettings.marketOutlookCashTargetRiskOff != null ? { marketOutlookCashTargetRiskOff: cloudSettings.marketOutlookCashTargetRiskOff } : {}),
+          ...(cloudSettings.marketOutlookCashTargetSevere != null ? { marketOutlookCashTargetSevere: cloudSettings.marketOutlookCashTargetSevere } : {}),
           ...(cloudSettings.useRSIGating != null ? { useRSIGatingForRecommendations: cloudSettings.useRSIGating } : {}),
           ...(cloudSettings.rsiPeriod != null ? { rsiPeriodForRecommendations: cloudSettings.rsiPeriod } : {}),
           ...(cloudSettings.rsiOversoldThreshold != null ? { rsiOversoldThresholdForRecommendations: cloudSettings.rsiOversoldThreshold } : {}),
@@ -882,6 +897,49 @@ function SettingsInner() {
                     </span>
                   </span>
                 </label>
+                {useMarketRegimeCashTilt && premiumFeatures ? (
+                  <div className="rounded-md border border-border/80 bg-background/40 px-2.5 py-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                    <p className="text-[12px] font-medium text-foreground">Cash-equivalent target by market outlook (%)</p>
+                    <p className="mt-1 text-[10px] leading-snug text-subtle">
+                      The active outlook uses that row&apos;s target. Cash-equivalent-building sells only appear when your cash equivalents are below it.
+                    </p>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      {(
+                        [
+                          ["Favorable to buy", "marketOutlookCashTargetRiskOn", marketOutlookCashTargetRiskOn, 0, 20],
+                          ["Mixed", "marketOutlookCashTargetNeutral", marketOutlookCashTargetNeutral, 0, 30],
+                          ["Prefer holding cash equivalents", "marketOutlookCashTargetElevated", marketOutlookCashTargetElevated, 10, 50],
+                          ["Defensive — raise cash equivalents", "marketOutlookCashTargetRiskOff", marketOutlookCashTargetRiskOff, 15, 75],
+                          ["Severe", "marketOutlookCashTargetSevere", marketOutlookCashTargetSevere, 20, 95],
+                        ] as const
+                      ).map(([label, key, value, min, max]) => (
+                        <label key={key} className="flex items-center justify-between gap-2 text-[11px] text-foreground">
+                          <span>{label}</span>
+                          <input
+                            type="number"
+                            min={min}
+                            max={max}
+                            value={value}
+                            onChange={(event) => {
+                              const next = Math.min(max, Math.max(min, Number(event.target.value)));
+                              if (!Number.isFinite(next)) return;
+                              const patch = { [key]: next } as Parameters<typeof persistSettingsPatch>[0];
+                              const elevated = key === "marketOutlookCashTargetElevated" ? next : marketOutlookCashTargetElevated;
+                              const riskOff = key === "marketOutlookCashTargetRiskOff" ? next : marketOutlookCashTargetRiskOff;
+                              const severe = key === "marketOutlookCashTargetSevere" ? next : marketOutlookCashTargetSevere;
+                              if (riskOff < elevated) patch.marketOutlookCashTargetRiskOff = elevated;
+                              if (severe < (patch.marketOutlookCashTargetRiskOff ?? riskOff)) {
+                                patch.marketOutlookCashTargetSevere = patch.marketOutlookCashTargetRiskOff ?? riskOff;
+                              }
+                              persistSettingsPatch(patch);
+                            }}
+                            className={`${fieldInputClass} w-16 rounded-md px-2 py-1 text-right text-xs`}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
 
                 {traderModeEnabled ? (
                   <>
