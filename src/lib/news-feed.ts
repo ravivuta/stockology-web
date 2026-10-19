@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { postgrestInList } from "@/lib/postgrest-symbol";
 import { safeHttpUrlForHref } from "@/lib/safe-external-url";
 
 /** One article from `ai_sentiment_scores.news_sources` (matches iOS / edge function shape). */
@@ -136,7 +137,7 @@ export async function fetchNewsFeedFromSupabase(
   const { data, error } = await supabase
     .from("ai_sentiment_scores")
     .select("symbol, news_sources, last_updated")
-    .in("symbol", querySymbols);
+    .filter("symbol", "in", postgrestInList(querySymbols));
 
   if (error) {
     return { items: [], error: error.message };

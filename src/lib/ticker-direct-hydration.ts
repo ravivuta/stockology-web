@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { postgrestInList } from "@/lib/postgrest-symbol";
 import { parseStockPeg } from "@/lib/stock-metric-parse";
 import type { StockHolding } from "@/store/portfolioStore";
 
@@ -121,7 +122,7 @@ export async function fetchTickerHydrationFromTables(
     supabase
       .from("ticker_prices")
       .select("symbol, last_price, daily_pct_change, last_updated")
-      .in("symbol", upper)
+      .filter("symbol", "in", postgrestInList(upper))
       .eq("skip", false)
       .gt("last_price", 0),
     supabase
@@ -129,8 +130,8 @@ export async function fetchTickerHydrationFromTables(
       .select(
         "symbol, analyst_average, market_cap, peg_ratio, return_on_equity, profit_margin, trailing_pe, debt_to_equity, dividend_yield, payout_ratio, analyst_target, beta, company_name, consensus_conclusion, is_etf"
       )
-      .in("symbol", upper),
-    supabase.from("ai_sentiment_scores").select("symbol, sentiment_score, last_updated").in("symbol", upper),
+      .filter("symbol", "in", postgrestInList(upper)),
+    supabase.from("ai_sentiment_scores").select("symbol, sentiment_score, last_updated").filter("symbol", "in", postgrestInList(upper)),
   ]);
 
   const fundBySym: Record<string, Record<string, unknown>> = {};

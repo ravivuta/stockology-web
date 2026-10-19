@@ -18,6 +18,7 @@ import { formatNewsRelativeDate, parseNewsPublishedAt, sentimentDotClass, type N
 import { buildRecommendation } from "@/lib/recommendation";
 import { formatCompactCurrency, formatCurrency, formatDecimal, formatNumberMax2, formatPercent } from "@/lib/numberFormat";
 import { safeHttpUrlForHref } from "@/lib/safe-external-url";
+import { postgrestEqValue } from "@/lib/postgrest-symbol";
 import { createClient } from "@/lib/supabase/client";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { parseSuggestedQuantity, suggestedTradeType } from "@/lib/tradePrefill";
@@ -616,7 +617,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
         const { data, error } = await supabase
           .from("ai_sentiment_scores")
           .select("news_sources, last_updated")
-          .eq("symbol", stockSymbol)
+          .filter("symbol", "eq", postgrestEqValue(stockSymbol))
           .order("last_updated", { ascending: false })
           .limit(1)
           .maybeSingle();

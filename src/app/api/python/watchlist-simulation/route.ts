@@ -9,6 +9,7 @@ import {
   type IosStockInput,
 } from "@/lib/ios-recommendation";
 import { resolveHistoryClose, sanitizeProvidedHistoryMap } from "@/lib/historical-price-server";
+import { postgrestInList } from "@/lib/postgrest-symbol";
 import type { StockHolding } from "@/store/portfolioStore";
 
 type HistoryRow = {
@@ -240,7 +241,7 @@ export async function POST(request: NextRequest) {
     supabase
       .from("ticker_data")
       .select("symbol, analyst_average, market_cap, peg_ratio, analyst_target, company_name, is_etf")
-      .in("symbol", symbols),
+      .filter("symbol", "in", postgrestInList(symbols)),
   ]);
 
   if (tickerError) {

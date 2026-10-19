@@ -7,6 +7,7 @@ import {
   type IosStockInput,
 } from "@/lib/ios-recommendation";
 import { resolveHistoryClose } from "@/lib/historical-price-server";
+import { postgrestEqValue } from "@/lib/postgrest-symbol";
 
 type HistoryRow = {
   date: string;
@@ -181,12 +182,12 @@ export async function POST(request: NextRequest) {
     supabase
       .from("ticker_data")
       .select("symbol, analyst_average, market_cap, peg_ratio, analyst_target, is_etf")
-      .eq("symbol", symbol)
+      .filter("symbol", "eq", postgrestEqValue(symbol))
       .maybeSingle(),
     supabase
       .from("ai_sentiment_scores")
       .select("symbol, sentiment_score")
-      .eq("symbol", symbol)
+      .filter("symbol", "eq", postgrestEqValue(symbol))
       .maybeSingle(),
   ]);
 
