@@ -10,6 +10,7 @@ import { PortfolioSimulateLink } from "@/components/nav/PortfolioSimulateLink";
 import { StockDetailModal } from "@/components/stock/StockDetailModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
 import { formatCurrency, formatDecimal, formatNumberMax2, formatPercent, formatWholeCurrency } from "@/lib/numberFormat";
+import { preferredSymbolsForShortlistIndicator, symbolShortlistTextClass } from "@/lib/ios-recommendation";
 import { recommendationActionDisplay } from "@/lib/recommendation";
 import { fieldInputClass } from "@/lib/field-input";
 import { cashByAccount, displayAccount, isCashSymbol } from "@/lib/cash-accounts";
@@ -62,14 +63,6 @@ function recBadgeClass(action: string): string {
   return "bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary";
 }
 
-function recSymbolTextClass(action: string | undefined): string {
-  const u = action?.toUpperCase() ?? "";
-  if (u === "SELL") return "font-bold text-error dark:text-[#ff6157]";
-  if (u === "REDUCE") return "font-medium text-amber-700 dark:text-amber-200";
-  if (u === "BUY" || u === "ADD") return "font-bold text-primary dark:text-primary";
-  return "font-medium text-foreground dark:text-white";
-}
-
 function scoreTextClass(score: number | null | undefined): string {
   if (score == null || !Number.isFinite(score)) return "text-subtle";
   if (score >= 90) return "text-emerald-600 dark:text-emerald-400";
@@ -97,6 +90,10 @@ function filterChipClass(active: boolean, tone: "green" | "gold") {
 
 export default function PortfolioPage() {
   const stocks = usePortfolioStore((s) => s.stocks);
+  const portfolioSize = usePortfolioStore((s) => s.portfolioSize);
+  const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
+  const enableRiskFilter = usePortfolioStore((s) => s.enableRiskFilter);
+  const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
   const fixedIncomeByAccount = usePortfolioStore((s) => s.fixedIncomeByAccount);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
   const [sort, setSort] = useState<SortKey>("symbol");
@@ -106,6 +103,17 @@ export default function PortfolioPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<string>("__all__");
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
+
+  const shortlistedSymbols = useMemo(
+    () =>
+      preferredSymbolsForShortlistIndicator(stocks, {
+        limitWatchlistSize,
+        enableRiskFilter,
+        riskAppetite,
+        portfolioSize,
+      }),
+    [enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
+  );
 
   /** Portfolio page lists positions only; watchlist-only symbols (0 qty) stay in store for trading elsewhere. */
   const accountOptions = useMemo(() => {
@@ -337,7 +345,7 @@ export default function PortfolioPage() {
                               event.stopPropagation();
                               setDetailSymbol(s.symbol);
                             }}
-                            className={`ui-hover-text inline-flex max-w-full items-center justify-center gap-1 truncate hover:underline ${recSymbolTextClass(s.recommendation?.action)}`}
+                            className={`ui-hover-text inline-flex max-w-full items-center justify-center gap-1 truncate hover:underline ${symbolShortlistTextClass(s, shortlistedSymbols, { limitWatchlistSize, mode: "portfolio" })}`}
                           >
                             {s.symbol}
                           </button>

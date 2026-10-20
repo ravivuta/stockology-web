@@ -651,6 +651,51 @@ export type AddGateContext = {
   allStocks: IosStockInput[];
 };
 
+/**
+ * Symbols that show as in-shortlist (green) on Portfolio and Watchlist.
+ * ETFs are extras and do not use a top-N slot. When the size limit is off,
+ * every eligible name is in the set; Portfolio still paints every holding green.
+ */
+export function preferredSymbolsForShortlistIndicator(
+  stocks: IosStockInput[],
+  options: {
+    limitWatchlistSize: boolean;
+    enableRiskFilter?: boolean;
+    riskAppetite?: "Low" | "Medium" | "High";
+    portfolioSize: number;
+  }
+): Set<string> {
+  const eligible = stocks.filter(
+    (stock) => stock.symbol !== "$CASH" && stock.excludeFromShortlist !== true
+  );
+  if (!options.limitWatchlistSize) {
+    return new Set(eligible.map((stock) => stock.symbol));
+  }
+  const etfSymbols = eligible.filter((stock) => stock.isETF === true).map((stock) => stock.symbol);
+  const topStockSymbols = rankedTopWatchlistCandidates(eligible, {
+    enableRiskFilter: options.enableRiskFilter,
+    riskAppetite: options.riskAppetite,
+  })
+    .slice(0, recommendedWatchlistSize(options.portfolioSize))
+    .map((stock) => stock.symbol);
+  return new Set([...etfSymbols, ...topStockSymbols]);
+}
+
+/** Portfolio holdings are green, or red when the size limit is on and the name is outside it. Watchlist colors holdings only. */
+export function symbolShortlistTextClass(
+  stock: { symbol: string; quantity: number },
+  preferred: Set<string>,
+  options: { limitWatchlistSize: boolean; mode: "portfolio" | "watchlist" }
+): string {
+  if (stock.quantity <= 0) return "font-bold text-foreground dark:text-white";
+  const outside =
+    options.mode === "portfolio"
+      ? options.limitWatchlistSize && !preferred.has(stock.symbol)
+      : !preferred.has(stock.symbol);
+  if (outside) return "font-bold text-red-700 dark:text-[#ff6157]";
+  return "font-bold text-emerald-700 dark:text-emerald-400";
+}
+
 /** Non-ETF names that compete for top-N. Risk Low/Medium/High is applied first when enabled. Rank N of N is included. */
 export function rankedTopWatchlistCandidates(
   stocks: IosStockInput[],

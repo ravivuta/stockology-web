@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePortfolioStore } from "@/store/portfolioStore";
-import { recommendedWatchlistSize, dividendYieldPercent } from "@/lib/ios-recommendation";
+import {
+  dividendYieldPercent,
+  preferredSymbolsForShortlistIndicator,
+  recommendedWatchlistSize,
+  symbolShortlistTextClass,
+} from "@/lib/ios-recommendation";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
 import { formatCurrency, formatDecimal, formatNumberMax2, formatPercent } from "@/lib/numberFormat";
 import { recommendationActionDisplay } from "@/lib/recommendation";
@@ -100,6 +105,8 @@ export default function WatchlistPage() {
   const stocks = usePortfolioStore((s) => s.stocks);
   const portfolioSize = usePortfolioStore((s) => s.portfolioSize);
   const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
+  const enableRiskFilter = usePortfolioStore((s) => s.enableRiskFilter);
+  const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
   const removeStock = usePortfolioStore((s) => s.removeStock);
   const [query, setQuery] = useState("");
   const [showShortlisted, setShowShortlisted] = useState(limitWatchlistSize);
@@ -142,19 +149,21 @@ export default function WatchlistPage() {
 
     return new Set([...etfSymbols, ...topStockSymbols]);
   }, [limitWatchlistSize, portfolioSize, watchlistStocks]);
+  const shortlistedSymbols = useMemo(
+    () =>
+      preferredSymbolsForShortlistIndicator(stocks, {
+        limitWatchlistSize,
+        enableRiskFilter,
+        riskAppetite,
+        portfolioSize,
+      }),
+    [enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
+  );
 
   function isActionable(action: string | undefined): boolean {
     if (!action) return false;
     const normalized = action.toUpperCase();
     return normalized === "BUY" || normalized === "ADD" || normalized === "SELL" || normalized === "REDUCE";
-  }
-
-  function recSymbolTextClass(action: string | undefined): string {
-    const normalized = action?.toUpperCase() ?? "";
-    if (normalized === "SELL") return "font-bold text-error dark:text-[#ff6157]";
-    if (normalized === "REDUCE") return "text-amber-700 dark:text-amber-200";
-    if (normalized === "BUY" || normalized === "ADD") return "font-bold text-primary dark:text-primary";
-    return "text-foreground dark:text-white";
   }
 
   function toggleSort(next: SortKey) {
@@ -385,7 +394,7 @@ export default function WatchlistPage() {
                           event.stopPropagation();
                           setDetailSymbol(s.symbol);
                         }}
-                        className={`ui-hover-text inline-flex max-w-full min-w-0 justify-center text-center hover:underline ${recSymbolTextClass(s.recommendation?.action)}`}
+                        className={`ui-hover-text inline-flex max-w-full min-w-0 justify-center text-center hover:underline ${symbolShortlistTextClass(s, shortlistedSymbols, { limitWatchlistSize, mode: "watchlist" })}`}
                       >
                         <span className="min-w-0 truncate">{s.symbol}</span>
                       </button>
