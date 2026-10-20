@@ -77,6 +77,17 @@ function resolveSellTargetReference(args: {
   };
 }
 
+function rsiGateFromPayload(payload: Record<string, unknown>) {
+  return {
+    useRSIGating: payload.useRSIGating == null ? false : Boolean(payload.useRSIGating),
+    rsiPeriod: Math.trunc(clampNumber(payload.rsiPeriod, 14, 2, 30)),
+    rsiOversoldThreshold: clampNumber(payload.rsiOversoldThreshold, 30, 10, 50),
+    rsiOverboughtThreshold: clampNumber(payload.rsiOverboughtThreshold, 70, 50, 90),
+    rsiHysteresisPoints: clampNumber(payload.rsiHysteresisPoints, 5, 0, 20),
+    rsiMinRisingDays: Math.trunc(clampNumber(payload.rsiMinRisingDays, 2, 1, 5)),
+  };
+}
+
 export async function POST(request: NextRequest) {
   let payload: Record<string, unknown>;
   try {
@@ -98,7 +109,8 @@ export async function POST(request: NextRequest) {
   const transactionLimit = clampNumber(payload.transactionLimit ?? Math.min(2500, stockLimit), Math.min(2500, stockLimit), 1, 10_000_000);
   const etfProfitTargetPercent = clampNumber(payload.etfProfitTargetPercent ?? 50, 50, 0, 500);
   const stockProfitTargetPercent = clampNumber(payload.stockProfitTargetPercent ?? 50, 50, 0, 500);
-  const useRSIGating = payload.useRSIGating == null ? true : Boolean(payload.useRSIGating);
+  const rsiGate = rsiGateFromPayload(payload);
+  const useRSIGating = rsiGate.useRSIGating;
   const manualTarget = payload.targetPrice != null ? Number(payload.targetPrice) : undefined;
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -218,6 +230,11 @@ export async function POST(request: NextRequest) {
       relaxScoreRequirement: true,
       useAISentiment: false,
       useRSIGating,
+      rsiPeriod: rsiGate.rsiPeriod,
+      rsiOversoldThreshold: rsiGate.rsiOversoldThreshold,
+      rsiOverboughtThreshold: rsiGate.rsiOverboughtThreshold,
+      rsiHysteresisPoints: rsiGate.rsiHysteresisPoints,
+      rsiMinRisingDays: rsiGate.rsiMinRisingDays,
       sellOnlyLongTermQualified: false,
     });
 
@@ -334,7 +351,9 @@ export async function POST(request: NextRequest) {
       sellTargetReference,
       considered: [
         "ETF/Stock profit target settings",
-        "RSI gate on/off setting",
+        useRSIGating
+          ? `RSI gate (${rsiGate.rsiPeriod}-day, oversold ${rsiGate.rsiOversoldThreshold}, overbought ${rsiGate.rsiOverboughtThreshold})`
+          : "RSI gate off",
         "Stock-level strategy parameters (SMA, dynamic factor, limits)",
       ],
       notConsidered: [

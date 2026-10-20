@@ -593,7 +593,8 @@ function generateSellComment(stock: IosStockInput, targetPrice: number): string 
 export function stockPassesRiskAppetiteOnly(
   stock: IosStockInput,
   risk: "Low" | "Medium" | "High",
-  upsidePercent?: number | null
+  upsidePercent?: number | null,
+  includeScoreThreshold = false
 ): boolean {
   const marketCap = stock.marketCap ?? 0;
   const analystRating = parseFloat(stock.analystAvg ?? "0") || 0;
@@ -601,21 +602,22 @@ export function stockPassesRiskAppetiteOnly(
   const lowCap = 100_000_000_000;
   const mediumCap = 50_000_000_000;
   const up = upsidePercent ?? 0;
+  const scoreOk = (minimum: number) => !includeScoreThreshold || score === 0 || score >= minimum;
 
   switch (risk) {
     case "Low":
       return marketCap >= lowCap && analystRating >= 4.5;
     case "Medium": {
       const meetsLow = marketCap >= lowCap && analystRating >= 4.5;
-      const meetsMedium = marketCap >= mediumCap && analystRating >= 4;
+      const meetsMedium = marketCap >= mediumCap && analystRating >= 4 && scoreOk(50);
       return meetsLow || meetsMedium;
     }
     case "High": {
       const meetsLow = marketCap >= lowCap && analystRating >= 4.5;
-      const meetsMedium = marketCap >= mediumCap && analystRating >= 4 && (score === 0 || score >= 50);
+      const meetsMedium = marketCap >= mediumCap && analystRating >= 4 && scoreOk(50);
       const hasHighUpside = up > 25;
       const smallerCapOk = marketCap >= 10_000_000_000 && analystRating >= 3.5;
-      const meetsHigh = (hasHighUpside || smallerCapOk) && (score === 0 || score >= 40);
+      const meetsHigh = (hasHighUpside || smallerCapOk) && scoreOk(40);
       return meetsLow || meetsMedium || meetsHigh;
     }
     default:

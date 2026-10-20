@@ -130,6 +130,11 @@ export default function SimulationPage() {
   const etfProfitTarget = usePortfolioStore((s) => s.etfProfitTarget);
   const stockProfitTarget = usePortfolioStore((s) => s.stockProfitTarget);
   const useRSIGatingForRecommendations = usePortfolioStore((s) => s.useRSIGatingForRecommendations);
+  const rsiPeriodForRecommendations = usePortfolioStore((s) => s.rsiPeriodForRecommendations);
+  const rsiOversoldThresholdForRecommendations = usePortfolioStore((s) => s.rsiOversoldThresholdForRecommendations);
+  const rsiOverboughtThresholdForRecommendations = usePortfolioStore((s) => s.rsiOverboughtThresholdForRecommendations);
+  const rsiHysteresisPointsForRecommendations = usePortfolioStore((s) => s.rsiHysteresisPointsForRecommendations);
+  const rsiMinRisingDaysForRecommendations = usePortfolioStore((s) => s.rsiMinRisingDaysForRecommendations);
   const watchlistTrackedCount = stocks.length;
   const selectedWatchlistYears = watchlistResult?.years ?? Number.parseInt(watchlistYears, 10) ?? 1;
   const trackedStock = useMemo(
@@ -182,15 +187,15 @@ export default function SimulationPage() {
           marketCap: trackedStock?.marketCap,
           peg: trackedStock?.peg,
           isETF: trackedStock?.isETF,
-          rsiPeriod: trackedStock?.rsiPeriod,
-          rsiOversoldThreshold: trackedStock?.rsiOversoldThreshold,
-          rsiOverboughtThreshold: trackedStock?.rsiOverboughtThreshold,
-          rsiHysteresisPoints: trackedStock?.rsiHysteresisPoints,
-          rsiMinRisingDays: trackedStock?.rsiMinRisingDays,
           etfProfitTargetPercent: etfProfitTarget,
           stockProfitTargetPercent: stockProfitTarget,
           targetPrice: trackedStock?.targetPrice,
           useRSIGating: useRSIGatingForRecommendations,
+          rsiPeriod: rsiPeriodForRecommendations,
+          rsiOversoldThreshold: rsiOversoldThresholdForRecommendations,
+          rsiOverboughtThreshold: rsiOverboughtThresholdForRecommendations,
+          rsiHysteresisPoints: rsiHysteresisPointsForRecommendations,
+          rsiMinRisingDays: rsiMinRisingDaysForRecommendations,
         }),
       });
       const data = await res.json();
@@ -224,6 +229,11 @@ export default function SimulationPage() {
           etfProfitTargetPercent: etfProfitTarget,
           stockProfitTargetPercent: stockProfitTarget,
           useRSIGating: useRSIGatingForRecommendations,
+          rsiPeriod: rsiPeriodForRecommendations,
+          rsiOversoldThreshold: rsiOversoldThresholdForRecommendations,
+          rsiOverboughtThreshold: rsiOverboughtThresholdForRecommendations,
+          rsiHysteresisPoints: rsiHysteresisPointsForRecommendations,
+          rsiMinRisingDays: rsiMinRisingDaysForRecommendations,
           stocks,
         }),
       });
@@ -395,7 +405,7 @@ export default function SimulationPage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">
               <h2 className="text-lg font-semibold text-foreground">Watchlist Simulation</h2>
-              <p className="text-sm text-subtle">Mirrors the iOS portfolio/watchlist simulation path with shared cash, risk filtering, recommended-watchlist limiting, and the same relaxed recommendation gates used during mobile backtests.</p>
+              <p className="text-sm text-subtle">Uses the same shortlist and risk gates as iOS. When the watchlist-size limit is on, only that top list plus ETFs are simulated. RSI uses your saved period and thresholds.</p>
             </div>
             <button
               type="button"
@@ -431,7 +441,7 @@ export default function SimulationPage() {
               <div className="text-xs uppercase tracking-[0.18em] text-subtle">Filters</div>
               <div className="mt-1 font-medium text-foreground">{riskAppetite} risk from your saved settings</div>
               <div className="mt-1 text-subtle">
-                Risk filter {enableRiskFilter ? "on" : "off"} • Watchlist limit {limitWatchlistSize ? "on" : "off"} from your saved settings
+                Risk filter {enableRiskFilter ? "on" : "off"} • Watchlist limit {limitWatchlistSize ? "on" : "off"} • RSI gate {useRSIGatingForRecommendations ? "on" : "off"}
               </div>
             </div>
           </div>

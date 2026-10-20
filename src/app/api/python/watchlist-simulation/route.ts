@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import {
   computeIosRecommendation,
   computeRiskReturnScore,
-  rankedTopWatchlistCandidates,
+  preferredSymbolsForShortlistIndicator,
   recommendedWatchlistSize,
   stockPassesRiskAppetiteOnly,
   type IosStockInput,
@@ -102,6 +102,17 @@ function toIosStockInput(stock: StockHolding): IosStockInput {
   };
 }
 
+function rsiGateFromPayload(payload: Record<string, unknown>) {
+  return {
+    useRSIGating: payload.useRSIGating == null ? false : Boolean(payload.useRSIGating),
+    rsiPeriod: Math.trunc(clampNumber(payload.rsiPeriod, 14, 2, 30)),
+    rsiOversoldThreshold: clampNumber(payload.rsiOversoldThreshold, 30, 10, 50),
+    rsiOverboughtThreshold: clampNumber(payload.rsiOverboughtThreshold, 70, 50, 90),
+    rsiHysteresisPoints: clampNumber(payload.rsiHysteresisPoints, 5, 0, 20),
+    rsiMinRisingDays: Math.trunc(clampNumber(payload.rsiMinRisingDays, 2, 1, 5)),
+  };
+}
+
 function buildUniverse(
   stocks: StockHolding[],
   settings: {
@@ -112,56 +123,44 @@ function buildUniverse(
   }
 ) {
   const idealWatchlistSize = recommendedWatchlistSize(settings.portfolioSize);
-  const scored: SimStock[] = stocks
-    .filter((stock) => stock.excludeFromShortlist !== true)
+  const prepared = stocks
+    .filter((stock) => stock.symbol !== "$CASH")
     .map((stock) => {
       const score = stock.isETF ? undefined : (stock.score ?? computeRiskReturnScore(toIosStockInput(stock)));
-      const iosStock = { ...toIosStockInput(stock), score };
-      const isVisibleInRisk = !settings.enableRiskFilter
-        || stock.isETF === true
-        || stockPassesRiskAppetiteOnly(
-          iosStock,
-          settings.riskAppetite,
-          upsidePercent(stock.lastPrice, stock.analystTarget)
-        );
-      return {
-        ...stock,
-        score,
-        isVisibleInRisk,
-        isInRecommendedWatchlist: false,
-      };
+      return { ...stock, score };
     });
+  const inputs = prepared.map((stock) => ({ ...toIosStockInput(stock), score: stock.score }));
+  // Same scope as iOS getStocksForSimulation: top-N shortlist when that setting is on,
+  // otherwise the risk-appetite gate. Holdings are not added back in automatically.
+  const allowed = settings.limitWatchlistSize
+    ? preferredSymbolsForShortlistIndicator(inputs, {
+        limitWatchlistSize: true,
+        enableRiskFilter: settings.enableRiskFilter,
+        riskAppetite: settings.riskAppetite,
+        portfolioSize: settings.portfolioSize,
+      })
+    : new Set(
+        inputs
+          .filter((stock) => {
+            if (stock.excludeFromShortlist === true) return false;
+            if (!settings.enableRiskFilter || stock.isETF === true) return true;
+            return stockPassesRiskAppetiteOnly(
+              stock,
+              settings.riskAppetite,
+              upsidePercent(stock.lastPrice, stock.analystTarget),
+              false
+            );
+          })
+          .map((stock) => stock.symbol)
+      );
 
-  const shortlistedSymbols = new Set<string>();
-
-  if (settings.limitWatchlistSize) {
-    const etfs = scored.filter((stock) => stock.isETF === true);
-    const rankedInputs = scored.map((stock) => ({ ...toIosStockInput(stock), score: stock.score }));
-    const topN = rankedTopWatchlistCandidates(rankedInputs, {
-      enableRiskFilter: settings.enableRiskFilter,
-      riskAppetite: settings.riskAppetite,
-    }).slice(0, idealWatchlistSize);
-
-    for (const stock of etfs) shortlistedSymbols.add(stock.symbol);
-    for (const stock of topN) shortlistedSymbols.add(stock.symbol);
-  } else {
-    for (const stock of scored) {
-      if (stock.isETF === true || stock.isVisibleInRisk) {
-        shortlistedSymbols.add(stock.symbol);
-      }
-    }
-  }
-
-  const universe = scored
+  const universe: SimStock[] = prepared
+    .filter((stock) => stock.excludeFromShortlist !== true && allowed.has(stock.symbol))
     .map((stock) => ({
       ...stock,
-      isInRecommendedWatchlist: shortlistedSymbols.has(stock.symbol),
-    }))
-    .filter((stock) => {
-      if (settings.enableRiskFilter && !stock.isVisibleInRisk) return false;
-      if (settings.limitWatchlistSize && !stock.isInRecommendedWatchlist) return false;
-      return true;
-    });
+      isVisibleInRisk: !settings.enableRiskFilter || stock.isETF === true || allowed.has(stock.symbol),
+      isInRecommendedWatchlist: allowed.has(stock.symbol),
+    }));
 
   return { idealWatchlistSize, universe };
 }
@@ -195,7 +194,8 @@ export async function POST(request: NextRequest) {
   const limitWatchlistSize = payload.limitWatchlistSize == null ? false : Boolean(payload.limitWatchlistSize);
   const etfProfitTargetPercent = clampNumber(payload.etfProfitTargetPercent ?? 50, 50, 0, 500);
   const stockProfitTargetPercent = clampNumber(payload.stockProfitTargetPercent ?? 50, 50, 0, 500);
-  const useRSIGating = payload.useRSIGating == null ? true : Boolean(payload.useRSIGating);
+  const rsiGate = rsiGateFromPayload(payload);
+  const useRSIGating = rsiGate.useRSIGating;
 
   const { idealWatchlistSize, universe } = buildUniverse(cleanedStocks, {
     portfolioSize,
@@ -371,6 +371,11 @@ export async function POST(request: NextRequest) {
         relaxScoreRequirement: true,
         useAISentiment: false,
         useRSIGating,
+        rsiPeriod: rsiGate.rsiPeriod,
+        rsiOversoldThreshold: rsiGate.rsiOversoldThreshold,
+        rsiOverboughtThreshold: rsiGate.rsiOverboughtThreshold,
+        rsiHysteresisPoints: rsiGate.rsiHysteresisPoints,
+        rsiMinRisingDays: rsiGate.rsiMinRisingDays,
         sellOnlyLongTermQualified: false,
       });
 
@@ -547,9 +552,13 @@ export async function POST(request: NextRequest) {
         considered: [
           "Each stock uses its own saved criteria with shared portfolio cash",
           "ETF/Stock profit target settings",
-          "RSI gate on/off setting",
+          useRSIGating
+            ? `RSI gate (${rsiGate.rsiPeriod}-day, oversold ${rsiGate.rsiOversoldThreshold}, overbought ${rsiGate.rsiOverboughtThreshold})`
+            : "RSI gate off",
           "Risk appetite filter",
-          'Limit to recommended watchlist size',
+          limitWatchlistSize
+            ? `Top ${idealWatchlistSize} shortlist plus ETFs`
+            : "Shortlist size limit off",
         ],
         bypassed: [
           "AI Sentiment (latest news digest)",
