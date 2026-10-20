@@ -741,20 +741,20 @@ function upsidePct(stock: IosStockInput): number {
   return ((target - price) / price) * 100;
 }
 
-/** Holdings stay shortlisted; ADD still requires enabled risk/top-N gates. */
+/** ETFs and the current top-ranked names keep ADD. Other holdings can be paused by rank or risk. */
 export function holdingQualifiesForAdd(stock: IosStockInput, ctx: AddGateContext): boolean {
   if (stock.excludeFromShortlist === true) return false;
-
-  if (ctx.enableRiskFilter && !stockPassesRiskAppetiteOnly(stock, ctx.riskAppetite, upsidePct(stock))) {
-    return false;
-  }
+  if (stock.isETF === true) return true;
 
   if (ctx.limitWatchlistSize) {
-    if (stock.isETF === true) return true;
     if ((stock.score ?? 0) <= 50) return false;
     const rank = rankInTopWatchlist(ctx.allStocks, stock.symbol, ctx);
     const size = recommendedWatchlistSize(ctx.portfolioSize);
-    if (rank == null || rank > size) return false;
+    return rank != null && rank <= size;
+  }
+
+  if (ctx.enableRiskFilter && !stockPassesRiskAppetiteOnly(stock, ctx.riskAppetite, upsidePct(stock))) {
+    return false;
   }
 
   return true;

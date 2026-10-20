@@ -6,7 +6,6 @@ import { usePortfolioStore } from "@/store/portfolioStore";
 import {
   dividendYieldPercent,
   preferredSymbolsForShortlistIndicator,
-  recommendedWatchlistSize,
   symbolShortlistTextClass,
 } from "@/lib/ios-recommendation";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
@@ -99,7 +98,8 @@ function filterChipClass(active: boolean, tone: "green" | "gold") {
 }
 
 /**
- * Watchlist page shows watch-only symbols. Active holdings stay on Portfolio.
+ * Watchlist matches iOS: holdings and unowned names. Holdings are green when
+ * shortlisted and red when they fall outside that list. Unowned names stay the normal color.
  */
 export default function WatchlistPage() {
   const stocks = usePortfolioStore((s) => s.stocks);
@@ -122,33 +122,10 @@ export default function WatchlistPage() {
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
-  const watchlistStocks = useMemo(() => stocks.filter((s) => s.quantity <= 0), [stocks]);
-  const shortlistedSymbolsForWatchlistFilter = useMemo(() => {
-    const eligible = watchlistStocks.filter((s) => s.excludeFromShortlist !== true);
-
-    if (!limitWatchlistSize) {
-      return new Set(eligible.filter((s) => s.isShortlisted === true).map((s) => s.symbol));
-    }
-
-    const idealSize = recommendedWatchlistSize(portfolioSize);
-    const etfSymbols = new Set(eligible.filter((s) => s.isETF === true).map((s) => s.symbol));
-    const stockSlots = idealSize;
-
-    const topStockSymbols = new Set(
-      eligible
-        .filter((s) => s.isETF !== true)
-        .sort((a, b) => {
-          const lhs = a.score ?? 0;
-          const rhs = b.score ?? 0;
-          if (lhs === rhs) return a.symbol.localeCompare(b.symbol);
-          return rhs - lhs;
-        })
-        .slice(0, stockSlots)
-        .map((s) => s.symbol)
-    );
-
-    return new Set([...etfSymbols, ...topStockSymbols]);
-  }, [limitWatchlistSize, portfolioSize, watchlistStocks]);
+  const watchlistStocks = useMemo(
+    () => stocks.filter((s) => s.symbol !== "$CASH"),
+    [stocks]
+  );
   const shortlistedSymbols = useMemo(
     () =>
       preferredSymbolsForShortlistIndicator(stocks, {
@@ -181,7 +158,7 @@ export default function WatchlistPage() {
     const q = query.trim().toUpperCase();
     const filtered = watchlistStocks
       .filter((s) => {
-        if (showShortlisted && !shortlistedSymbolsForWatchlistFilter.has(s.symbol)) return false;
+        if (showShortlisted && !shortlistedSymbols.has(s.symbol)) return false;
         if (showActionable && !isActionable(s.recommendation?.action)) return false;
         if (!q) return true;
         return (
@@ -238,7 +215,7 @@ export default function WatchlistPage() {
     });
 
     return filtered;
-  }, [query, shortlistedSymbolsForWatchlistFilter, showActionable, showShortlisted, sort, sortDirection, watchlistStocks]);
+  }, [query, shortlistedSymbols, showActionable, showShortlisted, sort, sortDirection, watchlistStocks]);
 
   async function persistWatchlistRemoval(symbol: string) {
     setRemoveError(null);
@@ -479,16 +456,18 @@ export default function WatchlistPage() {
                       )}
                     </td>
                     <td className="hidden px-2 py-3 text-center md:table-cell md:px-3">
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setRemoveTarget(s.symbol);
-                        }}
-                        className="ui-hover-text text-xs text-error hover:underline"
-                      >
-                        Remove
-                      </button>
+                      {s.quantity <= 0 ? (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setRemoveTarget(s.symbol);
+                          }}
+                          className="ui-hover-text text-xs text-error hover:underline"
+                        >
+                          Remove
+                        </button>
+                      ) : null}
                     </td>
                   </tr>
                 );
