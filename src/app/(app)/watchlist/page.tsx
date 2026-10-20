@@ -60,6 +60,21 @@ function upsideTextClass(upside: number | null | undefined): string {
   return "text-subtle";
 }
 
+function pegTextClass(peg: number | null | undefined): string {
+  if (peg == null || !Number.isFinite(peg) || peg <= 0) return "text-subtle";
+  if (peg < 1) return "text-emerald-700 dark:text-emerald-400";
+  if (peg > 2) return "text-red-700 dark:text-[#ff6157]";
+  return "text-foreground";
+}
+
+function debtRatioTextClass(raw: number | null | undefined): string {
+  if (raw == null || !Number.isFinite(raw) || raw < 0) return "text-subtle";
+  const ratio = raw > 1 ? raw / 100 : raw;
+  if (ratio < 0.5) return "text-emerald-700 dark:text-emerald-400";
+  if (ratio > 1) return "text-red-700 dark:text-[#ff6157]";
+  return "text-foreground";
+}
+
 function analystRatingTextClass(value: string | null | undefined): string {
   const rating = typeof value === "string" ? Number.parseFloat(value) : Number.NaN;
   if (!Number.isFinite(rating)) return "text-subtle";
@@ -413,10 +428,10 @@ export default function WatchlistPage() {
                     >
                       <span className="block truncate">{rating && !Number.isNaN(Number.parseFloat(rating)) ? formatDecimal(Number.parseFloat(rating)) : "—"}</span>
                     </td>
-                    <td className="hidden px-2 py-3 text-center tabular-nums font-medium text-foreground md:table-cell md:px-3">
+                    <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${pegTextClass(s.peg)}`}>
                       {s.peg != null && s.peg > 0 ? formatDecimal(s.peg) : "—"}
                     </td>
-                    <td className="hidden px-2 py-3 text-center tabular-nums font-medium text-foreground md:table-cell md:px-3">
+                    <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${debtRatioTextClass(s.debtToEquity)}`}>
                       {s.debtToEquity != null && s.debtToEquity >= 0 ? formatNumberMax2(s.debtToEquity) : "—"}
                     </td>
                     <td className="hidden px-2 py-3 text-center font-medium text-subtle sm:table-cell sm:px-3">
