@@ -92,12 +92,13 @@ function marginNormalized(margin: number): number {
 }
 
 function debtToEquityNormalized(debtToEquity: number): number {
-  if (debtToEquity < 0.5) return 1.0;
-  if (debtToEquity <= 1.0) return 0.8;
-  if (debtToEquity <= 1.8) return 0.6;
-  if (debtToEquity <= 3.0) return 0.4;
-  if (debtToEquity <= 5.0) return 0.2;
-  return 0.0;
+  const ratio = debtToEquity > 1 ? debtToEquity / 100 : debtToEquity;
+  if (ratio < 0.25) return 1.0;
+  if (ratio <= 0.5) return 0.95;
+  if (ratio <= 1.0) return 0.9;
+  if (ratio <= 1.8) return -0.25;
+  if (ratio <= 3.0) return -0.65;
+  return -1.0;
 }
 
 export function dividendScoreBonus(yieldValue?: number | null, payoutValue?: number | null): number {

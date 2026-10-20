@@ -221,7 +221,7 @@ export function AppShell({
         planVariant={planVariant}
       />
       <main className="app-shell-main">
-        <div className="mx-auto w-full max-w-6xl pb-2">
+        <div className={cn("mx-auto w-full pb-2", pathname === "/watchlist" ? "max-w-none" : "max-w-6xl")}>
           {children}
         </div>
       </main>

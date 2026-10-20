@@ -64,10 +64,10 @@ function recBadgeClass(action: string): string {
 
 function recSymbolTextClass(action: string | undefined): string {
   const u = action?.toUpperCase() ?? "";
-  if (u === "SELL") return "text-error dark:text-[#ff6157]";
-  if (u === "REDUCE") return "text-amber-700 dark:text-amber-200";
-  if (u === "BUY" || u === "ADD") return "text-primary dark:text-primary";
-  return "text-foreground dark:text-white";
+  if (u === "SELL") return "font-bold text-error dark:text-[#ff6157]";
+  if (u === "REDUCE") return "font-medium text-amber-700 dark:text-amber-200";
+  if (u === "BUY" || u === "ADD") return "font-bold text-primary dark:text-primary";
+  return "font-medium text-foreground dark:text-white";
 }
 
 function scoreTextClass(score: number | null | undefined): string {
@@ -337,7 +337,7 @@ export default function PortfolioPage() {
                               event.stopPropagation();
                               setDetailSymbol(s.symbol);
                             }}
-                            className={`ui-hover-text inline-flex max-w-full items-center justify-center gap-1 truncate font-medium hover:underline ${recSymbolTextClass(s.recommendation?.action)}`}
+                            className={`ui-hover-text inline-flex max-w-full items-center justify-center gap-1 truncate hover:underline ${recSymbolTextClass(s.recommendation?.action)}`}
                           >
                             {s.symbol}
                           </button>

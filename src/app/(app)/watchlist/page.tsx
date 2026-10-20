@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { recommendedWatchlistSize, dividendYieldPercent } from "@/lib/ios-recommendation";
 import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
-import { formatCurrency, formatDecimal, formatPercent } from "@/lib/numberFormat";
+import { formatCurrency, formatDecimal, formatNumberMax2, formatPercent } from "@/lib/numberFormat";
 import { recommendationActionDisplay } from "@/lib/recommendation";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
 import { AddAssetButton } from "@/components/portfolio/AddAssetForm";
@@ -18,13 +18,15 @@ import {
   patchCurrentPortfolioSnapshotHoldings,
 } from "@/lib/portfolio-snapshot-client";
 
-type SortKey = "symbol" | "lastPrice" | "change" | "analyst" | "upside" | "yield" | "score" | "signal";
+type SortKey = "symbol" | "lastPrice" | "change" | "analyst" | "peg" | "debt" | "upside" | "yield" | "score" | "signal";
 
 const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
   symbol: "asc",
   lastPrice: "desc",
   change: "desc",
   analyst: "desc",
+  peg: "asc",
+  debt: "asc",
   upside: "desc",
   yield: "desc",
   score: "desc",
@@ -134,9 +136,9 @@ export default function WatchlistPage() {
 
   function recSymbolTextClass(action: string | undefined): string {
     const normalized = action?.toUpperCase() ?? "";
-    if (normalized === "SELL") return "text-error dark:text-[#ff6157]";
+    if (normalized === "SELL") return "font-bold text-error dark:text-[#ff6157]";
     if (normalized === "REDUCE") return "text-amber-700 dark:text-amber-200";
-    if (normalized === "BUY" || normalized === "ADD") return "text-primary dark:text-primary";
+    if (normalized === "BUY" || normalized === "ADD") return "font-bold text-primary dark:text-primary";
     return "text-foreground dark:text-white";
   }
 
@@ -183,6 +185,12 @@ export default function WatchlistPage() {
           break;
         case "analyst":
           cmp = (Number.isFinite(analystA) ? analystA : Number.NEGATIVE_INFINITY) - (Number.isFinite(analystB) ? analystB : Number.NEGATIVE_INFINITY);
+          break;
+        case "peg":
+          cmp = (a.peg != null && a.peg > 0 ? a.peg : Number.POSITIVE_INFINITY) - (b.peg != null && b.peg > 0 ? b.peg : Number.POSITIVE_INFINITY);
+          break;
+        case "debt":
+          cmp = (a.debtToEquity != null && a.debtToEquity >= 0 ? a.debtToEquity : Number.POSITIVE_INFINITY) - (b.debtToEquity != null && b.debtToEquity >= 0 ? b.debtToEquity : Number.POSITIVE_INFINITY);
           break;
         case "upside":
           cmp = (upsideA ?? Number.NEGATIVE_INFINITY) - (upsideB ?? Number.NEGATIVE_INFINITY);
@@ -295,8 +303,10 @@ export default function WatchlistPage() {
             <col className="w-[20%] md:hidden" />
             <col className="hidden md:table-column md:w-[10%]" />
             <col className="hidden md:table-column md:w-[10%]" />
-            <col className="hidden md:table-column md:w-[10%]" />
-            <col className="hidden sm:table-column sm:w-[10%] md:w-[10%]" />
+            <col className="hidden md:table-column md:w-[8%]" />
+            <col className="hidden md:table-column md:w-[8%]" />
+            <col className="hidden md:table-column md:w-[8%]" />
+            <col className="hidden sm:table-column sm:w-[10%] md:w-[8%]" />
             <col className="w-[18%] md:w-[9%]" />
             <col className="w-[14%] sm:w-[8%] md:w-[8%]" />
             <col className="hidden sm:table-column sm:w-[10%] md:w-[10%]" />
@@ -318,6 +328,8 @@ export default function WatchlistPage() {
               <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 md:table-cell md:px-3" />
               <SortableHeaderCell label="Today %" column="change" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 md:table-cell md:px-3" />
               <SortableHeaderCell label="Analyst Rating" column="analyst" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 md:table-cell md:px-3" />
+              <SortableHeaderCell label="PEG" column="peg" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 md:table-cell md:px-3" />
+              <SortableHeaderCell label="Debt ratio" column="debt" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 md:table-cell md:px-3" />
               <th scope="col" className="hidden px-2 py-3 text-center text-xs font-semibold uppercase tracking-wide sm:table-cell sm:px-3">
                 Shortlisted
               </th>
@@ -337,7 +349,7 @@ export default function WatchlistPage() {
                 <td colSpan={7} className="px-4 py-8 text-center text-subtle md:hidden">
                   No watchlist symbols yet. Add a symbol in the toolbar above or import a watchlist CSV.
                 </td>
-                <td colSpan={11} className="hidden px-4 py-8 text-center text-subtle md:table-cell sm:px-5">
+                <td colSpan={13} className="hidden px-4 py-8 text-center text-subtle md:table-cell sm:px-5">
                   No watchlist symbols yet. Add a symbol in the toolbar above or import a watchlist CSV.
                 </td>
               </tr>
@@ -400,6 +412,12 @@ export default function WatchlistPage() {
                       title="Consensus / average rating when available from data refresh"
                     >
                       <span className="block truncate">{rating && !Number.isNaN(Number.parseFloat(rating)) ? formatDecimal(Number.parseFloat(rating)) : "—"}</span>
+                    </td>
+                    <td className="hidden px-2 py-3 text-center tabular-nums font-medium text-foreground md:table-cell md:px-3">
+                      {s.peg != null && s.peg > 0 ? formatDecimal(s.peg) : "—"}
+                    </td>
+                    <td className="hidden px-2 py-3 text-center tabular-nums font-medium text-foreground md:table-cell md:px-3">
+                      {s.debtToEquity != null && s.debtToEquity >= 0 ? formatNumberMax2(s.debtToEquity) : "—"}
                     </td>
                     <td className="hidden px-2 py-3 text-center font-medium text-subtle sm:table-cell sm:px-3">
                       {s.isShortlisted ? "Yes" : "No"}
