@@ -42,7 +42,7 @@ export default function DashboardPage() {
   const cash = usePortfolioStore((s) => s.cashBalance);
   const fixedIncomeByAccount = usePortfolioStore((s) => s.fixedIncomeByAccount);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
-  const [bars, setBars] = useState(false);
+  const [bars, setBars] = useState(true);
   const [showCashEditor, setShowCashEditor] = useState(false);
   const [showFixedIncomeEditor, setShowFixedIncomeEditor] = useState(false);
   const [dashStockDetail, setDashStockDetail] = useState<string | null>(null);
