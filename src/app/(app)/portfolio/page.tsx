@@ -10,12 +10,12 @@ import { PortfolioSimulateLink } from "@/components/nav/PortfolioSimulateLink";
 import { StockDetailModal } from "@/components/stock/StockDetailModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
 import { formatCurrency, formatDecimal, formatNumberMax2, formatPercent, formatWholeCurrency } from "@/lib/numberFormat";
-import { preferredSymbolsForShortlistIndicator, symbolShortlistTextClass } from "@/lib/ios-recommendation";
+import { dividendYieldPercent, preferredSymbolsForShortlistIndicator, symbolShortlistTextClass } from "@/lib/ios-recommendation";
 import { recommendationActionDisplay } from "@/lib/recommendation";
 import { fieldInputClass } from "@/lib/field-input";
 import { cashByAccount, displayAccount, isCashSymbol } from "@/lib/cash-accounts";
 
-type SortKey = "symbol" | "quantity" | "averageCost" | "costBasis" | "lastPrice" | "value" | "gainLoss" | "upside" | "score" | "today" | "signal";
+type SortKey = "symbol" | "quantity" | "averageCost" | "costBasis" | "lastPrice" | "value" | "gainLoss" | "yield" | "peg" | "debt" | "upside" | "score" | "today" | "signal";
 
 type OpenLotLike = { quantity: number; costBasis: number; account?: string };
 
@@ -48,6 +48,9 @@ const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
   lastPrice: "desc",
   value: "desc",
   gainLoss: "desc",
+  yield: "desc",
+  peg: "asc",
+  debt: "asc",
   upside: "desc",
   score: "desc",
   today: "desc",
@@ -71,6 +74,21 @@ function scoreTextClass(score: number | null | undefined): string {
   if (score >= 60) return "text-amber-600 dark:text-amber-300";
   if (score >= 50) return "text-red-600/85 dark:text-[#ff6157]";
   return "text-red-600 dark:text-[#ff6157]";
+}
+
+function pegTextClass(peg: number | null | undefined): string {
+  if (peg == null || !Number.isFinite(peg) || peg <= 0) return "text-subtle";
+  if (peg <= 1) return "text-emerald-700 dark:text-emerald-400";
+  if (peg > 2) return "text-red-700 dark:text-[#ff6157]";
+  return "text-foreground";
+}
+
+function debtRatioTextClass(raw: number | null | undefined): string {
+  if (raw == null || !Number.isFinite(raw) || raw < 0) return "text-subtle";
+  const ratio = raw > 1 ? raw / 100 : raw;
+  if (ratio < 0.5) return "text-emerald-700 dark:text-emerald-400";
+  if (ratio > 1) return "text-red-700 dark:text-[#ff6157]";
+  return "text-foreground";
 }
 
 function upsideTextClass(upside: number | null | undefined): string {
@@ -202,6 +220,18 @@ export default function PortfolioPage() {
         case "gainLoss":
           cmp = gainLossA - gainLossB;
           break;
+        case "yield": {
+          const yieldA = a.dividendYield != null && a.dividendYield > 0 ? dividendYieldPercent(a.dividendYield) : Number.NEGATIVE_INFINITY;
+          const yieldB = b.dividendYield != null && b.dividendYield > 0 ? dividendYieldPercent(b.dividendYield) : Number.NEGATIVE_INFINITY;
+          cmp = yieldA - yieldB;
+          break;
+        }
+        case "peg":
+          cmp = (a.peg != null && a.peg > 0 ? a.peg : Number.POSITIVE_INFINITY) - (b.peg != null && b.peg > 0 ? b.peg : Number.POSITIVE_INFINITY);
+          break;
+        case "debt":
+          cmp = (a.debtToEquity != null && a.debtToEquity >= 0 ? a.debtToEquity : Number.POSITIVE_INFINITY) - (b.debtToEquity != null && b.debtToEquity >= 0 ? b.debtToEquity : Number.POSITIVE_INFINITY);
+          break;
         case "upside":
           cmp = (upsideA ?? Number.NEGATIVE_INFINITY) - (upsideB ?? Number.NEGATIVE_INFINITY);
           break;
@@ -292,19 +322,22 @@ export default function PortfolioPage() {
         </div>
 
         <div className="ui-hover-lift overflow-x-auto rounded-2xl border border-border bg-elevated">
-            <table className="w-full table-auto text-xs sm:text-sm md:min-w-[1180px] md:table-fixed">
+            <table className="w-full table-auto border-collapse text-xs sm:text-sm md:table-fixed">
               <colgroup>
-                <col className="w-[22%] md:w-[13%]" />
+                <col className="w-[22%] md:w-[11%]" />
                 <col className="w-[20%] md:hidden" />
-                <col className="hidden md:table-column md:w-[8%]" />
-                <col className="hidden md:table-column md:w-[8%]" />
-                <col className="w-[12%] md:w-[7%]" />
-                <col className="hidden sm:table-column sm:w-[9%] md:w-[9%]" />
-                <col className="hidden md:table-column md:w-[10%]" />
-                <col className="w-[22%] md:w-[16%]" />
                 <col className="hidden md:table-column md:w-[7%]" />
+                <col className="hidden md:table-column md:w-[7%]" />
+                <col className="w-[12%] md:w-[6%]" />
+                <col className="hidden sm:table-column sm:w-[9%] md:w-[7%]" />
+                <col className="hidden md:table-column md:w-[8%]" />
+                <col className="w-[22%] md:w-[8%]" />
+                <col className="hidden md:table-column md:w-[7%]" />
+                <col className="hidden md:table-column md:w-[7%]" />
+                <col className="hidden md:table-column md:w-[8%]" />
+                <col className="hidden md:table-column md:w-[8%]" />
                 <col className="hidden md:table-column md:w-[6%]" />
-                <col className="w-[24%] md:w-[9%]" />
+                <col className="w-[24%] md:w-[10%]" />
               </colgroup>
               <thead className="border-b border-zinc-400/70 bg-zinc-300/95 text-subtle dark:border-zinc-600 dark:bg-zinc-700/85">
                 <tr>
@@ -316,6 +349,9 @@ export default function PortfolioPage() {
                   <SortableHeaderCell label="Avg" column="averageCost" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-3 pb-2 pt-2.5 sm:table-cell md:px-4 md:pt-3" />
                   <SortableHeaderCell label="Costbasis" column="costBasis" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
                   <SortableHeaderCell label="Gain" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 md:px-4 md:pt-3" />
+                  <SortableHeaderCell label="Div%" column="yield" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 pb-2 pt-2.5 md:table-cell md:px-3 md:pt-3" />
+                  <SortableHeaderCell label="PEG" column="peg" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 pb-2 pt-2.5 md:table-cell md:px-3 md:pt-3" />
+                  <SortableHeaderCell label="Debt ratio" column="debt" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 pb-2 pt-2.5 md:table-cell md:px-3 md:pt-3" />
                   <SortableHeaderCell label="Potential Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
                   <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
                   <SortableHeaderCell label="Rec" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 sm:hidden" />
@@ -394,6 +430,17 @@ export default function PortfolioPage() {
                             ? "—"
                             : `${gainLossPct >= 0 ? "+" : ""}${gainLossPct.toFixed(1)}%`}
                         </span>
+                      </td>
+                      <td className="hidden px-2 py-3 text-center tabular-nums font-medium text-foreground md:table-cell md:px-3">
+                        {s.dividendYield != null && s.dividendYield > 0
+                          ? `${dividendYieldPercent(s.dividendYield).toFixed(1)}%`
+                          : "—"}
+                      </td>
+                      <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${pegTextClass(s.peg)}`}>
+                        {s.peg != null && s.peg > 0 ? formatDecimal(s.peg) : "—"}
+                      </td>
+                      <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${debtRatioTextClass(s.debtToEquity)}`}>
+                        {s.debtToEquity != null && s.debtToEquity >= 0 ? formatNumberMax2(s.debtToEquity) : "—"}
                       </td>
                       <td className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${upsideTextClass(upside)}`}>
                         {formatUpsidePct(upside)}
