@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePortfolioStore } from "@/store/portfolioStore";
-import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
+import { analystTargetUpsidePct, formatScore, formatUpsidePct } from "@/lib/marketFormat";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
 import { AddAssetButton } from "@/components/portfolio/AddAssetForm";
 import { PortfolioSimulateLink } from "@/components/nav/PortfolioSimulateLink";
@@ -217,9 +217,12 @@ export default function PortfolioPage() {
         case "value":
           cmp = valueA - valueB;
           break;
-        case "gainLoss":
-          cmp = gainLossA - gainLossB;
+        case "gainLoss": {
+          const pctA = costBasisA > 0 ? Math.round((gainLossA / costBasisA) * 100) : Number.NEGATIVE_INFINITY;
+          const pctB = costBasisB > 0 ? Math.round((gainLossB / costBasisB) * 100) : Number.NEGATIVE_INFINITY;
+          cmp = pctA - pctB;
           break;
+        }
         case "yield": {
           const yieldA = a.dividendYield != null && a.dividendYield > 0 ? dividendYieldPercent(a.dividendYield) : Number.NEGATIVE_INFINITY;
           const yieldB = b.dividendYield != null && b.dividendYield > 0 ? dividendYieldPercent(b.dividendYield) : Number.NEGATIVE_INFINITY;
@@ -428,7 +431,7 @@ export default function PortfolioPage() {
                         >
                           {gainLossPct == null
                             ? "—"
-                            : `${gainLossPct >= 0 ? "+" : ""}${gainLossPct.toFixed(1)}%`}
+                            : `${Math.round(gainLossPct) >= 0 ? "+" : ""}${Math.round(gainLossPct)}%`}
                         </span>
                       </td>
                       <td className="hidden px-2 py-3 text-center tabular-nums font-medium text-foreground md:table-cell md:px-3">
@@ -440,12 +443,12 @@ export default function PortfolioPage() {
                         {s.peg != null && s.peg > 0 ? formatDecimal(s.peg) : "—"}
                       </td>
                       <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${debtRatioTextClass(s.debtToEquity)}`}>
-                        {s.debtToEquity != null && s.debtToEquity >= 0 ? formatNumberMax2(s.debtToEquity) : "—"}
+                        {s.debtToEquity != null && s.debtToEquity >= 0 ? String(Math.round(s.debtToEquity)) : "—"}
                       </td>
                       <td className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${upsideTextClass(upside)}`}>
                         {formatUpsidePct(upside)}
                       </td>
-                      <td className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${scoreTextClass(s.score)}`}>{s.score != null ? formatDecimal(s.score) : "—"}</td>
+                      <td className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${scoreTextClass(s.score)}`}>{s.score != null ? formatScore(s.score) : "—"}</td>
                       <td className="px-2 py-2.5 align-middle text-center md:px-4 md:py-3">
                         {s.recommendation ? (
                           <span

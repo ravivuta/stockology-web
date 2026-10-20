@@ -1,4 +1,4 @@
-import { formatCompactCurrency, formatPercent } from "@/lib/numberFormat";
+import { formatCompactCurrency } from "@/lib/numberFormat";
 
 /** Compact USD market cap for tables (e.g. $1.25B). */
 export function formatMarketCapCompact(value: number | undefined | null): string {
@@ -16,6 +16,13 @@ export function analystTargetUpsidePct(lastPrice: number | undefined | null, ana
 }
 
 export function formatUpsidePct(pct: number | null): string {
-  if (pct == null) return "—";
-  return formatPercent(pct, true);
+  if (pct == null || !Number.isFinite(pct)) return "—";
+  const rounded = Math.round(pct);
+  const sign = rounded >= 0 ? "+" : "";
+  return `${sign}${rounded}%`;
+}
+
+export function formatScore(score: number | null | undefined): string {
+  if (score == null || !Number.isFinite(score)) return "—";
+  return String(Math.round(score));
 }

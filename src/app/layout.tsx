@@ -27,6 +27,13 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var modeKey="stocks-pm-ui-theme";var mode=localStorage.getItem(modeKey);if(mode==="auto"){mode="system";localStorage.setItem(modeKey,mode);}if(mode!=="light"&&mode!=="dark"&&mode!=="system"){var legacy=localStorage.getItem("theme");mode=legacy==="light"||legacy==="dark"?legacy:"system";localStorage.setItem(modeKey,mode);}localStorage.removeItem("stocks-pm-ui-theme-active");var theme=mode==="system"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):mode;var root=document.documentElement;root.classList.remove("light","dark");root.classList.add(theme);root.style.colorScheme=theme;}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body className={`${ibmPlexSans.variable} ${geistMono.variable} min-h-screen font-sans antialiased`}>
         <TopBrandBadge />
         <Providers>{children}</Providers>

@@ -694,7 +694,7 @@ export default function DashboardPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              className="grid gap-8 sm:grid-cols-2"
+              className="grid min-w-0 gap-8 sm:grid-cols-2"
             >
               <GainerLoserBars
                 gainers={gainers}
@@ -939,6 +939,11 @@ function HoldingsHeatmap({
   );
 }
 
+const holdingsBarScrollerClass =
+  "holdings-bar-scroller flex h-44 w-full min-w-0 flex-nowrap items-end gap-2 overflow-x-auto overscroll-x-contain pb-2";
+const holdingsBarButtonClass = "ui-hover-pop flex w-14 shrink-0 flex-col items-center gap-1 rounded-md";
+const holdingsBarTrackClass = "flex w-11 shrink-0 flex-col justify-end overflow-hidden rounded-md shadow-sm";
+
 function GainerLoserBars({
   gainers,
   losers,
@@ -964,7 +969,7 @@ function GainerLoserBars({
 
   return (
     <>
-      <div>
+      <div className="min-w-0">
         <div className="mb-3 flex flex-wrap items-baseline gap-2">
           <h3 className="text-sm font-semibold text-[color:var(--dashboard-chart-gain)]">Gainers</h3>
           <span className="text-xs text-subtle">Cost basis {fmtShort(totalGainerCb)}</span>
@@ -972,7 +977,7 @@ function GainerLoserBars({
         {sortedG.length === 0 ? (
           <EmptyCol message="No gainers to chart." sub="Switch to cards or add positions." />
         ) : (
-          <div className="flex h-44 flex-nowrap items-end gap-2 overflow-x-auto pb-1" style={{ scrollbarGutter: "stable" }}>
+          <div className={holdingsBarScrollerClass}>
             {sortedG.map((g) => {
               const costBasis = Math.max(g.quantity * g.averageCost, 0.0001);
               const gain = Math.max((g.lastPrice ?? g.averageCost) * g.quantity - costBasis, 0);
@@ -986,12 +991,12 @@ function GainerLoserBars({
                   key={g.symbol}
                   type="button"
                   onClick={() => onToggleSymbol(g.symbol)}
-                  className={`ui-hover-pop flex w-10 flex-col items-center gap-1 rounded-md ${
+                  className={`${holdingsBarButtonClass} ${
                     selectedSymbol === g.symbol ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""
                   }`}
                 >
-                  <span className="text-[9px] font-bold tabular-nums text-[color:var(--dashboard-chart-gain)]">{fmtShort(gain)}</span>
-                  <div className="flex w-9 flex-col justify-end overflow-hidden rounded-md shadow-sm" style={{ height: barH }}>
+                  <span className="max-w-full truncate text-[9px] font-bold tabular-nums text-[color:var(--dashboard-chart-gain)]">{fmtShort(gain)}</span>
+                  <div className={holdingsBarTrackClass} style={{ height: barH }}>
                     <div
                       className="w-full transition-all duration-500"
                       style={{
@@ -1015,7 +1020,7 @@ function GainerLoserBars({
           </div>
         )}
       </div>
-      <div>
+      <div className="min-w-0">
         <div className="mb-3 flex flex-wrap items-baseline gap-2">
           <h3 className="text-sm font-semibold text-[color:var(--dashboard-chart-loss)]">Losers</h3>
           <span className="text-xs text-subtle">Cost basis {fmtShort(totalLoserCb)}</span>
@@ -1023,7 +1028,7 @@ function GainerLoserBars({
         {sortedL.length === 0 ? (
           <EmptyCol message="No losers to chart." sub="Switch to cards or add positions." />
         ) : (
-          <div className="flex h-44 flex-nowrap items-end gap-2 overflow-x-auto pb-1" style={{ scrollbarGutter: "stable" }}>
+          <div className={holdingsBarScrollerClass}>
             {sortedL.map((l) => {
               const costBasis = Math.max(l.quantity * l.averageCost, 0.0001);
               const loss = Math.abs((l.lastPrice ?? l.averageCost) * l.quantity - costBasis);
@@ -1037,14 +1042,14 @@ function GainerLoserBars({
                   key={l.symbol}
                   type="button"
                   onClick={() => onToggleSymbol(l.symbol)}
-                  className={`ui-hover-pop flex w-10 flex-col items-center gap-1 rounded-md ${
+                  className={`${holdingsBarButtonClass} ${
                     selectedSymbol === l.symbol
                       ? "ring-2 ring-[color:var(--dashboard-chart-loss)] ring-offset-2 ring-offset-background"
                       : ""
                   }`}
                 >
-                  <span className="text-[9px] font-bold tabular-nums text-[color:var(--dashboard-chart-loss)]">{fmtShort(loss)}</span>
-                  <div className="flex w-9 flex-col justify-end overflow-hidden rounded-md shadow-sm" style={{ height: barH }}>
+                  <span className="max-w-full truncate text-[9px] font-bold tabular-nums text-[color:var(--dashboard-chart-loss)]">{fmtShort(loss)}</span>
+                  <div className={holdingsBarTrackClass} style={{ height: barH }}>
                     <div
                       className="w-full transition-all duration-500"
                       style={{

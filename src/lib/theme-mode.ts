@@ -22,13 +22,11 @@ export function readStoredAppearanceMode(): AppearanceMode {
 
   try {
     const stored = localStorage.getItem(THEME_MODE_STORAGE);
-    if (isAppearanceMode(stored)) return stored;
+    if (stored === "auto" || stored === "system") return "auto";
+    if (stored === "light" || stored === "dark") return stored;
 
     const legacy = localStorage.getItem("theme");
-    if (isAppearanceMode(legacy)) return legacy;
-
-    const active = localStorage.getItem(THEME_ACTIVE_STORAGE);
-    if (active === "light" || active === "dark") return active;
+    if (legacy === "light" || legacy === "dark") return legacy;
   } catch {
     /* storage blocked */
   }
@@ -40,7 +38,8 @@ export function writeAppearanceMode(mode: AppearanceMode) {
   if (typeof window === "undefined") return;
 
   try {
-    localStorage.setItem(THEME_MODE_STORAGE, mode);
+    localStorage.setItem(THEME_MODE_STORAGE, mode === "auto" ? "system" : mode);
+    localStorage.removeItem(THEME_ACTIVE_STORAGE);
     window.dispatchEvent(new CustomEvent(THEME_MODE_EVENT, { detail: mode }));
   } catch {
     /* storage blocked */

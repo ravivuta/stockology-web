@@ -1045,4 +1045,20 @@ body {
     line-height: 1.55;
     letter-spacing: -0.025em;
   }
+
+  /* Always-visible horizontal bar when holdings overflow, matching the iOS scroll row. */
+  .holdings-bar-scroller {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--theme-foreground) 35%, transparent) transparent;
+  }
+  .holdings-bar-scroller::-webkit-scrollbar {
+    height: 8px;
+  }
+  .holdings-bar-scroller::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--theme-foreground) 35%, transparent);
+    border-radius: 999px;
+  }
+  .holdings-bar-scroller::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }

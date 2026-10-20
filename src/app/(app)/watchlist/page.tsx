@@ -8,8 +8,8 @@ import {
   preferredSymbolsForShortlistIndicator,
   symbolShortlistTextClass,
 } from "@/lib/ios-recommendation";
-import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
-import { formatCurrency, formatDecimal, formatNumberMax2, formatPercent } from "@/lib/numberFormat";
+import { analystTargetUpsidePct, formatScore, formatUpsidePct } from "@/lib/marketFormat";
+import { formatCurrency, formatDecimal, formatPercent } from "@/lib/numberFormat";
 import { recommendationActionDisplay } from "@/lib/recommendation";
 import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
 import { AddAssetButton } from "@/components/portfolio/AddAssetForm";
@@ -418,7 +418,7 @@ export default function WatchlistPage() {
                       {s.peg != null && s.peg > 0 ? formatDecimal(s.peg) : "—"}
                     </td>
                     <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${debtRatioTextClass(s.debtToEquity)}`}>
-                      {s.debtToEquity != null && s.debtToEquity >= 0 ? formatNumberMax2(s.debtToEquity) : "—"}
+                      {s.debtToEquity != null && s.debtToEquity >= 0 ? String(Math.round(s.debtToEquity)) : "—"}
                     </td>
                     <td className="hidden px-2 py-3 text-center font-medium text-subtle sm:table-cell sm:px-3">
                       {s.isShortlisted ? "Yes" : "No"}
@@ -441,7 +441,7 @@ export default function WatchlistPage() {
                       </span>
                     </td>
                     <td className={`hidden min-w-0 px-2 py-3 text-center tabular-nums font-medium sm:table-cell sm:px-3 ${scoreTextClass(s.score)}`}>
-                      <span className="block truncate text-center">{s.score != null ? formatDecimal(s.score) : "—"}</span>
+                      <span className="block truncate text-center">{s.score != null ? formatScore(s.score) : "—"}</span>
                     </td>
                     <td className="min-w-0 px-1.5 py-2.5 text-center text-xs text-subtle sm:px-3 sm:py-3">
                       {s.recommendation ? (

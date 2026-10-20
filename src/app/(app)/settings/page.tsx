@@ -799,8 +799,8 @@ function SettingsInner() {
                 </label>
               </div>
 
-              <div className="self-start">
-                <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
+              <div className="self-start rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                <label className="flex w-full cursor-pointer items-start gap-2">
                   <input
                     type="checkbox"
                     className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
@@ -814,25 +814,24 @@ function SettingsInner() {
                     </span>
                   </span>
                 </label>
+                {enableRiskFilter ? (
+                  <div className="mt-2 border-t border-border/70 pt-2 dark:border-white/[0.08]">
+                    <label className="block">
+                      <FieldLabel>Investment Risk Appetite</FieldLabel>
+                      <select
+                        value={riskAppetite}
+                        onChange={(e) => persistSettingsPatch({ riskAppetite: e.target.value as "Low" | "Medium" | "High" })}
+                        className={cn(inputClass, "cursor-pointer")}
+                      >
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                      </select>
+                    </label>
+                    <p className="mt-1 text-[10px] leading-snug text-subtle">{RISK_APPETITE_DETAILS[riskAppetite]}</p>
+                  </div>
+                ) : null}
               </div>
-
-              {enableRiskFilter ? (
-                <div className="self-start">
-                  <label className="block">
-                    <FieldLabel>Investment Risk Appetite</FieldLabel>
-                    <select
-                      value={riskAppetite}
-                      onChange={(e) => persistSettingsPatch({ riskAppetite: e.target.value as "Low" | "Medium" | "High" })}
-                      className={cn(inputClass, "cursor-pointer")}
-                    >
-                      <option value="Low">Low</option>
-                      <option value="Medium">Medium</option>
-                      <option value="High">High</option>
-                    </select>
-                  </label>
-                  <p className="mt-1 text-[10px] leading-snug text-subtle">{RISK_APPETITE_DETAILS[riskAppetite]}</p>
-                </div>
-              ) : null}
 
               <div className="md:col-span-2 grid gap-2">
                 <div className="rounded-md border border-border/80 bg-background/40 px-2.5 py-2 dark:border-white/[0.08] dark:bg-white/[0.03]">

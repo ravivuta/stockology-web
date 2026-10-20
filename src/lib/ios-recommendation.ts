@@ -1044,7 +1044,7 @@ export function computeRecommendationFactors(
       if (score > 0) {
         factors.push({
           label: "Score ≥ 50",
-          detail: `${score.toFixed(1)}/100`,
+          detail: `${Math.round(score)}/100`,
           passes: score >= 50,
         });
       }

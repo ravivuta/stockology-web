@@ -13,7 +13,7 @@ import {
   sentimentLabelForScore,
   offloadHoldingOutsideShortlistIfNeeded,
 } from "@/lib/ios-recommendation";
-import { analystTargetUpsidePct, formatUpsidePct } from "@/lib/marketFormat";
+import { analystTargetUpsidePct, formatScore, formatUpsidePct } from "@/lib/marketFormat";
 import { formatNewsRelativeDate, parseNewsPublishedAt, sentimentDotClass, type NewsSourceRow } from "@/lib/news-feed";
 import { buildRecommendation } from "@/lib/recommendation";
 import { formatCompactCurrency, formatCurrency, formatDecimal, formatNumberMax2, formatPercent } from "@/lib/numberFormat";
@@ -48,10 +48,8 @@ function formatAccountType(isRetirementAccount: boolean | null | undefined): str
   return "Unknown type";
 }
 
-/** Human-readable score (avoid long float noise). */
 function formatScoreDisplay(score: number | undefined | null): string {
-  if (score == null || !Number.isFinite(score)) return "—";
-  return formatDecimal(score);
+  return formatScore(score);
 }
 
 function isInsufficientHistoryComment(comment: string | undefined): boolean {
