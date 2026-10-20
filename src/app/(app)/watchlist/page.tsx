@@ -62,7 +62,7 @@ function upsideTextClass(upside: number | null | undefined): string {
 
 function pegTextClass(peg: number | null | undefined): string {
   if (peg == null || !Number.isFinite(peg) || peg <= 0) return "text-subtle";
-  if (peg < 1) return "text-emerald-700 dark:text-emerald-400";
+  if (peg <= 1) return "text-emerald-700 dark:text-emerald-400";
   if (peg > 2) return "text-red-700 dark:text-[#ff6157]";
   return "text-foreground";
 }
