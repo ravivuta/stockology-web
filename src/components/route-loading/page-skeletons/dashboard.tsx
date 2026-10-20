@@ -22,10 +22,10 @@ export function DashboardPageSkeleton() {
             <Sk className="h-9 flex-1 rounded-full" />
             <Sk className="h-9 flex-1 rounded-full" />
           </div>
-        <div className="mt-5 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
-          <div className="flex flex-wrap items-center justify-center gap-5 sm:gap-6 lg:min-w-0 lg:flex-1 lg:justify-start">
+        <div className="mt-5 grid items-center gap-8 lg:grid-cols-[auto_minmax(12rem,1fr)_minmax(18rem,1.35fr)] lg:gap-10">
+          <div className="flex flex-wrap items-center justify-center gap-5 sm:gap-6 lg:contents">
             <Sk className="h-[140px] w-[140px] shrink-0 rounded-full sm:h-[152px] sm:w-[152px]" />
-            <div className="min-w-[9rem] max-w-xs flex-1 space-y-2 sm:min-w-[10.5rem]">
+            <div className="min-w-0 w-full space-y-2">
               {[0, 1, 2].map((i) => (
                 <div key={i} className="flex items-center gap-2.5">
                   <Sk className="h-2.5 w-2.5 shrink-0 rounded-sm" />
@@ -35,7 +35,7 @@ export function DashboardPageSkeleton() {
               ))}
             </div>
           </div>
-          <dl className="grid w-full max-w-lg shrink-0 grid-cols-1 gap-0">
+          <dl className="grid w-full grid-cols-1 gap-0">
             {[0, 1, 2].map((i) => (
               <div
                 key={i}
@@ -53,7 +53,7 @@ export function DashboardPageSkeleton() {
       <section className="dashboard-panel p-5 sm:p-6">
         <Sk className="h-4 w-48 rounded-md" />
         <Sk className="mt-2 h-3 w-full max-w-lg rounded-md" />
-        <ul className="mt-4 space-y-2">
+        <ul className="mt-4 grid gap-2 lg:grid-cols-2">
           {[0, 1, 2].map((i) => (
             <li key={i} className="flex items-start gap-3 rounded-xl border border-border bg-background/60 px-3 py-2.5 dark:bg-white/5">
               <Sk className="h-6 w-11 shrink-0 rounded-md" />

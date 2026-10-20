@@ -165,7 +165,7 @@ export function RecommendedActionsWidget({ stocks }: { stocks: StockHolding[] })
         </div>
       ) : (
         <div className="space-y-2">
-          <ul className="space-y-2">
+          <ul className="grid gap-2 lg:grid-cols-2">
             {visible.map((s) => (
               <li key={s.symbol}>
                 <ActionRow stock={s} />

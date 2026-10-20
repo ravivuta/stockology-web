@@ -357,8 +357,8 @@ export default function DashboardPage() {
           </div>
         {summaryTab === "summary" ? (
         <>
-        <div className="mt-5 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
-          <div className="flex flex-wrap items-center justify-center gap-5 sm:gap-6 lg:min-w-0 lg:flex-1 lg:justify-start">
+        <div className="mt-5 grid items-center gap-8 lg:grid-cols-[auto_minmax(12rem,1fr)_minmax(18rem,1.35fr)] lg:gap-10">
+          <div className="flex flex-wrap items-center justify-center gap-5 sm:gap-6 lg:contents">
             <motion.div
               className="shrink-0"
               initial={reduceMotion ? false : { opacity: 0, scale: 0.92 }}
@@ -372,7 +372,7 @@ export default function DashboardPage() {
                 totalValueClassName="text-[color:var(--dashboard-chart-center-text)]"
               />
             </motion.div>
-            <ul className="min-w-[9rem] max-w-xs flex-1 space-y-2 text-left sm:min-w-[10.5rem]" aria-label="Allocation breakdown">
+            <ul className="min-w-0 w-full space-y-2 text-left" aria-label="Allocation breakdown">
               {pieData.map((p) => {
                 const pct = p.value * 100;
                 const pctLabel = pct < 0.5 && pct > 0 ? "<1%" : `${Math.round(pct)}%`;
@@ -405,7 +405,7 @@ export default function DashboardPage() {
             </ul>
           </div>
 
-          <dl className="grid w-full max-w-lg grid-cols-1 gap-0 lg:shrink-0">
+          <dl className="grid w-full grid-cols-1 gap-0">
             <StatRow
               label="Cash"
               value={formatCurrency(cash)}
@@ -514,7 +514,7 @@ export default function DashboardPage() {
           <p className="mt-1 text-[11px] leading-relaxed text-subtle">
             Holdings and cash grouped by account.
           </p>
-          <div className="mt-4 grid gap-3.5 md:grid-cols-2" aria-label="Account allocation breakdown">
+          <div className="mt-4 grid gap-3.5 md:grid-cols-[repeat(auto-fit,minmax(22rem,1fr))]" aria-label="Account allocation breakdown">
             {accountBreakdown.rows.map((row, index) => {
               const rowTotal = row.value + row.cash + row.fixedIncome;
               const pct = (rowTotal / Math.max(accountBreakdown.total + accountBreakdown.cashTotal + accountBreakdown.fixedIncomeTotal, 0.0001)) * 100;
@@ -892,7 +892,7 @@ function HoldingsHeatmap({
   }
 
   return (
-    <div className="mx-auto w-full max-w-[600px]">
+    <div className="mx-auto w-full max-w-4xl">
       <div className="relative aspect-square w-full overflow-hidden rounded-[10px]">
         {tiles.map((tile) => {
           const intensity = Math.min(1, Math.abs(tile.pnlPercent) / 25);
