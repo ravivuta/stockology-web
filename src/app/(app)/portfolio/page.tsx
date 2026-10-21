@@ -344,11 +344,11 @@ export default function PortfolioPage() {
                 <col className="w-[18%] md:hidden" />
                 <col className="hidden md:table-column md:w-[7%]" />
                 <col className="hidden md:table-column md:w-[7%]" />
-                <col className="w-[18%] md:w-[9%]" />
                 <col className="hidden sm:table-column sm:w-[9%] md:w-[7%]" />
                 <col className="hidden md:table-column md:w-[8%]" />
                 <col className="w-[22%] md:w-[7%]" />
                 <col className="hidden md:table-column md:w-[7%]" />
+                <col className="w-[18%] md:w-[9%]" />
                 <col className="hidden md:table-column md:w-[7%]" />
                 <col className="hidden md:table-column md:w-[8%]" />
                 <col className="hidden md:table-column md:w-[8%]" />
@@ -361,11 +361,11 @@ export default function PortfolioPage() {
                   <SortableHeaderCell label="Last / Chg" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 md:hidden" />
                   <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
                   <SortableHeaderCell label="Chg" column="today" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
-                  <SortableHeaderCell label="Analyst Rating" column="analyst" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="whitespace-nowrap px-2 pb-2 pt-2.5 md:px-3 md:pt-3" />
                   <SortableHeaderCell label="Avg" column="averageCost" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-3 pb-2 pt-2.5 sm:table-cell md:px-4 md:pt-3" />
                   <SortableHeaderCell label="Costbasis" column="costBasis" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
                   <SortableHeaderCell label="Gain" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 md:px-4 md:pt-3" />
                   <SortableHeaderCell label="Div%" column="yield" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 pb-2 pt-2.5 md:table-cell md:px-3 md:pt-3" />
+                  <SortableHeaderCell label="Analyst Rating" column="analyst" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="whitespace-nowrap px-2 pb-2 pt-2.5 md:px-3 md:pt-3" />
                   <SortableHeaderCell label="PEG" column="peg" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 pb-2 pt-2.5 md:table-cell md:px-3 md:pt-3" />
                   <SortableHeaderCell label="Debt ratio" column="debt" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 pb-2 pt-2.5 md:table-cell md:px-3 md:pt-3" />
                   <SortableHeaderCell label="Potential Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
@@ -429,14 +429,6 @@ export default function PortfolioPage() {
                       >
                         {d != null && Number.isFinite(d) ? formatPercent(d, true) : "—"}
                       </td>
-                      <td
-                        className={`px-2 py-2.5 text-center tabular-nums font-medium md:px-3 md:py-3 ${analystRatingTextClass(s.analystAvg)}`}
-                        title="Consensus / average rating when available from data refresh"
-                      >
-                        {s.analystAvg != null && Number.isFinite(Number.parseFloat(s.analystAvg))
-                          ? formatDecimal(Number.parseFloat(s.analystAvg))
-                          : "—"}
-                      </td>
                       <td className="hidden px-3 py-2.5 text-center tabular-nums text-foreground sm:table-cell md:px-4 md:py-3">{formatCurrency(metrics.averageCost)}</td>
                       <td className="hidden px-4 py-3 text-center tabular-nums text-foreground md:table-cell">{formatWholeCurrency(costBasis)}</td>
                       <td className="px-2 py-2.5 text-center tabular-nums md:px-4 md:py-3">
@@ -457,6 +449,14 @@ export default function PortfolioPage() {
                       <td className="hidden px-2 py-3 text-center tabular-nums font-medium text-foreground md:table-cell md:px-3">
                         {s.dividendYield != null && s.dividendYield > 0
                           ? `${dividendYieldPercent(s.dividendYield).toFixed(1)}%`
+                          : "—"}
+                      </td>
+                      <td
+                        className={`px-2 py-2.5 text-center tabular-nums font-medium md:px-3 md:py-3 ${analystRatingTextClass(s.analystAvg)}`}
+                        title="Consensus / average rating when available from data refresh"
+                      >
+                        {s.analystAvg != null && Number.isFinite(Number.parseFloat(s.analystAvg))
+                          ? formatDecimal(Number.parseFloat(s.analystAvg))
                           : "—"}
                       </td>
                       <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${pegTextClass(s.peg)}`}>
