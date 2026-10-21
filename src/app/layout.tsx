@@ -30,7 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var modeKey="stocks-pm-ui-theme";var mode=localStorage.getItem(modeKey);if(mode==="auto"){mode="system";localStorage.setItem(modeKey,mode);}if(mode!=="light"&&mode!=="dark"&&mode!=="system"){var legacy=localStorage.getItem("theme");mode=legacy==="light"||legacy==="dark"?legacy:"system";localStorage.setItem(modeKey,mode);}localStorage.removeItem("stocks-pm-ui-theme-active");var theme=mode==="system"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):mode;var root=document.documentElement;root.classList.remove("light","dark");root.classList.add(theme);root.style.colorScheme=theme;}catch(e){}})();`,
+            __html: `(function(){try{var modeKey="stocks-pm-ui-theme";var resolvedKey="stocks-pm-ui-theme-resolved";var mode=localStorage.getItem(modeKey);if(mode==="auto"){mode="system";localStorage.setItem(modeKey,mode);}if(mode!=="light"&&mode!=="dark"&&mode!=="system"){var legacy=localStorage.getItem("theme");mode=legacy==="light"||legacy==="dark"?legacy:"system";localStorage.setItem(modeKey,mode);}localStorage.removeItem("stocks-pm-ui-theme-active");var hour=new Date().getHours();var day=hour>=7&&hour<19?"light":"dark";var theme=mode==="system"?day:mode;localStorage.setItem(resolvedKey,theme);var root=document.documentElement;root.classList.remove("light","dark");root.classList.add(theme);root.style.colorScheme=theme;}catch(e){}})();`,
           }}
         />
       </head>

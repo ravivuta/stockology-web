@@ -1,8 +1,13 @@
 "use client";
 
 export const THEME_MODE_STORAGE = "stocks-pm-ui-theme";
+export const THEME_RESOLVED_STORAGE = "stocks-pm-ui-theme-resolved";
 export const THEME_ACTIVE_STORAGE = "stocks-pm-ui-theme-active";
 export const THEME_MODE_EVENT = "stocks-pm:theme-mode-change";
+
+/** Local daytime is light. Night is dark. Auto does not follow the OS appearance. */
+export const DAYTIME_START_HOUR = 7;
+export const DAYTIME_END_HOUR = 19;
 
 export type AppearanceMode = "light" | "dark" | "auto";
 export type ResolvedAppearanceTheme = "light" | "dark";
@@ -11,10 +16,14 @@ export function isAppearanceMode(value: string | null | undefined): value is App
   return value === "light" || value === "dark" || value === "auto";
 }
 
+export function themeForLocalTime(date = new Date()): ResolvedAppearanceTheme {
+  const hour = date.getHours();
+  return hour >= DAYTIME_START_HOUR && hour < DAYTIME_END_HOUR ? "light" : "dark";
+}
+
 export function resolveAppearanceTheme(mode: AppearanceMode): ResolvedAppearanceTheme {
   if (mode === "light" || mode === "dark") return mode;
-  if (typeof window === "undefined") return "light";
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return themeForLocalTime();
 }
 
 export function readStoredAppearanceMode(): AppearanceMode {

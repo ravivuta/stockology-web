@@ -5,6 +5,7 @@ import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import {
   readStoredAppearanceMode,
+  resolveAppearanceTheme,
   writeAppearanceMode,
   type AppearanceMode,
 } from "@/lib/theme-mode";
@@ -28,7 +29,7 @@ export function ThemeToggle() {
   function applyMode(nextMode: AppearanceMode) {
     setMode(nextMode);
     writeAppearanceMode(nextMode);
-    setTheme(nextMode === "auto" ? "system" : nextMode);
+    setTheme(nextMode === "auto" ? resolveAppearanceTheme("auto") : nextMode);
   }
 
   if (!mounted) return <span className="inline-block h-11 w-full rounded-xl bg-muted sm:w-80" />;
