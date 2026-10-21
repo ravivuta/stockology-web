@@ -1,9 +1,10 @@
-/** Light green cell fill used on iOS when a value is in the green band. */
-export const allGreenMetricCellClass = "bg-[#edfaf0] text-[#005c14] dark:bg-[#e6f7e8] dark:text-[#004214]";
+/** Light green cell fill. Dark mode uses a deep green so the cell does not glare. */
+export const allGreenMetricCellClass = "bg-[#edfaf0] text-[#005c14] dark:bg-[#245233] dark:text-[#b8edc7]";
 
 /**
- * True when analyst rating, PEG, debt ratio, score, and upside are all in the
- * same green text bands the tables already use.
+ * True when analyst rating, PEG, debt ratio, score, and upside all use green
+ * text. Score from 70 and analyst rating from 3.5 use the theme green, not only
+ * the brighter emerald bands.
  */
 export function metricsAreAllGreen(input: {
   analystAvg?: string | null;
@@ -13,7 +14,7 @@ export function metricsAreAllGreen(input: {
   upside?: number | null;
 }): boolean {
   const rating = Number.parseFloat(input.analystAvg ?? "");
-  if (!Number.isFinite(rating) || rating < 4) return false;
+  if (!Number.isFinite(rating) || rating < 3.5) return false;
 
   const peg = input.peg;
   if (peg == null || !Number.isFinite(peg) || peg <= 0 || peg > 1) return false;
@@ -24,7 +25,7 @@ export function metricsAreAllGreen(input: {
   if (debtRatio >= 0.5) return false;
 
   const score = input.score;
-  if (score == null || !Number.isFinite(score) || score < 80) return false;
+  if (score == null || !Number.isFinite(score) || score < 70) return false;
 
   const upside = input.upside;
   if (upside == null || !Number.isFinite(upside) || upside <= 50) return false;
