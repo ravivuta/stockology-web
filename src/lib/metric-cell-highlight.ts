@@ -1,6 +1,6 @@
 /** Light green cell fill. Dark mode uses a deep green so the cell does not glare. */
 export const allGreenMetricCellClass =
-  "bg-[#c9e6d2] ring-1 ring-inset ring-black dark:bg-[#245233] dark:ring-white";
+  "bg-[#c9e6d2] ring-1 ring-inset ring-elevated dark:bg-[#245233]";
 
 /**
  * True when analyst rating, PEG, debt ratio, and score use green text, and
