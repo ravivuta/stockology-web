@@ -9,13 +9,13 @@ import { AddAssetButton } from "@/components/portfolio/AddAssetForm";
 import { PortfolioSimulateLink } from "@/components/nav/PortfolioSimulateLink";
 import { StockDetailModal } from "@/components/stock/StockDetailModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
-import { formatCurrency, formatDecimal, formatNumberMax2, formatPercent, formatWholeCurrency } from "@/lib/numberFormat";
+import { formatCurrency, formatDecimal, formatPercent, formatWholeCurrency } from "@/lib/numberFormat";
 import { dividendYieldPercent, preferredSymbolsForShortlistIndicator, symbolShortlistTextClass } from "@/lib/ios-recommendation";
 import { recommendationActionDisplay } from "@/lib/recommendation";
 import { fieldInputClass } from "@/lib/field-input";
 import { cashByAccount, displayAccount, isCashSymbol } from "@/lib/cash-accounts";
 
-type SortKey = "symbol" | "quantity" | "averageCost" | "costBasis" | "lastPrice" | "value" | "gainLoss" | "yield" | "peg" | "debt" | "upside" | "score" | "today" | "signal";
+type SortKey = "symbol" | "analyst" | "averageCost" | "costBasis" | "lastPrice" | "value" | "gainLoss" | "yield" | "peg" | "debt" | "upside" | "score" | "today" | "signal";
 
 type OpenLotLike = { quantity: number; costBasis: number; account?: string };
 
@@ -42,7 +42,7 @@ function positionMetrics(
 
 const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
   symbol: "asc",
-  quantity: "desc",
+  analyst: "desc",
   averageCost: "desc",
   costBasis: "desc",
   lastPrice: "desc",
@@ -73,6 +73,17 @@ function scoreTextClass(score: number | null | undefined): string {
   if (score >= 70) return "text-primary dark:text-primary";
   if (score >= 60) return "text-amber-600 dark:text-amber-300";
   if (score >= 50) return "text-red-600/85 dark:text-[#ff6157]";
+  return "text-red-600 dark:text-[#ff6157]";
+}
+
+function analystRatingTextClass(value: string | null | undefined): string {
+  const rating = typeof value === "string" ? Number.parseFloat(value) : Number.NaN;
+  if (!Number.isFinite(rating)) return "text-subtle";
+  if (rating >= 4.5) return "text-emerald-600 dark:text-emerald-400";
+  if (rating >= 4.0) return "text-emerald-600/90 dark:text-emerald-300";
+  if (rating >= 3.5) return "text-primary dark:text-primary";
+  if (rating >= 3.0) return "text-amber-600 dark:text-amber-300";
+  if (rating >= 2.5) return "text-red-600/85 dark:text-[#ff6157]";
   return "text-red-600 dark:text-[#ff6157]";
 }
 
@@ -194,6 +205,8 @@ export default function PortfolioPage() {
       const gainLossB = valueB - costBasisB;
       const upsideA = analystTargetUpsidePct(a.lastPrice, a.analystTarget);
       const upsideB = analystTargetUpsidePct(b.lastPrice, b.analystTarget);
+      const analystA = Number.parseFloat(a.analystAvg ?? "");
+      const analystB = Number.parseFloat(b.analystAvg ?? "");
       const todayA = a.dailyChangePercent ?? Number.NEGATIVE_INFINITY;
       const todayB = b.dailyChangePercent ?? Number.NEGATIVE_INFINITY;
 
@@ -202,8 +215,8 @@ export default function PortfolioPage() {
         case "symbol":
           cmp = a.symbol.localeCompare(b.symbol);
           break;
-        case "quantity":
-          cmp = metricsA.quantity - metricsB.quantity;
+        case "analyst":
+          cmp = (Number.isFinite(analystA) ? analystA : Number.NEGATIVE_INFINITY) - (Number.isFinite(analystB) ? analystB : Number.NEGATIVE_INFINITY);
           break;
         case "averageCost":
           cmp = metricsA.averageCost - metricsB.averageCost;
@@ -327,20 +340,20 @@ export default function PortfolioPage() {
         <div className="ui-hover-lift overflow-x-auto rounded-2xl border border-border bg-elevated">
             <table className="w-full table-auto border-collapse text-xs sm:text-sm md:table-fixed">
               <colgroup>
-                <col className="w-[22%] md:w-[11%]" />
-                <col className="w-[20%] md:hidden" />
+                <col className="w-[20%] md:w-[10%]" />
+                <col className="w-[18%] md:hidden" />
                 <col className="hidden md:table-column md:w-[7%]" />
                 <col className="hidden md:table-column md:w-[7%]" />
-                <col className="w-[12%] md:w-[6%]" />
+                <col className="w-[18%] md:w-[9%]" />
                 <col className="hidden sm:table-column sm:w-[9%] md:w-[7%]" />
                 <col className="hidden md:table-column md:w-[8%]" />
-                <col className="w-[22%] md:w-[8%]" />
+                <col className="w-[22%] md:w-[7%]" />
                 <col className="hidden md:table-column md:w-[7%]" />
                 <col className="hidden md:table-column md:w-[7%]" />
                 <col className="hidden md:table-column md:w-[8%]" />
                 <col className="hidden md:table-column md:w-[8%]" />
                 <col className="hidden md:table-column md:w-[6%]" />
-                <col className="w-[24%] md:w-[10%]" />
+                <col className="w-[22%] md:w-[9%]" />
               </colgroup>
               <thead className="border-b border-zinc-400/70 bg-zinc-300/95 text-subtle dark:border-zinc-600 dark:bg-zinc-700/85">
                 <tr>
@@ -348,7 +361,7 @@ export default function PortfolioPage() {
                   <SortableHeaderCell label="Last / Chg" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 md:hidden" />
                   <SortableHeaderCell label="Last" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
                   <SortableHeaderCell label="Chg" column="today" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
-                  <SortableHeaderCell label="Qty" column="quantity" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 md:px-4 md:pt-3" />
+                  <SortableHeaderCell label="Analyst Rating" column="analyst" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="whitespace-nowrap px-2 pb-2 pt-2.5 md:px-3 md:pt-3" />
                   <SortableHeaderCell label="Avg" column="averageCost" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-3 pb-2 pt-2.5 sm:table-cell md:px-4 md:pt-3" />
                   <SortableHeaderCell label="Costbasis" column="costBasis" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-4 pb-2 pt-3 md:table-cell" />
                   <SortableHeaderCell label="Gain" column="gainLoss" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 md:px-4 md:pt-3" />
@@ -416,7 +429,14 @@ export default function PortfolioPage() {
                       >
                         {d != null && Number.isFinite(d) ? formatPercent(d, true) : "—"}
                       </td>
-                      <td className="px-2 py-2.5 text-center tabular-nums text-foreground md:px-4 md:py-3">{formatNumberMax2(metrics.quantity)}</td>
+                      <td
+                        className={`px-2 py-2.5 text-center tabular-nums font-medium md:px-3 md:py-3 ${analystRatingTextClass(s.analystAvg)}`}
+                        title="Consensus / average rating when available from data refresh"
+                      >
+                        {s.analystAvg != null && Number.isFinite(Number.parseFloat(s.analystAvg))
+                          ? formatDecimal(Number.parseFloat(s.analystAvg))
+                          : "—"}
+                      </td>
                       <td className="hidden px-3 py-2.5 text-center tabular-nums text-foreground sm:table-cell md:px-4 md:py-3">{formatCurrency(metrics.averageCost)}</td>
                       <td className="hidden px-4 py-3 text-center tabular-nums text-foreground md:table-cell">{formatWholeCurrency(costBasis)}</td>
                       <td className="px-2 py-2.5 text-center tabular-nums md:px-4 md:py-3">
