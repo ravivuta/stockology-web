@@ -461,23 +461,23 @@ export default function PortfolioPage() {
                           : "—"}
                       </td>
                       <td
-                        className={`px-2 py-2.5 text-center tabular-nums font-medium md:px-3 md:py-3 ${metricCellClass || analystRatingTextClass(s.analystAvg)}`}
+                        className={`px-2 py-2.5 text-center tabular-nums font-medium md:px-3 md:py-3 ${analystRatingTextClass(s.analystAvg)} ${metricCellClass}`}
                         title="Consensus / average rating when available from data refresh"
                       >
                         {s.analystAvg != null && Number.isFinite(Number.parseFloat(s.analystAvg))
                           ? formatDecimal(Number.parseFloat(s.analystAvg))
                           : "—"}
                       </td>
-                      <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${metricCellClass || pegTextClass(s.peg)}`}>
+                      <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${pegTextClass(s.peg)} ${metricCellClass}`}>
                         {s.peg != null && s.peg > 0 ? formatDecimal(s.peg) : "—"}
                       </td>
-                      <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${metricCellClass || debtRatioTextClass(s.debtToEquity)}`}>
+                      <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${debtRatioTextClass(s.debtToEquity)} ${metricCellClass}`}>
                         {s.debtToEquity != null && s.debtToEquity >= 0 ? String(Math.round(s.debtToEquity)) : "—"}
                       </td>
-                      <td className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${metricCellClass || upsideTextClass(upside)}`}>
+                      <td className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${upsideTextClass(upside)} ${metricCellClass}`}>
                         {formatUpsidePct(upside)}
                       </td>
-                      <td className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${metricCellClass || scoreTextClass(s.score)}`}>{s.score != null ? formatScore(s.score) : "—"}</td>
+                      <td className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${scoreTextClass(s.score)} ${metricCellClass}`}>{s.score != null ? formatScore(s.score) : "—"}</td>
                       <td className="px-2 py-2.5 align-middle text-center md:px-4 md:py-3">
                         {s.recommendation ? (
                           <span
