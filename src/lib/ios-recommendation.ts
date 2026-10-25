@@ -683,6 +683,40 @@ export function preferredSymbolsForShortlistIndicator(
   return new Set([...etfSymbols, ...topStockSymbols]);
 }
 
+/**
+ * Names iOS `getStocksForSimulation` would backtest.
+ * With the size limit on: ETFs plus the top-N names that pass risk and score.
+ * Holdings outside those gates are left out. With the limit off: ETFs plus names
+ * that pass the risk appetite gate.
+ */
+export function symbolsForSimulation(
+  stocks: IosStockInput[],
+  settings: {
+    limitWatchlistSize: boolean;
+    enableRiskFilter: boolean;
+    riskAppetite: "Low" | "Medium" | "High";
+    portfolioSize: number;
+  }
+): Set<string> {
+  const eligible = stocks.filter((stock) => stock.symbol !== "$CASH" && stock.excludeFromShortlist !== true);
+  if (settings.limitWatchlistSize) {
+    return preferredSymbolsForShortlistIndicator(eligible, {
+      limitWatchlistSize: true,
+      enableRiskFilter: settings.enableRiskFilter,
+      riskAppetite: settings.riskAppetite,
+      portfolioSize: settings.portfolioSize,
+    });
+  }
+  return new Set(
+    eligible
+      .filter((stock) => {
+        if (!settings.enableRiskFilter || stock.isETF === true) return true;
+        return stockPassesRiskAppetiteOnly(stock, settings.riskAppetite, upsidePct(stock), false);
+      })
+      .map((stock) => stock.symbol)
+  );
+}
+
 /** Portfolio holdings are green, or red when the size limit is on and the name is outside it. Watchlist colors holdings only. */
 export function symbolShortlistTextClass(
   stock: { symbol: string; quantity: number },

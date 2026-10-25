@@ -320,6 +320,7 @@ export function CsvImportExportBar({
   const [savedPresets, setSavedPresets] = useState<SavedCsvMappingPreset[]>([]);
   const [deleteHoldingsOpen, setDeleteHoldingsOpen] = useState(false);
   const mappingFields = getMappingFieldsForMode(importMode);
+  const importLabel = importMode === "watchlist" ? "Import watchlist (CSV)" : "Import holdings (CSV)";
   // importBusy tracks only the import's own progress — not background optimization.
   // importCsvRows already cancels any in-flight optimizePendingStocks via optimizationGeneration,
   // so blocking import on `optimizing` just locks the button during normal post-load auto-optimize.
@@ -758,7 +759,7 @@ export function CsvImportExportBar({
         type="file"
         accept=".csv,text/csv,text/plain"
         className="sr-only"
-        aria-label="Choose CSV file to import"
+        aria-label={importLabel}
         onChange={onPickFile}
       />
       <div className="flex flex-wrap gap-2">
@@ -770,7 +771,7 @@ export function CsvImportExportBar({
             compact ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm"
           } ${importBusy ? "cursor-wait opacity-60" : ""}`}
         >
-          Import CSV
+          {importLabel}
         </button>
         <button
           type="button"
@@ -1065,7 +1066,7 @@ export function CsvImportExportBar({
               progress.active || !canSubmitMappingImport(pendingMappingImport) ? "cursor-not-allowed opacity-70" : ""
             }`}
           >
-            {progress.active ? "Importing…" : "Import CSV"}
+            {progress.active ? "Importing…" : importLabel}
           </button>
         </ModalSection>
       </AppModal>

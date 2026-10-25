@@ -3,7 +3,8 @@ export default function CsvHelpPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <h1 className="text-2xl font-bold text-foreground">CSV import / export</h1>
       <p className="text-sm text-subtle">
-        Import and export match the Stocks PM mobile app. Use <strong className="font-medium text-foreground">Import CSV</strong> on Portfolio or Watchlist to load a file;{" "}
+        Import and export match the Stocks PM mobile app. Use <strong className="font-medium text-foreground">Import holdings (CSV)</strong> on Portfolio or{" "}
+        <strong className="font-medium text-foreground">Import watchlist (CSV)</strong> on Watchlist to load a file;{" "}
         <strong className="font-medium text-foreground">Export CSV</strong> downloads every tracked symbol (holdings and watch-only) in the same column layout as the app.
       </p>
 

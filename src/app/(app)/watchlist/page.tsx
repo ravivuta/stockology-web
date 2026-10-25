@@ -308,10 +308,10 @@ export default function WatchlistPage() {
             <col className="hidden md:table-column md:w-[8%]" />
             <col className="hidden md:table-column md:w-[8%]" />
             <col className="hidden md:table-column md:w-[8%]" />
-            <col className="hidden sm:table-column sm:w-[10%] md:w-[8%]" />
             <col className="w-[18%] md:w-[9%]" />
-            <col className="w-[14%] sm:w-[8%] md:w-[8%]" />
             <col className="hidden sm:table-column sm:w-[10%] md:w-[10%]" />
+            <col className="w-[14%] sm:w-[8%] md:w-[8%]" />
+            <col className="hidden sm:table-column sm:w-[10%] md:w-[8%]" />
             <col className="w-[34%] sm:w-[18%] md:w-[12%]" />
             <col className="hidden md:table-column md:w-[6%]" />
           </colgroup>
@@ -332,12 +332,12 @@ export default function WatchlistPage() {
               <SortableHeaderCell label="Analyst Rating" column="analyst" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 md:table-cell md:px-3" />
               <SortableHeaderCell label="PEG" column="peg" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 md:table-cell md:px-3" />
               <SortableHeaderCell label="Debt ratio" column="debt" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 md:table-cell md:px-3" />
+              <SortableHeaderCell label="Potential Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-1.5 py-2.5 sm:px-3 sm:py-3" />
+              <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 sm:table-cell sm:px-3" />
+              <SortableHeaderCell label="Div%" column="yield" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-1 py-2.5 sm:px-2 sm:py-3" />
               <th scope="col" className="hidden px-2 py-3 text-center text-xs font-semibold uppercase tracking-wide sm:table-cell sm:px-3">
                 Shortlisted
               </th>
-              <SortableHeaderCell label="Potential Upside" column="upside" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-1.5 py-2.5 sm:px-3 sm:py-3" />
-              <SortableHeaderCell label="Div%" column="yield" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-1 py-2.5 sm:px-2 sm:py-3" />
-              <SortableHeaderCell label="Score" column="score" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden px-2 py-3 sm:table-cell sm:px-3" />
               <SortableHeaderCell label="Rec" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="min-w-0 px-1.5 py-2.5 sm:hidden" />
               <SortableHeaderCell label="Recommendation" column="signal" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="hidden min-w-0 px-3 py-3 sm:table-cell" />
               <th scope="col" className="hidden px-2 py-3 text-center md:table-cell md:px-3">
@@ -429,9 +429,6 @@ export default function WatchlistPage() {
                     <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${debtRatioTextClass(s.debtToEquity)} ${metricCellClass}`}>
                       {s.debtToEquity != null && s.debtToEquity >= 0 ? String(Math.round(s.debtToEquity)) : "—"}
                     </td>
-                    <td className="hidden px-2 py-3 text-center font-medium text-subtle sm:table-cell sm:px-3">
-                      {s.isShortlisted ? "Yes" : "No"}
-                    </td>
                     <td
                       className={`min-w-0 px-1.5 py-2.5 text-center tabular-nums font-medium sm:px-3 sm:py-3 ${upsideTextClass(upside)} ${metricCellClass}`}
                       title={
@@ -442,6 +439,9 @@ export default function WatchlistPage() {
                     >
                       <span className="block truncate">{formatUpsidePct(upside)}</span>
                     </td>
+                    <td className={`hidden min-w-0 px-2 py-3 text-center tabular-nums font-medium sm:table-cell sm:px-3 ${scoreTextClass(s.score)} ${metricCellClass}`}>
+                      <span className="block truncate text-center">{s.score != null ? formatScore(s.score) : "—"}</span>
+                    </td>
                     <td className="min-w-0 px-1 py-2.5 text-center tabular-nums font-medium text-foreground sm:px-2 sm:py-3">
                       <span className="block truncate">
                         {s.dividendYield != null && s.dividendYield > 0
@@ -449,8 +449,8 @@ export default function WatchlistPage() {
                           : "—"}
                       </span>
                     </td>
-                    <td className={`hidden min-w-0 px-2 py-3 text-center tabular-nums font-medium sm:table-cell sm:px-3 ${scoreTextClass(s.score)} ${metricCellClass}`}>
-                      <span className="block truncate text-center">{s.score != null ? formatScore(s.score) : "—"}</span>
+                    <td className="hidden px-2 py-3 text-center font-medium text-subtle sm:table-cell sm:px-3">
+                      {s.isShortlisted ? "Yes" : "No"}
                     </td>
                     <td className="min-w-0 px-1.5 py-2.5 text-center text-xs text-subtle sm:px-3 sm:py-3">
                       {s.recommendation ? (

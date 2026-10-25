@@ -11,6 +11,7 @@ import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
 import { useSubscriptionGate } from "@/hooks/useSubscriptionGate";
 import { hasPremiumFeatureAccess } from "@/lib/subscription-limits";
 import { withAppBasePath } from "@/lib/base-path";
+import { recommendedWatchlistSize, symbolsForSimulation } from "@/lib/ios-recommendation";
 
 type SingleSimulationResponse = {
   ok?: boolean;
@@ -135,7 +136,24 @@ export default function SimulationPage() {
   const rsiOverboughtThresholdForRecommendations = usePortfolioStore((s) => s.rsiOverboughtThresholdForRecommendations);
   const rsiHysteresisPointsForRecommendations = usePortfolioStore((s) => s.rsiHysteresisPointsForRecommendations);
   const rsiMinRisingDaysForRecommendations = usePortfolioStore((s) => s.rsiMinRisingDaysForRecommendations);
-  const watchlistTrackedCount = stocks.length;
+  const watchlistTrackedCount = stocks.filter((stock) => stock.symbol !== "$CASH").length;
+  const simulationSymbols = useMemo(
+    () =>
+      symbolsForSimulation(stocks, {
+        limitWatchlistSize,
+        enableRiskFilter,
+        riskAppetite,
+        portfolioSize,
+      }),
+    [enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
+  );
+  const simulationStocks = useMemo(
+    () => stocks.filter((stock) => simulationSymbols.has(stock.symbol)),
+    [simulationSymbols, stocks]
+  );
+  const idealWatchlistSize = recommendedWatchlistSize(portfolioSize);
+  const etfSimulationCount = simulationStocks.filter((stock) => stock.isETF === true).length;
+  const rankedSimulationCount = simulationStocks.length - etfSimulationCount;
   const selectedWatchlistYears = watchlistResult?.years ?? Number.parseInt(watchlistYears, 10) ?? 1;
   const trackedStock = useMemo(
     () => stocks.find((stock) => stock.symbol === symbol.trim().toUpperCase()),
@@ -214,8 +232,14 @@ export default function SimulationPage() {
     const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
     try {
       const requestedYears = parseInt(watchlistYears, 10) || 1;
-      const maxSMA = Math.max(...stocks.map((stock) => Math.max(2, Math.trunc(stock.shortSMA || 50))), 50);
-      const histories = await loadHistoricalPayloadBySymbol(stocks.map((stock) => stock.symbol), requestedYears * 252 + maxSMA + 80);
+      const scoped = simulationStocks;
+      if (scoped.length === 0) {
+        setWatchlistResult({ ok: false, error: "No stocks remain after risk, rank, and ETF shortlist filters" });
+        setWatchlistLoading(false);
+        return;
+      }
+      const maxSMA = Math.max(...scoped.map((stock) => Math.max(2, Math.trunc(stock.shortSMA || 50))), 50);
+      const histories = await loadHistoricalPayloadBySymbol(scoped.map((stock) => stock.symbol), requestedYears * 252 + maxSMA + 80);
       const res = await fetch(`${basePath}/api/python/watchlist-simulation`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -226,6 +250,8 @@ export default function SimulationPage() {
           riskAppetite,
           enableRiskFilter,
           limitWatchlistSize,
+          shortlistSymbols: [...simulationSymbols],
+          trackedCount: watchlistTrackedCount,
           etfProfitTargetPercent: etfProfitTarget,
           stockProfitTargetPercent: stockProfitTarget,
           useRSIGating: useRSIGatingForRecommendations,
@@ -234,7 +260,7 @@ export default function SimulationPage() {
           rsiOverboughtThreshold: rsiOverboughtThresholdForRecommendations,
           rsiHysteresisPoints: rsiHysteresisPointsForRecommendations,
           rsiMinRisingDays: rsiMinRisingDaysForRecommendations,
-          stocks,
+          stocks: scoped,
         }),
       });
       const data = await res.json();
@@ -409,7 +435,7 @@ export default function SimulationPage() {
             </div>
             <button
               type="button"
-              disabled={watchlistLoading || watchlistTrackedCount === 0 || !premiumSimulation}
+              disabled={watchlistLoading || simulationStocks.length === 0 || !premiumSimulation}
               onClick={runWatchlist}
               className={appCtaButton(prominentWatchlistButtonClass)}
             >
@@ -433,9 +459,16 @@ export default function SimulationPage() {
               </select>
             </label>
             <div className="rounded-xl border border-border/70 bg-background/50 p-3 text-sm">
-              <div className="text-xs uppercase tracking-[0.18em] text-subtle">Universe</div>
-              <div className="mt-1 font-medium text-foreground">{watchlistTrackedCount} tracked symbols</div>
-              <div className="mt-1 text-subtle">Portfolio size {formatCurrency(portfolioSize)}</div>
+              <div className="text-xs uppercase tracking-[0.18em] text-subtle">Stocks to simulate</div>
+              <div className="mt-1 text-xl font-semibold text-foreground">{simulationStocks.length}</div>
+              <div className="mt-1 text-subtle">
+                {limitWatchlistSize
+                  ? `${rankedSimulationCount} top-ranked for a ${idealWatchlistSize}-name shortlist${enableRiskFilter ? ` at ${riskAppetite} risk` : ""}, plus ${etfSimulationCount} ETFs`
+                  : enableRiskFilter
+                    ? `Risk appetite gate (${riskAppetite}), plus ETFs`
+                    : "Size limit and risk filter are off"}
+              </div>
+              <div className="mt-1 text-subtle">{watchlistTrackedCount} tracked · portfolio {formatCurrency(portfolioSize)}</div>
             </div>
             <div className="rounded-xl border border-border/70 bg-background/50 p-3 text-sm">
               <div className="text-xs uppercase tracking-[0.18em] text-subtle">Filters</div>
@@ -478,7 +511,11 @@ export default function SimulationPage() {
                   <div className="rounded-xl border border-border/70 bg-background/50 p-4">
                     <div className="text-xs uppercase tracking-[0.18em] text-subtle">Simulation Universe</div>
                     <div className="mt-2 text-sm text-foreground">
-                      {watchlistResult.universe.totalSimulated} of {watchlistResult.universe.totalTracked} tracked names simulated. Ideal watchlist size {watchlistResult.universe.idealWatchlistSize}.
+                      {watchlistResult.universe.totalSimulated} stocks simulated
+                      {watchlistResult.universe.totalTracked > watchlistResult.universe.totalSimulated
+                        ? ` of ${watchlistResult.universe.totalTracked} tracked`
+                        : ""}
+                      . Ideal watchlist size {watchlistResult.universe.idealWatchlistSize}.
                     </div>
                     <div className="mt-3 text-sm text-subtle">{watchlistResult.universe.simulatedSymbols.join(", ")}</div>
                     {(watchlistResult.universe.skippedSymbols?.insufficientHistory?.length ?? 0) > 0 ? (

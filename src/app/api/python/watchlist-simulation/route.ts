@@ -3,9 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import {
   computeIosRecommendation,
   computeRiskReturnScore,
-  preferredSymbolsForShortlistIndicator,
   recommendedWatchlistSize,
-  stockPassesRiskAppetiteOnly,
+  symbolsForSimulation,
   type IosStockInput,
 } from "@/lib/ios-recommendation";
 import { resolveHistoryClose, sanitizeProvidedHistoryMap } from "@/lib/historical-price-server";
@@ -48,11 +47,6 @@ function clampNumber(value: unknown, fallback: number, min: number, max: number)
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ ok: false, error: message }, { status });
-}
-
-function upsidePercent(lastPrice: number | undefined, analystTarget: number | undefined): number | undefined {
-  if ((lastPrice ?? 0) <= 0 || (analystTarget ?? 0) <= 0) return undefined;
-  return (((analystTarget ?? 0) - (lastPrice ?? 0)) / (lastPrice ?? 1)) * 100;
 }
 
 function sanitizeHistory(rows: HistoryRow[] | null | undefined) {
@@ -126,33 +120,13 @@ function buildUniverse(
   const prepared = stocks
     .filter((stock) => stock.symbol !== "$CASH")
     .map((stock) => {
-      const score = stock.isETF ? undefined : (stock.score ?? computeRiskReturnScore(toIosStockInput(stock)));
+      const score = stock.isETF === true ? undefined : (stock.score ?? computeRiskReturnScore(toIosStockInput(stock)));
       return { ...stock, score };
     });
   const inputs = prepared.map((stock) => ({ ...toIosStockInput(stock), score: stock.score }));
-  // Same scope as iOS getStocksForSimulation: top-N shortlist when that setting is on,
-  // otherwise the risk-appetite gate. Holdings are not added back in automatically.
-  const allowed = settings.limitWatchlistSize
-    ? preferredSymbolsForShortlistIndicator(inputs, {
-        limitWatchlistSize: true,
-        enableRiskFilter: settings.enableRiskFilter,
-        riskAppetite: settings.riskAppetite,
-        portfolioSize: settings.portfolioSize,
-      })
-    : new Set(
-        inputs
-          .filter((stock) => {
-            if (stock.excludeFromShortlist === true) return false;
-            if (!settings.enableRiskFilter || stock.isETF === true) return true;
-            return stockPassesRiskAppetiteOnly(
-              stock,
-              settings.riskAppetite,
-              upsidePercent(stock.lastPrice, stock.analystTarget),
-              false
-            );
-          })
-          .map((stock) => stock.symbol)
-      );
+  // Same scope as iOS getStocksForSimulation. Holdings outside the rank/risk
+  // gates are not added back in. ETFs stay included and do not use a top-N slot.
+  const allowed = symbolsForSimulation(inputs, settings);
 
   const universe: SimStock[] = prepared
     .filter((stock) => stock.excludeFromShortlist !== true && allowed.has(stock.symbol))
@@ -191,7 +165,8 @@ export async function POST(request: NextRequest) {
     ? String(payload.riskAppetite)
     : "Medium") as "Low" | "Medium" | "High";
   const enableRiskFilter = payload.enableRiskFilter == null ? true : Boolean(payload.enableRiskFilter);
-  const limitWatchlistSize = payload.limitWatchlistSize == null ? false : Boolean(payload.limitWatchlistSize);
+  const limitWatchlistSize = payload.limitWatchlistSize == null ? true : Boolean(payload.limitWatchlistSize);
+  const trackedCount = clampNumber(payload.trackedCount, 0, 0, 100_000);
   const etfProfitTargetPercent = clampNumber(payload.etfProfitTargetPercent ?? 50, 50, 0, 500);
   const stockProfitTargetPercent = clampNumber(payload.stockProfitTargetPercent ?? 50, 50, 0, 500);
   const rsiGate = rsiGateFromPayload(payload);
@@ -537,7 +512,7 @@ export async function POST(request: NextRequest) {
     mode: "watchlist",
     years,
     universe: {
-      totalTracked: cleanedStocks.length,
+      totalTracked: trackedCount > 0 ? trackedCount : cleanedStocks.length,
       totalSimulated: validStocks.length,
       idealWatchlistSize,
       riskAppetite,
