@@ -14,7 +14,14 @@ import { dividendYieldPercent, preferredSymbolsForShortlistIndicator, symbolShor
 import { recommendationActionDisplay } from "@/lib/recommendation";
 import { fieldInputClass } from "@/lib/field-input";
 import { cashByAccount, displayAccount, isCashSymbol } from "@/lib/cash-accounts";
-import { allGreenMetricCellClass, metricsAreAllGreen } from "@/lib/metric-cell-highlight";
+import {
+  analystTextIsGreen,
+  debtTextIsGreen,
+  greenTextCellClass,
+  pegTextIsGreen,
+  scoreTextIsGreen,
+  upsideTextIsGreen,
+} from "@/lib/metric-cell-highlight";
 
 type SortKey = "symbol" | "analyst" | "averageCost" | "costBasis" | "lastPrice" | "value" | "gainLoss" | "yield" | "peg" | "debt" | "upside" | "score" | "today" | "signal";
 
@@ -384,14 +391,11 @@ export default function PortfolioPage() {
                   const gainLossPct = costBasis > 0 ? (gainLoss / costBasis) * 100 : null;
                   const upside = analystTargetUpsidePct(s.lastPrice, s.analystTarget);
                   const d = s.dailyChangePercent;
-                  const allGreenMetrics = metricsAreAllGreen({
-                    analystAvg: s.analystAvg,
-                    peg: s.peg,
-                    debtToEquity: s.debtToEquity,
-                    score: s.score,
-                    upside,
-                  });
-                  const metricCellClass = allGreenMetrics ? allGreenMetricCellClass : "";
+                  const analystCellClass = greenTextCellClass(analystTextIsGreen(s.analystAvg));
+                  const pegCellClass = greenTextCellClass(pegTextIsGreen(s.peg));
+                  const debtCellClass = greenTextCellClass(debtTextIsGreen(s.debtToEquity));
+                  const upsideCellClass = greenTextCellClass(upsideTextIsGreen(upside));
+                  const scoreCellClass = greenTextCellClass(scoreTextIsGreen(s.score));
                   return (
                     <tr
                       key={s.symbol}
@@ -461,23 +465,23 @@ export default function PortfolioPage() {
                           : "—"}
                       </td>
                       <td
-                        className={`px-2 py-2.5 text-center tabular-nums font-medium md:px-3 md:py-3 ${analystRatingTextClass(s.analystAvg)} ${metricCellClass}`}
+                        className={`px-2 py-2.5 text-center tabular-nums font-medium md:px-3 md:py-3 ${analystRatingTextClass(s.analystAvg)} ${analystCellClass}`}
                         title="Consensus / average rating when available from data refresh"
                       >
                         {s.analystAvg != null && Number.isFinite(Number.parseFloat(s.analystAvg))
                           ? formatDecimal(Number.parseFloat(s.analystAvg))
                           : "—"}
                       </td>
-                      <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${pegTextClass(s.peg)} ${metricCellClass}`}>
+                      <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${pegTextClass(s.peg)} ${pegCellClass}`}>
                         {s.peg != null && s.peg > 0 ? formatDecimal(s.peg) : "—"}
                       </td>
-                      <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${debtRatioTextClass(s.debtToEquity)} ${metricCellClass}`}>
+                      <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${debtRatioTextClass(s.debtToEquity)} ${debtCellClass}`}>
                         {s.debtToEquity != null && s.debtToEquity >= 0 ? String(Math.round(s.debtToEquity)) : "—"}
                       </td>
-                      <td className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${upsideTextClass(upside)} ${metricCellClass}`}>
+                      <td className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${upsideTextClass(upside)} ${upsideCellClass}`}>
                         {formatUpsidePct(upside)}
                       </td>
-                      <td className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${scoreTextClass(s.score)} ${metricCellClass}`}>{s.score != null ? formatScore(s.score) : "—"}</td>
+                      <td className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${scoreTextClass(s.score)} ${scoreCellClass}`}>{s.score != null ? formatScore(s.score) : "—"}</td>
                       <td className="px-2 py-2.5 align-middle text-center md:px-4 md:py-3">
                         {s.recommendation ? (
                           <span

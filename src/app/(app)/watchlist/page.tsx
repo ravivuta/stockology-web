@@ -17,7 +17,14 @@ import { StockDetailModal } from "@/components/stock/StockDetailModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
 import { fieldInputClass } from "@/lib/field-input";
-import { allGreenMetricCellClass, metricsAreAllGreen } from "@/lib/metric-cell-highlight";
+import {
+  analystTextIsGreen,
+  debtTextIsGreen,
+  greenTextCellClass,
+  pegTextIsGreen,
+  scoreTextIsGreen,
+  upsideTextIsGreen,
+} from "@/lib/metric-cell-highlight";
 import {
   flushCurrentPortfolioSnapshotNow,
   patchCurrentPortfolioSnapshotHoldings,
@@ -359,14 +366,11 @@ export default function WatchlistPage() {
               rows.map((s) => {
                 const upside = analystTargetUpsidePct(s.lastPrice, s.analystTarget);
                 const rating = s.analystAvg?.trim();
-                const allGreenMetrics = metricsAreAllGreen({
-                  analystAvg: rating,
-                  peg: s.peg,
-                  debtToEquity: s.debtToEquity,
-                  score: s.score,
-                  upside,
-                });
-                const metricCellClass = allGreenMetrics ? allGreenMetricCellClass : "";
+                const analystCellClass = greenTextCellClass(analystTextIsGreen(rating));
+                const pegCellClass = greenTextCellClass(pegTextIsGreen(s.peg));
+                const debtCellClass = greenTextCellClass(debtTextIsGreen(s.debtToEquity));
+                const upsideCellClass = greenTextCellClass(upsideTextIsGreen(upside));
+                const scoreCellClass = greenTextCellClass(scoreTextIsGreen(s.score));
                 return (
                   <tr
                     key={s.symbol}
@@ -418,19 +422,19 @@ export default function WatchlistPage() {
                       {s.dailyChangePercent != null ? formatPercent(s.dailyChangePercent, true) : "—"}
                     </td>
                     <td
-                      className={`hidden min-w-0 px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${analystRatingTextClass(rating)} ${metricCellClass}`}
+                      className={`hidden min-w-0 px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${analystRatingTextClass(rating)} ${analystCellClass}`}
                       title="Consensus / average rating when available from data refresh"
                     >
                       <span className="block truncate">{rating && !Number.isNaN(Number.parseFloat(rating)) ? formatDecimal(Number.parseFloat(rating)) : "—"}</span>
                     </td>
-                    <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${pegTextClass(s.peg)} ${metricCellClass}`}>
+                    <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${pegTextClass(s.peg)} ${pegCellClass}`}>
                       {s.peg != null && s.peg > 0 ? formatDecimal(s.peg) : "—"}
                     </td>
-                    <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${debtRatioTextClass(s.debtToEquity)} ${metricCellClass}`}>
+                    <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${debtRatioTextClass(s.debtToEquity)} ${debtCellClass}`}>
                       {s.debtToEquity != null && s.debtToEquity >= 0 ? String(Math.round(s.debtToEquity)) : "—"}
                     </td>
                     <td
-                      className={`min-w-0 px-1.5 py-2.5 text-center tabular-nums font-medium sm:px-3 sm:py-3 ${upsideTextClass(upside)} ${metricCellClass}`}
+                      className={`min-w-0 px-1.5 py-2.5 text-center tabular-nums font-medium sm:px-3 sm:py-3 ${upsideTextClass(upside)} ${upsideCellClass}`}
                       title={
                         s.analystTarget != null && s.lastPrice
                           ? `Target ${formatCurrency(s.analystTarget)} vs last ${formatCurrency(s.lastPrice)}`
@@ -439,7 +443,7 @@ export default function WatchlistPage() {
                     >
                       <span className="block truncate">{formatUpsidePct(upside)}</span>
                     </td>
-                    <td className={`hidden min-w-0 px-2 py-3 text-center tabular-nums font-medium sm:table-cell sm:px-3 ${scoreTextClass(s.score)} ${metricCellClass}`}>
+                    <td className={`hidden min-w-0 px-2 py-3 text-center tabular-nums font-medium sm:table-cell sm:px-3 ${scoreTextClass(s.score)} ${scoreCellClass}`}>
                       <span className="block truncate text-center">{s.score != null ? formatScore(s.score) : "—"}</span>
                     </td>
                     <td className="min-w-0 px-1 py-2.5 text-center tabular-nums font-medium text-foreground sm:px-2 sm:py-3">

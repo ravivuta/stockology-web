@@ -2,34 +2,35 @@
 export const allGreenMetricCellClass =
   "bg-[#c9e6d2] ring-1 ring-inset ring-elevated dark:bg-[#245233]";
 
-/**
- * True when analyst rating, PEG, debt ratio, and score use green text, and
- * upside is above 25% even when that upside is not in the green band.
- * Score from 70 and analyst rating from 3.5 use the theme green.
- */
-export function metricsAreAllGreen(input: {
-  analystAvg?: string | null;
-  peg?: number | null;
-  debtToEquity?: number | null;
-  score?: number | null;
-  upside?: number | null;
-}): boolean {
-  const rating = Number.parseFloat(input.analystAvg ?? "");
-  if (!Number.isFinite(rating) || rating < 3.5) return false;
+/** Background for one quality cell whose value text is already green. */
+export function greenTextCellClass(isGreen: boolean): string {
+  return isGreen ? allGreenMetricCellClass : "";
+}
 
-  const peg = input.peg;
-  if (peg == null || !Number.isFinite(peg) || peg <= 0 || peg > 1) return false;
+/** Analyst rating text is green from 3.5, including the theme-green band. */
+export function analystTextIsGreen(value: string | null | undefined): boolean {
+  const rating = Number.parseFloat(value ?? "");
+  return Number.isFinite(rating) && rating >= 3.5;
+}
 
-  const debt = input.debtToEquity;
-  if (debt == null || !Number.isFinite(debt) || debt < 0) return false;
-  const debtRatio = debt > 1 ? debt / 100 : debt;
-  if (debtRatio >= 0.5) return false;
+/** PEG text is green at 1.0 or below. */
+export function pegTextIsGreen(peg: number | null | undefined): boolean {
+  return peg != null && Number.isFinite(peg) && peg > 0 && peg <= 1;
+}
 
-  const score = input.score;
-  if (score == null || !Number.isFinite(score) || score < 70) return false;
+/** Debt ratio text is green under 50%. */
+export function debtTextIsGreen(raw: number | null | undefined): boolean {
+  if (raw == null || !Number.isFinite(raw) || raw < 0) return false;
+  const ratio = raw > 1 ? raw / 100 : raw;
+  return ratio < 0.5;
+}
 
-  const upside = input.upside;
-  if (upside == null || !Number.isFinite(upside) || upside <= 25) return false;
+/** Score text is green from 70, including the theme-green band. */
+export function scoreTextIsGreen(score: number | null | undefined): boolean {
+  return score != null && Number.isFinite(score) && score >= 70;
+}
 
-  return true;
+/** Upside text is green only above 50%. Orange 25–50% stays unfilled. */
+export function upsideTextIsGreen(upside: number | null | undefined): boolean {
+  return upside != null && Number.isFinite(upside) && upside > 50;
 }
