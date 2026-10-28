@@ -625,19 +625,35 @@ function normalizeImportedDate(raw: string): string | undefined {
   const value = raw.trim();
   if (!value) return undefined;
 
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const isoMatch = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (isoMatch) {
+    return `${isoMatch[1]}-${isoMatch[2].padStart(2, "0")}-${isoMatch[3].padStart(2, "0")}`;
+  }
 
-  const slashMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  const slashMatch = value.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/) ?? value.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
   if (slashMatch) {
-    const month = slashMatch[1].padStart(2, "0");
-    const day = slashMatch[2].padStart(2, "0");
-    const year = slashMatch[3].length === 2 ? `20${slashMatch[3]}` : slashMatch[3];
+    const month = slashMatch[1].length === 4 ? slashMatch[2].padStart(2, "0") : slashMatch[1].padStart(2, "0");
+    const day = slashMatch[1].length === 4 ? slashMatch[3].padStart(2, "0") : slashMatch[2].padStart(2, "0");
+    const year = slashMatch[1].length === 4 ? slashMatch[1] : slashMatch[3].length === 2 ? `20${slashMatch[3]}` : slashMatch[3];
     return `${year}-${month}-${day}`;
   }
 
-  const ms = Date.parse(value);
-  if (!Number.isFinite(ms)) return value;
-  return new Date(ms).toISOString().slice(0, 10);
+  const monthNameMatch = value.match(/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})$/i);
+  if (monthNameMatch) {
+    const monthIndex = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"].indexOf(monthNameMatch[1].toLowerCase());
+    if (monthIndex >= 0) {
+      const month = (monthIndex + 1).toString().padStart(2, "0");
+      const day = monthNameMatch[2].padStart(2, "0");
+      return `${monthNameMatch[3]}-${month}-${day}`;
+    }
+  }
+
+  const isoWithTimeMatch = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})[T\s].*$/);
+  if (isoWithTimeMatch) {
+    return `${isoWithTimeMatch[1]}-${isoWithTimeMatch[2].padStart(2, "0")}-${isoWithTimeMatch[3].padStart(2, "0")}`;
+  }
+
+  return value;
 }
 
 function parseRetirementAccountFlag(raw: string): boolean | undefined {

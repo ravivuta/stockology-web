@@ -33,9 +33,43 @@ import { StockStrategyModal } from "./StockStrategyModal";
 
 function formatDateLabel(value: string | undefined): string {
   if (!value) return "Unknown";
-  const ms = Date.parse(value);
+
+  const trimmed = value.trim();
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (isoMatch) {
+    const year = Number(isoMatch[1]);
+    const month = Number(isoMatch[2]);
+    const day = Number(isoMatch[3]);
+    const middayUtc = Date.UTC(year, month - 1, day, 12, 0, 0);
+    const offsetMinutes = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      timeZoneName: "shortOffset",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).formatToParts(new Date(middayUtc)).find((part) => part.type === "timeZoneName")?.value ?? "GMT";
+    const offsetMatch = offsetMinutes.match(/GMT([+-])(\d{1,2})(?::?(\d{2}))?/);
+    const sign = offsetMatch?.[1] === "-" ? -1 : 1;
+    const hours = Number(offsetMatch?.[2] ?? 0);
+    const minutes = Number(offsetMatch?.[3] ?? 0);
+    const etDate = new Date(middayUtc - sign * (hours * 60 + minutes) * 60 * 1000);
+    return etDate.toLocaleDateString("en-US", {
+      timeZone: "America/New_York",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  const ms = Date.parse(trimmed);
   if (!Number.isFinite(ms)) return value;
+
   return new Date(ms).toLocaleDateString("en-US", {
+    timeZone: "America/New_York",
     month: "short",
     day: "numeric",
     year: "numeric",

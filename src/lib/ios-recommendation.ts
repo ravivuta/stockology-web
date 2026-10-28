@@ -277,9 +277,44 @@ export function passesRSISellSignalWithHysteresis(
   return amplitudeDeclined;
 }
 
+function getEasternOffsetMinutesFor(date: Date): number {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    timeZoneName: "shortOffset",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+
+  const match = formatter.formatToParts(date).find((part) => part.type === "timeZoneName")?.value ?? "GMT";
+  const offsetMatch = match.match(/GMT([+-])(\d{1,2})(?::?(\d{2}))?/);
+  if (!offsetMatch) return 0;
+
+  const sign = offsetMatch[1] === "-" ? -1 : 1;
+  const hours = Number(offsetMatch[2] ?? 0);
+  const minutes = Number(offsetMatch[3] ?? 0);
+  return sign * (hours * 60 + minutes);
+}
+
 function parseDate(value: string | undefined): Date | null {
   if (!value) return null;
-  const ms = Date.parse(value);
+
+  const trimmed = value.trim();
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (isoMatch) {
+    const year = Number(isoMatch[1]);
+    const month = Number(isoMatch[2]);
+    const day = Number(isoMatch[3]);
+    const middayUtc = Date.UTC(year, month - 1, day, 12, 0, 0);
+    const offsetMinutes = getEasternOffsetMinutesFor(new Date(middayUtc));
+    return new Date(middayUtc - offsetMinutes * 60 * 1000);
+  }
+
+  const ms = Date.parse(trimmed);
   if (!Number.isFinite(ms)) return null;
   return new Date(ms);
 }
