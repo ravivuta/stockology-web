@@ -307,6 +307,13 @@ function preserveImportedMetadata(existing: StockHolding | undefined) {
   } satisfies Partial<StockHolding>;
 }
 
+function lotIdentityKey(account: string | undefined, symbol: string, purchaseDate: string | undefined, quantity: number, price: number): string {
+  const normalizedAccount = normalizeAccountKey(account);
+  const dateKey = (purchaseDate ?? "").trim() || defaultImportPurchaseDate();
+  const fmt = (value: number) => Number.isFinite(value) ? value.toFixed(6) : "0.000000";
+  return [normalizedAccount, symbol.toUpperCase(), dateKey, fmt(quantity), fmt(price)].join("|");
+}
+
 function buildImportedOpenLots(rows: CsvImportRow[]): {
   totalQty: number;
   averageCost: number;
@@ -316,11 +323,16 @@ function buildImportedOpenLots(rows: CsvImportRow[]): {
   let totalQty = 0;
   let totalBasis = 0;
   const openLots: TradeLot[] = [];
+  const seen = new Set<string>();
 
   for (const row of rows) {
     const qty = Math.max(0, row.qty);
     const price = Math.max(0, row.price);
     if (qty <= 0) continue;
+
+    const key = lotIdentityKey(row.account, row.symbol, row.purchaseDate, qty, price);
+    if (seen.has(key)) continue;
+    seen.add(key);
 
     totalQty += qty;
     totalBasis += qty * price;
@@ -2116,8 +2128,29 @@ export const usePortfolioStore = create<State>()(
                   );
                   const existingAvg = existingQty > 0 ? existingBasis / existingQty : 0;
                   const importedPriceMatchesExisting = Math.abs(importedLot.costBasis - existingAvg) <= 0.01;
+                  const existingLotKeys = new Set(
+                    existingAccountLots.map((lot) =>
+                      lotIdentityKey(lot.account, symbol, lot.purchaseDate, lot.quantity, lot.costBasis)
+                    )
+                  );
+                  const importedLotKeys = new Set(
+                    importedLots.map((lot) =>
+                      lotIdentityKey(lot.account, symbol, lot.purchaseDate, lot.quantity, lot.costBasis)
+                    )
+                  );
+                  const sameQtyDifferentLotSignature =
+                    Math.abs(importedQty - existingQty) <= 1e-6 &&
+                    importedLotKeys.size > 0 &&
+                    existingLotKeys.size > 0 &&
+                    (importedLotKeys.size !== existingLotKeys.size ||
+                      [...importedLotKeys].some((key) => !existingLotKeys.has(key)));
 
                   if (existingAccountLots.length === 0) {
+                    mergedOpenLots.push(importedLot);
+                    continue;
+                  }
+
+                  if (sameQtyDifferentLotSignature) {
                     mergedOpenLots.push(importedLot);
                     continue;
                   }
