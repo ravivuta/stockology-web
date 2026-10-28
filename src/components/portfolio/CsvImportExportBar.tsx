@@ -630,9 +630,18 @@ export function CsvImportExportBar({
         .join("\n  ");
 
     const hasDeltaUpdates = buyUpdates.length + addUpdates.length + soldUpdates.length > 0;
+    const hasStructuralUpdates = outcome.lotDetailUpdates.length > 0;
     const cashAdjustmentNote =
       Math.abs(outcome.cashAdjustedBy) > 1e-6
         ? `Cash ${outcome.cashAdjustedBy > 0 ? "increased" : "decreased"} by ${formatCurrency(Math.abs(outcome.cashAdjustedBy))} from CSV holdings updates.`
+        : "";
+
+    const structuralSummary =
+      hasStructuralUpdates && !hasDeltaUpdates
+        ? [
+            "CSV lot details updated.",
+            `Updated lots: ${outcome.lotDetailUpdates.map((symbol) => symbol).join(", ")}`,
+          ].join("\n")
         : "";
 
     const summaryText = hasDeltaUpdates
@@ -645,7 +654,7 @@ export function CsvImportExportBar({
         ]
           .filter(Boolean)
           .join("\n")
-      : "No updates detected from CSV.";
+      : structuralSummary || "No updates detected from CSV.";
 
     setFlash({
       kind: "ok",

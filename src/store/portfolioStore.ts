@@ -211,6 +211,7 @@ type State = {
     prunedWatchlistCount: number;
     importedTradeCount: number;
     netUpdates: Array<{ symbol: string; action: "BUY" | "SELL"; qty: number; account?: string }>;
+    lotDetailUpdates: string[];
     liquidationCashCredited: number;
     cashAdjustedBy: number;
   };
@@ -1945,6 +1946,7 @@ export const usePortfolioStore = create<State>()(
         let cashAdjustedBy = 0;
         const importedSymbolsByAccount = new Map<string, Set<string>>();
         const netUpdatesMap = new Map<string, number>();
+        const lotDetailUpdateSymbols = new Set<string>();
         const accountSaleEvents: Array<{ symbol: string; account: string; qty: number }> = [];
         const explicitSoldQtyBySymbol = new Map<string, number>();
         const explicitSellProceedsBySymbol = new Map<string, number>();
@@ -2333,6 +2335,22 @@ export const usePortfolioStore = create<State>()(
             if (openQty > 0) postImportQtyBySymbol.set(stock.symbol, openQty);
           }
 
+          const preLotSignatureMap = new Map<string, Set<string>>();
+          for (const [symbol, bundle] of Object.entries(st.lotsBySymbol)) {
+            const signatures = new Set(
+              bundle.open.map((lot) => lotIdentityKey(lot.account, symbol, lot.purchaseDate, lot.quantity, lot.costBasis))
+            );
+            if (signatures.size > 0) preLotSignatureMap.set(symbol.toUpperCase(), signatures);
+          }
+
+          const postLotSignatureMap = new Map<string, Set<string>>();
+          for (const [symbol, bundle] of Object.entries(lotsBySymbol)) {
+            const signatures = new Set(
+              bundle.open.map((lot) => lotIdentityKey(lot.account, symbol, lot.purchaseDate, lot.quantity, lot.costBasis))
+            );
+            if (signatures.size > 0) postLotSignatureMap.set(symbol.toUpperCase(), signatures);
+          }
+
           const hadExistingHoldings =
             preOpenCostBasis > 1e-6 || [...preImportQtyBySymbol.values()].some((qty) => qty > 1e-6);
           const allSymbolsForDiff = new Set<string>([
@@ -2345,6 +2363,17 @@ export const usePortfolioStore = create<State>()(
             const delta = afterQty - beforeQty;
             if (Math.abs(delta) > 1e-6) {
               netUpdatesMap.set(symbol, (netUpdatesMap.get(symbol) ?? 0) + delta);
+            }
+
+            const beforeSigs = preLotSignatureMap.get(symbol) ?? new Set<string>();
+            const afterSigs = postLotSignatureMap.get(symbol) ?? new Set<string>();
+            const sameQtyLotChange =
+              Math.abs(beforeQty - afterQty) <= 1e-6 &&
+              beforeSigs.size > 0 &&
+              afterSigs.size > 0 &&
+              (beforeSigs.size !== afterSigs.size || [...beforeSigs].some((key) => !afterSigs.has(key)));
+            if (sameQtyLotChange) {
+              lotDetailUpdateSymbols.add(symbol);
             }
           }
 
@@ -2430,6 +2459,7 @@ export const usePortfolioStore = create<State>()(
           prunedWatchlistCount,
           importedTradeCount,
           netUpdates,
+          lotDetailUpdates: [...lotDetailUpdateSymbols].sort((a, b) => a.localeCompare(b)),
           liquidationCashCredited,
           cashAdjustedBy,
         };
