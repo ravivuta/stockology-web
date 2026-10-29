@@ -70,9 +70,11 @@ export function RecommendedActionsWidget({ stocks }: { stocks: StockHolding[] })
   const portfolioSize = usePortfolioStore((s) => s.portfolioSize);
   const fixedIncomeByAccount = usePortfolioStore((s) => s.fixedIncomeByAccount);
   const [outlookOpen, setOutlookOpen] = useState(false);
+  const [isRefreshingRecommendations, setIsRefreshingRecommendations] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setIsRefreshingRecommendations(outlookEnabled);
     void fetchLatestMarketOutlook(createClient()).then((next) => {
       if (cancelled || !next) return;
       const state = usePortfolioStore.getState();
@@ -80,14 +82,17 @@ export function RecommendedActionsWidget({ stocks }: { stocks: StockHolding[] })
       if (state.useMarketRegimeCashTilt) {
         state.setSettings({ useMarketRegimeCashTilt: true });
       }
+    }).finally(() => {
+      if (!cancelled) setIsRefreshingRecommendations(false);
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [outlookEnabled]);
 
   const hasOverflow = items.length > MAX_VISIBLE;
   const visible = hasOverflow ? items.slice(0, MAX_VISIBLE) : items;
+  const recommendationsReady = !isRefreshingRecommendations;
 
   return (
     <motion.section
@@ -114,7 +119,7 @@ export function RecommendedActionsWidget({ stocks }: { stocks: StockHolding[] })
             </button>
           ) : null}
         </div>
-        {items.length > 0 ? (
+        {recommendationsReady && items.length > 0 ? (
           <Link href={destination} className="ui-hover-text text-xs font-semibold text-primary">
             See all
           </Link>
@@ -156,7 +161,12 @@ export function RecommendedActionsWidget({ stocks }: { stocks: StockHolding[] })
         </div>
       ) : null}
 
-      {visible.length === 0 ? (
+      {!recommendationsReady ? (
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-background/50 px-3 py-3 dark:bg-white/5">
+          <span className="inline-flex h-4 w-4 animate-spin rounded-full border-2 border-primary/30 border-t-primary" aria-hidden />
+          <p className="text-sm text-subtle">Refreshing recommendations…</p>
+        </div>
+      ) : visible.length === 0 ? (
         <div className="flex items-center gap-2.5 rounded-xl border border-border bg-background/50 px-3 py-3 dark:bg-white/5">
           <span className="text-base leading-none text-primary" aria-hidden>
             ✓
