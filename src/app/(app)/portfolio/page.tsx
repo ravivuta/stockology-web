@@ -452,9 +452,9 @@ export default function PortfolioPage() {
                               d == null
                                 ? "text-[11px] text-subtle"
                                 : d > 0
-                                  ? "text-[11px] font-medium text-emerald-700 dark:text-primary"
+                                  ? "text-[11px] font-bold text-emerald-700 dark:text-primary"
                                   : d < 0
-                                    ? "text-[11px] font-medium text-red-700 dark:text-[#ff6157]"
+                                    ? "text-[11px] font-bold text-red-700 dark:text-[#ff6157]"
                                     : "text-[11px] text-subtle"
                             }
                           >
@@ -464,7 +464,7 @@ export default function PortfolioPage() {
                       </td>
                       <td className="hidden px-4 py-3 text-center tabular-nums text-foreground md:table-cell">{formatCurrency(s.lastPrice ?? 0)}</td>
                       <td
-                        className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${
+                        className={`hidden px-4 py-3 text-center tabular-nums font-bold md:table-cell ${
                           d == null ? "text-subtle" : d > 0 ? "text-emerald-700 dark:text-primary" : d < 0 ? "text-red-700 dark:text-[#ff6157]" : "text-subtle"
                         }`}
                       >
@@ -474,7 +474,7 @@ export default function PortfolioPage() {
                       <td className="hidden px-4 py-3 text-center tabular-nums text-foreground md:table-cell">{formatWholeCurrency(costBasis)}</td>
                       <td className="px-2 py-2.5 text-center tabular-nums md:px-4 md:py-3">
                         <span
-                          className={`font-medium ${
+                          className={`font-bold ${
                             gainLoss > 0
                               ? "text-emerald-700 dark:text-primary"
                               : gainLoss < 0
@@ -493,20 +493,20 @@ export default function PortfolioPage() {
                           : "—"}
                       </td>
                       <td
-                        className={`px-2 py-2.5 text-center tabular-nums font-medium md:px-3 md:py-3 ${analystRatingTextClass(s.analystAvg)} ${analystCellClass}`}
+                        className={`px-2 py-2.5 text-center tabular-nums font-bold md:px-3 md:py-3 ${analystRatingTextClass(s.analystAvg)} ${analystCellClass}`}
                         title="Consensus / average rating when available from data refresh"
                       >
                         {s.analystAvg != null && Number.isFinite(Number.parseFloat(s.analystAvg))
                           ? formatDecimal(Number.parseFloat(s.analystAvg))
                           : "—"}
                       </td>
-                      <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${pegTextClass(s.peg)} ${pegCellClass}`}>
+                      <td className={`hidden px-2 py-3 text-center tabular-nums font-bold md:table-cell md:px-3 ${pegTextClass(s.peg)} ${pegCellClass}`}>
                         {s.peg != null && s.peg > 0 ? formatDecimal(s.peg) : "—"}
                       </td>
-                      <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${debtRatioTextClass(s.debtToEquity)} ${debtCellClass}`}>
+                      <td className={`hidden px-2 py-3 text-center tabular-nums font-bold md:table-cell md:px-3 ${debtRatioTextClass(s.debtToEquity)} ${debtCellClass}`}>
                         {s.debtToEquity != null && s.debtToEquity >= 0 ? String(Math.round(s.debtToEquity)) : "—"}
                       </td>
-                      <td className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${upsideTextClass(upside)} ${upsideCellClass}`}>
+                      <td className={`hidden px-4 py-3 text-center tabular-nums font-bold md:table-cell ${upsideTextClass(upside)} ${upsideCellClass}`}>
                         {formatUpsidePct(upside)}
                       </td>
                       <td className={`hidden px-4 py-3 text-center tabular-nums font-medium md:table-cell ${scoreTextClass(s.score)} ${scoreCellClass}`}>{s.score != null ? formatScore(s.score) : "—"}</td>

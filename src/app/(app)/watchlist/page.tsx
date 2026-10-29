@@ -425,9 +425,9 @@ export default function WatchlistPage() {
                             s.dailyChangePercent == null
                               ? "text-[11px] text-subtle"
                               : s.dailyChangePercent > 0
-                                ? "text-[11px] font-medium text-emerald-700 dark:text-emerald-400"
+                                ? "text-[11px] font-bold text-emerald-700 dark:text-emerald-400"
                                 : s.dailyChangePercent < 0
-                                  ? "text-[11px] font-medium text-red-700 dark:text-[#ff6157]"
+                                  ? "text-[11px] font-bold text-red-700 dark:text-[#ff6157]"
                                   : "text-[11px] text-subtle"
                           }
                         >
@@ -437,7 +437,7 @@ export default function WatchlistPage() {
                     </td>
                     <td className="hidden px-2 py-3 text-center tabular-nums text-subtle md:table-cell md:px-3">{formatDecimal(s.lastPrice ?? 0)}</td>
                     <td
-                      className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${
+                      className={`hidden px-2 py-3 text-center tabular-nums font-bold md:table-cell md:px-3 ${
                         s.dailyChangePercent == null
                           ? "text-subtle"
                           : s.dailyChangePercent > 0
@@ -450,19 +450,19 @@ export default function WatchlistPage() {
                       {s.dailyChangePercent != null ? formatPercent(s.dailyChangePercent, true) : "—"}
                     </td>
                     <td
-                      className={`hidden min-w-0 px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${analystRatingTextClass(rating)} ${analystCellClass}`}
+                      className={`hidden min-w-0 px-2 py-3 text-center tabular-nums font-bold md:table-cell md:px-3 ${analystRatingTextClass(rating)} ${analystCellClass}`}
                       title="Consensus / average rating when available from data refresh"
                     >
                       <span className="block truncate">{rating && !Number.isNaN(Number.parseFloat(rating)) ? formatDecimal(Number.parseFloat(rating)) : "—"}</span>
                     </td>
-                    <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${pegTextClass(s.peg)} ${pegCellClass}`}>
+                    <td className={`hidden px-2 py-3 text-center tabular-nums font-bold md:table-cell md:px-3 ${pegTextClass(s.peg)} ${pegCellClass}`}>
                       {s.peg != null && s.peg > 0 ? formatDecimal(s.peg) : "—"}
                     </td>
-                    <td className={`hidden px-2 py-3 text-center tabular-nums font-medium md:table-cell md:px-3 ${debtRatioTextClass(s.debtToEquity)} ${debtCellClass}`}>
+                    <td className={`hidden px-2 py-3 text-center tabular-nums font-bold md:table-cell md:px-3 ${debtRatioTextClass(s.debtToEquity)} ${debtCellClass}`}>
                       {s.debtToEquity != null && s.debtToEquity >= 0 ? String(Math.round(s.debtToEquity)) : "—"}
                     </td>
                     <td
-                      className={`min-w-0 px-1.5 py-2.5 text-center tabular-nums font-medium sm:px-3 sm:py-3 ${upsideTextClass(upside)} ${upsideCellClass}`}
+                      className={`min-w-0 px-1.5 py-2.5 text-center tabular-nums font-bold sm:px-3 sm:py-3 ${upsideTextClass(upside)} ${upsideCellClass}`}
                       title={
                         s.analystTarget != null && s.lastPrice
                           ? `Target ${formatCurrency(s.analystTarget)} vs last ${formatCurrency(s.lastPrice)}`
@@ -471,7 +471,7 @@ export default function WatchlistPage() {
                     >
                       <span className="block truncate">{formatUpsidePct(upside)}</span>
                     </td>
-                    <td className={`hidden min-w-0 px-2 py-3 text-center tabular-nums font-medium sm:table-cell sm:px-3 ${scoreTextClass(s.score)} ${scoreCellClass}`}>
+                    <td className={`hidden min-w-0 px-2 py-3 text-center tabular-nums font-bold sm:table-cell sm:px-3 ${scoreTextClass(s.score)} ${scoreCellClass}`}>
                       <span className="block truncate text-center">{s.score != null ? formatScore(s.score) : "—"}</span>
                     </td>
                     <td className="min-w-0 px-1 py-2.5 text-center tabular-nums font-medium text-foreground sm:px-2 sm:py-3">
