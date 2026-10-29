@@ -529,7 +529,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     if (stock.isETF === true) {
       const rows = [
         {
-          label: "Current holding",
+          label: "Because, either you are holding a position of this stock",
           detail: stock.quantity > 0 ? "Yes" : "No",
           passes: stock.quantity > 0,
         },
@@ -554,7 +554,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     const riskPasses = stock.isVisibleInRisk === true;
     const rows = [
       {
-        label: "Current holding",
+        label: "Because, either you are holding a position of this stock",
         detail: stock.quantity > 0 ? "Yes" : "No",
         passes: stock.quantity > 0,
       },
@@ -1365,7 +1365,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                 compact={dense}
                 title={
                   <span className="flex items-center justify-between gap-3">
-                    <span>Shortlisted</span>
+                    <span>Generating Recommendations</span>
                     <span
                       className={cn(
                         "inline-flex rounded-lg border px-2.5 py-1 font-semibold tracking-tight",
@@ -1382,8 +1382,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               >
                 <div className={dense ? "space-y-3" : "space-y-3"}>
                   <div>
-                    <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Status reasons</p>
-                    <div className={cn(dense ? "mt-3 space-y-1.5" : "mt-3 space-y-1.5")}>
+                    <div className={cn(dense ? "space-y-1.5" : "space-y-1.5")}>
                       {shortlistFactors.map((factor, index) => (
                         <div key={`${factor.label}-${factor.detail}`}>
                           <FactorFlagRow
