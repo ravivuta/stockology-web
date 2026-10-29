@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/client";
 import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { useSubscriptionGate } from "@/hooks/useSubscriptionGate";
-import { SymbolTradeCombobox } from "@/components/portfolio/SymbolTradeCombobox";
 import { cashByAccount, displayAccount, isCashSymbol, CASH_SYMBOL } from "@/lib/cash-accounts";
 import { isValidTicker } from "@/lib/csvPortfolio";
 import { recordExternalCashFlow } from "@/lib/external-cash-flows";
@@ -20,6 +19,7 @@ import { fieldInputClass } from "@/lib/field-input";
 import { AppModal } from "@/components/ui/AppModal";
 
 type AssetKind = "stock" | "cash" | "fixedIncome";
+type AddAssetMode = "full" | "stockOnly";
 
 const RETURN_RATE_KEY = "fixedIncomeReturnRateByAccount.v1";
 
@@ -45,7 +45,7 @@ function rememberReturnRate(account: string, rate: number) {
   }
 }
 
-export function AddAssetForm({ idPrefix }: { idPrefix: string }) {
+export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mode?: AddAssetMode }) {
   const stocks = usePortfolioStore((s) => s.stocks);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
   const fixedIncomeByAccount = usePortfolioStore((s) => s.fixedIncomeByAccount);
@@ -72,6 +72,12 @@ export function AddAssetForm({ idPrefix }: { idPrefix: string }) {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (mode === "stockOnly") {
+      setKind("stock");
+    }
+  }, [mode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -250,7 +256,7 @@ export function AddAssetForm({ idPrefix }: { idPrefix: string }) {
   async function submit() {
     setError(null);
     setStatus(null);
-    if (kind === "stock") await submitStock();
+    if (mode === "stockOnly" || kind === "stock") await submitStock();
     else await submitCashLike();
   }
 
@@ -259,32 +265,36 @@ export function AddAssetForm({ idPrefix }: { idPrefix: string }) {
   return (
     <div className="w-full space-y-3">
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-subtle">What are you adding?</p>
-        <div className="mt-1 inline-flex rounded-lg border border-border p-0.5" role="tablist" aria-label="Asset type">
-          {(
-            [
-              ["stock", "Stock"],
-              ["cash", "Cash"],
-              ["fixedIncome", "Fixed Income"],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              role="tab"
-              aria-selected={kind === value}
-              onClick={() => {
-                setKind(value);
-                setError(null);
-              }}
-              className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                kind === value ? "bg-primary text-primary-foreground" : "text-subtle"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        {mode === "full" ? (
+          <>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-subtle">What are you adding?</p>
+            <div className="mt-1 inline-flex rounded-lg border border-border p-0.5" role="tablist" aria-label="Asset type">
+              {(
+                [
+                  ["stock", "Stock"],
+                  ["cash", "Cash"],
+                  ["fixedIncome", "Fixed Income"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={kind === value}
+                  onClick={() => {
+                    setKind(value);
+                    setError(null);
+                  }}
+                  className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+                    kind === value ? "bg-primary text-primary-foreground" : "text-subtle"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : null}
       </div>
 
       {error ? <p className="text-xs text-red-600 dark:text-red-300">{error}</p> : null}
@@ -293,24 +303,39 @@ export function AddAssetForm({ idPrefix }: { idPrefix: string }) {
       {kind === "stock" ? (
         <div className="grid gap-2 md:grid-cols-2">
           <label className="flex flex-col gap-0.5 text-[10px] text-subtle md:col-span-2">
-            Company name or symbol
-            <SymbolTradeCombobox id={`${idPrefix}-symbol`} value={symbol} onChange={setSymbol} portfolioStocks={stocks} />
-          </label>
-          <label className="flex flex-col gap-0.5 text-[10px] text-subtle">
-            Quantity
-            <input value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="Number of shares" className={inputClass} />
-          </label>
-          <label className="flex flex-col gap-0.5 text-[10px] text-subtle">
-            Average cost per share
-            <input value={averageCost} onChange={(e) => setAverageCost(e.target.value)} placeholder="Purchase price" className={inputClass} />
-          </label>
-          <label className="flex flex-col gap-0.5 text-[10px] text-subtle">
-            Trade date
-            <input type="date" value={tradeDate} onChange={(e) => setTradeDate(e.target.value)} className={inputClass} />
+            Ticker symbol
+            <input
+              id={`${idPrefix}-symbol`}
+              value={symbol}
+              onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+              placeholder="Ticker symbol (e.g. AAPL)"
+              autoComplete="off"
+              spellCheck={false}
+              className={inputClass}
+            />
           </label>
           <p className="text-[10px] leading-snug text-subtle md:col-span-2">
-            Leave quantity and price empty to add without holdings. If entering holding info, fill both quantity and price.
+            Enter ticker symbol only (company-name lookup is disabled).
           </p>
+          {mode === "full" ? (
+            <>
+              <label className="flex flex-col gap-0.5 text-[10px] text-subtle">
+                Quantity
+                <input value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="Number of shares" className={inputClass} />
+              </label>
+              <label className="flex flex-col gap-0.5 text-[10px] text-subtle">
+                Average cost per share
+                <input value={averageCost} onChange={(e) => setAverageCost(e.target.value)} placeholder="Purchase price" className={inputClass} />
+              </label>
+              <label className="flex flex-col gap-0.5 text-[10px] text-subtle">
+                Trade date
+                <input type="date" value={tradeDate} onChange={(e) => setTradeDate(e.target.value)} className={inputClass} />
+              </label>
+              <p className="text-[10px] leading-snug text-subtle md:col-span-2">
+                Leave quantity and price empty to add without holdings. If entering holding info, fill both quantity and price.
+              </p>
+            </>
+          ) : null}
         </div>
       ) : (
         <div className="grid gap-2">
@@ -337,32 +362,36 @@ export function AddAssetForm({ idPrefix }: { idPrefix: string }) {
         </div>
       )}
 
-      <div className="grid gap-2 md:grid-cols-2">
-        <label className="flex flex-col gap-0.5 text-[10px] text-subtle">
-          Account/Profile
-          <select value={profileChoice} onChange={(e) => setProfileChoice(e.target.value)} className={inputClass}>
-            <option value="__new__">Add new account/profile</option>
-            {accounts.map((account) => (
-              <option key={account} value={account}>{account}</option>
-            ))}
-          </select>
-        </label>
-        {profileChoice === "__new__" ? (
-          <label className="flex flex-col gap-0.5 text-[10px] text-subtle">
-            New account name
-            <input value={newAccount} onChange={(e) => setNewAccount(e.target.value)} placeholder="Brokerage, IRA, 401k" className={inputClass} />
-          </label>
-        ) : null}
-        <label className="flex flex-col gap-0.5 text-[10px] text-subtle">
-          Account type
-          <select value={accountType} onChange={(e) => setAccountType(e.target.value as typeof accountType)} className={inputClass}>
-            <option value="unknown">Select type</option>
-            <option value="retirement">Retirement</option>
-            <option value="taxable">Taxable</option>
-          </select>
-        </label>
-      </div>
-      <p className="text-[10px] leading-snug text-subtle">Account and type map balances into the account allocation summary.</p>
+      {mode === "full" ? (
+        <>
+          <div className="grid gap-2 md:grid-cols-2">
+            <label className="flex flex-col gap-0.5 text-[10px] text-subtle">
+              Account/Profile
+              <select value={profileChoice} onChange={(e) => setProfileChoice(e.target.value)} className={inputClass}>
+                <option value="__new__">Add new account/profile</option>
+                {accounts.map((account) => (
+                  <option key={account} value={account}>{account}</option>
+                ))}
+              </select>
+            </label>
+            {profileChoice === "__new__" ? (
+              <label className="flex flex-col gap-0.5 text-[10px] text-subtle">
+                New account name
+                <input value={newAccount} onChange={(e) => setNewAccount(e.target.value)} placeholder="Brokerage, IRA, 401k" className={inputClass} />
+              </label>
+            ) : null}
+            <label className="flex flex-col gap-0.5 text-[10px] text-subtle">
+              Account type
+              <select value={accountType} onChange={(e) => setAccountType(e.target.value as typeof accountType)} className={inputClass}>
+                <option value="unknown">Select type</option>
+                <option value="retirement">Retirement</option>
+                <option value="taxable">Taxable</option>
+              </select>
+            </label>
+          </div>
+          <p className="text-[10px] leading-snug text-subtle">Account and type map balances into the account allocation summary.</p>
+        </>
+      ) : null}
 
       {!hasPremiumFeatureAccess(row ?? null, accountEmail) && kind === "stock" ? (
         <p className="text-[10px] leading-snug text-subtle">
@@ -381,7 +410,7 @@ export function AddAssetForm({ idPrefix }: { idPrefix: string }) {
   );
 }
 
-export function AddAssetButton({ idPrefix, className }: { idPrefix: string; className?: string }) {
+export function AddAssetButton({ idPrefix, className, mode = "full" }: { idPrefix: string; className?: string; mode?: AddAssetMode }) {
   const [open, setOpen] = useState(false);
   const titleId = `${idPrefix}-title`;
 
@@ -396,7 +425,7 @@ export function AddAssetButton({ idPrefix, className }: { idPrefix: string; clas
       </button>
       <AppModal open={open} onClose={() => setOpen(false)} size="lg" stagger={false} titleId={titleId}>
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h2 id={titleId} className="text-base font-semibold text-foreground">Add asset</h2>
+          <h2 id={titleId} className="text-base font-semibold text-foreground">{mode === "stockOnly" ? "Add stock" : "Add asset"}</h2>
           <button
             type="button"
             onClick={() => setOpen(false)}
@@ -406,7 +435,7 @@ export function AddAssetButton({ idPrefix, className }: { idPrefix: string; clas
           </button>
         </div>
         <div className="overflow-y-auto px-4 py-3">
-          <AddAssetForm idPrefix={idPrefix} />
+          <AddAssetForm idPrefix={idPrefix} mode={mode} />
         </div>
       </AppModal>
     </>

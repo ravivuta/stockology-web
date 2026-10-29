@@ -302,7 +302,7 @@ export default function WatchlistPage() {
           >
             <Paintbrush className="h-3.5 w-3.5" />
           </button>
-          <AddAssetButton idPrefix="watchlist-add" className={filterChipClass(false, "gold")} />
+          <AddAssetButton idPrefix="watchlist-add" className={filterChipClass(false, "gold")} mode="stockOnly" />
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
