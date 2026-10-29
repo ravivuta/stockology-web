@@ -680,6 +680,94 @@ function recalcHolding(
   };
 }
 
+function estimatedSpendForBuyAction(stock: StockHolding): number {
+  const currentPrice = Math.max(0, stock.lastPrice ?? 0);
+  if (!(currentPrice > 0)) return 0;
+
+  const transactionLimit = Math.max(0, stock.transactionLimit ?? 2500);
+  const stockLimit = Math.max(0, stock.stockLimit ?? 10_000);
+  const costBasis = Math.max(0, stock.quantity) * Math.max(0, stock.averageCost);
+  const maxAccumulationLimit = Math.max(stockLimit, stockLimit * 2);
+  const remainingCapacity = Math.max(0, maxAccumulationLimit - costBasis);
+  const cappedByTrade =
+    transactionLimit > 0
+      ? Math.min(transactionLimit, remainingCapacity > 0 ? remainingCapacity : transactionLimit)
+      : remainingCapacity;
+  const baseSpend = cappedByTrade > 0 ? cappedByTrade : Math.min(currentPrice, remainingCapacity > 0 ? remainingCapacity : currentPrice);
+  return Math.max(currentPrice, baseSpend);
+}
+
+function applyCashAwareBuyPrioritization(
+  stocks: StockHolding[],
+  options: {
+    cashEquivalentBalance: number;
+    portfolioSize: number;
+    useMarketRegimeCashTilt: boolean;
+    marketOutlookCashTargetPct?: number;
+  }
+): StockHolding[] {
+  const candidates = stocks
+    .map((stock, index) => ({ stock, index }))
+    .filter(({ stock }) => stock.recommendation?.action === "BUY" || stock.recommendation?.action === "ADD")
+    .map(({ stock, index }) => {
+      const spend = estimatedSpendForBuyAction(stock);
+      const scorePriority = stock.isETF === true ? 55 : stock.score ?? 0;
+      const shortlistBoost = stock.isInWatchlistSize ? 1000 : 0;
+      const expected = stock.recommendation?.expectedReturnPct ?? 0;
+      return { index, spend, priority: shortlistBoost + (scorePriority * 10) + expected };
+    })
+    .filter((item) => item.spend > 0);
+
+  if (candidates.length === 0) return stocks;
+
+  const cashEquivalentBalance = Math.max(0, options.cashEquivalentBalance);
+  const reserveCash = options.useMarketRegimeCashTilt && options.marketOutlookCashTargetPct != null
+    ? Math.max(
+        0,
+        Math.min(
+          cashEquivalentBalance,
+          options.portfolioSize * Math.max(0, Math.min(1, options.marketOutlookCashTargetPct / 100))
+        )
+      )
+    : 0;
+  let remainingDeployableCash = Math.max(0, cashEquivalentBalance - reserveCash);
+
+  const sorted = [...candidates].sort((a, b) => {
+    if (a.priority === b.priority) {
+      const symbolA = stocks[a.index]?.symbol ?? "";
+      const symbolB = stocks[b.index]?.symbol ?? "";
+      return symbolA.localeCompare(symbolB);
+    }
+    return b.priority - a.priority;
+  });
+
+  const next = [...stocks];
+  for (const candidate of sorted) {
+    const current = next[candidate.index];
+    const rec = current?.recommendation;
+    if (!current || !rec) continue;
+
+    if (remainingDeployableCash + 0.01 >= candidate.spend) {
+      remainingDeployableCash -= candidate.spend;
+      continue;
+    }
+
+    const reservePct = cashEquivalentBalance > 0 ? (reserveCash / cashEquivalentBalance) * 100 : 0;
+    next[candidate.index] = {
+      ...current,
+      recommendation: {
+        ...rec,
+        action: rec.action === "BUY" ? "WAIT_BUY" : "WAIT_ADD",
+        comments:
+          `Cash-aware prioritization deferred this buy to avoid over-consuming deployable cash. ` +
+          `Reserved ${reservePct.toFixed(0)}% cash-equivalent buffer for outlook and higher-ranked buys first.`,
+      },
+    };
+  }
+
+  return next;
+}
+
 function derivePortfolioState(
   stocksInput: StockHolding[],
   cashBalance: number,
@@ -833,7 +921,14 @@ function derivePortfolioState(
     };
   });
 
-  return { stocks, portfolioSize };
+  const budgetedStocks = applyCashAwareBuyPrioritization(stocks, {
+    cashEquivalentBalance: cashEquivalent,
+    portfolioSize,
+    useMarketRegimeCashTilt: outlookCtx.useMarketRegimeCashTilt === true,
+    marketOutlookCashTargetPct: outlookCtx.marketOutlookCashTargetPct,
+  });
+
+  return { stocks: budgetedStocks, portfolioSize };
 }
 
 const defaultStock = (partial: Partial<StockHolding> & { symbol: string }): StockHolding => ({
