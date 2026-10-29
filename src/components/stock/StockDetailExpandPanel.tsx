@@ -15,6 +15,7 @@ import {
   raiseCashForMarketOutlookIfNeeded,
 } from "@/lib/ios-recommendation";
 import { analystTargetUpsidePct, formatScore, formatUpsidePct } from "@/lib/marketFormat";
+import { effectiveOutlookCashTargetPct } from "@/lib/market-outlook";
 import { formatNewsRelativeDate, parseNewsPublishedAt, sentimentDotClass, type NewsSourceRow } from "@/lib/news-feed";
 import { buildRecommendation } from "@/lib/recommendation";
 import { formatCompactCurrency, formatCurrency, formatDecimal, formatNumberMax2, formatPercent } from "@/lib/numberFormat";
@@ -442,18 +443,13 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const cashEquivalentBalance = cashBalance + fixedIncomeTotal;
   const marketOutlookCashTargetPct = useMemo(() => {
     if (!marketOutlook) return undefined;
-    switch (marketOutlook.regime) {
-      case "risk_on":
-        return marketOutlookCashTargetRiskOn;
-      case "neutral":
-        return marketOutlookCashTargetNeutral;
-      case "elevated":
-        return marketOutlookCashTargetElevated;
-      case "risk_off":
-        return marketOutlook.severeDefensive ? marketOutlookCashTargetSevere : marketOutlookCashTargetRiskOff;
-      default:
-        return undefined;
-    }
+    return effectiveOutlookCashTargetPct(marketOutlook, {
+      riskOn: marketOutlookCashTargetRiskOn,
+      neutral: marketOutlookCashTargetNeutral,
+      elevated: marketOutlookCashTargetElevated,
+      riskOff: marketOutlookCashTargetRiskOff,
+      severe: marketOutlookCashTargetSevere,
+    });
   }, [
     marketOutlook,
     marketOutlookCashTargetElevated,
