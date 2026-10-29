@@ -668,6 +668,11 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const hasAiSentiment = stockIsEtf !== true && aiSentimentScore != null && Number.isFinite(aiSentimentScore) && aiSentimentScore > 0;
   const suppressTradeActions = stock?.suppressTradeActions ?? false;
   const excludeFromShortlist = stock?.excludeFromShortlist ?? false;
+  const includeInShortlist = stock?.includeInShortlist ?? false;
+  const showIncludeToggle =
+    (stock?.quantity ?? 0) <= 0 &&
+    stock?.isETF !== true &&
+    (isShortlistedForPortfolio === false || includeInShortlist === true);
   const canToggleShortlistExclusion = (stock?.quantity ?? 0) <= 0 || excludeFromShortlist;
 
   useEffect(() => {
@@ -944,7 +949,12 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   }
 
   function handleExcludeFromShortlistChange(nextValue: boolean) {
-    updateStock(symbol, { excludeFromShortlist: nextValue });
+    updateStock(symbol, { excludeFromShortlist: nextValue, includeInShortlist: nextValue ? false : includeInShortlist });
+    void flushCurrentPortfolioSnapshotNow(true);
+  }
+
+  function handleIncludeInShortlistChange(nextValue: boolean) {
+    updateStock(symbol, { includeInShortlist: nextValue, excludeFromShortlist: nextValue ? false : excludeFromShortlist });
     void flushCurrentPortfolioSnapshotNow(true);
   }
 
@@ -1456,6 +1466,25 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                         </p>
                       ))}
                     </div>
+                  ) : null}
+                  {showIncludeToggle ? (
+                    <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-background/50 px-3 py-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                      <input
+                        type="checkbox"
+                        checked={includeInShortlist}
+                        onChange={(e) => handleIncludeInShortlistChange(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-border accent-emerald-600"
+                        aria-label="Include in shortlist"
+                      />
+                      <span>
+                        <span className={cn("block font-medium text-foreground", dense ? "text-[11px]" : "text-xs")}>
+                          Include in shortlist
+                        </span>
+                        <span className="mt-0.5 block text-[11px] text-subtle">
+                          Force include this stock in Top N shortlisting.
+                        </span>
+                      </span>
+                    </label>
                   ) : null}
                   {canToggleShortlistExclusion ? (
                     <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-background/50 px-3 py-2 dark:border-white/[0.08] dark:bg-white/[0.03]">

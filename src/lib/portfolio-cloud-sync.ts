@@ -135,6 +135,7 @@ function holdingPayload(s: StockHolding, lots: { open: TradeLot[]; sold: SoldLot
   if (lotHistory) payload.lotHistory = lotHistory;
   if (s.suppressTradeActions === true) payload.noAutoBuy = true;
   if (s.excludeFromShortlist === true) payload.excludeFromShortlist = true;
+  if (s.includeInShortlist === true) payload.includeInShortlist = true;
   if (s.rsiPeriod != null && Number.isFinite(s.rsiPeriod)) payload.rsiPeriod = Math.round(s.rsiPeriod);
   if (s.rsiOversoldThreshold != null && Number.isFinite(s.rsiOversoldThreshold)) {
     payload.rsiOversoldThreshold = s.rsiOversoldThreshold;
@@ -207,6 +208,7 @@ export function portfolioSyncFingerprint(state: PortfolioSlice): string {
       s.isShortlisted,
       s.suppressTradeActions,
       s.excludeFromShortlist,
+      s.includeInShortlist,
       s.enableRSIReversalGate,
       s.rsiPeriod,
       s.rsiOversoldThreshold,
@@ -233,6 +235,7 @@ export function portfolioHoldingsIdentityFingerprint(state: PortfolioSlice): str
       s.averageCost,
       s.suppressTradeActions,
       s.excludeFromShortlist,
+      s.includeInShortlist,
       s.enableRSIReversalGate,
       s.rsiPeriod,
       s.rsiOversoldThreshold,
@@ -357,6 +360,7 @@ export function portfolioHoldingsStructuralFingerprint(state: PortfolioSlice): s
       s.targetPrice,
       s.suppressTradeActions,
       s.excludeFromShortlist,
+      s.includeInShortlist,
       s.enableRSIReversalGate,
       s.rsiPeriod,
       s.rsiOversoldThreshold,

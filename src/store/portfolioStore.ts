@@ -106,6 +106,7 @@ export type StockHolding = {
   movingAvgPeriod?: number;
   suppressTradeActions?: boolean;
   excludeFromShortlist?: boolean;
+  includeInShortlist?: boolean;
   enableRSIReversalGate?: boolean;
   rsiPeriod?: number;
   rsiOversoldThreshold?: number;
@@ -299,6 +300,7 @@ function preserveImportedMetadata(existing: StockHolding | undefined) {
     movingAvg: existing.movingAvg,
     suppressTradeActions: existing.suppressTradeActions,
     excludeFromShortlist: existing.excludeFromShortlist,
+    includeInShortlist: existing.includeInShortlist,
     enableRSIReversalGate: existing.enableRSIReversalGate,
     rsiPeriod: existing.rsiPeriod,
     rsiOversoldThreshold: existing.rsiOversoldThreshold,
@@ -761,13 +763,26 @@ function derivePortfolioState(
   if (shortlistCtx.limitWatchlistSize) {
     const holdingSymbols = stocksWithRisk.filter((stock) => stock.quantity > 0 && stock.excludeFromShortlist !== true);
     const unownedEtfs = stocksWithRisk.filter((stock) => stock.quantity <= 0 && stock.isETF === true && stock.excludeFromShortlist !== true);
+    const forceIncluded = stocksWithRisk
+      .filter(
+        (stock) =>
+          stock.quantity <= 0 &&
+          stock.isETF !== true &&
+          stock.excludeFromShortlist !== true &&
+          stock.includeInShortlist === true
+      )
+      .sort((a, b) => a.symbol.localeCompare(b.symbol));
+    const forceIncludedSymbols = new Set(forceIncluded.map((stock) => stock.symbol));
     const topN = rankedTopWatchlistCandidates(stocksWithRisk, {
       enableRiskFilter: shortlistCtx.enableRiskFilter,
       riskAppetite: shortlistCtx.riskAppetite,
-    }).slice(0, idealWatchlistSize);
+    })
+      .filter((stock) => !forceIncludedSymbols.has(stock.symbol))
+      .slice(0, Math.max(idealWatchlistSize - forceIncluded.length, 0));
 
     for (const stock of holdingSymbols) shortlistedSymbols.add(stock.symbol);
     for (const stock of unownedEtfs) shortlistedSymbols.add(stock.symbol);
+    for (const stock of forceIncluded) shortlistedSymbols.add(stock.symbol);
     for (const stock of topN) shortlistedSymbols.add(stock.symbol);
   } else {
     for (const stock of stocksWithRisk) {
@@ -847,6 +862,7 @@ const defaultStock = (partial: Partial<StockHolding> & { symbol: string }): Stoc
   movingAvg: partial.movingAvg,
   suppressTradeActions: partial.suppressTradeActions ?? false,
   excludeFromShortlist: partial.excludeFromShortlist ?? false,
+  includeInShortlist: partial.includeInShortlist ?? false,
   enableRSIReversalGate: partial.enableRSIReversalGate ?? true,
   rsiPeriod: partial.rsiPeriod ?? 14,
   rsiOversoldThreshold: partial.rsiOversoldThreshold ?? 30,
@@ -1373,6 +1389,7 @@ export const usePortfolioStore = create<State>()(
                   quantity: qty,
                   averageCost: price,
                   excludeFromShortlist: false,
+                  includeInShortlist: false,
                   pendingOptimization: true,
                 }),
               ];
@@ -1389,6 +1406,7 @@ export const usePortfolioStore = create<State>()(
                   quantity: q1,
                   averageCost: avg1,
                   excludeFromShortlist: false,
+                  includeInShortlist: false,
                   pendingOptimization: q0 > 0 ? s.pendingOptimization : true,
                 };
               });

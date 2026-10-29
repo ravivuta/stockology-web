@@ -51,6 +51,7 @@ export type IosStockInput = {
   isInWatchlistSize?: boolean;
   suppressTradeActions?: boolean;
   excludeFromShortlist?: boolean;
+  includeInShortlist?: boolean;
   enableRSIReversalGate?: boolean;
   rsiPeriod?: number;
   rsiOversoldThreshold?: number;
@@ -713,13 +714,18 @@ export function preferredSymbolsForShortlistIndicator(
     return new Set(eligible.map((stock) => stock.symbol));
   }
   const etfSymbols = eligible.filter((stock) => stock.isETF === true).map((stock) => stock.symbol);
+  const forced = eligible
+    .filter((stock) => stock.quantity <= 0 && stock.isETF !== true && stock.includeInShortlist === true)
+    .sort((a, b) => a.symbol.localeCompare(b.symbol));
+  const forcedSymbols = forced.map((stock) => stock.symbol);
   const topStockSymbols = rankedTopWatchlistCandidates(eligible, {
     enableRiskFilter: options.enableRiskFilter,
     riskAppetite: options.riskAppetite,
   })
-    .slice(0, recommendedWatchlistSize(options.portfolioSize))
+    .filter((stock) => !forcedSymbols.includes(stock.symbol))
+    .slice(0, Math.max(recommendedWatchlistSize(options.portfolioSize) - forcedSymbols.length, 0))
     .map((stock) => stock.symbol);
-  return new Set([...etfSymbols, ...topStockSymbols]);
+  return new Set([...etfSymbols, ...forcedSymbols, ...topStockSymbols]);
 }
 
 /**
@@ -776,8 +782,20 @@ export function rankedTopWatchlistCandidates(
   stocks: IosStockInput[],
   options?: { enableRiskFilter?: boolean; riskAppetite?: "Low" | "Medium" | "High"; includeLowScores?: boolean }
 ): IosStockInput[] {
-  return stocks
+  const forceIncluded = stocks
+    .filter(
+      (stock) =>
+        stock.isETF !== true &&
+        stock.excludeFromShortlist !== true &&
+        stock.quantity <= 0 &&
+        stock.includeInShortlist === true
+    )
+    .sort((a, b) => a.symbol.localeCompare(b.symbol));
+  const forceIncludedSymbols = new Set(forceIncluded.map((stock) => stock.symbol));
+
+  const ranked = stocks
     .filter((stock) => stock.isETF !== true && stock.excludeFromShortlist !== true)
+    .filter((stock) => !forceIncludedSymbols.has(stock.symbol))
     .filter((stock) => {
       if (!options?.enableRiskFilter) return true;
       return stockPassesRiskAppetiteOnly(stock, options.riskAppetite ?? "Medium", upsidePct(stock));
@@ -787,6 +805,8 @@ export function rankedTopWatchlistCandidates(
       const cmp = (b.score ?? 0) - (a.score ?? 0);
       return cmp === 0 ? a.symbol.localeCompare(b.symbol) : cmp;
     });
+
+  return [...forceIncluded, ...ranked];
 }
 
 function rankInTopWatchlist(
