@@ -10,6 +10,7 @@ export type RecOut = ReturnType<typeof computeIosRecommendation>;
 export type BuildRecommendationOptions = Pick<IosRecOptions, "closes"> & {
   etfProfitTarget?: number;
   stockProfitTarget?: number;
+  useTraderMode?: boolean;
   useAISentiment?: boolean;
   useRSIGating?: boolean;
   rsiPeriod?: number;
@@ -51,6 +52,7 @@ export function buildRecommendation(stock: RecInput, options?: BuildRecommendati
       rsiHysteresisPoints: options?.rsiHysteresisPoints,
       rsiMinRisingDays: options?.rsiMinRisingDays,
       sellOnlyLongTermQualified: options?.sellOnlyLongTermQualified ?? false,
+      useTraderMode: options?.useTraderMode ?? false,
       useMarketRegimeCashTilt: options?.useMarketRegimeCashTilt ?? false,
       marketOutlookCashTargetPct: options?.marketOutlookCashTargetPct,
       marketOutlookLabel: options?.marketOutlookLabel,

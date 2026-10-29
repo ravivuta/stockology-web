@@ -368,6 +368,7 @@ function cloneSoldLot(lot: SoldLot): SoldLot {
 type RecalcContext = {
   etfProfitTarget: number;
   stockProfitTarget: number;
+  traderModeEnabled?: boolean;
   useAISentimentForRecommendations: boolean;
   useRSIGatingForRecommendations: boolean;
   rsiPeriodForRecommendations: number;
@@ -383,7 +384,7 @@ type RecalcContext = {
   lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }>;
 };
 
-type ShortlistContext = Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "marketOutlookCashTargetRiskOn" | "marketOutlookCashTargetNeutral" | "marketOutlookCashTargetElevated" | "marketOutlookCashTargetRiskOff" | "marketOutlookCashTargetSevere"> & {
+type ShortlistContext = Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "marketOutlookCashTargetRiskOn" | "marketOutlookCashTargetNeutral" | "marketOutlookCashTargetElevated" | "marketOutlookCashTargetRiskOff" | "marketOutlookCashTargetSevere" | "traderModeEnabled"> & {
   fixedIncomeByAccount?: Record<string, number>;
   useMarketRegimeCashTilt?: boolean;
   marketOutlook?: MarketOutlook | null;
@@ -647,12 +648,13 @@ function recalcHolding(
       closes: getRecommendationHistoryCloses(next.symbol),
       etfProfitTarget: ctx.etfProfitTarget,
       stockProfitTarget: ctx.stockProfitTarget,
-      useAISentiment: ctx.useAISentimentForRecommendations,
+      useTraderMode: ctx.traderModeEnabled === true,
+      useAISentiment: ctx.traderModeEnabled === true ? ctx.useAISentimentForRecommendations : false,
       useMarketRegimeCashTilt: ctx.useMarketRegimeCashTilt === true,
       marketOutlookCashTargetPct: ctx.marketOutlookCashTargetPct,
       marketOutlookLabel: ctx.marketOutlookLabel,
       cashSharePct: ctx.cashSharePct,
-      useRSIGating: ctx.useRSIGatingForRecommendations,
+      useRSIGating: ctx.traderModeEnabled === true ? ctx.useRSIGatingForRecommendations : false,
       rsiPeriod: ctx.rsiPeriodForRecommendations,
       rsiOversoldThreshold: ctx.rsiOversoldThresholdForRecommendations,
       rsiOverboughtThreshold: ctx.rsiOverboughtThresholdForRecommendations,
@@ -728,6 +730,7 @@ function derivePortfolioState(
   const cashEquivalent = cashBalance + fixedIncomeTotal(shortlistCtx.fixedIncomeByAccount);
   const outlookCtx: RecalcContext = {
     ...recalcCtx,
+    traderModeEnabled: shortlistCtx.traderModeEnabled === true,
     useMarketRegimeCashTilt: shortlistCtx.useMarketRegimeCashTilt === true && shortlistCtx.marketOutlook?.preferCash === true,
     marketOutlookCashTargetPct: shortlistCtx.marketOutlook
       ? effectiveOutlookCashTargetPct(shortlistCtx.marketOutlook, {
