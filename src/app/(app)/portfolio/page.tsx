@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { analystTargetUpsidePct, formatScore, formatUpsidePct } from "@/lib/marketFormat";
@@ -15,9 +15,9 @@ import { recommendationActionDisplay } from "@/lib/recommendation";
 import { fieldInputClass } from "@/lib/field-input";
 import { cashByAccount, displayAccount, isCashSymbol } from "@/lib/cash-accounts";
 import {
+  allGreenMetricCellClass,
   analystTextIsGreen,
   debtTextIsGreen,
-  greenTextCellClass,
   pegTextIsGreen,
   scoreTextIsGreen,
   upsideTextIsGreen,
@@ -137,9 +137,19 @@ export default function PortfolioPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION.symbol);
   const [query, setQuery] = useState("");
   const [showActionable, setShowActionable] = useState(false);
+  const [qualityCellHighlightEnabled, setQualityCellHighlightEnabled] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<string>("__all__");
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem("qualityCellHighlightEnabled");
+    if (saved !== null) setQualityCellHighlightEnabled(saved === "true");
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("qualityCellHighlightEnabled", String(qualityCellHighlightEnabled));
+  }, [qualityCellHighlightEnabled]);
 
   const shortlistedSymbols = useMemo(
     () =>
@@ -314,6 +324,14 @@ export default function PortfolioPage() {
             >
               Actionable
             </button>
+            <button
+              type="button"
+              onClick={() => setQualityCellHighlightEnabled((value) => !value)}
+              className={filterChipClass(qualityCellHighlightEnabled, "green")}
+              aria-pressed={qualityCellHighlightEnabled}
+            >
+              Highlight
+            </button>
             <AddAssetButton idPrefix="portfolio-add" />
             <button
               type="button"
@@ -391,11 +409,11 @@ export default function PortfolioPage() {
                   const gainLossPct = costBasis > 0 ? (gainLoss / costBasis) * 100 : null;
                   const upside = analystTargetUpsidePct(s.lastPrice, s.analystTarget);
                   const d = s.dailyChangePercent;
-                  const analystCellClass = greenTextCellClass(analystTextIsGreen(s.analystAvg));
-                  const pegCellClass = greenTextCellClass(pegTextIsGreen(s.peg));
-                  const debtCellClass = greenTextCellClass(debtTextIsGreen(s.debtToEquity));
-                  const upsideCellClass = greenTextCellClass(upsideTextIsGreen(upside));
-                  const scoreCellClass = greenTextCellClass(scoreTextIsGreen(s.score));
+                  const analystCellClass = qualityCellHighlightEnabled && analystTextIsGreen(s.analystAvg) ? allGreenMetricCellClass : "";
+                  const pegCellClass = qualityCellHighlightEnabled && pegTextIsGreen(s.peg) ? allGreenMetricCellClass : "";
+                  const debtCellClass = qualityCellHighlightEnabled && debtTextIsGreen(s.debtToEquity) ? allGreenMetricCellClass : "";
+                  const upsideCellClass = qualityCellHighlightEnabled && upsideTextIsGreen(upside) ? allGreenMetricCellClass : "";
+                  const scoreCellClass = qualityCellHighlightEnabled && scoreTextIsGreen(s.score) ? allGreenMetricCellClass : "";
                   return (
                     <tr
                       key={s.symbol}

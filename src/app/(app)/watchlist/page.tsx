@@ -18,9 +18,9 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
 import { fieldInputClass } from "@/lib/field-input";
 import {
+  allGreenMetricCellClass,
   analystTextIsGreen,
   debtTextIsGreen,
-  greenTextCellClass,
   pegTextIsGreen,
   scoreTextIsGreen,
   upsideTextIsGreen,
@@ -124,10 +124,20 @@ export default function WatchlistPage() {
     else setShowShortlisted(false);
   }, [limitWatchlistSize]);
   const [showActionable, setShowActionable] = useState(false);
+  const [qualityCellHighlightEnabled, setQualityCellHighlightEnabled] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [sort, setSort] = useState<SortKey>("symbol");
   const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION.symbol);
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem("qualityCellHighlightEnabled");
+    if (saved !== null) setQualityCellHighlightEnabled(saved === "true");
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("qualityCellHighlightEnabled", String(qualityCellHighlightEnabled));
+  }, [qualityCellHighlightEnabled]);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
   const watchlistStocks = useMemo(
@@ -274,6 +284,14 @@ export default function WatchlistPage() {
           >
             Actionable
           </button>
+          <button
+            type="button"
+            onClick={() => setQualityCellHighlightEnabled((value) => !value)}
+            className={filterChipClass(qualityCellHighlightEnabled, "green")}
+            aria-pressed={qualityCellHighlightEnabled}
+          >
+            Highlight
+          </button>
           <AddAssetButton idPrefix="watchlist-add" />
           <button
             type="button"
@@ -366,11 +384,11 @@ export default function WatchlistPage() {
               rows.map((s) => {
                 const upside = analystTargetUpsidePct(s.lastPrice, s.analystTarget);
                 const rating = s.analystAvg?.trim();
-                const analystCellClass = greenTextCellClass(analystTextIsGreen(rating));
-                const pegCellClass = greenTextCellClass(pegTextIsGreen(s.peg));
-                const debtCellClass = greenTextCellClass(debtTextIsGreen(s.debtToEquity));
-                const upsideCellClass = greenTextCellClass(upsideTextIsGreen(upside));
-                const scoreCellClass = greenTextCellClass(scoreTextIsGreen(s.score));
+                const analystCellClass = qualityCellHighlightEnabled && analystTextIsGreen(rating) ? allGreenMetricCellClass : "";
+                const pegCellClass = qualityCellHighlightEnabled && pegTextIsGreen(s.peg) ? allGreenMetricCellClass : "";
+                const debtCellClass = qualityCellHighlightEnabled && debtTextIsGreen(s.debtToEquity) ? allGreenMetricCellClass : "";
+                const upsideCellClass = qualityCellHighlightEnabled && upsideTextIsGreen(upside) ? allGreenMetricCellClass : "";
+                const scoreCellClass = qualityCellHighlightEnabled && scoreTextIsGreen(s.score) ? allGreenMetricCellClass : "";
                 return (
                   <tr
                     key={s.symbol}
