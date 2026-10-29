@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { Paintbrush } from "lucide-react";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import {
   dividendYieldPercent,
@@ -100,6 +101,13 @@ function analystRatingTextClass(value: string | null | undefined): string {
 
 function filterChipClass(active: boolean, tone: "green" | "gold") {
   const base = "no-ui-hover inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold leading-tight";
+  if (!active) return `${base} border-border bg-background text-foreground`;
+  if (tone === "green") return `${base} border-transparent bg-emerald-500/90 text-black`;
+  return `${base} border-transparent bg-[#f3c74a] text-black`;
+}
+
+function filterIconButtonClass(active: boolean, tone: "green" | "gold") {
+  const base = "no-ui-hover inline-flex h-6 w-6 items-center justify-center rounded-full border";
   if (!active) return `${base} border-border bg-background text-foreground`;
   if (tone === "green") return `${base} border-transparent bg-emerald-500/90 text-black`;
   return `${base} border-transparent bg-[#f3c74a] text-black`;
@@ -287,10 +295,12 @@ export default function WatchlistPage() {
           <button
             type="button"
             onClick={() => setQualityCellHighlightEnabled((value) => !value)}
-            className={filterChipClass(qualityCellHighlightEnabled, "green")}
+            className={filterIconButtonClass(qualityCellHighlightEnabled, "green")}
             aria-pressed={qualityCellHighlightEnabled}
+            aria-label="Toggle cell highlights"
+            title={qualityCellHighlightEnabled ? "Disable highlights" : "Enable highlights"}
           >
-            Highlight
+            <Paintbrush className="h-3.5 w-3.5" />
           </button>
           <AddAssetButton idPrefix="watchlist-add" />
           <button
