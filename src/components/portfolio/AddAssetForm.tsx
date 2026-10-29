@@ -20,6 +20,8 @@ import { AppModal } from "@/components/ui/AppModal";
 
 type AssetKind = "stock" | "cash" | "fixedIncome";
 type AddAssetMode = "full" | "stockOnly";
+const PROFILE_PROMPT = "__pick__";
+const NEW_PROFILE = "__new__";
 
 const RETURN_RATE_KEY = "fixedIncomeReturnRateByAccount.v1";
 
@@ -63,7 +65,7 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
   const [quantity, setQuantity] = useState("");
   const [averageCost, setAverageCost] = useState("");
   const [tradeDate, setTradeDate] = useState(todayInputDate);
-  const [profileChoice, setProfileChoice] = useState("__new__");
+  const [profileChoice, setProfileChoice] = useState(PROFILE_PROMPT);
   const [newAccount, setNewAccount] = useState("");
   const [accountType, setAccountType] = useState<"unknown" | "retirement" | "taxable">("unknown");
   const [amountText, setAmountText] = useState("");
@@ -113,7 +115,7 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
     return [...names.values()].sort((a, b) => a.localeCompare(b));
   }, [fixedIncomeByAccount, lotsBySymbol]);
 
-  const accountName = profileChoice === "__new__" ? newAccount.trim() : profileChoice;
+  const accountName = profileChoice === NEW_PROFILE ? newAccount.trim() : profileChoice === PROFILE_PROMPT ? "" : profileChoice;
   const retirementFlag = accountType === "retirement" ? true : accountType === "taxable" ? false : null;
 
   function resetStockFields() {
@@ -133,7 +135,12 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
     const priceRaw = averageCost.trim();
     const hasQty = qtyRaw.length > 0;
     const hasPrice = priceRaw.length > 0;
-    if (hasQty !== hasPrice) {
+    if (mode === "full") {
+      if (!hasQty || !hasPrice) {
+        setError("Quantity and average cost are required.");
+        return;
+      }
+    } else if (hasQty !== hasPrice) {
       setError("Enter both quantity and average cost, or leave both empty.");
       return;
     }
@@ -143,7 +150,11 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
       setError("Quantity and average cost must be greater than 0.");
       return;
     }
-    if (hasQty) {
+    if (mode === "full" || hasQty) {
+      if (profileChoice === PROFILE_PROMPT) {
+        setError("Select an account/profile.");
+        return;
+      }
       if (!accountName) {
         setError("Account/Profile is required when adding holdings.");
         return;
@@ -167,11 +178,11 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
         symbol: sym,
         quantity: 0,
         averageCost: 0,
-        lastPrice: hasQty ? price : 0,
+        lastPrice: mode === "full" || hasQty ? price : 0,
         pendingOptimization: true,
       });
     }
-    if (hasQty) {
+    if (mode === "full" || hasQty) {
       recordTrade(sym, "BUY", qty, price, tradeDate, {
         account: accountName,
         isRetirementAccount: retirementFlag,
@@ -180,7 +191,7 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
     recalc();
     await flushCurrentPortfolioSnapshotNow(true);
     setSaving(false);
-    setStatus(hasQty ? `Added ${qty} ${sym} @ ${formatCurrency(price)}.` : `Added ${sym} without a holding.`);
+    setStatus(mode === "full" || hasQty ? `Added ${qty} ${sym} @ ${formatCurrency(price)}.` : `Added ${sym} without a holding.`);
     resetStockFields();
   }
 
@@ -190,8 +201,16 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
       setError("Enter a valid amount greater than 0.");
       return;
     }
+    if (profileChoice === PROFILE_PROMPT) {
+      setError("Select an account/profile.");
+      return;
+    }
     if (!accountName) {
       setError("Enter an account/profile name.");
+      return;
+    }
+    if (accountType === "unknown") {
+      setError("Select account type (Retirement or Taxable).");
       return;
     }
     const cash = cashByAccount(lotsBySymbol[CASH_SYMBOL]);
@@ -261,6 +280,37 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
   }
 
   const inputClass = `${fieldInputClass} rounded-lg px-3 py-2 text-sm`;
+  const stockSymbol = symbol.trim().toUpperCase();
+  const stockQty = parseAmount(quantity.trim());
+  const stockPrice = parseAmount(averageCost.trim());
+  const stockAccountReady =
+    profileChoice !== PROFILE_PROMPT &&
+    (profileChoice !== NEW_PROFILE || newAccount.trim().length > 0);
+  const stockFormReady =
+    mode === "stockOnly"
+      ? stockSymbol.length > 0
+      : stockSymbol.length > 0 &&
+        Number.isFinite(stockQty) &&
+        stockQty > 0 &&
+        Number.isFinite(stockPrice) &&
+        stockPrice > 0 &&
+        stockAccountReady &&
+        accountType !== "unknown";
+  const cashLikeAccountReady =
+    profileChoice !== PROFILE_PROMPT &&
+    (profileChoice !== NEW_PROFILE || newAccount.trim().length > 0) &&
+    accountType !== "unknown";
+  const fixedIncomeRate = parseAmount(returnRateText.trim());
+  const cashLikeFormReady =
+    kind === "cash"
+      ? parseAmount(amountText) > 0 && cashLikeAccountReady
+      : parseAmount(amountText) > 0 &&
+        cashLikeAccountReady &&
+        returnRateText.trim().length > 0 &&
+        Number.isFinite(fixedIncomeRate) &&
+        fixedIncomeRate >= 0;
+  const isSubmitDisabled =
+    saving || (kind === "stock" ? !stockFormReady : !cashLikeFormReady);
 
   return (
     <div className="w-full space-y-3">
@@ -315,7 +365,7 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
             />
           </label>
           <p className="text-[10px] leading-snug text-subtle md:col-span-2">
-            Enter ticker symbol only (company-name lookup is disabled).
+            Enter ticker (not company name) for stocks traded (NYSE)
           </p>
           {mode === "full" ? (
             <>
@@ -332,7 +382,7 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
                 <input type="date" value={tradeDate} onChange={(e) => setTradeDate(e.target.value)} className={inputClass} />
               </label>
               <p className="text-[10px] leading-snug text-subtle md:col-span-2">
-                Leave quantity and price empty to add without holdings. If entering holding info, fill both quantity and price.
+                Quantity, average cost, account/profile, and account type are required for portfolio adds.
               </p>
             </>
           ) : null}
@@ -368,13 +418,14 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
             <label className="flex flex-col gap-0.5 text-[10px] text-subtle">
               Account/Profile
               <select value={profileChoice} onChange={(e) => setProfileChoice(e.target.value)} className={inputClass}>
-                <option value="__new__">Add new account/profile</option>
+                <option value={PROFILE_PROMPT}>- pick option -</option>
                 {accounts.map((account) => (
                   <option key={account} value={account}>{account}</option>
                 ))}
+                <option value={NEW_PROFILE}>Add new account/profile</option>
               </select>
             </label>
-            {profileChoice === "__new__" ? (
+            {profileChoice === NEW_PROFILE ? (
               <label className="flex flex-col gap-0.5 text-[10px] text-subtle">
                 New account name
                 <input value={newAccount} onChange={(e) => setNewAccount(e.target.value)} placeholder="Brokerage, IRA, 401k" className={inputClass} />
@@ -403,7 +454,7 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
         </p>
       ) : null}
 
-      <button type="button" disabled={saving} onClick={() => void submit()} className={appCtaButton("ui-hover-pop px-3 py-2 text-sm")}>
+      <button type="button" disabled={isSubmitDisabled} onClick={() => void submit()} className={appCtaButton("ui-hover-pop px-3 py-2 text-sm")}>
         {saving ? "Saving..." : kind === "stock" ? "Add stock" : kind === "cash" ? "Add cash" : "Add fixed income"}
       </button>
     </div>
