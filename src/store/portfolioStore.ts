@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { setLocalStorageItem } from "@/lib/local-storage-quota";
-import { calculateTradingLimits, computeRiskReturnScore, localCalendarDay, rankedTopWatchlistCandidates, recommendedWatchlistSize, stockPassesRiskFilter, offloadHoldingOutsideShortlistIfNeeded } from "@/lib/ios-recommendation";
+import { calculateTradingLimits, computeRiskReturnScore, localCalendarDay, rankedTopWatchlistCandidates, recommendedWatchlistSize, stockPassesRiskFilter, offloadHoldingOutsideShortlistIfNeeded, raiseCashForMarketOutlookIfNeeded } from "@/lib/ios-recommendation";
 import { getRecommendationHistoryCloses } from "@/lib/recommendation-history-cache";
 import { buildRecommendation } from "@/lib/recommendation";
 import type { CsvImportRow, CsvImportTrade } from "@/lib/csvPortfolio";
@@ -778,14 +778,34 @@ function derivePortfolioState(
   const stocks = stocksWithRisk.map((stock) => {
     const isShortlisted = shortlistedSymbols.has(stock.symbol);
     const gatedRec = isShortlisted
-      ? offloadHoldingOutsideShortlistIfNeeded(stock.recommendation, stock, {
-          enableRiskFilter: shortlistCtx.enableRiskFilter,
-          limitWatchlistSize: shortlistCtx.limitWatchlistSize,
-          riskAppetite: shortlistCtx.riskAppetite,
-          portfolioSize,
-          cashBalance,
-          allStocks: stocksWithRisk,
-        }, { sellOnlyLongTermQualified: recalcCtx.sellOnlyLongTermQualified })
+      ? raiseCashForMarketOutlookIfNeeded(
+          offloadHoldingOutsideShortlistIfNeeded(stock.recommendation, stock, {
+            enableRiskFilter: shortlistCtx.enableRiskFilter,
+            limitWatchlistSize: shortlistCtx.limitWatchlistSize,
+            riskAppetite: shortlistCtx.riskAppetite,
+            portfolioSize,
+            cashBalance: cashEquivalent,
+            cashSharePct: outlookCtx.cashSharePct,
+            useMarketRegimeCashTilt: outlookCtx.useMarketRegimeCashTilt,
+            marketOutlookCashTargetPct: outlookCtx.marketOutlookCashTargetPct,
+            marketOutlookLabel: outlookCtx.marketOutlookLabel,
+            allStocks: stocksWithRisk,
+          }, { sellOnlyLongTermQualified: recalcCtx.sellOnlyLongTermQualified }),
+          stock,
+          {
+            enableRiskFilter: shortlistCtx.enableRiskFilter,
+            limitWatchlistSize: shortlistCtx.limitWatchlistSize,
+            riskAppetite: shortlistCtx.riskAppetite,
+            portfolioSize,
+            cashBalance: cashEquivalent,
+            cashSharePct: outlookCtx.cashSharePct,
+            useMarketRegimeCashTilt: outlookCtx.useMarketRegimeCashTilt,
+            marketOutlookCashTargetPct: outlookCtx.marketOutlookCashTargetPct,
+            marketOutlookLabel: outlookCtx.marketOutlookLabel,
+            allStocks: stocksWithRisk,
+          },
+          { sellOnlyLongTermQualified: recalcCtx.sellOnlyLongTermQualified }
+        )
       : undefined;
     return {
       ...stock,

@@ -12,6 +12,7 @@ import {
   scoreBreakdownRows,
   sentimentLabelForScore,
   offloadHoldingOutsideShortlistIfNeeded,
+  raiseCashForMarketOutlookIfNeeded,
 } from "@/lib/ios-recommendation";
 import { analystTargetUpsidePct, formatScore, formatUpsidePct } from "@/lib/marketFormat";
 import { formatNewsRelativeDate, parseNewsPublishedAt, sentimentDotClass, type NewsSourceRow } from "@/lib/news-feed";
@@ -339,6 +340,14 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
   const portfolioSize = usePortfolioStore((s) => s.portfolioSize);
   const cashBalance = usePortfolioStore((s) => s.cashBalance);
+  const fixedIncomeByAccount = usePortfolioStore((s) => s.fixedIncomeByAccount);
+  const useMarketRegimeCashTilt = usePortfolioStore((s) => s.useMarketRegimeCashTilt);
+  const marketOutlook = usePortfolioStore((s) => s.marketOutlook);
+  const marketOutlookCashTargetRiskOn = usePortfolioStore((s) => s.marketOutlookCashTargetRiskOn);
+  const marketOutlookCashTargetNeutral = usePortfolioStore((s) => s.marketOutlookCashTargetNeutral);
+  const marketOutlookCashTargetElevated = usePortfolioStore((s) => s.marketOutlookCashTargetElevated);
+  const marketOutlookCashTargetRiskOff = usePortfolioStore((s) => s.marketOutlookCashTargetRiskOff);
+  const marketOutlookCashTargetSevere = usePortfolioStore((s) => s.marketOutlookCashTargetSevere);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
 
   const stock = useMemo(() => stocks.find((s) => s.symbol === symbol), [stocks, symbol]);
@@ -426,6 +435,33 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     [lotPendingDeleteId, lotSummary.openLots]
   );
   const storedRec = stock?.recommendation;
+  const fixedIncomeTotal = useMemo(
+    () => Object.values(fixedIncomeByAccount ?? {}).reduce((sum, value) => sum + (Number.isFinite(value) ? Number(value) : 0), 0),
+    [fixedIncomeByAccount]
+  );
+  const cashEquivalentBalance = cashBalance + fixedIncomeTotal;
+  const marketOutlookCashTargetPct = useMemo(() => {
+    if (!marketOutlook) return undefined;
+    switch (marketOutlook.regime) {
+      case "risk_on":
+        return marketOutlookCashTargetRiskOn;
+      case "neutral":
+        return marketOutlookCashTargetNeutral;
+      case "elevated":
+        return marketOutlookCashTargetElevated;
+      case "risk_off":
+        return marketOutlook.severeDefensive ? marketOutlookCashTargetSevere : marketOutlookCashTargetRiskOff;
+      default:
+        return undefined;
+    }
+  }, [
+    marketOutlook,
+    marketOutlookCashTargetElevated,
+    marketOutlookCashTargetNeutral,
+    marketOutlookCashTargetRiskOff,
+    marketOutlookCashTargetRiskOn,
+    marketOutlookCashTargetSevere,
+  ]);
   const rec = useMemo(() => {
     if (!stock) return undefined;
     if (closes.length <= 0 && !(stock.movingAvg != null && Number.isFinite(stock.movingAvg) && stock.movingAvg > 0)) {
@@ -437,36 +473,52 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       }
       return storedRec;
     }
-    return offloadHoldingOutsideShortlistIfNeeded(
-      buildRecommendation(stock, {
-        closes,
-        etfProfitTarget,
-        stockProfitTarget,
-        useAISentiment: useAISentimentForRecommendations,
-        useRSIGating: useRSIGatingForRecommendations,
-        rsiPeriod: rsiPeriodForRecommendations,
-        rsiOversoldThreshold: rsiOversoldThresholdForRecommendations,
-        rsiOverboughtThreshold: rsiOverboughtThresholdForRecommendations,
-        rsiHysteresisPoints: rsiHysteresisPointsForRecommendations,
-        rsiMinRisingDays: rsiMinRisingDaysForRecommendations,
-        sellOnlyLongTermQualified,
-        openLots: lotSummary.openLots,
-        soldLots: lotSummary.soldLots,
-      }),
+    const baseRec = buildRecommendation(stock, {
+      closes,
+      etfProfitTarget,
+      stockProfitTarget,
+      useAISentiment: useAISentimentForRecommendations,
+      useRSIGating: useRSIGatingForRecommendations,
+      rsiPeriod: rsiPeriodForRecommendations,
+      rsiOversoldThreshold: rsiOversoldThresholdForRecommendations,
+      rsiOverboughtThreshold: rsiOverboughtThresholdForRecommendations,
+      rsiHysteresisPoints: rsiHysteresisPointsForRecommendations,
+      rsiMinRisingDays: rsiMinRisingDaysForRecommendations,
+      sellOnlyLongTermQualified,
+      openLots: lotSummary.openLots,
+      soldLots: lotSummary.soldLots,
+    });
+    const gateCtx = {
+      enableRiskFilter,
+      limitWatchlistSize,
+      riskAppetite,
+      portfolioSize,
+      cashBalance: cashEquivalentBalance,
+      cashSharePct: portfolioSize > 0 ? (cashEquivalentBalance / portfolioSize) * 100 : 100,
+      useMarketRegimeCashTilt: useMarketRegimeCashTilt && marketOutlook?.preferCash === true,
+      marketOutlookCashTargetPct,
+      marketOutlookLabel: marketOutlook?.label,
+      allStocks: stocks,
+    };
+    const outsideShortlistAdjusted = offloadHoldingOutsideShortlistIfNeeded(
+      baseRec,
       stock,
-      {
-        enableRiskFilter,
-        limitWatchlistSize,
-        riskAppetite,
-        portfolioSize,
-        cashBalance,
-        allStocks: stocks,
-      },
+      gateCtx,
+      { sellOnlyLongTermQualified }
+    );
+    return raiseCashForMarketOutlookIfNeeded(
+      outsideShortlistAdjusted,
+      stock,
+      gateCtx,
       { sellOnlyLongTermQualified }
     );
   }, [
+    cashEquivalentBalance,
     closes,
     etfProfitTarget,
+    marketOutlook?.label,
+    marketOutlook?.preferCash,
+    marketOutlookCashTargetPct,
     histLoading,
     lotSummary.openLots,
     lotSummary.soldLots,
@@ -485,7 +537,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     limitWatchlistSize,
     riskAppetite,
     portfolioSize,
-    cashBalance,
+    useMarketRegimeCashTilt,
     stocks,
   ]);
   const recommendationFactors = useMemo(() => {

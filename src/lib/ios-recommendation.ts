@@ -685,6 +685,10 @@ export type AddGateContext = {
   riskAppetite: "Low" | "Medium" | "High";
   portfolioSize: number;
   cashBalance?: number;
+  cashSharePct?: number;
+  useMarketRegimeCashTilt?: boolean;
+  marketOutlookCashTargetPct?: number;
+  marketOutlookLabel?: string;
   allStocks: IosStockInput[];
 };
 
@@ -909,6 +913,111 @@ export function offloadHoldingOutsideShortlistIfNeeded<T extends IosRecOut>(
   };
 }
 
+function profitableOpenLotsForCashRaise(stock: IosStockInput, currentPrice: number): IosOpenLot[] {
+  return (stock.openLots ?? [])
+    .filter((lot) => (lot.quantity ?? 0) > 1e-6 && typeof lot.costBasis === "number" && lot.costBasis < currentPrice)
+    .sort((a, b) => lotDateMs(a) - lotDateMs(b));
+}
+
+function profitableOpenQuantityForCashRaise(stock: IosStockInput, currentPrice: number): number {
+  return profitableOpenLotsForCashRaise(stock, currentPrice).reduce((sum, lot) => sum + Math.max(0, lot.quantity ?? 0), 0);
+}
+
+/**
+ * Market-outlook cash raising: when outlook prefers more cash and we are below target,
+ * prioritize (1) outside-shortlist sells, (2) low-upside sells, then (3) oversized trims.
+ * For oversized shortlisted trims, use oldest profitable lots first.
+ */
+export function raiseCashForMarketOutlookIfNeeded<T extends IosRecOut>(
+  rec: T | undefined,
+  stock: IosStockInput,
+  ctx: AddGateContext,
+  options?: { sellOnlyLongTermQualified?: boolean; nowMs?: number }
+): T | undefined {
+  if (!rec || stock.quantity <= 0 || stock.isETF === true) return rec;
+  if (stock.suppressTradeActions === true) return rec;
+  if (rec.action === "SELL" || rec.action === "REDUCE") return rec;
+  if (stock.averageCost <= 0 || (stock.lastPrice ?? 0) <= 0) return rec;
+
+  const marketTiltOn = ctx.useMarketRegimeCashTilt === true;
+  const targetPct = Number(ctx.marketOutlookCashTargetPct ?? 0);
+  const hasTarget = Number.isFinite(targetPct) && targetPct > 0;
+  if (!marketTiltOn || !hasTarget) return rec;
+
+  const currentPrice = stock.lastPrice ?? 0;
+  const avgCost = stock.averageCost;
+  const unrealizedGain = (currentPrice - avgCost) * stock.quantity;
+  if (unrealizedGain <= 0) return rec;
+
+  if (options?.sellOnlyLongTermQualified) {
+    const oldest = getOldestTaxableGainLotDate(stock, currentPrice);
+    const now = options.nowMs ?? Date.now();
+    if (oldest && !isUnknownPurchaseDate(oldest) && now - oldest.getTime() <= 365 * DAY_MS) {
+      return rec;
+    }
+  }
+
+  const cashSharePct =
+    Number.isFinite(ctx.cashSharePct ?? Number.NaN)
+      ? Math.max(0, Number(ctx.cashSharePct))
+      : (ctx.portfolioSize > 0 ? ((ctx.cashBalance ?? 0) / ctx.portfolioSize) * 100 : 100);
+  if (cashSharePct + 0.5 >= targetPct) return rec;
+
+  const regimeLabel = ctx.marketOutlookLabel?.trim() || "current outlook";
+  const targetText = targetPct.toFixed(0);
+  const cashText = cashSharePct.toFixed(0);
+  const upside = upsidePct(stock);
+  const outside = holdingIsOutsideEnabledShortlistAndRisk(stock, ctx);
+  const priceAboveBuySma = rec.movingAvg > 0 && currentPrice > rec.movingAvg;
+
+  if (outside && priceAboveBuySma) {
+    return {
+      ...rec,
+      action: "SELL",
+      comments: `Market outlook is ${regimeLabel}. Cash equivalents are ${cashText}% and the target is ${targetText}%. This holding is outside your shortlist and in profit, so it is a good candidate to sell and rebuild cash equivalents.`,
+    };
+  }
+
+  if (upside < 15 && priceAboveBuySma) {
+    return {
+      ...rec,
+      action: "SELL",
+      comments: `Market outlook is ${regimeLabel}. Cash equivalents are ${cashText}% and the target is ${targetText}%. Estimated upside is only ${upside.toFixed(1)}%, so selling can help rebuild cash equivalents with limited opportunity cost.`,
+    };
+  }
+
+  const costBasis = stock.quantity * avgCost;
+  const stockLimit = stock.stockLimit > 0 ? stock.stockLimit : 0;
+  const positionShare = ctx.portfolioSize > 0 ? (stock.quantity * currentPrice) / ctx.portfolioSize : 0;
+  const isLargeHolding = positionShare >= 0.12 || (stockLimit > 0 && costBasis > stockLimit);
+  if (!isLargeHolding || currentPrice <= avgCost) return rec;
+
+  const reduceEstimate = estimateReduceQty(
+    currentPrice,
+    costBasis,
+    stockLimit > 0 ? stockLimit : Math.max(costBasis * 0.75, 1),
+    stock.transactionLimit,
+    unrealizedGain
+  );
+  if (reduceEstimate <= 0) return rec;
+
+  const profitableQty = profitableOpenQuantityForCashRaise(stock, currentPrice);
+  if (profitableQty <= 1e-6) return rec;
+  const maxQtyToLimit = stockLimit > 0 ? Math.max(0, costBasis - stockLimit) / Math.max(currentPrice, 0.0001) : reduceEstimate;
+  const reduceQty = Math.min(reduceEstimate, profitableQty, maxQtyToLimit > 0 ? maxQtyToLimit : reduceEstimate);
+  if (reduceQty <= 0.1) return rec;
+
+  const oldestProfitable = profitableOpenLotsForCashRaise(stock, currentPrice)[0];
+  const oldestText = oldestProfitable ? formatLotDate(oldestProfitable) : "missing date";
+  const shareText = (positionShare * 100).toFixed(0);
+  const gainText = avgCost > 0 ? (((currentPrice - avgCost) / avgCost) * 100).toFixed(1) : "0.0";
+  return {
+    ...rec,
+    action: "REDUCE",
+    comments: `Market outlook is ${regimeLabel}. Cash equivalents are ${cashText}% and the target is ${targetText}%. This is a larger position (~${shareText}% of portfolio) with +${gainText}% gain, so trim ${formatShareCount(reduceQty)} shares to rebuild cash while keeping exposure. Sell oldest profitable lots first (starting ${oldestText}).`,
+  };
+}
+
 /**
  * Mirrors iOS `Stock.calculateLimits(...)`.
  */
@@ -1032,15 +1141,41 @@ export function computeRecommendationFactors(
       }
       break;
     case "SELL":
+      const isMarketOutlookSell = rec.comments.includes("Market outlook is");
       const isRsiOverboughtLeftoverSell = rec.comments.includes("leftover upside");
-      if (isRsiOverboughtLeftoverSell) {
+      if (isMarketOutlookSell) {
+        const cashMatch = rec.comments.match(/Cash equivalents are (\d+(?:\.\d+)?)% and the target is (\d+(?:\.\d+)?)%/i);
+        if (cashMatch) {
+          const cashPct = Number.parseFloat(cashMatch[1] ?? "0");
+          const targetPct = Number.parseFloat(cashMatch[2] ?? "0");
+          factors.push({
+            label: "Cash below market-outlook target",
+            detail: `${cashPct.toFixed(0)}% vs ${targetPct.toFixed(0)}% target`,
+            passes: Number.isFinite(cashPct) && Number.isFinite(targetPct) ? cashPct + 0.5 < targetPct : true,
+          });
+        }
+        if (rec.comments.includes("outside your shortlist")) {
+          factors.push({
+            label: "Outside shortlist and in profit",
+            detail: "First choice for a full sale while rebuilding cash",
+            passes: true,
+          });
+        }
+        if (rec.comments.includes("Estimated upside is only")) {
+          factors.push({
+            label: "Leftover upside under 15%",
+            detail: `${rec.expectedReturnPct.toFixed(1)}%`,
+            passes: rec.expectedReturnPct < 15,
+          });
+        }
+      } else if (isRsiOverboughtLeftoverSell) {
         factors.push({
           label: "Leftover upside < 10% (Trader)",
           detail: `${rec.expectedReturnPct.toFixed(1)}% remaining to target`,
           passes: rec.expectedReturnPct < 10,
         });
       }
-      if (!rec.comments.includes("RSI overbought reversal") && !isRsiOverboughtLeftoverSell && stock.analystTarget != null && stock.analystTarget > 0) {
+      if (!isMarketOutlookSell && !rec.comments.includes("RSI overbought reversal") && !isRsiOverboughtLeftoverSell && stock.analystTarget != null && stock.analystTarget > 0) {
         factors.push({
           label: "Price at/above Analyst Target (Median)",
           detail: `${formatCurrency(currentPrice)} ≥ ${formatCurrency(stock.analystTarget)}`,
@@ -1083,6 +1218,35 @@ export function computeRecommendationFactors(
       break;
     case "REDUCE":
     case "WAIT_REDUCE": {
+      const isMarketOutlookReduce = rec.comments.includes("Market outlook is");
+      if (isMarketOutlookReduce) {
+        const cashMatch = rec.comments.match(/Cash equivalents are (\d+(?:\.\d+)?)% and the target is (\d+(?:\.\d+)?)%/i);
+        if (cashMatch) {
+          const cashPct = Number.parseFloat(cashMatch[1] ?? "0");
+          const targetPct = Number.parseFloat(cashMatch[2] ?? "0");
+          factors.push({
+            label: "Cash below market-outlook target",
+            detail: `${cashPct.toFixed(0)}% vs ${targetPct.toFixed(0)}% target`,
+            passes: Number.isFinite(cashPct) && Number.isFinite(targetPct) ? cashPct + 0.5 < targetPct : true,
+          });
+        }
+        factors.push({
+          label: "Position is large and in profit",
+          detail: `${(((currentPrice - avgPrice) / Math.max(avgPrice, 0.0001)) * 100).toFixed(1)}%`,
+          passes: unrealizedGain > 0,
+        });
+        if (rec.comments.includes("oldest profitable lots first")) {
+          const profitableLots = profitableOpenLotsForCashRaise(stock, currentPrice);
+          const oldest = profitableLots[0];
+          const profitableQty = profitableOpenQuantityForCashRaise(stock, currentPrice);
+          factors.push({
+            label: "Oldest profitable lots are available",
+            detail: `${formatShareCount(profitableQty)} shares eligible, oldest lot ${oldest ? formatLotDate(oldest) : "missing date"}`,
+            passes: profitableQty > 0.1,
+          });
+        }
+        break;
+      }
       if (costBasis > stockLimit) {
         const moneyToFree = Math.max(0, costBasis - stockLimit);
         factors.push({
