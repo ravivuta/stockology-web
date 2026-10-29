@@ -422,7 +422,7 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
                 {accounts.map((account) => (
                   <option key={account} value={account}>{account}</option>
                 ))}
-                <option value={NEW_PROFILE}>Add new account/profile</option>
+                <option value={NEW_PROFILE}>Add new..</option>
               </select>
             </label>
             {profileChoice === NEW_PROFILE ? (
