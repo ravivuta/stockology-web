@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TradeJournalEntry } from "@/store/portfolioStore";
 
-export type NetWorthPoint = { t: number; value: number };
+export type NetWorthPoint = { t: number; value: number; cashBalance?: number | null };
 
 export type NetWorthSeriesMeta = {
   points: NetWorthPoint[];
@@ -27,6 +27,10 @@ function parseYmdUtcNoon(ymd: string): number {
   const p = ymd.trim().split("-").map((x) => parseInt(x, 10));
   if (p.length !== 3 || p.some((n) => !Number.isFinite(n))) return Date.now();
   return Date.UTC(p[0], p[1] - 1, p[2], 12, 0, 0);
+}
+
+function etYmdFromMs(ms: number): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(ms));
 }
 
 export function mergeNetWorthOverlay(base: NetWorthPoint[], overlay: NetWorthPoint[]): NetWorthPoint[] {
@@ -258,20 +262,40 @@ function snapshotEtYmd(value: unknown): string | null {
 }
 
 function rowsToNetWorthPoints(rows: unknown[]): NetWorthPoint[] {
-  const byDate = new Map<string, { value: number; updated: string }>();
-  for (const row of rows as { et_calendar_date?: unknown; total_portfolio_value?: unknown; updated_at?: unknown }[]) {
+  const byDate = new Map<string, { value: number; cashBalance: number | null; updated: string }>();
+  for (const row of rows as { et_calendar_date?: unknown; total_portfolio_value?: unknown; cash_balance?: unknown; updated_at?: unknown }[]) {
     const d = snapshotEtYmd(row.et_calendar_date) ?? snapshotEtYmd(String(row.updated_at ?? "").slice(0, 10));
     if (!d) continue;
     const v = Number(row.total_portfolio_value);
     if (!Number.isFinite(v) || v <= 0) continue;
+    const cashRaw = Number(row.cash_balance);
+    const cashBalance = Number.isFinite(cashRaw) ? cashRaw : null;
     const upd = typeof row.updated_at === "string" ? row.updated_at : "";
     const cur = byDate.get(d);
-    if (!cur || upd > cur.updated) byDate.set(d, { value: v, updated: upd });
+    if (!cur || upd > cur.updated) byDate.set(d, { value: v, cashBalance, updated: upd });
   }
 
   return [...byDate.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, { value }]) => ({ t: parseYmdUtcNoon(date), value }));
+    .map(([date, { value, cashBalance }]) => ({ t: parseYmdUtcNoon(date), value, cashBalance }));
+}
+
+function enrichNetWorthCashCoverage(
+  primary: NetWorthPoint[],
+  cashSource: NetWorthPoint[]
+): NetWorthPoint[] {
+  if (primary.length === 0 || cashSource.length === 0) return primary;
+  const cashByDay = new Map<string, number>();
+  for (const point of cashSource) {
+    if (!Number.isFinite(point.cashBalance ?? NaN)) continue;
+    cashByDay.set(etYmdFromMs(point.t), point.cashBalance as number);
+  }
+  if (cashByDay.size === 0) return primary;
+  return primary.map((point) => {
+    const ymd = etYmdFromMs(point.t);
+    const enrichedCash = cashByDay.has(ymd) ? cashByDay.get(ymd)! : point.cashBalance ?? null;
+    return { ...point, cashBalance: enrichedCash };
+  });
 }
 
 function coerceLatestSnapshotRow(data: unknown): unknown | null {
@@ -302,7 +326,16 @@ export async function fetchCloudNetWorthHistory(
     p_start_et_date: sinceStr,
   });
   const chartPts = rowsToNetWorthPoints(coerceRpcArray(chart.data));
-  if (chartPts.length > 0) return chartPts;
+  if (chartPts.length > 0) {
+    // Enrich chart-history rows with daily cash balances from snapshots so external-flow
+    // adjustment can reliably detect real deposits/withdrawals vs market moves.
+    const snapshotsForCash = await supabase.rpc("get_portfolio_snapshots", {
+      p_user_id: dataUserId,
+      p_start_et_date: sinceStr,
+    });
+    const cashPts = rowsToNetWorthPoints(coerceRpcArray(snapshotsForCash.data));
+    return enrichNetWorthCashCoverage(chartPts, cashPts);
+  }
 
   // Holdings are AES-256-CBC encrypted at rest; must read via RPC which decrypts server-side.
   const snapshots = await supabase.rpc("get_portfolio_snapshots", {

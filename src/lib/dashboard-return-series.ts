@@ -3,6 +3,31 @@ import { interpolateOneDayValueSpikes } from "@/lib/portfolio-net-worth-series";
 
 export type SpyDaily = { date: string; close: number };
 export type ExternalCashFlowPoint = { occurredAtMs: number; amount: number };
+const MIN_CASH_COVERAGE = 0.5;
+const CASH_COVERAGE_WINDOW_DAYS = 120;
+
+function hasReliableCashCoverage(points: NetWorthPoint[]): boolean {
+  if (points.length === 0) return false;
+  const sorted = [...points].sort((a, b) => a.t - b.t);
+  const recent = sorted.slice(-Math.min(sorted.length, CASH_COVERAGE_WINDOW_DAYS));
+  const covered = recent.filter((point) => Number.isFinite(point.cashBalance ?? NaN)).length;
+  return recent.length > 0 && covered / recent.length >= MIN_CASH_COVERAGE;
+}
+
+function shouldApplyExternalFlow(
+  flowAmount: number,
+  valueDelta: number,
+  cashDelta: number | null
+): boolean {
+  if (!Number.isFinite(flowAmount) || flowAmount === 0) return false;
+  if (cashDelta != null && Number.isFinite(cashDelta)) {
+    const sameDirection = (flowAmount > 0 && cashDelta > 0) || (flowAmount < 0 && cashDelta < 0);
+    if (!sameDirection) return false;
+    return Math.abs(cashDelta) >= Math.abs(flowAmount) * 0.4;
+  }
+  const sameDirection = (flowAmount > 0 && valueDelta > 0) || (flowAmount < 0 && valueDelta < 0);
+  return sameDirection && Math.abs(valueDelta) >= Math.abs(flowAmount) * 0.4;
+}
 
 function etYmdFromMs(ms: number): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(ms));
@@ -36,6 +61,7 @@ export function adjustNetWorthPointsForExternalCashFlows(
 
   const sortedPoints = [...points].sort((a, b) => a.t - b.t);
   const baselineYmd = etYmdFromMs(sortedPoints[0]!.t);
+  if (!hasReliableCashCoverage(sortedPoints)) return sortedPoints;
 
   const flowTotalsByDay = new Map<string, number>();
   for (const flow of flows) {
@@ -50,25 +76,27 @@ export function adjustNetWorthPointsForExternalCashFlows(
   let flowIndex = 0;
   let cumulativeExternalFlow = 0;
   let previousValue = sortedPoints[0]!.value;
+  let previousCash = Number.isFinite(sortedPoints[0]!.cashBalance ?? NaN) ? (sortedPoints[0]!.cashBalance as number) : null;
 
   return sortedPoints.map((point) => {
     const pointYmd = etYmdFromMs(point.t);
     const valueDelta = point.value - previousValue;
+    const cashNow = Number.isFinite(point.cashBalance ?? NaN) ? (point.cashBalance as number) : null;
+    const cashDelta = previousCash != null && cashNow != null ? cashNow - previousCash : null;
     while (flowIndex < sortedFlowDays.length && sortedFlowDays[flowIndex]![0] <= pointYmd) {
       const [flowDay, flowAmount] = sortedFlowDays[flowIndex]!;
       if (flowDay > baselineYmd) {
-        const sameDirection =
-          (flowAmount > 0 && valueDelta > 0) || (flowAmount < 0 && valueDelta < 0);
         // Same-day snapshot must actually jump with the cash edit. Ghost Settings
         // taps that never changed the stored total are skipped so vs-SPY stays
         // a market comparison. Portfolio (value) mode uses the unadjusted series.
-        if (sameDirection && Math.abs(valueDelta) >= Math.abs(flowAmount) * 0.4) {
+        if (shouldApplyExternalFlow(flowAmount, valueDelta, cashDelta)) {
           cumulativeExternalFlow += flowAmount;
         }
       }
       flowIndex += 1;
     }
     previousValue = point.value;
+    previousCash = cashNow;
     return {
       ...point,
       value: point.value - cumulativeExternalFlow,
