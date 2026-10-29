@@ -782,26 +782,29 @@ export function CsvImportExportBar({
         >
           {importLabel}
         </button>
-        <button
-          type="button"
-          onClick={onExport}
-          disabled={importBusy}
-          className={`ui-hover-pop rounded-lg border border-primary/40 bg-background font-medium text-foreground dark:border-primary/30 ${
-            compact ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm"
-          } ${importBusy ? "cursor-wait opacity-60" : ""}`}
-        >
-          Export Holdings
-        </button>
-        <button
-          type="button"
-          onClick={onExportWatchlist}
-          disabled={importBusy}
-          className={`ui-hover-pop rounded-lg border border-border bg-background font-medium text-foreground dark:border-white/10 ${
-            compact ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm"
-          } ${importBusy ? "cursor-wait opacity-60" : ""}`}
-        >
-          Export Watchlist
-        </button>
+        {importMode === "portfolio" ? (
+          <button
+            type="button"
+            onClick={onExport}
+            disabled={importBusy}
+            className={`ui-hover-pop rounded-lg border border-primary/40 bg-background font-medium text-foreground dark:border-primary/30 ${
+              compact ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm"
+            } ${importBusy ? "cursor-wait opacity-60" : ""}`}
+          >
+            Export Holdings
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onExportWatchlist}
+            disabled={importBusy}
+            className={`ui-hover-pop rounded-lg border border-border bg-background font-medium text-foreground dark:border-white/10 ${
+              compact ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm"
+            } ${importBusy ? "cursor-wait opacity-60" : ""}`}
+          >
+            Export Watchlist
+          </button>
+        )}
         {importMode === "portfolio" ? (
           <button
             type="button"

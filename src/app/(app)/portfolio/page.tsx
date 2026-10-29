@@ -145,7 +145,7 @@ export default function PortfolioPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION.symbol);
   const [query, setQuery] = useState("");
   const [showActionable, setShowActionable] = useState(false);
-  const [qualityCellHighlightEnabled, setQualityCellHighlightEnabled] = useState(true);
+  const [qualityCellHighlightEnabled, setQualityCellHighlightEnabled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<string>("__all__");
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
@@ -342,7 +342,7 @@ export default function PortfolioPage() {
             >
               <Paintbrush className="h-3.5 w-3.5" />
             </button>
-            <AddAssetButton idPrefix="portfolio-add" />
+            <AddAssetButton idPrefix="portfolio-add" className={filterChipClass(false, "green")} />
             <button
               type="button"
               onClick={() => setSearchOpen(true)}

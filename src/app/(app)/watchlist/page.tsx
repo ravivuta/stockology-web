@@ -132,7 +132,7 @@ export default function WatchlistPage() {
     else setShowShortlisted(false);
   }, [limitWatchlistSize]);
   const [showActionable, setShowActionable] = useState(false);
-  const [qualityCellHighlightEnabled, setQualityCellHighlightEnabled] = useState(true);
+  const [qualityCellHighlightEnabled, setQualityCellHighlightEnabled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [sort, setSort] = useState<SortKey>("symbol");
   const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION.symbol);
@@ -302,7 +302,7 @@ export default function WatchlistPage() {
           >
             <Paintbrush className="h-3.5 w-3.5" />
           </button>
-          <AddAssetButton idPrefix="watchlist-add" />
+          <AddAssetButton idPrefix="watchlist-add" className={filterChipClass(false, "gold")} />
           <button
             type="button"
             onClick={() => setSearchOpen(true)}

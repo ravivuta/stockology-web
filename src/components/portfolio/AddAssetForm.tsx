@@ -381,7 +381,7 @@ export function AddAssetForm({ idPrefix }: { idPrefix: string }) {
   );
 }
 
-export function AddAssetButton({ idPrefix }: { idPrefix: string }) {
+export function AddAssetButton({ idPrefix, className }: { idPrefix: string; className?: string }) {
   const [open, setOpen] = useState(false);
   const titleId = `${idPrefix}-title`;
 
@@ -390,9 +390,9 @@ export function AddAssetButton({ idPrefix }: { idPrefix: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={appCtaButton("ui-hover-pop px-3 py-1.5 text-sm")}
+        className={className ?? appCtaButton("ui-hover-pop px-3 py-1.5 text-sm")}
       >
-        Add stock
+        Add
       </button>
       <AppModal open={open} onClose={() => setOpen(false)} size="lg" stagger={false} titleId={titleId}>
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
