@@ -2542,7 +2542,7 @@ export const usePortfolioStore = create<State>()(
             for (const { name, delta } of cashByAccount.values()) {
               if (Math.abs(delta) <= 1e-6) continue;
               cashDeltaFromHoldings += delta;
-              nextLots = applyCashDelta(nextLots, name, delta);
+              nextLots = applyCashDelta(nextLots, name, delta, { confineToAccount: true });
             }
           } else {
             cashDeltaFromHoldings = 0;
