@@ -79,7 +79,9 @@ export function useHydrateTickerFundamentals(options?: { enabled?: boolean }) {
       try {
         const result = await runRefreshPipeline(symbols, {
           optimizePending,
-          includeSnapshot: reason === "init" || reason === "visible",
+          // Always include snapshot so cross-device optimization changes (e.g. SMA 200 set on iOS)
+          // are picked up during periodic web refreshes without requiring a full reload.
+          includeSnapshot: true,
         });
         if (result.ok && optimizePending) {
           lastAutoOptimizeAtRef.current = Date.now();
