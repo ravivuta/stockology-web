@@ -2158,36 +2158,32 @@ function sellFromWaitFactors({
   const aboveSMA = rec.movingAvg > 0 && currentPrice > rec.movingAvg;
   const cashShare = portfolioSize > 0 ? cashEquivalentBalance / portfolioSize : 1;
   const cashFloor = outlookRaiseCashEnabled ? Math.max(0.2, (marketOutlookCashTargetPct ?? 20) / 100) : 0.2;
+  const cashNeedsRaise = cashShare < cashFloor;
 
-  const factors: RecFactor[] = [
-    {
+  const factors: RecFactor[] = [];
+
+  if (outside) {
+    factors.push({
       label: "Outside shortlist and risk gates",
-      detail: outside
-        ? "Not in the current shortlist"
-        : (filtersOn ? "Still inside shortlist / risk gates" : "Shortlist and risk filters are not both on"),
-      passes: outside,
-    },
-    {
+      detail: "Not in the current shortlist",
+      passes: true,
+    });
+    factors.push({
       label: `Price above ${stock.shortSMA}-day SMA`,
       detail: rec.movingAvg > 0 ? `${formatCurrency(currentPrice)} vs ${formatCurrency(rec.movingAvg)}` : "SMA unavailable",
       passes: aboveSMA,
-    },
-    {
+    });
+    factors.push({
       label: "Gain beats leftover upside",
       detail: `${gainPct.toFixed(1)}% vs ${upside.toFixed(1)}%`,
       passes: gainPct > upside,
-    },
-    {
+    });
+  }
+
+  if (outlookRaiseCashEnabled && cashNeedsRaise) {
+    factors.push({
       label: "Need to increase cash per market outlook",
       detail: `Have ${(cashShare * 100).toFixed(1)}%, need ${(cashFloor * 100).toFixed(0)}%`,
-      passes: cashShare < cashFloor,
-    },
-  ];
-
-  if (outlookRaiseCashEnabled) {
-    factors.push({
-      label: "Market outlook prefers cash",
-      detail: "Cash-first regime is active",
       passes: true,
     });
   }
