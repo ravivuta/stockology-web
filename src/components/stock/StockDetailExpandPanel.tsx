@@ -398,6 +398,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const [aiNewsLoading, setAiNewsLoading] = useState(false);
   const [optimizationMessage, setOptimizationMessage] = useState<string | null>(null);
   const [decisionMapOpen, setDecisionMapOpen] = useState(false);
+  const [flowChartOpen, setFlowChartOpen] = useState(false);
 
   const smaFromHistory = useMemo(() => {
     if (!points || !stock) return null;
@@ -1455,17 +1456,30 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                   {rec ? (
                     <>
                       <p className={cn("leading-snug", recommendationTextTone(rec.action), dense ? "text-sm" : "text-sm")}>{rec.comments}</p>
-                      <button
-                        type="button"
-                        onClick={() => setDecisionMapOpen(true)}
-                        className={cn(
-                          "inline-flex items-center gap-1.5 text-subtle hover:text-foreground",
-                          dense ? "text-[11px]" : "text-xs"
-                        )}
-                      >
-                        <Info className={dense ? "h-3.5 w-3.5" : "h-4 w-4"} />
-                        Decision map
-                      </button>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setFlowChartOpen(true)}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 text-subtle hover:text-foreground",
+                            dense ? "text-[11px]" : "text-xs"
+                          )}
+                        >
+                          <Info className={dense ? "h-3.5 w-3.5" : "h-4 w-4"} />
+                          Flow chart
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDecisionMapOpen(true)}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 text-subtle hover:text-foreground",
+                            dense ? "text-[11px]" : "text-xs"
+                          )}
+                        >
+                          <Info className={dense ? "h-3.5 w-3.5" : "h-4 w-4"} />
+                          Decision map
+                        </button>
+                      </div>
                     </>
                   ) : (
                     <p className={cn("text-subtle", dense ? "text-sm" : "text-base")}>
@@ -2088,6 +2102,28 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
         </ModalSection>
       </AppModal>
 
+      <AppModal open={flowChartOpen} onClose={() => setFlowChartOpen(false)} size="md" titleId="flowchart-modal-title">
+        <ModalSection className="border-b border-border bg-elevated px-4 py-3 dark:border-foreground/10">
+          <h3 id="flowchart-modal-title" className="text-base font-semibold tracking-tight text-foreground">
+            Recommendation Flow
+          </h3>
+          <p className="mt-1 text-xs text-subtle">Schematic flow for how this stock reaches its current recommendation.</p>
+        </ModalSection>
+        <ModalSection className="space-y-2 px-4 py-4">
+          <RecFlowNode title="Start" detail="Live price + latest history/settings" />
+          <RecFlowArrow />
+          <RecFlowNode title="Compute levels" detail="SMA, next buy trigger, selected analyst target" />
+          <RecFlowArrow />
+          <RecFlowDecision title="Has position?" yesText="Yes → ADD / REDUCE / SELL / WAIT" noText="No → BUY / WAIT_BUY" />
+          <RecFlowArrow />
+          <RecFlowNode title="Safety gates" detail="RSI, AI sentiment, wash sale, long-term tax" />
+          <RecFlowArrow />
+          <RecFlowNode title="Portfolio overlays" detail="Shortlist/risk + market-outlook cash rules" />
+          <RecFlowArrow />
+          <RecFlowNode title="Final recommendation" detail="Shown as Action + Comments + Factors" />
+        </ModalSection>
+      </AppModal>
+
       <StockStrategyModal
         open={strategyOpen}
         onClose={() => setStrategyOpen(false)}
@@ -2324,6 +2360,54 @@ function recommendationFactorGroups(
     return groups;
   }
   return [{ title: "Active path", description: null as string | null, factors }];
+}
+
+function RecFlowNode({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className="rounded-md border border-border/70 bg-background/40 px-2 py-1.5 dark:border-white/[0.08]">
+      <p className="text-[11px] font-semibold text-foreground">{title}</p>
+      <p className="text-[10.5px] text-subtle">{detail}</p>
+    </div>
+  );
+}
+
+function RecFlowArrow() {
+  return (
+    <div className="flex items-center justify-center">
+      <span className="h-3 w-px bg-border/80 dark:bg-white/[0.18]" />
+      <span className="ml-1 text-[10px] text-subtle">▼</span>
+    </div>
+  );
+}
+
+function RecFlowDecision({
+  title,
+  yesText,
+  noText,
+}: {
+  title: string;
+  yesText: string;
+  noText: string;
+}) {
+  return (
+    <div className="space-y-1">
+      <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-center">
+        <p className="text-[11px] font-semibold text-foreground">◆ {title}</p>
+      </div>
+      <div className="mx-auto h-2 w-px bg-border/80 dark:bg-white/[0.18]" />
+      <div className="h-px w-full bg-border/80 dark:bg-white/[0.18]" />
+      <div className="grid grid-cols-2 gap-2 text-subtle">
+        <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1">
+          <p className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">YES</p>
+          <p>{yesText}</p>
+        </div>
+        <div className="rounded-md border border-border/70 bg-background/40 px-2 py-1 dark:border-white/[0.08]">
+          <p className="text-[10px] font-semibold text-subtle">NO</p>
+          <p>{noText}</p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function FactorFlagRow({

@@ -110,15 +110,11 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
               <FlowArrow />
               <FlowNode title="Compute levels" detail="SMA, next-buy level, selected analyst target." />
               <FlowArrow />
-              <FlowDecision title="Has position?" />
-              <div className="grid grid-cols-2 gap-2 px-1 text-subtle">
-                <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1">
-                  No → BUY / WAIT_BUY
-                </div>
-                <div className="rounded-md border border-border/70 bg-background/40 px-2 py-1 dark:border-white/[0.08]">
-                  Yes → ADD / REDUCE / SELL / WAIT
-                </div>
-              </div>
+              <FlowDecision
+                title="Has position?"
+                yesText="Yes → ADD / REDUCE / SELL / WAIT"
+                noText="No → BUY / WAIT_BUY"
+              />
               <FlowArrow />
               <FlowNode title="Safety gates" detail="RSI, AI sentiment, wash sale, tax holding period." />
               <FlowArrow />
@@ -269,10 +265,24 @@ function FlowNode({ title, detail }: { title: string; detail: string }) {
   );
 }
 
-function FlowDecision({ title }: { title: string }) {
+function FlowDecision({ title, yesText, noText }: { title: string; yesText: string; noText: string }) {
   return (
-    <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5">
-      <p className="text-[11px] font-semibold text-foreground">◆ {title}</p>
+    <div className="space-y-1">
+      <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-center">
+        <p className="text-[11px] font-semibold text-foreground">◆ {title}</p>
+      </div>
+      <div className="mx-auto h-2 w-px bg-border/80 dark:bg-white/[0.18]" />
+      <div className="h-px w-full bg-border/80 dark:bg-white/[0.18]" />
+      <div className="grid grid-cols-2 gap-2 text-subtle">
+        <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1">
+          <p className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">YES</p>
+          <p>{yesText}</p>
+        </div>
+        <div className="rounded-md border border-border/70 bg-background/40 px-2 py-1 dark:border-white/[0.08]">
+          <p className="text-[10px] font-semibold text-subtle">NO</p>
+          <p>{noText}</p>
+        </div>
+      </div>
     </div>
   );
 }
