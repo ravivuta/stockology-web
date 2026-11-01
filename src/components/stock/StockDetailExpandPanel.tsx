@@ -26,7 +26,7 @@ import { postgrestEqValue } from "@/lib/postgrest-symbol";
 import { createClient } from "@/lib/supabase/client";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { parseSuggestedQuantity, suggestedTradeType } from "@/lib/tradePrefill";
-import { usePortfolioStore } from "@/store/portfolioStore";
+import { usePortfolioStore, type StockHolding } from "@/store/portfolioStore";
 import { useSupabaseStockHistory } from "@/hooks/useSupabaseStockHistory";
 import { lastSma } from "@/lib/stock-chart";
 import { appCtaButton } from "@/lib/appCtaClasses";
@@ -2102,15 +2102,22 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
         </ModalSection>
       </AppModal>
 
-      <AppModal open={flowChartOpen} onClose={() => setFlowChartOpen(false)} size="md" titleId="flowchart-modal-title">
-        <ModalSection className="border-b border-border bg-elevated px-4 py-3 dark:border-foreground/10">
-          <h3 id="flowchart-modal-title" className="text-base font-semibold tracking-tight text-foreground">
+      <AppModal
+        open={flowChartOpen}
+        onClose={() => setFlowChartOpen(false)}
+        size="xl"
+        panelClassName="h-[94vh] max-w-[min(98vw,1320px)]"
+        shellClassName="sm:p-2"
+        titleId="flowchart-modal-title"
+      >
+        <ModalSection className="border-b border-border bg-elevated px-4 py-3 sm:px-5 sm:py-3.5 dark:border-foreground/10">
+          <h3 id="flowchart-modal-title" className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
             Recommendation Flow
           </h3>
-          <p className="mt-1 text-xs text-subtle">Schematic flow for how this stock reaches its current recommendation.</p>
+          <p className="mt-1 text-xs text-subtle sm:text-sm">Schematic flow for how this stock reaches its current recommendation.</p>
         </ModalSection>
-        <ModalSection className="space-y-2 px-4 py-4">
-          <RecommendationFlowSvgDiagram />
+        <ModalSection className="min-h-0 flex-1 space-y-2 px-3 py-3 sm:px-5 sm:py-4">
+          <RecommendationFlowSvgDiagram stock={stock} recommendation={rec} />
         </ModalSection>
       </AppModal>
 
@@ -2352,58 +2359,302 @@ function recommendationFactorGroups(
   return [{ title: "Active path", description: null as string | null, factors }];
 }
 
-function RecommendationFlowSvgDiagram() {
+type FlowHighlightData = {
+  activeNodes: Set<string>;
+  activeEdges: Set<string>;
+  finalNode: string;
+  shortlistOverlayTriggered: boolean;
+  marketOverlayTriggered: boolean;
+};
+
+function buildRecommendationFlowHighlight(
+  stock: StockHolding | undefined,
+  recommendation: { action?: string; comments?: string } | undefined
+): FlowHighlightData {
+  const activeNodes = new Set<string>(["start_a", "decision_b", "overlay_p", "overlay_q", "final_r"]);
+  const activeEdges = new Set<string>(["a_to_b", "p_to_q", "q_to_r"]);
+  const action = (recommendation?.action ?? "").toUpperCase();
+  const lowerComment = (recommendation?.comments ?? "").toLowerCase();
+  const shortlistOverlayTriggered = lowerComment.includes("outside shortlist") || lowerComment.includes("shortlist/risk");
+  const marketOverlayTriggered = lowerComment.includes("market outlook is") || lowerComment.includes("need to increase cash");
+
+  if (stock?.suppressTradeActions === true) {
+    activeNodes.add("wait_override");
+    activeEdges.add("b_yes_to_wait_override");
+    activeEdges.add("wait_override_to_p");
+    return {
+      activeNodes,
+      activeEdges,
+      finalNode: "wait_override",
+      shortlistOverlayTriggered,
+      marketOverlayTriggered,
+    };
+  }
+
+  if (lowerComment.includes("insufficient historical data") || lowerComment.includes("loading historical data")) {
+    activeNodes.add("decision_c");
+    activeNodes.add("wait_history");
+    activeEdges.add("b_no_to_c");
+    activeEdges.add("c_no_to_wait_history");
+    activeEdges.add("wait_history_to_p");
+    return {
+      activeNodes,
+      activeEdges,
+      finalNode: "wait_history",
+      shortlistOverlayTriggered,
+      marketOverlayTriggered,
+    };
+  }
+
+  activeNodes.add("decision_c");
+  activeNodes.add("levels_d");
+  activeNodes.add("decision_e");
+  activeEdges.add("b_no_to_c");
+  activeEdges.add("c_yes_to_d");
+  activeEdges.add("d_to_e");
+
+  const hasPosition = (stock?.quantity ?? 0) > 0;
+
+  if (!hasPosition) {
+    activeNodes.add("decision_f");
+    activeEdges.add("e_no_to_f");
+    if (action === "BUY") {
+      activeNodes.add("buy");
+      activeEdges.add("f_yes_to_buy");
+      activeEdges.add("buy_to_p");
+      return { activeNodes, activeEdges, finalNode: "buy", shortlistOverlayTriggered, marketOverlayTriggered };
+    }
+    activeNodes.add("wait_buy");
+    activeEdges.add("f_no_to_wait_buy");
+    activeEdges.add("wait_buy_to_p");
+    return { activeNodes, activeEdges, finalNode: "wait_buy", shortlistOverlayTriggered, marketOverlayTriggered };
+  }
+
+  activeNodes.add("decision_i");
+  activeEdges.add("e_yes_to_i");
+
+  if (action === "SELL") {
+    activeNodes.add("sell_reduce");
+    activeEdges.add("i_yes_to_sell_reduce");
+    activeEdges.add("sell_reduce_to_p");
+    return { activeNodes, activeEdges, finalNode: "sell_reduce", shortlistOverlayTriggered, marketOverlayTriggered };
+  }
+
+  if (action === "REDUCE") {
+    const reduceFromSizePath =
+      lowerComment.includes("consider diversifying") ||
+      lowerComment.includes("trim") ||
+      lowerComment.includes("position is above stock limit");
+    if (reduceFromSizePath) {
+      activeNodes.add("decision_k");
+      activeNodes.add("decision_m");
+      activeNodes.add("reduce");
+      activeEdges.add("i_no_to_k");
+      activeEdges.add("k_no_to_m");
+      activeEdges.add("m_yes_to_reduce");
+      activeEdges.add("reduce_to_p");
+      return { activeNodes, activeEdges, finalNode: "reduce", shortlistOverlayTriggered, marketOverlayTriggered };
+    }
+    activeNodes.add("sell_reduce");
+    activeEdges.add("i_yes_to_sell_reduce");
+    activeEdges.add("sell_reduce_to_p");
+    return { activeNodes, activeEdges, finalNode: "sell_reduce", shortlistOverlayTriggered, marketOverlayTriggered };
+  }
+
+  if (action === "ADD") {
+    activeNodes.add("decision_k");
+    activeNodes.add("add");
+    activeEdges.add("i_no_to_k");
+    activeEdges.add("k_yes_to_add");
+    activeEdges.add("add_to_p");
+    return { activeNodes, activeEdges, finalNode: "add", shortlistOverlayTriggered, marketOverlayTriggered };
+  }
+
+  activeNodes.add("decision_k");
+  activeNodes.add("decision_m");
+  activeNodes.add("wait_hold");
+  activeEdges.add("i_no_to_k");
+  activeEdges.add("k_no_to_m");
+  activeEdges.add("m_no_to_wait_hold");
+  activeEdges.add("wait_hold_to_p");
+  return { activeNodes, activeEdges, finalNode: "wait_hold", shortlistOverlayTriggered, marketOverlayTriggered };
+}
+
+function RecommendationFlowSvgDiagram({
+  stock,
+  recommendation,
+}: {
+  stock: StockHolding | undefined;
+  recommendation: { action?: string; comments?: string } | undefined;
+}) {
+  const flow = buildRecommendationFlowHighlight(stock, recommendation);
+  const ACTIVE = "#60a5fa";
+  const OVERLAY = "#f59e0b";
+  const FINAL_GO = "#10b981";
+  const FINAL_WAIT = "#f87171";
+
+  const isWaitFinal = flow.finalNode === "wait_buy" || flow.finalNode === "wait_hold" || flow.finalNode === "wait_override" || flow.finalNode === "wait_history";
+  const finalColor = isWaitFinal ? FINAL_WAIT : FINAL_GO;
+  const isNodeVisible = (nodeId: string) => flow.activeNodes.has(nodeId);
+  const edgeColor = (edgeId: string) => {
+    if (!flow.activeEdges.has(edgeId)) return "transparent";
+    if (flow.marketOverlayTriggered && (edgeId === "p_to_q" || edgeId === "q_to_r")) return OVERLAY;
+    if (flow.shortlistOverlayTriggered && edgeId.endsWith("_to_p")) return OVERLAY;
+    return ACTIVE;
+  };
+  const edgeWidth = (edgeId: string) => (flow.activeEdges.has(edgeId) ? 2 : 1);
+  const nodeStroke = (nodeId: string) => {
+    if (nodeId === flow.finalNode) return finalColor;
+    if (nodeId === "overlay_p" && flow.shortlistOverlayTriggered) return OVERLAY;
+    if (nodeId === "overlay_q" && flow.marketOverlayTriggered) return OVERLAY;
+    if (flow.activeNodes.has(nodeId)) return ACTIVE;
+    return "transparent";
+  };
+  const nodeStrokeWidth = (nodeId: string) => (nodeStroke(nodeId) ? 2 : 1);
+  const nodeFill = (nodeId: string, defaultFill: string) => {
+    if (!isNodeVisible(nodeId)) return "transparent";
+    if (nodeId === flow.finalNode) return isWaitFinal ? "rgba(248,113,113,0.16)" : "rgba(16,185,129,0.18)";
+    if (nodeId === "overlay_p" && flow.shortlistOverlayTriggered) return "rgba(245,158,11,0.14)";
+    if (nodeId === "overlay_q" && flow.marketOverlayTriggered) return "rgba(245,158,11,0.14)";
+    if (flow.activeNodes.has(nodeId)) return "rgba(96,165,250,0.14)";
+    return defaultFill;
+  };
+  const textFill = (nodeId: string, fill: string) => (isNodeVisible(nodeId) ? fill : "transparent");
+
   return (
     <div className="rounded-lg border border-border/70 bg-background/40 p-2 dark:border-white/[0.08]">
-      <svg viewBox="0 0 340 360" className="h-auto w-full">
+      <div className="mb-2 flex flex-wrap items-center gap-3 text-[10px] text-subtle sm:text-xs">
+        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-sky-400" /> Active path</span>
+        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Final action</span>
+        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-400" /> Final wait</span>
+        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> Overlay trigger</span>
+      </div>
+      <div className="h-[70vh] overflow-auto rounded-md border border-border/50 bg-background/30 p-1.5 sm:h-[74vh] sm:p-2 dark:border-white/[0.08]">
+      <svg viewBox="0 0 740 1020" className="mx-auto h-auto w-full max-w-[980px]">
         <defs>
-          <marker id="arrowHeadRec" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+          <marker id="arrowHeadRec" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
             <path d="M0,0 L8,4 L0,8 Z" fill="#94a3b8" />
           </marker>
         </defs>
 
-        <rect x="40" y="10" width="260" height="40" rx="8" fill="rgba(148,163,184,0.10)" stroke="#94a3b8" />
-        <text x="52" y="27" fontSize="11" fill="currentColor" fontWeight="600">Start</text>
-        <text x="52" y="41" fontSize="10" fill="#94a3b8">Live price + latest history/settings</text>
+        <rect x="220" y="12" width="260" height="42" rx="8" fill={nodeFill("start_a", "rgba(148,163,184,0.10)")} stroke={nodeStroke("start_a") ?? "#94a3b8"} strokeWidth={nodeStrokeWidth("start_a")} />
+        <text x="232" y="30" fontSize="11" fill={textFill("start_a", "currentColor")} fontWeight="600">A. Start</text>
+        <text x="232" y="44" fontSize="10" fill={textFill("start_a", "#94a3b8")}>Live price + latest data loaded</text>
+        <line x1="350" y1="54" x2="350" y2="82" stroke={edgeColor("a_to_b")} strokeWidth={edgeWidth("a_to_b")} markerEnd="url(#arrowHeadRec)" />
 
-        <line x1="170" y1="50" x2="170" y2="66" stroke="#94a3b8" markerEnd="url(#arrowHeadRec)" />
+        <polygon points="350,86 410,112 350,138 290,112" fill={nodeFill("decision_b", "rgba(245,158,11,0.14)")} stroke={nodeStroke("decision_b") ?? "#f59e0b"} strokeWidth={nodeStrokeWidth("decision_b")} />
+        <text x="350" y="110" textAnchor="middle" fontSize="10" fill={textFill("decision_b", "currentColor")} fontWeight="600">B. Excluded or suppressed?</text>
+        <line x1="294" y1="112" x2="150" y2="140" stroke={edgeColor("b_yes_to_wait_override")} strokeWidth={edgeWidth("b_yes_to_wait_override")} markerEnd="url(#arrowHeadRec)" />
+        <text x="210" y="118" fontSize="9" fill={flow.activeEdges.has("b_yes_to_wait_override") ? "#94a3b8" : "transparent"}>Yes</text>
+        <line x1="350" y1="138" x2="350" y2="162" stroke={edgeColor("b_no_to_c")} strokeWidth={edgeWidth("b_no_to_c")} markerEnd="url(#arrowHeadRec)" />
+        <text x="358" y="154" fontSize="9" fill={flow.activeEdges.has("b_no_to_c") ? "#94a3b8" : "transparent"}>No</text>
 
-        <rect x="40" y="70" width="260" height="42" rx="8" fill="rgba(148,163,184,0.10)" stroke="#94a3b8" />
-        <text x="52" y="88" fontSize="11" fill="currentColor" fontWeight="600">Compute levels</text>
-        <text x="52" y="102" fontSize="10" fill="#94a3b8">SMA, next-buy trigger, selected analyst target</text>
+        <rect x="48" y="142" width="204" height="44" rx="8" fill={nodeFill("wait_override", "rgba(239,68,68,0.12)")} stroke={nodeStroke("wait_override") ?? "#f87171"} strokeWidth={nodeStrokeWidth("wait_override")} />
+        <text x="60" y="160" fontSize="11" fill={textFill("wait_override", "#f87171")} fontWeight="700">WAIT</text>
+        <text x="60" y="174" fontSize="10" fill={textFill("wait_override", "currentColor")}>No action due to your override</text>
 
-        <line x1="170" y1="112" x2="170" y2="124" stroke="#94a3b8" markerEnd="url(#arrowHeadRec)" />
+        <polygon points="350,166 410,192 350,218 290,192" fill={nodeFill("decision_c", "rgba(245,158,11,0.14)")} stroke={nodeStroke("decision_c") ?? "#f59e0b"} strokeWidth={nodeStrokeWidth("decision_c")} />
+        <text x="350" y="196" textAnchor="middle" fontSize="10" fill={textFill("decision_c", "currentColor")} fontWeight="600">C. Enough price history?</text>
+        <line x1="294" y1="192" x2="150" y2="220" stroke={edgeColor("c_no_to_wait_history")} strokeWidth={edgeWidth("c_no_to_wait_history")} markerEnd="url(#arrowHeadRec)" />
+        <text x="212" y="198" fontSize="9" fill={flow.activeEdges.has("c_no_to_wait_history") ? "#94a3b8" : "transparent"}>No</text>
+        <line x1="350" y1="218" x2="350" y2="244" stroke={edgeColor("c_yes_to_d")} strokeWidth={edgeWidth("c_yes_to_d")} markerEnd="url(#arrowHeadRec)" />
+        <text x="358" y="236" fontSize="9" fill={flow.activeEdges.has("c_yes_to_d") ? "#94a3b8" : "transparent"}>Yes</text>
 
-        <polygon points="170,128 230,154 170,180 110,154" fill="rgba(245,158,11,0.14)" stroke="#f59e0b" />
-        <text x="170" y="158" textAnchor="middle" fontSize="11" fill="currentColor" fontWeight="600">Has position?</text>
+        <rect x="48" y="222" width="204" height="44" rx="8" fill={nodeFill("wait_history", "rgba(239,68,68,0.12)")} stroke={nodeStroke("wait_history") ?? "#f87171"} strokeWidth={nodeStrokeWidth("wait_history")} />
+        <text x="60" y="240" fontSize="11" fill={textFill("wait_history", "#f87171")} fontWeight="700">WAIT</text>
+        <text x="60" y="254" fontSize="10" fill={textFill("wait_history", "currentColor")}>Need more historical data</text>
 
-        <line x1="170" y1="180" x2="170" y2="194" stroke="#94a3b8" />
-        <line x1="170" y1="194" x2="90" y2="194" stroke="#94a3b8" />
-        <line x1="170" y1="194" x2="250" y2="194" stroke="#94a3b8" />
-        <line x1="90" y1="194" x2="90" y2="204" stroke="#94a3b8" markerEnd="url(#arrowHeadRec)" />
-        <line x1="250" y1="194" x2="250" y2="204" stroke="#94a3b8" markerEnd="url(#arrowHeadRec)" />
+        <rect x="200" y="248" width="300" height="52" rx="8" fill={nodeFill("levels_d", "rgba(148,163,184,0.10)")} stroke={nodeStroke("levels_d") ?? "#94a3b8"} strokeWidth={nodeStrokeWidth("levels_d")} />
+        <text x="212" y="268" fontSize="11" fill={textFill("levels_d", "currentColor")} fontWeight="600">D. Compute key levels</text>
+        <text x="212" y="282" fontSize="10" fill={textFill("levels_d", "#94a3b8")}>SMA, next buy, selected target, upside %</text>
+        <line x1="350" y1="300" x2="350" y2="326" stroke={edgeColor("d_to_e")} strokeWidth={edgeWidth("d_to_e")} markerEnd="url(#arrowHeadRec)" />
 
-        <rect x="20" y="208" width="140" height="42" rx="6" fill="rgba(16,185,129,0.14)" stroke="#10b981" />
-        <text x="30" y="224" fontSize="10" fill="#10b981" fontWeight="700">YES</text>
-        <text x="30" y="238" fontSize="10" fill="currentColor">ADD / REDUCE / SELL / WAIT</text>
+        <polygon points="350,330 410,356 350,382 290,356" fill={nodeFill("decision_e", "rgba(245,158,11,0.14)")} stroke={nodeStroke("decision_e") ?? "#f59e0b"} strokeWidth={nodeStrokeWidth("decision_e")} />
+        <text x="350" y="360" textAnchor="middle" fontSize="10" fill={textFill("decision_e", "currentColor")} fontWeight="600">E. Holding shares now?</text>
 
-        <rect x="180" y="208" width="140" height="42" rx="6" fill="rgba(148,163,184,0.08)" stroke="#94a3b8" />
-        <text x="190" y="224" fontSize="10" fill="#94a3b8" fontWeight="700">NO</text>
-        <text x="190" y="238" fontSize="10" fill="currentColor">BUY / WAIT_BUY</text>
+        <line x1="294" y1="356" x2="210" y2="384" stroke={edgeColor("e_no_to_f")} strokeWidth={edgeWidth("e_no_to_f")} markerEnd="url(#arrowHeadRec)" />
+        <text x="246" y="352" fontSize="9" fill={flow.activeEdges.has("e_no_to_f") ? "#94a3b8" : "transparent"}>No</text>
+        <line x1="406" y1="356" x2="490" y2="384" stroke={edgeColor("e_yes_to_i")} strokeWidth={edgeWidth("e_yes_to_i")} markerEnd="url(#arrowHeadRec)" />
+        <text x="430" y="352" fontSize="9" fill={flow.activeEdges.has("e_yes_to_i") ? "#94a3b8" : "transparent"}>Yes</text>
 
-        <line x1="90" y1="250" x2="170" y2="264" stroke="#94a3b8" />
-        <line x1="250" y1="250" x2="170" y2="264" stroke="#94a3b8" />
-        <line x1="170" y1="264" x2="170" y2="278" stroke="#94a3b8" markerEnd="url(#arrowHeadRec)" />
+        <polygon points="210,388 270,414 210,440 150,414" fill={nodeFill("decision_f", "rgba(245,158,11,0.14)")} stroke={nodeStroke("decision_f") ?? "#f59e0b"} strokeWidth={nodeStrokeWidth("decision_f")} />
+        <text x="210" y="412" textAnchor="middle" fontSize="10" fill={textFill("decision_f", "currentColor")} fontWeight="600">F. Price ≤ SMA + entry gates?</text>
+        <line x1="154" y1="414" x2="112" y2="444" stroke={edgeColor("f_yes_to_buy")} strokeWidth={edgeWidth("f_yes_to_buy")} markerEnd="url(#arrowHeadRec)" />
+        <text x="134" y="422" fontSize="9" fill={flow.activeEdges.has("f_yes_to_buy") ? "#94a3b8" : "transparent"}>Yes</text>
+        <line x1="266" y1="414" x2="310" y2="444" stroke={edgeColor("f_no_to_wait_buy")} strokeWidth={edgeWidth("f_no_to_wait_buy")} markerEnd="url(#arrowHeadRec)" />
+        <text x="270" y="422" fontSize="9" fill={flow.activeEdges.has("f_no_to_wait_buy") ? "#94a3b8" : "transparent"}>No</text>
 
-        <rect x="40" y="282" width="260" height="36" rx="8" fill="rgba(148,163,184,0.10)" stroke="#94a3b8" />
-        <text x="52" y="299" fontSize="11" fill="currentColor" fontWeight="600">Safety gates</text>
-        <text x="52" y="312" fontSize="10" fill="#94a3b8">RSI, AI sentiment, wash sale, long-term tax</text>
+        <rect x="34" y="448" width="156" height="44" rx="8" fill={nodeFill("buy", "rgba(16,185,129,0.16)")} stroke={nodeStroke("buy") ?? "#10b981"} strokeWidth={nodeStrokeWidth("buy")} />
+        <text x="46" y="466" fontSize="11" fill={textFill("buy", "#10b981")} fontWeight="700">BUY</text>
+        <text x="46" y="480" fontSize="10" fill={textFill("buy", "currentColor")}>Entry gates passed</text>
+        <rect x="232" y="448" width="156" height="44" rx="8" fill={nodeFill("wait_buy", "rgba(239,68,68,0.12)")} stroke={nodeStroke("wait_buy") ?? "#f87171"} strokeWidth={nodeStrokeWidth("wait_buy")} />
+        <text x="244" y="466" fontSize="11" fill={textFill("wait_buy", "#f87171")} fontWeight="700">WAIT_BUY</text>
+        <text x="244" y="480" fontSize="10" fill={textFill("wait_buy", "currentColor")}>Entry conditions pending</text>
 
-        <line x1="170" y1="318" x2="170" y2="332" stroke="#94a3b8" markerEnd="url(#arrowHeadRec)" />
+        <polygon points="490,388 550,414 490,440 430,414" fill={nodeFill("decision_i", "rgba(245,158,11,0.14)")} stroke={nodeStroke("decision_i") ?? "#f59e0b"} strokeWidth={nodeStrokeWidth("decision_i")} />
+        <text x="490" y="412" textAnchor="middle" fontSize="10" fill={textFill("decision_i", "currentColor")} fontWeight="600">I. RSI sell / target-hit sell?</text>
+        <line x1="434" y1="414" x2="410" y2="444" stroke={edgeColor("i_yes_to_sell_reduce")} strokeWidth={edgeWidth("i_yes_to_sell_reduce")} markerEnd="url(#arrowHeadRec)" />
+        <text x="422" y="422" fontSize="9" fill={flow.activeEdges.has("i_yes_to_sell_reduce") ? "#94a3b8" : "transparent"}>Yes</text>
+        <line x1="546" y1="414" x2="570" y2="444" stroke={edgeColor("i_no_to_k")} strokeWidth={edgeWidth("i_no_to_k")} markerEnd="url(#arrowHeadRec)" />
+        <text x="548" y="422" fontSize="9" fill={flow.activeEdges.has("i_no_to_k") ? "#94a3b8" : "transparent"}>No</text>
+
+        <rect x="330" y="448" width="160" height="44" rx="8" fill={nodeFill("sell_reduce", "rgba(16,185,129,0.16)")} stroke={nodeStroke("sell_reduce") ?? "#10b981"} strokeWidth={nodeStrokeWidth("sell_reduce")} />
+        <text x="342" y="466" fontSize="11" fill={textFill("sell_reduce", "#10b981")} fontWeight="700">SELL / REDUCE</text>
+        <text x="342" y="480" fontSize="10" fill={textFill("sell_reduce", "currentColor")}>Profit-taking condition hit</text>
+
+        <polygon points="570,448 630,474 570,500 510,474" fill={nodeFill("decision_k", "rgba(245,158,11,0.14)")} stroke={nodeStroke("decision_k") ?? "#f59e0b"} strokeWidth={nodeStrokeWidth("decision_k")} />
+        <text x="570" y="472" textAnchor="middle" fontSize="10" fill={textFill("decision_k", "currentColor")} fontWeight="600">K. Price ≤ next buy + add gates?</text>
+        <line x1="514" y1="474" x2="490" y2="504" stroke={edgeColor("k_yes_to_add")} strokeWidth={edgeWidth("k_yes_to_add")} markerEnd="url(#arrowHeadRec)" />
+        <text x="500" y="482" fontSize="9" fill={flow.activeEdges.has("k_yes_to_add") ? "#94a3b8" : "transparent"}>Yes</text>
+        <line x1="626" y1="474" x2="650" y2="504" stroke={edgeColor("k_no_to_m")} strokeWidth={edgeWidth("k_no_to_m")} markerEnd="url(#arrowHeadRec)" />
+        <text x="626" y="482" fontSize="9" fill={flow.activeEdges.has("k_no_to_m") ? "#94a3b8" : "transparent"}>No</text>
+
+        <rect x="412" y="508" width="156" height="44" rx="8" fill={nodeFill("add", "rgba(16,185,129,0.16)")} stroke={nodeStroke("add") ?? "#10b981"} strokeWidth={nodeStrokeWidth("add")} />
+        <text x="424" y="526" fontSize="11" fill={textFill("add", "#10b981")} fontWeight="700">ADD</text>
+        <text x="424" y="540" fontSize="10" fill={textFill("add", "currentColor")}>Averaging-down entry</text>
+
+        <polygon points="650,508 710,534 650,560 590,534" fill={nodeFill("decision_m", "rgba(245,158,11,0.14)")} stroke={nodeStroke("decision_m") ?? "#f59e0b"} strokeWidth={nodeStrokeWidth("decision_m")} />
+        <text x="650" y="532" textAnchor="middle" fontSize="10" fill={textFill("decision_m", "currentColor")} fontWeight="600">M. Oversize + trim gates pass?</text>
+        <line x1="594" y1="534" x2="560" y2="564" stroke={edgeColor("m_yes_to_reduce")} strokeWidth={edgeWidth("m_yes_to_reduce")} markerEnd="url(#arrowHeadRec)" />
+        <text x="576" y="542" fontSize="9" fill={flow.activeEdges.has("m_yes_to_reduce") ? "#94a3b8" : "transparent"}>Yes</text>
+        <line x1="706" y1="534" x2="710" y2="564" stroke={edgeColor("m_no_to_wait_hold")} strokeWidth={edgeWidth("m_no_to_wait_hold")} markerEnd="url(#arrowHeadRec)" />
+        <text x="704" y="542" fontSize="9" fill={flow.activeEdges.has("m_no_to_wait_hold") ? "#94a3b8" : "transparent"}>No</text>
+
+        <rect x="482" y="568" width="156" height="44" rx="8" fill={nodeFill("reduce", "rgba(16,185,129,0.16)")} stroke={nodeStroke("reduce") ?? "#10b981"} strokeWidth={nodeStrokeWidth("reduce")} />
+        <text x="494" y="586" fontSize="11" fill={textFill("reduce", "#10b981")} fontWeight="700">REDUCE</text>
+        <text x="494" y="600" fontSize="10" fill={textFill("reduce", "currentColor")}>Trim oversized holding</text>
+        <rect x="620" y="568" width="112" height="58" rx="8" fill={nodeFill("wait_hold", "rgba(239,68,68,0.12)")} stroke={nodeStroke("wait_hold") ?? "#f87171"} strokeWidth={nodeStrokeWidth("wait_hold")} />
+        <text x="632" y="586" fontSize="10" fill={textFill("wait_hold", "#f87171")} fontWeight="700">WAIT_ADD</text>
+        <text x="632" y="599" fontSize="10" fill={textFill("wait_hold", "#f87171")} fontWeight="700">/ WAIT_REDUCE</text>
+        <text x="632" y="612" fontSize="9" fill={textFill("wait_hold", "currentColor")}>Holding, conditions pending</text>
+
+        <line x1="140" y1="186" x2="350" y2="666" stroke={edgeColor("wait_override_to_p")} strokeWidth={edgeWidth("wait_override_to_p")} markerEnd="url(#arrowHeadRec)" />
+        <line x1="140" y1="266" x2="350" y2="666" stroke={edgeColor("wait_history_to_p")} strokeWidth={edgeWidth("wait_history_to_p")} markerEnd="url(#arrowHeadRec)" />
+        <line x1="112" y1="492" x2="350" y2="666" stroke={edgeColor("buy_to_p")} strokeWidth={edgeWidth("buy_to_p")} markerEnd="url(#arrowHeadRec)" />
+        <line x1="310" y1="492" x2="350" y2="666" stroke={edgeColor("wait_buy_to_p")} strokeWidth={edgeWidth("wait_buy_to_p")} markerEnd="url(#arrowHeadRec)" />
+        <line x1="410" y1="492" x2="350" y2="666" stroke={edgeColor("sell_reduce_to_p")} strokeWidth={edgeWidth("sell_reduce_to_p")} markerEnd="url(#arrowHeadRec)" />
+        <line x1="490" y1="552" x2="350" y2="666" stroke={edgeColor("add_to_p")} strokeWidth={edgeWidth("add_to_p")} markerEnd="url(#arrowHeadRec)" />
+        <line x1="560" y1="612" x2="350" y2="666" stroke={edgeColor("reduce_to_p")} strokeWidth={edgeWidth("reduce_to_p")} markerEnd="url(#arrowHeadRec)" />
+        <line x1="676" y1="626" x2="350" y2="666" stroke={edgeColor("wait_hold_to_p")} strokeWidth={edgeWidth("wait_hold_to_p")} markerEnd="url(#arrowHeadRec)" />
+
+        <rect x="190" y="670" width="320" height="50" rx="8" fill={nodeFill("overlay_p", "rgba(148,163,184,0.10)")} stroke={nodeStroke("overlay_p") ?? "#94a3b8"} strokeWidth={nodeStrokeWidth("overlay_p")} />
+        <text x="202" y="690" fontSize="11" fill={textFill("overlay_p", "currentColor")} fontWeight="600">P. Apply shortlist / risk rules</text>
+        <text x="202" y="705" fontSize="10" fill={textFill("overlay_p", "#94a3b8")}>Post-process BUY/WAIT/ADD/SELL actions against portfolio shortlist gates</text>
+        <line x1="350" y1="720" x2="350" y2="746" stroke={edgeColor("p_to_q")} strokeWidth={edgeWidth("p_to_q")} markerEnd="url(#arrowHeadRec)" />
+
+        <rect x="190" y="750" width="320" height="50" rx="8" fill={nodeFill("overlay_q", "rgba(148,163,184,0.10)")} stroke={nodeStroke("overlay_q") ?? "#94a3b8"} strokeWidth={nodeStrokeWidth("overlay_q")} />
+        <text x="202" y="770" fontSize="11" fill={textFill("overlay_q", "currentColor")} fontWeight="600">Q. Apply market outlook cash-raise rules</text>
+        <text x="202" y="785" fontSize="10" fill={textFill("overlay_q", "#94a3b8")}>Escalate to SELL/REDUCE when cash is below the target floor</text>
+        <line x1="350" y1="800" x2="350" y2="826" stroke={edgeColor("q_to_r")} strokeWidth={edgeWidth("q_to_r")} markerEnd="url(#arrowHeadRec)" />
+
+        <rect x="190" y="830" width="320" height="50" rx="8" fill={nodeFill("final_r", "rgba(59,130,246,0.12)")} stroke={nodeStroke("final_r") ?? "#60a5fa"} strokeWidth={nodeStrokeWidth("final_r")} />
+        <text x="202" y="850" fontSize="11" fill={textFill("final_r", "currentColor")} fontWeight="600">R. Final recommendation shown in app</text>
+        <text x="202" y="865" fontSize="10" fill={textFill("final_r", "#94a3b8")}>Action + comments + color-coded decision factors in Recommendation tab</text>
       </svg>
+      </div>
       <div className="mt-1 rounded-md border border-border/70 bg-background/30 px-2 py-1 dark:border-white/[0.08]">
-        <p className="text-[11px] font-semibold text-foreground">Portfolio overlays → Final recommendation</p>
-        <p className="text-[10px] text-subtle">Shortlist/risk + market-outlook cash rules, then Action + Comments + Factors.</p>
+        <p className="text-[11px] font-semibold text-foreground sm:text-xs">Active decision path only</p>
+        <p className="text-[10px] text-subtle sm:text-[11px]">Only the highlighted branch that produced this stock&apos;s current recommendation is shown.</p>
       </div>
     </div>
   );

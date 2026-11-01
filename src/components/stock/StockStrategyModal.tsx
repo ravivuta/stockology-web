@@ -26,7 +26,7 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
   const [stockLimit, setStockLimit] = useState(String(stock.stockLimit));
   const [transactionLimit, setTransactionLimit] = useState(String(stock.transactionLimit));
   const [targetPrice, setTargetPrice] = useState(stock.targetPrice != null ? String(stock.targetPrice) : "");
-  const [showRecommendationFlow, setShowRecommendationFlow] = useState(false);
+  const [flowChartOpen, setFlowChartOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -80,6 +80,7 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
         : "Adds use the moving average until this stock has a score below 85.";
 
   return (
+    <>
     <AppModal open={open} onClose={onClose} size="md" titleId="strategy-modal-title">
       <ModalSection className="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-elevated px-4 py-3 dark:border-foreground/10">
         <h2 id="strategy-modal-title" className="text-lg font-semibold text-foreground">
@@ -98,17 +99,12 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
         <div className="rounded-xl border border-border/70 bg-background/50 p-3 dark:border-foreground/10">
           <button
             type="button"
-            onClick={() => setShowRecommendationFlow((prev) => !prev)}
+            onClick={() => setFlowChartOpen(true)}
             className="inline-flex items-center gap-2 text-xs font-semibold text-foreground"
           >
             <Info className="h-3.5 w-3.5 text-subtle" />
             Recommendation Flow
           </button>
-          {showRecommendationFlow ? (
-            <div className="mt-2">
-              <RecommendationFlowSvgDiagram />
-            </div>
-          ) : null}
         </div>
 
         <div className="rounded-xl border border-border bg-background/60 p-3 text-xs leading-relaxed dark:border-foreground/10 dark:bg-yale/20">
@@ -239,61 +235,155 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
         </p>
       </ModalSection>
     </AppModal>
+    <AppModal
+      open={flowChartOpen}
+      onClose={() => setFlowChartOpen(false)}
+      size="xl"
+      panelClassName="h-[94vh] max-w-[min(98vw,1320px)]"
+      shellClassName="sm:p-2"
+      titleId="strategy-flowchart-modal-title"
+    >
+      <ModalSection className="border-b border-border bg-elevated px-4 py-3 sm:px-5 sm:py-3.5 dark:border-foreground/10">
+        <h3 id="strategy-flowchart-modal-title" className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
+          Recommendation Flow
+        </h3>
+        <p className="mt-1 text-xs text-subtle sm:text-sm">Full strategy flowchart in a large view for easier readability.</p>
+      </ModalSection>
+      <ModalSection className="min-h-0 flex-1 space-y-2 px-3 py-3 sm:px-5 sm:py-4">
+        <RecommendationFlowSvgDiagram />
+      </ModalSection>
+    </AppModal>
+    </>
   );
 }
 
 function RecommendationFlowSvgDiagram() {
   return (
     <div className="rounded-lg border border-border/70 bg-background/40 p-2 dark:border-white/[0.08]">
-      <svg viewBox="0 0 340 360" className="h-auto w-full">
+      <div className="h-[70vh] overflow-auto rounded-md border border-border/50 bg-background/30 p-1.5 sm:h-[74vh] sm:p-2 dark:border-white/[0.08]">
+      <svg viewBox="0 0 740 1020" className="mx-auto h-auto w-full max-w-[980px]">
         <defs>
-          <marker id="arrowHead" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+          <marker id="arrowHead" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
             <path d="M0,0 L8,4 L0,8 Z" fill="#94a3b8" />
           </marker>
         </defs>
 
-        <rect x="40" y="10" width="260" height="40" rx="8" fill="rgba(148,163,184,0.10)" stroke="#94a3b8" />
-        <text x="52" y="27" fontSize="11" fill="currentColor" fontWeight="600">Start</text>
-        <text x="52" y="41" fontSize="10" fill="#94a3b8">Live price + latest history/settings</text>
+        <rect x="220" y="12" width="260" height="42" rx="8" fill="rgba(148,163,184,0.10)" stroke="#94a3b8" />
+        <text x="232" y="30" fontSize="11" fill="currentColor" fontWeight="600">A. Start</text>
+        <text x="232" y="44" fontSize="10" fill="#94a3b8">Live price + latest data loaded</text>
+        <line x1="350" y1="54" x2="350" y2="82" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
 
-        <line x1="170" y1="50" x2="170" y2="66" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <polygon points="350,86 410,112 350,138 290,112" fill="rgba(245,158,11,0.14)" stroke="#f59e0b" />
+        <text x="350" y="110" textAnchor="middle" fontSize="10" fill="currentColor" fontWeight="600">B. Excluded or suppressed?</text>
+        <line x1="294" y1="112" x2="150" y2="140" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <text x="210" y="118" fontSize="9" fill="#94a3b8">Yes</text>
+        <line x1="350" y1="138" x2="350" y2="162" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <text x="358" y="154" fontSize="9" fill="#94a3b8">No</text>
 
-        <rect x="40" y="70" width="260" height="42" rx="8" fill="rgba(148,163,184,0.10)" stroke="#94a3b8" />
-        <text x="52" y="88" fontSize="11" fill="currentColor" fontWeight="600">Compute levels</text>
-        <text x="52" y="102" fontSize="10" fill="#94a3b8">SMA, next-buy trigger, selected analyst target</text>
+        <rect x="48" y="142" width="204" height="44" rx="8" fill="rgba(239,68,68,0.12)" stroke="#f87171" />
+        <text x="60" y="160" fontSize="11" fill="#f87171" fontWeight="700">WAIT</text>
+        <text x="60" y="174" fontSize="10" fill="currentColor">No action due to your override</text>
 
-        <line x1="170" y1="112" x2="170" y2="124" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <polygon points="350,166 410,192 350,218 290,192" fill="rgba(245,158,11,0.14)" stroke="#f59e0b" />
+        <text x="350" y="196" textAnchor="middle" fontSize="10" fill="currentColor" fontWeight="600">C. Enough price history?</text>
+        <line x1="294" y1="192" x2="150" y2="220" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <text x="212" y="198" fontSize="9" fill="#94a3b8">No</text>
+        <line x1="350" y1="218" x2="350" y2="244" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <text x="358" y="236" fontSize="9" fill="#94a3b8">Yes</text>
 
-        <polygon points="170,128 230,154 170,180 110,154" fill="rgba(245,158,11,0.14)" stroke="#f59e0b" />
-        <text x="170" y="158" textAnchor="middle" fontSize="11" fill="currentColor" fontWeight="600">Has position?</text>
+        <rect x="48" y="222" width="204" height="44" rx="8" fill="rgba(239,68,68,0.12)" stroke="#f87171" />
+        <text x="60" y="240" fontSize="11" fill="#f87171" fontWeight="700">WAIT</text>
+        <text x="60" y="254" fontSize="10" fill="currentColor">Need more historical data</text>
 
-        <line x1="170" y1="180" x2="170" y2="194" stroke="#94a3b8" />
-        <line x1="170" y1="194" x2="90" y2="194" stroke="#94a3b8" />
-        <line x1="170" y1="194" x2="250" y2="194" stroke="#94a3b8" />
-        <line x1="90" y1="194" x2="90" y2="204" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
-        <line x1="250" y1="194" x2="250" y2="204" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <rect x="200" y="248" width="300" height="52" rx="8" fill="rgba(148,163,184,0.10)" stroke="#94a3b8" />
+        <text x="212" y="268" fontSize="11" fill="currentColor" fontWeight="600">D. Compute key levels</text>
+        <text x="212" y="282" fontSize="10" fill="#94a3b8">SMA, next buy, selected target, upside %</text>
+        <line x1="350" y1="300" x2="350" y2="326" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
 
-        <rect x="20" y="208" width="140" height="42" rx="6" fill="rgba(16,185,129,0.14)" stroke="#10b981" />
-        <text x="30" y="224" fontSize="10" fill="#10b981" fontWeight="700">YES</text>
-        <text x="30" y="238" fontSize="10" fill="currentColor">ADD / REDUCE / SELL / WAIT</text>
+        <polygon points="350,330 410,356 350,382 290,356" fill="rgba(245,158,11,0.14)" stroke="#f59e0b" />
+        <text x="350" y="360" textAnchor="middle" fontSize="10" fill="currentColor" fontWeight="600">E. Holding shares now?</text>
 
-        <rect x="180" y="208" width="140" height="42" rx="6" fill="rgba(148,163,184,0.08)" stroke="#94a3b8" />
-        <text x="190" y="224" fontSize="10" fill="#94a3b8" fontWeight="700">NO</text>
-        <text x="190" y="238" fontSize="10" fill="currentColor">BUY / WAIT_BUY</text>
+        <line x1="294" y1="356" x2="210" y2="384" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <text x="246" y="352" fontSize="9" fill="#94a3b8">No</text>
+        <line x1="406" y1="356" x2="490" y2="384" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <text x="430" y="352" fontSize="9" fill="#94a3b8">Yes</text>
 
-        <line x1="90" y1="250" x2="170" y2="264" stroke="#94a3b8" />
-        <line x1="250" y1="250" x2="170" y2="264" stroke="#94a3b8" />
-        <line x1="170" y1="264" x2="170" y2="278" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <polygon points="210,388 270,414 210,440 150,414" fill="rgba(245,158,11,0.14)" stroke="#f59e0b" />
+        <text x="210" y="412" textAnchor="middle" fontSize="10" fill="currentColor" fontWeight="600">F. Price ≤ SMA + entry gates?</text>
+        <line x1="154" y1="414" x2="112" y2="444" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <text x="134" y="422" fontSize="9" fill="#94a3b8">Yes</text>
+        <line x1="266" y1="414" x2="310" y2="444" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <text x="270" y="422" fontSize="9" fill="#94a3b8">No</text>
 
-        <rect x="40" y="282" width="260" height="36" rx="8" fill="rgba(148,163,184,0.10)" stroke="#94a3b8" />
-        <text x="52" y="299" fontSize="11" fill="currentColor" fontWeight="600">Safety gates</text>
-        <text x="52" y="312" fontSize="10" fill="#94a3b8">RSI, AI sentiment, wash sale, long-term tax</text>
+        <rect x="34" y="448" width="156" height="44" rx="8" fill="rgba(16,185,129,0.16)" stroke="#10b981" />
+        <text x="46" y="466" fontSize="11" fill="#10b981" fontWeight="700">BUY</text>
+        <text x="46" y="480" fontSize="10" fill="currentColor">Entry gates passed</text>
+        <rect x="232" y="448" width="156" height="44" rx="8" fill="rgba(239,68,68,0.12)" stroke="#f87171" />
+        <text x="244" y="466" fontSize="11" fill="#f87171" fontWeight="700">WAIT_BUY</text>
+        <text x="244" y="480" fontSize="10" fill="currentColor">Entry conditions pending</text>
 
-        <line x1="170" y1="318" x2="170" y2="332" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <polygon points="490,388 550,414 490,440 430,414" fill="rgba(245,158,11,0.14)" stroke="#f59e0b" />
+        <text x="490" y="412" textAnchor="middle" fontSize="10" fill="currentColor" fontWeight="600">I. RSI sell / target-hit sell?</text>
+        <line x1="434" y1="414" x2="410" y2="444" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <text x="422" y="422" fontSize="9" fill="#94a3b8">Yes</text>
+        <line x1="546" y1="414" x2="570" y2="444" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <text x="548" y="422" fontSize="9" fill="#94a3b8">No</text>
+
+        <rect x="330" y="448" width="160" height="44" rx="8" fill="rgba(16,185,129,0.16)" stroke="#10b981" />
+        <text x="342" y="466" fontSize="11" fill="#10b981" fontWeight="700">SELL / REDUCE</text>
+        <text x="342" y="480" fontSize="10" fill="currentColor">Profit-taking condition hit</text>
+
+        <polygon points="570,448 630,474 570,500 510,474" fill="rgba(245,158,11,0.14)" stroke="#f59e0b" />
+        <text x="570" y="472" textAnchor="middle" fontSize="10" fill="currentColor" fontWeight="600">K. Price ≤ next buy + add gates?</text>
+        <line x1="514" y1="474" x2="490" y2="504" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <text x="500" y="482" fontSize="9" fill="#94a3b8">Yes</text>
+        <line x1="626" y1="474" x2="650" y2="504" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <text x="626" y="482" fontSize="9" fill="#94a3b8">No</text>
+
+        <rect x="412" y="508" width="156" height="44" rx="8" fill="rgba(16,185,129,0.16)" stroke="#10b981" />
+        <text x="424" y="526" fontSize="11" fill="#10b981" fontWeight="700">ADD</text>
+        <text x="424" y="540" fontSize="10" fill="currentColor">Averaging-down entry</text>
+
+        <polygon points="650,508 710,534 650,560 590,534" fill="rgba(245,158,11,0.14)" stroke="#f59e0b" />
+        <text x="650" y="532" textAnchor="middle" fontSize="10" fill="currentColor" fontWeight="600">M. Oversize + trim gates pass?</text>
+        <line x1="594" y1="534" x2="560" y2="564" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <text x="576" y="542" fontSize="9" fill="#94a3b8">Yes</text>
+        <line x1="706" y1="534" x2="710" y2="564" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <text x="704" y="542" fontSize="9" fill="#94a3b8">No</text>
+
+        <rect x="482" y="568" width="156" height="44" rx="8" fill="rgba(16,185,129,0.16)" stroke="#10b981" />
+        <text x="494" y="586" fontSize="11" fill="#10b981" fontWeight="700">REDUCE</text>
+        <text x="494" y="600" fontSize="10" fill="currentColor">Trim oversized holding</text>
+        <rect x="620" y="568" width="112" height="58" rx="8" fill="rgba(239,68,68,0.12)" stroke="#f87171" />
+        <text x="632" y="586" fontSize="10" fill="#f87171" fontWeight="700">WAIT_ADD</text>
+        <text x="632" y="599" fontSize="10" fill="#f87171" fontWeight="700">/ WAIT_REDUCE</text>
+        <text x="632" y="612" fontSize="9" fill="currentColor">Holding, conditions pending</text>
+
+        <line x1="112" y1="492" x2="350" y2="666" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <line x1="310" y1="492" x2="350" y2="666" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <line x1="410" y1="492" x2="350" y2="666" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <line x1="490" y1="552" x2="350" y2="666" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <line x1="560" y1="612" x2="350" y2="666" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <line x1="676" y1="626" x2="350" y2="666" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+
+        <rect x="190" y="670" width="320" height="50" rx="8" fill="rgba(148,163,184,0.10)" stroke="#94a3b8" />
+        <text x="202" y="690" fontSize="11" fill="currentColor" fontWeight="600">P. Apply shortlist / risk rules</text>
+        <text x="202" y="705" fontSize="10" fill="#94a3b8">Post-process BUY/WAIT/ADD/SELL actions against portfolio shortlist gates</text>
+        <line x1="350" y1="720" x2="350" y2="746" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+
+        <rect x="190" y="750" width="320" height="50" rx="8" fill="rgba(148,163,184,0.10)" stroke="#94a3b8" />
+        <text x="202" y="770" fontSize="11" fill="currentColor" fontWeight="600">Q. Apply market outlook cash-raise rules</text>
+        <text x="202" y="785" fontSize="10" fill="#94a3b8">Escalate to SELL/REDUCE when cash is below the target floor</text>
+        <line x1="350" y1="800" x2="350" y2="826" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+
+        <rect x="190" y="830" width="320" height="50" rx="8" fill="rgba(59,130,246,0.12)" stroke="#60a5fa" />
+        <text x="202" y="850" fontSize="11" fill="currentColor" fontWeight="600">R. Final recommendation shown in app</text>
+        <text x="202" y="865" fontSize="10" fill="#94a3b8">Action + comments + color-coded decision factors in Recommendation tab</text>
       </svg>
+      </div>
       <div className="mt-1 rounded-md border border-border/70 bg-background/30 px-2 py-1 dark:border-white/[0.08]">
-        <p className="text-[11px] font-semibold text-foreground">Portfolio overlays → Final recommendation</p>
-        <p className="text-[10px] text-subtle">Shortlist/risk + market-outlook cash rules, then Action + Comments + Factors.</p>
+        <p className="text-[11px] font-semibold text-foreground sm:text-xs">Full decision tree (base logic + overlays)</p>
+        <p className="text-[10px] text-subtle sm:text-[11px]">Shows every branch from suppression/history checks through shortlist and market-outlook post-processing.</p>
       </div>
     </div>
   );
