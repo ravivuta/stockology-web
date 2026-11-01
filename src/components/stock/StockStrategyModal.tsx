@@ -105,22 +105,8 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
             Recommendation Flow
           </button>
           {showRecommendationFlow ? (
-            <div className="mt-2 space-y-1.5 text-[11px]">
-              <FlowNode title="Start" detail="Live price + latest stock, holdings, and settings." />
-              <FlowArrow />
-              <FlowNode title="Compute levels" detail="SMA, next-buy level, selected analyst target." />
-              <FlowArrow />
-              <FlowDecision
-                title="Has position?"
-                yesText="Yes → ADD / REDUCE / SELL / WAIT"
-                noText="No → BUY / WAIT_BUY"
-              />
-              <FlowArrow />
-              <FlowNode title="Safety gates" detail="RSI, AI sentiment, wash sale, tax holding period." />
-              <FlowArrow />
-              <FlowNode title="Portfolio overlays" detail="Shortlist/risk and market-outlook cash rules." />
-              <FlowArrow />
-              <FlowNode title="Final recommendation" detail="Shown in Recommendation with factors." />
+            <div className="mt-2">
+              <RecommendationFlowSvgDiagram />
             </div>
           ) : null}
         </div>
@@ -256,39 +242,59 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
   );
 }
 
-function FlowNode({ title, detail }: { title: string; detail: string }) {
+function RecommendationFlowSvgDiagram() {
   return (
-    <div className="rounded-md border border-border/70 bg-background/40 px-2 py-1.5 dark:border-white/[0.08]">
-      <p className="text-[11px] font-semibold text-foreground">{title}</p>
-      <p className="text-[10.5px] text-subtle">{detail}</p>
-    </div>
-  );
-}
+    <div className="rounded-lg border border-border/70 bg-background/40 p-2 dark:border-white/[0.08]">
+      <svg viewBox="0 0 340 360" className="h-auto w-full">
+        <defs>
+          <marker id="arrowHead" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#94a3b8" />
+          </marker>
+        </defs>
 
-function FlowDecision({ title, yesText, noText }: { title: string; yesText: string; noText: string }) {
-  return (
-    <div className="space-y-1">
-      <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-center">
-        <p className="text-[11px] font-semibold text-foreground">◆ {title}</p>
-      </div>
-      <div className="mx-auto h-2 w-px bg-border/80 dark:bg-white/[0.18]" />
-      <div className="h-px w-full bg-border/80 dark:bg-white/[0.18]" />
-      <div className="grid grid-cols-2 gap-2 text-subtle">
-        <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1">
-          <p className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">YES</p>
-          <p>{yesText}</p>
-        </div>
-        <div className="rounded-md border border-border/70 bg-background/40 px-2 py-1 dark:border-white/[0.08]">
-          <p className="text-[10px] font-semibold text-subtle">NO</p>
-          <p>{noText}</p>
-        </div>
+        <rect x="40" y="10" width="260" height="40" rx="8" fill="rgba(148,163,184,0.10)" stroke="#94a3b8" />
+        <text x="52" y="27" fontSize="11" fill="currentColor" fontWeight="600">Start</text>
+        <text x="52" y="41" fontSize="10" fill="#94a3b8">Live price + latest history/settings</text>
+
+        <line x1="170" y1="50" x2="170" y2="66" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+
+        <rect x="40" y="70" width="260" height="42" rx="8" fill="rgba(148,163,184,0.10)" stroke="#94a3b8" />
+        <text x="52" y="88" fontSize="11" fill="currentColor" fontWeight="600">Compute levels</text>
+        <text x="52" y="102" fontSize="10" fill="#94a3b8">SMA, next-buy trigger, selected analyst target</text>
+
+        <line x1="170" y1="112" x2="170" y2="124" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+
+        <polygon points="170,128 230,154 170,180 110,154" fill="rgba(245,158,11,0.14)" stroke="#f59e0b" />
+        <text x="170" y="158" textAnchor="middle" fontSize="11" fill="currentColor" fontWeight="600">Has position?</text>
+
+        <line x1="170" y1="180" x2="170" y2="194" stroke="#94a3b8" />
+        <line x1="170" y1="194" x2="90" y2="194" stroke="#94a3b8" />
+        <line x1="170" y1="194" x2="250" y2="194" stroke="#94a3b8" />
+        <line x1="90" y1="194" x2="90" y2="204" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+        <line x1="250" y1="194" x2="250" y2="204" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+
+        <rect x="20" y="208" width="140" height="42" rx="6" fill="rgba(16,185,129,0.14)" stroke="#10b981" />
+        <text x="30" y="224" fontSize="10" fill="#10b981" fontWeight="700">YES</text>
+        <text x="30" y="238" fontSize="10" fill="currentColor">ADD / REDUCE / SELL / WAIT</text>
+
+        <rect x="180" y="208" width="140" height="42" rx="6" fill="rgba(148,163,184,0.08)" stroke="#94a3b8" />
+        <text x="190" y="224" fontSize="10" fill="#94a3b8" fontWeight="700">NO</text>
+        <text x="190" y="238" fontSize="10" fill="currentColor">BUY / WAIT_BUY</text>
+
+        <line x1="90" y1="250" x2="170" y2="264" stroke="#94a3b8" />
+        <line x1="250" y1="250" x2="170" y2="264" stroke="#94a3b8" />
+        <line x1="170" y1="264" x2="170" y2="278" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+
+        <rect x="40" y="282" width="260" height="36" rx="8" fill="rgba(148,163,184,0.10)" stroke="#94a3b8" />
+        <text x="52" y="299" fontSize="11" fill="currentColor" fontWeight="600">Safety gates</text>
+        <text x="52" y="312" fontSize="10" fill="#94a3b8">RSI, AI sentiment, wash sale, long-term tax</text>
+
+        <line x1="170" y1="318" x2="170" y2="332" stroke="#94a3b8" markerEnd="url(#arrowHead)" />
+      </svg>
+      <div className="mt-1 rounded-md border border-border/70 bg-background/30 px-2 py-1 dark:border-white/[0.08]">
+        <p className="text-[11px] font-semibold text-foreground">Portfolio overlays → Final recommendation</p>
+        <p className="text-[10px] text-subtle">Shortlist/risk + market-outlook cash rules, then Action + Comments + Factors.</p>
       </div>
     </div>
-  );
-}
-
-function FlowArrow() {
-  return (
-    <p className="text-center text-[10px] font-semibold text-subtle">↓</p>
   );
 }
