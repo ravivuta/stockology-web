@@ -274,9 +274,9 @@ export async function POST(request: NextRequest) {
     useRSIGating,
   };
 
-  // Match iOS optimizer grid exactly for parity.
-  const smaValues = [25, 50, 100, 200];
-  const dynamicFactorValues = [10, 15, 20, 25];
+  // Match current iOS StockParameterOptimizer grid exactly for parity.
+  const smaValues = [50, 100, 200];
+  const dynamicFactorValues = [5, 10, 15, 20, 25];
   let bestReturn = Number.NEGATIVE_INFINITY;
   let bestParams: { shortSMA: number; dynamicFactor: number } | null = null;
 
