@@ -2275,9 +2275,15 @@ function FactorFlagRow({
   passes: boolean;
   compact?: boolean;
 }) {
+  const statusPrefix = (() => {
+    const lower = label.toLowerCase();
+    const useBoolean = lower.includes("user override") || lower.includes("enabled") || lower.includes("suppressed");
+    if (useBoolean) return passes ? "True" : "False";
+    return passes ? "Yes" : "No";
+  })();
   const questionLabel = label.trim().endsWith("?") ? label.trim() : `${label.trim()}?`;
   const normalizedDetail = detail.trim();
-  const prefixedDetail = `${passes ? "Yes / True" : "No / False"}${normalizedDetail.length > 0 ? ` — ${normalizedDetail}` : ""}`;
+  const prefixedDetail = `${statusPrefix}${normalizedDetail.length > 0 ? ` — ${normalizedDetail}` : ""}`;
 
   return (
     <div className={cn("flex items-start gap-2", compact ? "py-1" : "py-1.5")}>
