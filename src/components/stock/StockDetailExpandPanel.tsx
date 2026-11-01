@@ -939,7 +939,12 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       setOptimizationMessage(result.error ?? `Unable to optimize ${symbol}.`);
       return;
     }
+    const latest = usePortfolioStore.getState().stocks.find((item) => item.symbol === symbol.toUpperCase());
+    const confirmationMessage = latest
+      ? `Optimization completed for ${symbol.toUpperCase()}.\nSMA: ${latest.shortSMA} days • Rebuy factor: ${Math.round(latest.dynamicFactor)}%`
+      : `Optimization completed for ${symbol.toUpperCase()}.`;
     setOptimizationMessage("Parameters optimized from historical data.");
+    window.alert(confirmationMessage);
     await flushCurrentPortfolioSnapshotNow(true);
   }
 
@@ -1307,21 +1312,45 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                   <span className="flex items-center justify-between gap-3">
                   <span>Recommendation</span>
                   <span className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleOptimize}
-                      disabled={optimizing || !stock.pendingOptimization}
-                      className={cn(
-                        "ui-hover-pop inline-flex items-center gap-1.5 border font-semibold shadow-sm backdrop-blur-lg sm:gap-2 disabled:cursor-not-allowed disabled:opacity-60",
-                        stock.pendingOptimization
-                          ? "border-primary/25 bg-primary/10 text-primary"
-                          : "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-                        dense ? "rounded-lg px-2 py-1 text-[10px]" : "rounded-lg px-2.5 py-1.5 text-xs"
-                      )}
-                      aria-label="Optimize parameters"
-                    >
-                      {optimizing ? "Optimizing…" : stock.pendingOptimization ? "Optimize" : "Optimized"}
-                    </button>
+                    {stock.pendingOptimization ? (
+                      <button
+                        type="button"
+                        onClick={handleOptimize}
+                        disabled={optimizing}
+                        className={cn(
+                          "ui-hover-pop inline-flex items-center gap-1.5 border font-semibold shadow-sm backdrop-blur-lg sm:gap-2 disabled:cursor-not-allowed disabled:opacity-60",
+                          "border-primary/25 bg-primary/10 text-primary",
+                          dense ? "rounded-lg px-2 py-1 text-[10px]" : "rounded-lg px-2.5 py-1.5 text-xs"
+                        )}
+                        aria-label="Optimize parameters"
+                      >
+                        {optimizing ? "Optimizing…" : "Optimize"}
+                      </button>
+                    ) : (
+                      <>
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1.5 border border-emerald-500/25 bg-emerald-500/10 font-semibold text-emerald-700 shadow-sm backdrop-blur-lg dark:text-emerald-300 sm:gap-2",
+                            dense ? "rounded-lg px-2 py-1 text-[10px]" : "rounded-lg px-2.5 py-1.5 text-xs"
+                          )}
+                          aria-label="Stock is optimized"
+                        >
+                          Optimized
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleOptimize}
+                          disabled={optimizing}
+                          className={cn(
+                            "ui-hover-pop inline-flex items-center gap-1.5 border border-primary/25 bg-primary/10 font-semibold text-primary shadow-sm backdrop-blur-lg sm:gap-2 disabled:cursor-not-allowed disabled:opacity-60",
+                            dense ? "rounded-lg px-2 py-1 text-[10px]" : "rounded-lg px-2.5 py-1.5 text-xs"
+                          )}
+                          aria-label="Re-optimize parameters"
+                        >
+                          {optimizing ? "Optimizing…" : "Re-optimize"}
+                        </button>
+                      </>
+                    )}
                     <button
                       type="button"
                       onClick={() => setStrategyOpen(true)}
