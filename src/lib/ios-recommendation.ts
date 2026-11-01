@@ -126,8 +126,8 @@ export function selectedAnalystTarget(
   }
 
   return firstValid([
-    [candidateLow, "low"],
     [candidateMedian, "median"],
+    [candidateLow, "low"],
     [candidateMean, "mean"],
     [candidateLegacy, "legacy"],
     [candidateHigh, "high"],
@@ -967,9 +967,13 @@ export function holdingIsOutsideEnabledShortlistAndRisk(
 ): boolean {
   if (!ctx.limitWatchlistSize || !ctx.enableRiskFilter) return false;
   if (stock.quantity <= 0 || stock.isETF === true || stock.excludeFromShortlist === true) return false;
-  const size = recommendedWatchlistSize(ctx.portfolioSize);
-  const rank = rankInTopWatchlist(ctx.allStocks, stock.symbol, ctx);
-  return rank == null || rank > size;
+  const preferred = preferredSymbolsForShortlistIndicator(ctx.allStocks, {
+    limitWatchlistSize: ctx.limitWatchlistSize,
+    enableRiskFilter: ctx.enableRiskFilter,
+    riskAppetite: ctx.riskAppetite,
+    portfolioSize: ctx.portfolioSize,
+  });
+  return !preferred.has(stock.symbol);
 }
 
 /**

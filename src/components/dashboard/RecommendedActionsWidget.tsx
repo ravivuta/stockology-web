@@ -3,14 +3,56 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
+import { AlertTriangle, ShieldAlert, TrendingUp, Wallet } from "lucide-react";
 import type { StockHolding } from "@/store/portfolioStore";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { isBuyOrSellAction } from "@/lib/recommendation";
-import { fetchLatestMarketOutlook } from "@/lib/market-outlook";
+import { fetchLatestMarketOutlook, type MarketOutlook } from "@/lib/market-outlook";
 import { createClient } from "@/lib/supabase/client";
 import { fixedIncomeTotal } from "@/lib/fixed-income-accounts";
 
 const MAX_VISIBLE = 4;
+
+function outlookIconMeta(outlook: MarketOutlook): {
+  Icon: typeof TrendingUp;
+  toneClass: string;
+  bgClass: string;
+} {
+  const severe = outlook.regime === "risk_off" && outlook.score <= 20;
+  if (severe) {
+    return {
+      Icon: ShieldAlert,
+      toneClass: "text-red-700 dark:text-red-300",
+      bgClass: "border-red-500/50 bg-red-500/10",
+    };
+  }
+  if (outlook.regime === "risk_off") {
+    return {
+      Icon: AlertTriangle,
+      toneClass: "text-amber-700 dark:text-amber-300",
+      bgClass: "border-amber-500/50 bg-amber-500/10",
+    };
+  }
+  if (outlook.regime === "elevated") {
+    return {
+      Icon: Wallet,
+      toneClass: "text-amber-700 dark:text-amber-300",
+      bgClass: "border-amber-500/40 bg-amber-500/10",
+    };
+  }
+  if (outlook.regime === "neutral") {
+    return {
+      Icon: TrendingUp,
+      toneClass: "text-subtle",
+      bgClass: "border-border bg-background/40 dark:bg-white/[0.06]",
+    };
+  }
+  return {
+    Icon: TrendingUp,
+    toneClass: "text-primary",
+    bgClass: "border-primary/40 bg-primary/10",
+  };
+}
 
 function pickActions(stocks: StockHolding[]) {
   const held = stocks
@@ -110,18 +152,21 @@ export function RecommendedActionsWidget({ stocks }: { stocks: StockHolding[] })
         <div className="flex items-center gap-2">
           <h2 className="text-base font-semibold tracking-tight">Recommended Actions</h2>
           {outlookEnabled && outlook && !outlook.stale ? (
-            <button
-              type="button"
-              onClick={() => setOutlookOpen((open) => !open)}
-              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
-                outlook.preferCash
-                  ? "border-amber-500/40 text-amber-700 dark:text-amber-300"
-                  : "border-primary/40 text-primary"
-              }`}
-              aria-expanded={outlookOpen}
-            >
-              Outlook
-            </button>
+            (() => {
+              const { Icon, toneClass, bgClass } = outlookIconMeta(outlook);
+              return (
+                <button
+                  type="button"
+                  onClick={() => setOutlookOpen((open) => !open)}
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-full border ${toneClass} ${bgClass}`}
+                  aria-expanded={outlookOpen}
+                  aria-label={`Market outlook: ${outlook.label}`}
+                  title={`Market outlook: ${outlook.label}`}
+                >
+                  <Icon className={`h-4 w-4 ${reduceMotion ? "" : "animate-pulse"}`} />
+                </button>
+              );
+            })()
           ) : null}
         </div>
         {recommendationsReady && items.length > 0 ? (
