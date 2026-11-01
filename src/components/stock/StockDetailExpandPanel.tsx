@@ -2487,6 +2487,7 @@ function RecommendationFlowSvgDiagram({
   stock: StockHolding | undefined;
   recommendation: { action?: string; comments?: string } | undefined;
 }) {
+  const [zoom, setZoom] = useState(1.2);
   const flow = buildRecommendationFlowHighlight(stock, recommendation);
   const ACTIVE = "#60a5fa";
   const OVERLAY = "#f59e0b";
@@ -2523,6 +2524,14 @@ function RecommendationFlowSvgDiagram({
 
   return (
     <div className="rounded-lg border border-border/70 bg-background/40 p-2 dark:border-white/[0.08]">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-[11px] text-subtle sm:text-xs">Zoom {Math.round(zoom * 100)}%</p>
+        <div className="flex items-center gap-1.5">
+          <button type="button" onClick={() => setZoom((z) => Math.max(0.7, +(z - 0.1).toFixed(2)))} className="rounded border border-border px-2 py-1 text-[11px] text-foreground hover:bg-border/60">-</button>
+          <button type="button" onClick={() => setZoom(1)} className="rounded border border-border px-2 py-1 text-[11px] text-foreground hover:bg-border/60">Reset</button>
+          <button type="button" onClick={() => setZoom((z) => Math.min(2.5, +(z + 0.1).toFixed(2)))} className="rounded border border-border px-2 py-1 text-[11px] text-foreground hover:bg-border/60">+</button>
+        </div>
+      </div>
       <div className="mb-2 flex flex-wrap items-center gap-3 text-[10px] text-subtle sm:text-xs">
         <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-sky-400" /> Active path</span>
         <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Final action</span>
@@ -2530,7 +2539,7 @@ function RecommendationFlowSvgDiagram({
         <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> Overlay trigger</span>
       </div>
       <div className="h-[70vh] overflow-auto rounded-md border border-border/50 bg-background/30 p-1.5 sm:h-[74vh] sm:p-2 dark:border-white/[0.08]">
-      <svg viewBox="0 0 740 1020" className="mx-auto h-auto w-full max-w-[980px]">
+      <svg viewBox="0 0 740 1020" className="h-auto max-w-none" style={{ width: `${Math.round(980 * zoom)}px` }}>
         <defs>
           <marker id="arrowHeadRec" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
             <path d="M0,0 L8,4 L0,8 Z" fill="#94a3b8" />
