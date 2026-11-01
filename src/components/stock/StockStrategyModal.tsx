@@ -105,14 +105,27 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
             Recommendation Flow
           </button>
           {showRecommendationFlow ? (
-            <ol className="mt-2 list-decimal space-y-1.5 pl-4 text-[11px] text-subtle">
-              <li>Live price + latest stock, holdings, and settings are loaded.</li>
-              <li>Core levels are computed (SMA, next-buy level, selected analyst target).</li>
-              <li>Base action is selected (BUY/ADD/SELL/REDUCE/WAIT).</li>
-              <li>Safety gates apply (RSI, AI sentiment, wash sale, tax holding period).</li>
-              <li>Portfolio overlays apply (shortlist/risk and market-outlook cash rules).</li>
-              <li>Final recommendation and factor diagnostics are shown in Recommendation.</li>
-            </ol>
+            <div className="mt-2 space-y-1.5 text-[11px]">
+              <FlowNode title="Start" detail="Live price + latest stock, holdings, and settings." />
+              <FlowArrow />
+              <FlowNode title="Compute levels" detail="SMA, next-buy level, selected analyst target." />
+              <FlowArrow />
+              <FlowDecision title="Has position?" />
+              <div className="grid grid-cols-2 gap-2 px-1 text-subtle">
+                <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1">
+                  No → BUY / WAIT_BUY
+                </div>
+                <div className="rounded-md border border-border/70 bg-background/40 px-2 py-1 dark:border-white/[0.08]">
+                  Yes → ADD / REDUCE / SELL / WAIT
+                </div>
+              </div>
+              <FlowArrow />
+              <FlowNode title="Safety gates" detail="RSI, AI sentiment, wash sale, tax holding period." />
+              <FlowArrow />
+              <FlowNode title="Portfolio overlays" detail="Shortlist/risk and market-outlook cash rules." />
+              <FlowArrow />
+              <FlowNode title="Final recommendation" detail="Shown in Recommendation with factors." />
+            </div>
           ) : null}
         </div>
 
@@ -244,5 +257,28 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
         </p>
       </ModalSection>
     </AppModal>
+  );
+}
+
+function FlowNode({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className="rounded-md border border-border/70 bg-background/40 px-2 py-1.5 dark:border-white/[0.08]">
+      <p className="text-[11px] font-semibold text-foreground">{title}</p>
+      <p className="text-[10.5px] text-subtle">{detail}</p>
+    </div>
+  );
+}
+
+function FlowDecision({ title }: { title: string }) {
+  return (
+    <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5">
+      <p className="text-[11px] font-semibold text-foreground">◆ {title}</p>
+    </div>
+  );
+}
+
+function FlowArrow() {
+  return (
+    <p className="text-center text-[10px] font-semibold text-subtle">↓</p>
   );
 }
