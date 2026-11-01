@@ -1437,7 +1437,27 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                         </span>
                       </div>
                       <div className="mt-3 space-y-2">
-                        {recommendationFactorGroups(rec?.action ?? "", recommendationActionFactors, (stock?.quantity ?? 0) > 0).map((group) => (
+                        {recommendationFactorGroups(
+                          rec?.action ?? "",
+                          recommendationActionFactors,
+                          {
+                            hasPosition: (stock?.quantity ?? 0) > 0,
+                            hasOversizePosition:
+                              (stock?.quantity ?? 0) * (stock?.averageCost ?? 0) > (stock?.stockLimit ?? Number.POSITIVE_INFINITY),
+                            recComments: rec?.comments ?? "",
+                            sellFromWaitFactors: sellFromWaitFactors({
+                              stock,
+                              rec,
+                              limitWatchlistSize,
+                              enableRiskFilter,
+                              useMarketRegimeCashTilt,
+                              marketOutlookPrefersCash: marketOutlook?.preferCash === true,
+                              marketOutlookCashTargetPct,
+                              cashEquivalentBalance,
+                              portfolioSize,
+                            }),
+                          }
+                        ).map((group) => (
                           <details key={group.title} className="rounded-md border border-border/70 px-2 py-1 dark:border-white/[0.08]">
                             <summary className="cursor-pointer text-xs font-semibold text-subtle">{group.title}</summary>
                             {group.description ? <p className="mt-1 text-[11px] text-subtle">{group.description}</p> : null}
@@ -2051,32 +2071,192 @@ function labelIn(set: Set<string>, label: string): boolean {
   return false;
 }
 
-function recommendationFactorGroups(action: string, factors: { label: string; detail: string; passes: boolean }[], hasPosition: boolean) {
+type RecFactor = { label: string; detail: string; passes: boolean };
+
+function selectiveWaitFactors(
+  factors: RecFactor[],
+  includePassingLabels: Set<string> = new Set()
+): RecFactor[] {
+  const selected: RecFactor[] = [];
+  const seen = new Set<string>();
+
+  for (const factor of factors) {
+    if (!factor.passes && !seen.has(factor.label)) {
+      selected.push(factor);
+      seen.add(factor.label);
+    }
+  }
+
+  for (const factor of factors) {
+    if (factor.passes && includePassingLabels.has(factor.label) && !seen.has(factor.label)) {
+      selected.push(factor);
+      seen.add(factor.label);
+    }
+  }
+
+  if (selected.length === 0) return factors.slice(0, 3);
+  return selected;
+}
+
+function sellFromWaitFactors({
+  stock,
+  rec,
+  limitWatchlistSize,
+  enableRiskFilter,
+  useMarketRegimeCashTilt,
+  marketOutlookPrefersCash,
+  marketOutlookCashTargetPct,
+  cashEquivalentBalance,
+  portfolioSize,
+}: {
+  stock:
+    | {
+        symbol: string;
+        quantity: number;
+        averageCost: number;
+        lastPrice?: number;
+    shortSMA: number;
+    score?: number;
+    isETF?: boolean;
+    analystTarget?: number;
+    analystTargetLow?: number;
+    analystTargetMedian?: number;
+    analystTargetHigh?: number;
+    analystTargetMean?: number;
+    isInWatchlistSize?: boolean;
+    excludeFromShortlist?: boolean;
+  }
+    | undefined;
+  rec: { movingAvg: number } | undefined;
+  limitWatchlistSize: boolean;
+  enableRiskFilter: boolean;
+  useMarketRegimeCashTilt: boolean;
+  marketOutlookPrefersCash: boolean;
+  marketOutlookCashTargetPct?: number;
+  cashEquivalentBalance: number;
+  portfolioSize: number;
+}): RecFactor[] {
+  if (!stock || !rec) return [];
+  if (stock.quantity <= 0 || stock.isETF === true) return [];
+
+  const filtersOn = limitWatchlistSize && enableRiskFilter;
+  const outlookRaiseCashEnabled = useMarketRegimeCashTilt && marketOutlookPrefersCash;
+  if (!filtersOn && !outlookRaiseCashEnabled) return [];
+
+  const currentPrice = stock.lastPrice ?? 0;
+  const avgPrice = stock.averageCost ?? 0;
+  const gainPct = avgPrice > 0 ? ((currentPrice - avgPrice) / avgPrice) * 100 : 0;
+  const selectedTarget = selectedAnalystTarget(stock);
+  const upside =
+    selectedTarget.value != null && currentPrice > 0
+      ? ((selectedTarget.value - currentPrice) / currentPrice) * 100
+      : 0;
+  const outside =
+    filtersOn &&
+    stock.excludeFromShortlist !== true &&
+    stock.isInWatchlistSize === false;
+  const aboveSMA = rec.movingAvg > 0 && currentPrice > rec.movingAvg;
+  const cashShare = portfolioSize > 0 ? cashEquivalentBalance / portfolioSize : 1;
+  const cashFloor = outlookRaiseCashEnabled ? Math.max(0.2, (marketOutlookCashTargetPct ?? 20) / 100) : 0.2;
+
+  const factors: RecFactor[] = [
+    {
+      label: "Outside shortlist and risk gates",
+      detail: outside
+        ? "Not in the current shortlist"
+        : (filtersOn ? "Still inside shortlist / risk gates" : "Shortlist and risk filters are not both on"),
+      passes: outside,
+    },
+    {
+      label: `Price above ${stock.shortSMA}-day SMA`,
+      detail: rec.movingAvg > 0 ? `${formatCurrency(currentPrice)} vs ${formatCurrency(rec.movingAvg)}` : "SMA unavailable",
+      passes: aboveSMA,
+    },
+    {
+      label: "Gain beats leftover upside",
+      detail: `${gainPct.toFixed(1)}% vs ${upside.toFixed(1)}%`,
+      passes: gainPct > upside,
+    },
+    {
+      label: "Cash below the raise-cash floor",
+      detail: `${(cashShare * 100).toFixed(1)}% vs ${(cashFloor * 100).toFixed(0)}%`,
+      passes: cashShare < cashFloor,
+    },
+  ];
+
+  if (outlookRaiseCashEnabled) {
+    factors.push({
+      label: "Market outlook prefers cash",
+      detail: "Cash-first regime is active",
+      passes: true,
+    });
+  }
+
+  return factors;
+}
+
+function recommendationFactorGroups(
+  action: string,
+  factors: RecFactor[],
+  context: {
+    hasPosition: boolean;
+    hasOversizePosition: boolean;
+    recComments: string;
+    sellFromWaitFactors: RecFactor[];
+  }
+) {
   const normalized = action.toUpperCase();
   if (normalized === "BUY" || normalized === "ADD" || normalized === "SELL" || normalized === "REDUCE") {
     const title = normalized === "BUY" ? "Buy path" : normalized === "ADD" ? "Add path" : normalized === "SELL" ? "Sell path" : "Reduce path";
     return [{ title, description: null as string | null, factors }];
   }
   if (normalized === "WAIT_ADD" || normalized === "WAIT_REDUCE") {
-    const groups = [];
+    const groups: Array<{ title: string; description: string | null; factors: RecFactor[] }> = [];
     const common = factors.filter((factor) => !labelIn(ADD_FACTOR_LABELS, factor.label) && !REDUCE_FACTOR_LABELS.has(factor.label));
     const addPath = factors.filter((factor) => labelIn(ADD_FACTOR_LABELS, factor.label));
-    const reducePath = hasPosition ? factors.filter((factor) => REDUCE_FACTOR_LABELS.has(factor.label)) : [];
-    if (common.length > 0) {
-      groups.push({ title: "Common gates", description: "Shared checks that apply regardless of price direction.", factors: common });
+    const reducePath = context.hasPosition ? factors.filter((factor) => REDUCE_FACTOR_LABELS.has(factor.label)) : [];
+    const showReduceGroup = context.hasPosition && (context.hasOversizePosition || normalized === "WAIT_REDUCE" || context.recComments.includes("REDUCE"));
+    const commonForWait = selectiveWaitFactors(common, new Set([
+      "User override: Excluded from Shortlist",
+      "Trade actions enabled",
+      "Long-term sale qualified",
+    ]));
+    if (commonForWait.length > 0) {
+      groups.push({ title: "Common gates", description: "Shared checks that apply regardless of price direction.", factors: commonForWait });
     }
-    if (addPath.length > 0) {
+    const addForWait = selectiveWaitFactors(addPath, new Set([
+      "Price below next buy target",
+      "Holding limit OK",
+      "Wash sale clear",
+    ]));
+    if (addForWait.length > 0) {
       groups.push({
         title: "For Adding more stocks (price weakness)",
         description: "Averaging-down checks used when price pulls back to your buy zone.",
-        factors: addPath,
+        factors: addForWait,
       });
     }
-    if (reducePath.length > 0) {
+    const reduceForWait = selectiveWaitFactors(reducePath, new Set([
+      "Cost basis above limit",
+      "Unrealized gain sufficient to reduce",
+    ]));
+    if (showReduceGroup && reduceForWait.length > 0) {
       groups.push({
         title: "For reducing holding size (oversize + profit)",
         description: "Trim checks used when position size is high and gains are sufficient.",
-        factors: reducePath,
+        factors: reduceForWait,
+      });
+    }
+    const sellForWait = selectiveWaitFactors(context.sellFromWaitFactors, new Set([
+      "Outside shortlist and risk gates",
+      "Cash below the raise-cash floor",
+    ]));
+    if (sellForWait.length > 0) {
+      groups.push({
+        title: "For selling the position",
+        description:
+          "A WAIT holding can become a full sale when it is outside the shortlist, price is above the moving average, and gain beats leftover upside, or when cash is below the floor in cash-first regimes.",
+        factors: sellForWait,
       });
     }
     return groups;
@@ -2095,6 +2275,10 @@ function FactorFlagRow({
   passes: boolean;
   compact?: boolean;
 }) {
+  const questionLabel = label.trim().endsWith("?") ? label.trim() : `${label.trim()}?`;
+  const normalizedDetail = detail.trim();
+  const prefixedDetail = `${passes ? "Yes / True" : "No / False"}${normalizedDetail.length > 0 ? ` — ${normalizedDetail}` : ""}`;
+
   return (
     <div className={cn("flex items-start gap-2", compact ? "py-1" : "py-1.5")}>
       {passes ? (
@@ -2102,7 +2286,7 @@ function FactorFlagRow({
       ) : (
         <XCircle className={cn("mt-0.5 shrink-0 text-red-600 dark:text-red-400", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
       )}
-      <p className={cn("min-w-0 flex-1 text-foreground/88", compact ? "text-xs" : "text-sm")}>{label}</p>
+      <p className={cn("min-w-0 flex-1 text-foreground/88", compact ? "text-xs" : "text-sm")}>{questionLabel}</p>
       <p
         className={cn(
           "shrink-0 text-right leading-snug",
@@ -2110,7 +2294,7 @@ function FactorFlagRow({
           compact ? "max-w-[45%] text-[10px]" : "max-w-[48%] text-xs"
         )}
       >
-        {detail}
+        {prefixedDetail}
       </p>
     </div>
   );
