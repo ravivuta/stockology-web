@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Pencil, PlusCircle, Settings, Trash2, X, XCircle } from "lucide-react";
+import { CheckCircle2, Pencil, PlusCircle, RefreshCw, Settings, Trash2, X, XCircle } from "lucide-react";
 import {
   computeRecommendationFactors,
   dividendYieldPercent,
@@ -1342,12 +1342,14 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                           onClick={handleOptimize}
                           disabled={optimizing}
                           className={cn(
-                            "ui-hover-pop inline-flex items-center gap-1.5 border border-primary/25 bg-primary/10 font-semibold text-primary shadow-sm backdrop-blur-lg sm:gap-2 disabled:cursor-not-allowed disabled:opacity-60",
-                            dense ? "rounded-lg px-2 py-1 text-[10px]" : "rounded-lg px-2.5 py-1.5 text-xs"
+                            "ui-hover-pop inline-flex items-center justify-center border border-primary/25 bg-primary/10 font-semibold text-primary shadow-sm backdrop-blur-lg disabled:cursor-not-allowed disabled:opacity-60",
+                            dense ? "h-6 w-6 rounded-lg" : "h-7 w-7 rounded-lg"
                           )}
                           aria-label="Re-optimize parameters"
+                          title={optimizing ? "Optimizing…" : "Re-optimize"}
                         >
-                          {optimizing ? "Optimizing…" : "Re-optimize"}
+                          <RefreshCw className={cn(dense ? "h-3.5 w-3.5" : "h-4 w-4", optimizing ? "animate-spin" : "")} />
+                          <span className="sr-only">{optimizing ? "Optimizing…" : "Re-optimize"}</span>
                         </button>
                       </>
                     )}
