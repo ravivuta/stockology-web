@@ -784,7 +784,7 @@ export type AddGateContext = {
 
 /**
  * Symbols that show as in-shortlist (green) on Portfolio and Watchlist.
- * ETFs are extras and do not use a top-N slot. When the size limit is off,
+ * ETF holdings are included and consume top-N slots. When the size limit is off,
  * every eligible name is in the set; Portfolio still paints every holding green.
  */
 export function preferredSymbolsForShortlistIndicator(
@@ -802,19 +802,25 @@ export function preferredSymbolsForShortlistIndicator(
   if (!options.limitWatchlistSize) {
     return new Set(eligible.map((stock) => stock.symbol));
   }
-  const etfSymbols = eligible.filter((stock) => stock.isETF === true).map((stock) => stock.symbol);
+  const etfHoldingSymbols = eligible
+    .filter((stock) => stock.isETF === true && stock.quantity > 0)
+    .map((stock) => stock.symbol);
   const forced = eligible
     .filter((stock) => stock.quantity <= 0 && stock.isETF !== true && stock.includeInShortlist === true)
     .sort((a, b) => a.symbol.localeCompare(b.symbol));
   const forcedSymbols = forced.map((stock) => stock.symbol);
+  const rankedSlots = Math.max(
+    recommendedWatchlistSize(options.portfolioSize) - etfHoldingSymbols.length - forcedSymbols.length,
+    0
+  );
   const topStockSymbols = rankedTopWatchlistCandidates(eligible, {
     enableRiskFilter: options.enableRiskFilter,
     riskAppetite: options.riskAppetite,
   })
     .filter((stock) => !forcedSymbols.includes(stock.symbol))
-    .slice(0, Math.max(recommendedWatchlistSize(options.portfolioSize) - forcedSymbols.length, 0))
+    .slice(0, rankedSlots)
     .map((stock) => stock.symbol);
-  return new Set([...etfSymbols, ...forcedSymbols, ...topStockSymbols]);
+  return new Set([...etfHoldingSymbols, ...forcedSymbols, ...topStockSymbols]);
 }
 
 /**
@@ -908,6 +914,18 @@ function rankInTopWatchlist(
   return index >= 0 ? index + 1 : null;
 }
 
+function rankedStockSlotsForTopN(stocks: IosStockInput[], portfolioSize: number): number {
+  const totalSlots = recommendedWatchlistSize(portfolioSize);
+  const etfHoldingSlots = stocks.filter(
+    (stock) =>
+      stock.isETF === true &&
+      stock.quantity > 0 &&
+      stock.excludeFromShortlist !== true &&
+      stock.symbol !== "$CASH"
+  ).length;
+  return Math.max(totalSlots - etfHoldingSlots, 0);
+}
+
 export function rankInWatchlistScoreUniverse(
   stocks: IosStockInput[],
   symbol: string,
@@ -933,7 +951,7 @@ export function holdingQualifiesForAdd(stock: IosStockInput, ctx: AddGateContext
   if (ctx.limitWatchlistSize) {
     if ((stock.score ?? 0) <= 50) return false;
     const rank = rankInTopWatchlist(ctx.allStocks, stock.symbol, ctx);
-    const size = recommendedWatchlistSize(ctx.portfolioSize);
+    const size = rankedStockSlotsForTopN(ctx.allStocks, ctx.portfolioSize);
     return rank != null && rank <= size;
   }
 
@@ -1933,10 +1951,11 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
         clampedRsiMinRisingDays
       );
       if (!passesRSIGate) {
+        const currentRSI = rsiSeries(closes, clampedRsiPeriod).at(-1) ?? 0;
         return {
           action: "WAIT_ADD",
           comments:
-            "RSI reversal gate active: wait for oversold momentum to reverse with hysteresis confirmation before buying.",
+            `RSI reversal gate active [RSI: ${currentRSI.toFixed(0)}/100]: wait for oversold momentum to reverse with hysteresis confirmation before buying.`,
           nextBuyPrice,
           movingAvg,
           expectedReturnPct,
