@@ -11,7 +11,7 @@ import { PortfolioSimulateLink } from "@/components/nav/PortfolioSimulateLink";
 import { StockDetailModal } from "@/components/stock/StockDetailModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
 import { formatCurrency, formatDecimal, formatPercent, formatWholeCurrency } from "@/lib/numberFormat";
-import { dividendYieldPercent, preferredSymbolsForShortlistIndicator, symbolShortlistTextClass } from "@/lib/ios-recommendation";
+import { dividendYieldPercent, preferredSymbolsForShortlistIndicator, selectedAnalystTarget, symbolShortlistTextClass } from "@/lib/ios-recommendation";
 import { recommendationActionDisplay } from "@/lib/recommendation";
 import { fieldInputClass } from "@/lib/field-input";
 import { cashByAccount, displayAccount, isCashSymbol } from "@/lib/cash-accounts";
@@ -229,8 +229,8 @@ export default function PortfolioPage() {
       const costBasisB = metricsB.costBasis;
       const gainLossA = valueA - costBasisA;
       const gainLossB = valueB - costBasisB;
-      const upsideA = analystTargetUpsidePct(a.lastPrice, a.analystTarget);
-      const upsideB = analystTargetUpsidePct(b.lastPrice, b.analystTarget);
+      const upsideA = analystTargetUpsidePct(a.lastPrice, selectedAnalystTarget(a).value);
+      const upsideB = analystTargetUpsidePct(b.lastPrice, selectedAnalystTarget(b).value);
       const analystA = Number.parseFloat(a.analystAvg ?? "");
       const analystB = Number.parseFloat(b.analystAvg ?? "");
       const todayA = a.dailyChangePercent ?? Number.NEGATIVE_INFINITY;
@@ -417,7 +417,7 @@ export default function PortfolioPage() {
                   const costBasis = metrics.costBasis;
                   const gainLoss = value - costBasis;
                   const gainLossPct = costBasis > 0 ? (gainLoss / costBasis) * 100 : null;
-                  const upside = analystTargetUpsidePct(s.lastPrice, s.analystTarget);
+                  const upside = analystTargetUpsidePct(s.lastPrice, selectedAnalystTarget(s).value);
                   const d = s.dailyChangePercent;
                   const analystCellClass = qualityCellHighlightEnabled && analystTextIsGreen(s.analystAvg) ? allGreenMetricCellClass : "";
                   const pegCellClass = qualityCellHighlightEnabled && pegTextIsGreen(s.peg) ? allGreenMetricCellClass : "";

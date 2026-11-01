@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { setLocalStorageItem } from "@/lib/local-storage-quota";
-import { calculateTradingLimits, computeRiskReturnScore, localCalendarDay, rankedTopWatchlistCandidates, recommendedWatchlistSize, stockPassesRiskFilter, offloadHoldingOutsideShortlistIfNeeded, raiseCashForMarketOutlookIfNeeded } from "@/lib/ios-recommendation";
+import { calculateTradingLimits, computeRiskReturnScore, localCalendarDay, rankedTopWatchlistCandidates, recommendedWatchlistSize, selectedAnalystTarget, stockPassesRiskFilter, offloadHoldingOutsideShortlistIfNeeded, raiseCashForMarketOutlookIfNeeded } from "@/lib/ios-recommendation";
 import { getRecommendationHistoryCloses } from "@/lib/recommendation-history-cache";
 import { buildRecommendation } from "@/lib/recommendation";
 import type { CsvImportRow, CsvImportTrade } from "@/lib/csvPortfolio";
@@ -850,7 +850,7 @@ function derivePortfolioState(
       stock,
       shortlistCtx.riskAppetite,
       shortlistCtx.enableRiskFilter,
-      analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)
+      analystTargetUpsidePct(stock.lastPrice, selectedAnalystTarget(stock).value)
     ),
   }));
 

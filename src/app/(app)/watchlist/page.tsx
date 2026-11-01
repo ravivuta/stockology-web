@@ -7,6 +7,7 @@ import { usePortfolioStore } from "@/store/portfolioStore";
 import {
   dividendYieldPercent,
   preferredSymbolsForShortlistIndicator,
+  selectedAnalystTarget,
   symbolShortlistTextClass,
 } from "@/lib/ios-recommendation";
 import { analystTargetUpsidePct, formatScore, formatUpsidePct } from "@/lib/marketFormat";
@@ -196,8 +197,8 @@ export default function WatchlistPage() {
     filtered.sort((a, b) => {
       const analystA = Number.parseFloat(a.analystAvg ?? "");
       const analystB = Number.parseFloat(b.analystAvg ?? "");
-      const upsideA = analystTargetUpsidePct(a.lastPrice, a.analystTarget);
-      const upsideB = analystTargetUpsidePct(b.lastPrice, b.analystTarget);
+      const upsideA = analystTargetUpsidePct(a.lastPrice, selectedAnalystTarget(a).value);
+      const upsideB = analystTargetUpsidePct(b.lastPrice, selectedAnalystTarget(b).value);
 
       let cmp = 0;
       switch (sort) {
@@ -392,7 +393,7 @@ export default function WatchlistPage() {
               </tr>
             ) : (
               rows.map((s) => {
-                const upside = analystTargetUpsidePct(s.lastPrice, s.analystTarget);
+                const upside = analystTargetUpsidePct(s.lastPrice, selectedAnalystTarget(s).value);
                 const rating = s.analystAvg?.trim();
                 const analystCellClass = qualityCellHighlightEnabled && analystTextIsGreen(rating) ? allGreenMetricCellClass : "";
                 const pegCellClass = qualityCellHighlightEnabled && pegTextIsGreen(s.peg) ? allGreenMetricCellClass : "";
@@ -464,8 +465,8 @@ export default function WatchlistPage() {
                     <td
                       className={`min-w-0 px-1.5 py-2.5 text-center tabular-nums font-bold sm:px-3 sm:py-3 ${upsideTextClass(upside)} ${upsideCellClass}`}
                       title={
-                        s.analystTarget != null && s.lastPrice
-                          ? `Target ${formatCurrency(s.analystTarget)} vs last ${formatCurrency(s.lastPrice)}`
+                        selectedAnalystTarget(s).value != null && s.lastPrice
+                          ? `Target ${formatCurrency(selectedAnalystTarget(s).value ?? 0)} vs last ${formatCurrency(s.lastPrice)}`
                           : undefined
                       }
                     >

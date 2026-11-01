@@ -351,6 +351,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const marketOutlookCashTargetElevated = usePortfolioStore((s) => s.marketOutlookCashTargetElevated);
   const marketOutlookCashTargetRiskOff = usePortfolioStore((s) => s.marketOutlookCashTargetRiskOff);
   const marketOutlookCashTargetSevere = usePortfolioStore((s) => s.marketOutlookCashTargetSevere);
+  const traderModeEnabled = usePortfolioStore((s) => s.traderModeEnabled);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
 
   const stock = useMemo(() => stocks.find((s) => s.symbol === symbol), [stocks, symbol]);
@@ -479,8 +480,9 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       closes,
       etfProfitTarget,
       stockProfitTarget,
-      useAISentiment: useAISentimentForRecommendations,
-      useRSIGating: useRSIGatingForRecommendations,
+      useTraderMode: traderModeEnabled,
+      useAISentiment: traderModeEnabled ? useAISentimentForRecommendations : false,
+      useRSIGating: traderModeEnabled ? useRSIGatingForRecommendations : false,
       rsiPeriod: rsiPeriodForRecommendations,
       rsiOversoldThreshold: rsiOversoldThresholdForRecommendations,
       rsiOverboughtThreshold: rsiOverboughtThresholdForRecommendations,
@@ -530,6 +532,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     storedRec,
     useAISentimentForRecommendations,
     useRSIGatingForRecommendations,
+    traderModeEnabled,
     rsiPeriodForRecommendations,
     rsiOversoldThresholdForRecommendations,
     rsiOverboughtThresholdForRecommendations,
@@ -545,8 +548,8 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const recommendationFactors = useMemo(() => {
     if (!stock || !rec) return [];
     return computeRecommendationFactors(stock, rec, {
-      useAISentiment: useAISentimentForRecommendations,
-      useRSIGating: useRSIGatingForRecommendations,
+      useAISentiment: traderModeEnabled ? useAISentimentForRecommendations : false,
+      useRSIGating: traderModeEnabled ? useRSIGatingForRecommendations : false,
       rsiPeriod: rsiPeriodForRecommendations,
       rsiOversoldThreshold: rsiOversoldThresholdForRecommendations,
       rsiOverboughtThreshold: rsiOverboughtThresholdForRecommendations,
@@ -567,6 +570,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     stock,
     useAISentimentForRecommendations,
     useRSIGatingForRecommendations,
+    traderModeEnabled,
   ]);
   const recommendationActionFactors = useMemo(
     () =>
