@@ -26,6 +26,7 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
   const [stockLimit, setStockLimit] = useState(String(stock.stockLimit));
   const [transactionLimit, setTransactionLimit] = useState(String(stock.transactionLimit));
   const [targetPrice, setTargetPrice] = useState(stock.targetPrice != null ? String(stock.targetPrice) : "");
+  const [showRecommendationFlow, setShowRecommendationFlow] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -94,6 +95,26 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
           Entry uses an SMA trend filter. {addBasisSentence} Limits cap position and trade size. Use Optimize on the stock details screen
           to run the same web-side parameter search against cached historical data.
         </p>
+        <div className="rounded-xl border border-border/70 bg-background/50 p-3 dark:border-foreground/10">
+          <button
+            type="button"
+            onClick={() => setShowRecommendationFlow((prev) => !prev)}
+            className="inline-flex items-center gap-2 text-xs font-semibold text-foreground"
+          >
+            <Info className="h-3.5 w-3.5 text-subtle" />
+            Recommendation Flow
+          </button>
+          {showRecommendationFlow ? (
+            <ol className="mt-2 list-decimal space-y-1.5 pl-4 text-[11px] text-subtle">
+              <li>Live price + latest stock, holdings, and settings are loaded.</li>
+              <li>Core levels are computed (SMA, next-buy level, selected analyst target).</li>
+              <li>Base action is selected (BUY/ADD/SELL/REDUCE/WAIT).</li>
+              <li>Safety gates apply (RSI, AI sentiment, wash sale, tax holding period).</li>
+              <li>Portfolio overlays apply (shortlist/risk and market-outlook cash rules).</li>
+              <li>Final recommendation and factor diagnostics are shown in Recommendation.</li>
+            </ol>
+          ) : null}
+        </div>
 
         <div className="rounded-xl border border-border bg-background/60 p-3 text-xs leading-relaxed dark:border-foreground/10 dark:bg-yale/20">
           <p>
