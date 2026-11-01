@@ -397,7 +397,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const [aiNewsItems, setAiNewsItems] = useState<StockSentimentNewsItem[]>([]);
   const [aiNewsLoading, setAiNewsLoading] = useState(false);
   const [optimizationMessage, setOptimizationMessage] = useState<string | null>(null);
-  const [decisionMapOpen, setDecisionMapOpen] = useState(false);
   const [flowChartOpen, setFlowChartOpen] = useState(false);
 
   const smaFromHistory = useMemo(() => {
@@ -1468,17 +1467,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                           <Info className={dense ? "h-3.5 w-3.5" : "h-4 w-4"} />
                           Flow chart
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setDecisionMapOpen(true)}
-                          className={cn(
-                            "inline-flex items-center gap-1.5 text-subtle hover:text-foreground",
-                            dense ? "text-[11px]" : "text-xs"
-                          )}
-                        >
-                          <Info className={dense ? "h-3.5 w-3.5" : "h-4 w-4"} />
-                          Decision map
-                        </button>
                       </div>
                     </>
                   ) : (
@@ -2061,44 +2049,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
           >
             Save Sell
           </button>
-        </ModalSection>
-      </AppModal>
-
-      <AppModal open={decisionMapOpen} onClose={() => setDecisionMapOpen(false)} size="md" titleId="decision-map-modal-title">
-        <ModalSection className="border-b border-border bg-elevated px-4 py-3 dark:border-foreground/10">
-          <h3 id="decision-map-modal-title" className="text-base font-semibold tracking-tight text-foreground">
-            Decision Map
-          </h3>
-          <p className="mt-1 text-xs text-subtle">Color shows what is supporting or blocking this stock&apos;s current recommendation.</p>
-        </ModalSection>
-        <ModalSection className="space-y-3 px-4 py-4">
-          <div className="flex flex-wrap items-center gap-3 text-xs">
-            <span className="inline-flex items-center gap-1 text-subtle"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Supporting</span>
-            <span className="inline-flex items-center gap-1 text-subtle"><span className="h-2.5 w-2.5 rounded-full bg-red-500" /> Blocking</span>
-          </div>
-          <div className="space-y-2">
-            {recommendationDecisionGroups.map((group) => {
-              const blocking = group.factors.some((factor) => !factor.passes);
-              return (
-                <div key={`decision-map-${group.title}`} className="rounded-lg border border-border/70 px-3 py-2 dark:border-white/[0.08]">
-                  <div className="mb-1 inline-flex items-center gap-2">
-                    <span className={cn("h-2.5 w-2.5 rounded-full", blocking ? "bg-red-500" : "bg-emerald-500")} />
-                    <p className="text-xs font-semibold text-foreground">{group.title}</p>
-                  </div>
-                  <div className="space-y-1">
-                    {group.factors.map((factor) => (
-                      <p
-                        key={`decision-map-factor-${group.title}-${factor.label}-${factor.detail}`}
-                        className={cn("text-[11px]", factor.passes ? "text-subtle" : "text-red-400")}
-                      >
-                        • {factor.label}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         </ModalSection>
       </AppModal>
 

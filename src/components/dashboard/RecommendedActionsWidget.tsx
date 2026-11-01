@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { AlertTriangle, ShieldAlert, TrendingUp, Wallet } from "lucide-react";
+import { ShieldAlert, TrendingUp } from "lucide-react";
 import type { StockHolding } from "@/store/portfolioStore";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { isBuyOrSellAction } from "@/lib/recommendation";
@@ -15,42 +15,20 @@ const MAX_VISIBLE = 4;
 
 function outlookIconMeta(outlook: MarketOutlook): {
   Icon: typeof TrendingUp;
-  toneClass: string;
+  toneColor: string;
   bgClass: string;
 } {
-  const severe = outlook.regime === "risk_off" && outlook.score <= 20;
-  if (severe) {
+  if (outlook.preferCash) {
     return {
       Icon: ShieldAlert,
-      toneClass: "text-red-700 dark:text-red-300",
-      bgClass: "border-red-500/50 bg-red-500/10",
-    };
-  }
-  if (outlook.regime === "risk_off") {
-    return {
-      Icon: AlertTriangle,
-      toneClass: "text-amber-700 dark:text-amber-300",
-      bgClass: "border-amber-500/50 bg-amber-500/10",
-    };
-  }
-  if (outlook.regime === "elevated") {
-    return {
-      Icon: Wallet,
-      toneClass: "text-amber-700 dark:text-amber-300",
-      bgClass: "border-amber-500/40 bg-amber-500/10",
-    };
-  }
-  if (outlook.regime === "neutral") {
-    return {
-      Icon: TrendingUp,
-      toneClass: "text-subtle",
-      bgClass: "border-border bg-background/40 dark:bg-white/[0.06]",
+      toneColor: "#F26B0D", // iOS: Color(red: 0.95, green: 0.42, blue: 0.05)
+      bgClass: "border-[color:#F26B0D]/45 bg-[color:#F26B0D]/10",
     };
   }
   return {
     Icon: TrendingUp,
-    toneClass: "text-primary",
-    bgClass: "border-primary/40 bg-primary/10",
+    toneColor: "#1F7AF2", // iOS: Color(red: 0.12, green: 0.48, blue: 0.95)
+    bgClass: "border-[color:#1F7AF2]/40 bg-[color:#1F7AF2]/10",
   };
 }
 
@@ -153,17 +131,17 @@ export function RecommendedActionsWidget({ stocks }: { stocks: StockHolding[] })
           <h2 className="text-base font-semibold tracking-tight">Recommended Actions</h2>
           {outlookEnabled && outlook && !outlook.stale ? (
             (() => {
-              const { Icon, toneClass, bgClass } = outlookIconMeta(outlook);
+              const { Icon, toneColor, bgClass } = outlookIconMeta(outlook);
               return (
                 <button
                   type="button"
                   onClick={() => setOutlookOpen((open) => !open)}
-                  className={`inline-flex h-8 w-8 items-center justify-center rounded-full border ${toneClass} ${bgClass}`}
+                  className={`inline-flex h-12 w-12 items-center justify-center rounded-full border ${bgClass}`}
                   aria-expanded={outlookOpen}
                   aria-label={`Market outlook: ${outlook.label}`}
                   title={`Market outlook: ${outlook.label}`}
                 >
-                  <Icon className={`h-4 w-4 ${reduceMotion ? "" : "animate-pulse"}`} />
+                  <Icon className={`${reduceMotion ? "" : "animate-pulse"} h-6 w-6`} style={{ color: toneColor }} />
                 </button>
               );
             })()
