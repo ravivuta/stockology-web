@@ -31,6 +31,10 @@ export type IosStockInput = {
   transactionLimit: number;
   isETF?: boolean;
   analystTarget?: number;
+  analystTargetLow?: number;
+  analystTargetMedian?: number;
+  analystTargetHigh?: number;
+  analystTargetMean?: number;
   analystAvg?: string;
   marketCap?: number;
   peg?: number;
@@ -61,6 +65,91 @@ export type IosStockInput = {
   openLots?: IosOpenLot[];
   soldLots?: IosSoldLot[];
 };
+
+export type AnalystTargetTier =
+  | "high"
+  | "median"
+  | "low"
+  | "mean"
+  | "legacy"
+  | "fallback";
+
+export function selectedAnalystTarget(
+  stock: Pick<
+    IosStockInput,
+    | "isETF"
+    | "score"
+    | "analystTarget"
+    | "analystTargetLow"
+    | "analystTargetMedian"
+    | "analystTargetHigh"
+    | "analystTargetMean"
+  >,
+  analystTargetOverride?: number
+): { value: number | undefined; tier: AnalystTargetTier } {
+  if (stock.isETF === true) return { value: undefined, tier: "fallback" };
+
+  const score = stock.score ?? 0;
+  const candidateHigh = stock.analystTargetHigh;
+  const candidateMedian = stock.analystTargetMedian;
+  const candidateLow = stock.analystTargetLow;
+  const candidateMean = stock.analystTargetMean;
+  const candidateLegacy = analystTargetOverride ?? stock.analystTarget;
+
+  const firstValid = (
+    candidates: Array<[number | undefined, Exclude<AnalystTargetTier, "fallback">]>
+  ): { value: number | undefined; tier: AnalystTargetTier } => {
+    for (const [value, tier] of candidates) {
+      if ((value ?? 0) > 0) return { value, tier };
+    }
+    return { value: undefined, tier: "fallback" };
+  };
+
+  if (score > 85) {
+    return firstValid([
+      [candidateHigh, "high"],
+      [candidateMedian, "median"],
+      [candidateMean, "mean"],
+      [candidateLegacy, "legacy"],
+      [candidateLow, "low"],
+    ]);
+  }
+
+  if (score > 70) {
+    return firstValid([
+      [candidateMedian, "median"],
+      [candidateMean, "mean"],
+      [candidateLegacy, "legacy"],
+      [candidateHigh, "high"],
+      [candidateLow, "low"],
+    ]);
+  }
+
+  return firstValid([
+    [candidateLow, "low"],
+    [candidateMedian, "median"],
+    [candidateMean, "mean"],
+    [candidateLegacy, "legacy"],
+    [candidateHigh, "high"],
+  ]);
+}
+
+export function analystTargetSourceLabel(tier: AnalystTargetTier): string {
+  switch (tier) {
+    case "high":
+      return "Analyst High";
+    case "median":
+      return "Analyst Median";
+    case "low":
+      return "Analyst Low";
+    case "mean":
+      return "Analyst Mean";
+    case "legacy":
+      return "Legacy Analyst Target";
+    case "fallback":
+      return "Fallback";
+  }
+}
 
 function pegNormalized(pegRatio: number): number {
   if (pegRatio < 1) return 1.0;
@@ -831,7 +920,7 @@ export function rankInWatchlistScoreUniverse(
 
 function upsidePct(stock: IosStockInput): number {
   const price = stock.lastPrice ?? 0;
-  const target = stock.analystTarget ?? 0;
+  const target = selectedAnalystTarget(stock).value ?? 0;
   if (price <= 0 || target <= 0) return 0;
   return ((target - price) / price) * 100;
 }
@@ -1195,11 +1284,18 @@ export function computeRecommendationFactors(
           passes: rec.expectedReturnPct < 10,
         });
       }
-      if (!isMarketOutlookSell && !rec.comments.includes("RSI overbought reversal") && !isRsiOverboughtLeftoverSell && stock.analystTarget != null && stock.analystTarget > 0) {
+      const selectedTarget = selectedAnalystTarget(stock);
+      if (
+        !isMarketOutlookSell &&
+        !rec.comments.includes("RSI overbought reversal") &&
+        !isRsiOverboughtLeftoverSell &&
+        selectedTarget.value != null &&
+        selectedTarget.value > 0
+      ) {
         factors.push({
-          label: "Price at/above Analyst Target (Median)",
-          detail: `${formatCurrency(currentPrice)} ≥ ${formatCurrency(stock.analystTarget)}`,
-          passes: currentPrice >= stock.analystTarget,
+          label: `Price at/above ${analystTargetSourceLabel(selectedTarget.tier)}`,
+          detail: `${formatCurrency(currentPrice)} ≥ ${formatCurrency(selectedTarget.value)}`,
+          passes: currentPrice >= selectedTarget.value,
         });
       }
       if (useAISentiment && !isETF) {
@@ -1635,9 +1731,10 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
   const addBasis = scoreForAddBasis < 90 && avgPrice > 0 ? avgPrice : movingAvg;
   const nextBuyPrice = numStock === 0 || avgPrice <= 0 ? movingAvg : addBasis * buyFactorSMA;
 
+  const selectedTarget = selectedAnalystTarget(stock);
   let targetPrice: number | undefined;
-  if (stock.analystTarget != null && stock.analystTarget > 0) {
-    targetPrice = stock.analystTarget;
+  if (selectedTarget.value != null && selectedTarget.value > 0) {
+    targetPrice = selectedTarget.value;
   } else if (stock.isETF) {
     const priceBase = avgPrice > 0 ? avgPrice : relaxScoreRequirement ? currentPrice : 0;
     targetPrice = priceBase > 0 ? priceBase * (1 + etfProfitTargetPercent / 100) : undefined;
@@ -1696,7 +1793,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
   );
 
   // Guard: for non-ETF stocks, leftover-upside SELLs require a real analyst target.
-  const hasDefinitiveTarget = (stock.analystTarget != null && stock.analystTarget > 0) || stock.isETF === true;
+  const hasDefinitiveTarget = (selectedTarget.value != null && selectedTarget.value > 0) || stock.isETF === true;
 
   // Trader mode only: live RSI is overbought and leftover upside is under 10% → full SELL.
   // Investor mode holds to analyst target. This uses the same overbought reading shown on

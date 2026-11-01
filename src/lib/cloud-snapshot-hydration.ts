@@ -38,6 +38,14 @@ type RawHolding = {
   name?: string | null;
   analystTarget?: number | null;
   analyst_target?: number | null;
+  analystTargetLow?: number | null;
+  analyst_target_low?: number | null;
+  analystTargetMedian?: number | null;
+  analyst_target_median?: number | null;
+  analystTargetHigh?: number | null;
+  analyst_target_high?: number | null;
+  analystTargetMean?: number | null;
+  analyst_target_mean?: number | null;
   analystAvg?: string | null;
   analyst_average?: string | number | null;
   beta?: number | null;
@@ -216,6 +224,14 @@ function parseRawHolding(raw: unknown): { stock: StockHolding; lots: { open: Tra
 
   const at = optFiniteNumber(h.analystTarget ?? h.analyst_target);
   if (at != null && at > 0) stock.analystTarget = at;
+  const atLow = optFiniteNumber(h.analystTargetLow ?? h.analyst_target_low);
+  if (atLow != null && atLow > 0) stock.analystTargetLow = atLow;
+  const atMedian = optFiniteNumber(h.analystTargetMedian ?? h.analyst_target_median);
+  if (atMedian != null && atMedian > 0) stock.analystTargetMedian = atMedian;
+  const atHigh = optFiniteNumber(h.analystTargetHigh ?? h.analyst_target_high);
+  if (atHigh != null && atHigh > 0) stock.analystTargetHigh = atHigh;
+  const atMean = optFiniteNumber(h.analystTargetMean ?? h.analyst_target_mean);
+  if (atMean != null && atMean > 0) stock.analystTargetMean = atMean;
 
   const aa = h.analystAvg ?? h.analyst_average;
   if (typeof aa === "string" && aa.trim()) stock.analystAvg = aa.trim();

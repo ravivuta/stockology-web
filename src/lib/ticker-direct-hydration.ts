@@ -10,6 +10,10 @@ export type TickerHydrationPriceRow = {
   daily_pct_change?: number;
   last_updated?: string | null;
   analyst_target?: number | null;
+  analyst_target_low?: number | null;
+  analyst_target_median?: number | null;
+  analyst_target_high?: number | null;
+  analyst_target_mean?: number | null;
   analyst_average?: number | string | null;
   market_cap?: number | null;
   peg_ratio?: number | null;
@@ -46,6 +50,22 @@ export function mapTickerHydrationPriceRowToPatch(
   if (p.analyst_target != null) {
     const target = Number(p.analyst_target);
     if (Number.isFinite(target) && target > 0) patch.analystTarget = target;
+  }
+  if (p.analyst_target_low != null) {
+    const value = Number(p.analyst_target_low);
+    if (Number.isFinite(value) && value > 0) patch.analystTargetLow = value;
+  }
+  if (p.analyst_target_median != null) {
+    const value = Number(p.analyst_target_median);
+    if (Number.isFinite(value) && value > 0) patch.analystTargetMedian = value;
+  }
+  if (p.analyst_target_high != null) {
+    const value = Number(p.analyst_target_high);
+    if (Number.isFinite(value) && value > 0) patch.analystTargetHigh = value;
+  }
+  if (p.analyst_target_mean != null) {
+    const value = Number(p.analyst_target_mean);
+    if (Number.isFinite(value) && value > 0) patch.analystTargetMean = value;
   }
   const analystAverage = p.analyst_average;
   if (analystAverage != null) {
@@ -129,16 +149,18 @@ export async function fetchTickerHydrationFromTables(
       .from("ticker_data")
       .select(
         "symbol, analyst_average, market_cap, peg_ratio, return_on_equity, profit_margin, trailing_pe, debt_to_equity, dividend_yield, payout_ratio, analyst_target, beta, company_name, consensus_conclusion, is_etf"
+        + ", analyst_target_low, analyst_target_median, analyst_target_high, analyst_target_mean"
       )
       .filter("symbol", "in", postgrestInList(upper)),
     supabase.from("ai_sentiment_scores").select("symbol, sentiment_score, last_updated").filter("symbol", "in", postgrestInList(upper)),
   ]);
 
+  const fundRows = ((fundRes.data ?? []) as unknown) as Array<Record<string, unknown>>;
   const fundBySym: Record<string, Record<string, unknown>> = {};
-  for (const row of fundRes.data ?? []) {
-    const raw = row.symbol as string;
+  for (const row of fundRows) {
+    const raw = typeof row.symbol === "string" ? row.symbol : "";
     if (!raw) continue;
-    fundBySym[raw.trim().toUpperCase()] = row as Record<string, unknown>;
+    fundBySym[raw.trim().toUpperCase()] = row;
   }
 
   function mergeFundamentals(sym: string, f: Record<string, unknown>): Pick<
@@ -153,6 +175,10 @@ export async function fetchTickerHydrationFromTables(
     | "dividend_yield"
     | "payout_ratio"
     | "analyst_target"
+    | "analyst_target_low"
+    | "analyst_target_median"
+    | "analyst_target_high"
+    | "analyst_target_mean"
     | "beta"
     | "company_name"
     | "is_etf"
@@ -177,6 +203,10 @@ export async function fetchTickerHydrationFromTables(
       dividend_yield: f.dividend_yield != null ? Number(f.dividend_yield) : null,
       payout_ratio: f.payout_ratio != null ? Number(f.payout_ratio) : null,
       analyst_target: f.analyst_target != null ? Number(f.analyst_target) : null,
+      analyst_target_low: f.analyst_target_low != null ? Number(f.analyst_target_low) : null,
+      analyst_target_median: f.analyst_target_median != null ? Number(f.analyst_target_median) : null,
+      analyst_target_high: f.analyst_target_high != null ? Number(f.analyst_target_high) : null,
+      analyst_target_mean: f.analyst_target_mean != null ? Number(f.analyst_target_mean) : null,
       beta: f.beta != null ? Number(f.beta) : null,
       company_name: typeof f.company_name === "string" ? f.company_name : null,
       is_etf: typeof f.is_etf === "boolean" ? f.is_etf : null,

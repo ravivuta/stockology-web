@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Pencil, PlusCircle, RefreshCw, Settings, Trash2, X, XCircle } from "lucide-react";
 import {
+  analystTargetSourceLabel,
   computeRecommendationFactors,
   dividendYieldPercent,
   payoutRatioDecimal,
   rankInWatchlistScoreUniverse,
   recommendedWatchlistSize,
+  selectedAnalystTarget,
   scoreBreakdownRows,
   sentimentLabelForScore,
   offloadHoldingOutsideShortlistIfNeeded,
@@ -352,6 +354,10 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
 
   const stock = useMemo(() => stocks.find((s) => s.symbol === symbol), [stocks, symbol]);
+  const selectedTarget = useMemo(
+    () => (stock ? selectedAnalystTarget(stock) : { value: undefined, tier: "fallback" as const }),
+    [stock]
+  );
   const { points, loading: histLoading, error: histError } = useSupabaseStockHistory(stock ? symbol : null);
 
   // Append today's live price as the last data point when it differs from the last historical close
@@ -1148,10 +1154,10 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                           valueClassName: analystRatingTone(stock.analystAvg),
                         },
                         {
-                          label: "Analyst Target (Median)",
-                          value: stock.analystTarget != null ? formatCurrency(stock.analystTarget) : "—",
-                          detail: formatUpsidePct(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)),
-                          valueClassName: valueTone(analystTargetUpsidePct(stock.lastPrice, stock.analystTarget)),
+                          label: selectedTarget.value != null ? analystTargetSourceLabel(selectedTarget.tier) : "Analyst target",
+                          value: selectedTarget.value != null ? formatCurrency(selectedTarget.value) : "—",
+                          detail: formatUpsidePct(analystTargetUpsidePct(stock.lastPrice, selectedTarget.value)),
+                          valueClassName: valueTone(analystTargetUpsidePct(stock.lastPrice, selectedTarget.value)),
                         },
                         {
                           label: `SMA(${stock.shortSMA})`,

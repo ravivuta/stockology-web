@@ -26,6 +26,10 @@ type EdgeTickerPrice = {
   payout_ratio?: number | null;
   beta?: number | null;
   analyst_target?: number | null;
+  analyst_target_low?: number | null;
+  analyst_target_median?: number | null;
+  analyst_target_high?: number | null;
+  analyst_target_mean?: number | null;
   company_name?: string | null;
   is_etf?: boolean | null;
 };
@@ -130,6 +134,10 @@ async function fetchFreshTickerHydration(symbols: string[]) {
       payout_ratio: row.payout_ratio ?? null,
       beta: row.beta ?? null,
       analyst_target: row.analyst_target ?? null,
+      analyst_target_low: row.analyst_target_low ?? null,
+      analyst_target_median: row.analyst_target_median ?? null,
+      analyst_target_high: row.analyst_target_high ?? null,
+      analyst_target_mean: row.analyst_target_mean ?? null,
       company_name: row.company_name ?? null,
       is_etf: row.is_etf ?? null,
     };

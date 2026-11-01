@@ -98,6 +98,10 @@ export type StockHolding = {
   dividendYield?: number | null;
   payoutRatio?: number | null;
   analystTarget?: number;
+  analystTargetLow?: number;
+  analystTargetMedian?: number;
+  analystTargetHigh?: number;
+  analystTargetMean?: number;
   analystAvg?: string;
   isETF?: boolean;
   /** SMA for the saved period. Computed once per calendar day from closes, then reused. */
@@ -295,6 +299,10 @@ function preserveImportedMetadata(existing: StockHolding | undefined) {
     marketCap: existing.marketCap,
     peg: existing.peg,
     analystTarget: existing.analystTarget,
+    analystTargetLow: existing.analystTargetLow,
+    analystTargetMedian: existing.analystTargetMedian,
+    analystTargetHigh: existing.analystTargetHigh,
+    analystTargetMean: existing.analystTargetMean,
     analystAvg: existing.analystAvg,
     isETF: existing.isETF,
     movingAvg: existing.movingAvg,
@@ -949,6 +957,10 @@ const defaultStock = (partial: Partial<StockHolding> & { symbol: string }): Stoc
   isVisibleInRisk: partial.isVisibleInRisk ?? false,
   isInWatchlistSize: partial.isInWatchlistSize ?? false,
   analystTarget: partial.analystTarget,
+  analystTargetLow: partial.analystTargetLow,
+  analystTargetMedian: partial.analystTargetMedian,
+  analystTargetHigh: partial.analystTargetHigh,
+  analystTargetMean: partial.analystTargetMean,
   analystAvg: partial.analystAvg ?? "4.2",
   beta: partial.beta ?? 1.1,
   marketCap: partial.marketCap,

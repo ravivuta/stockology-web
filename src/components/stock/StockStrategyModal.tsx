@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Info, X } from "lucide-react";
 import { appCtaButton } from "@/lib/appCtaClasses";
+import { analystTargetSourceLabel, selectedAnalystTarget } from "@/lib/ios-recommendation";
 import { formatCurrency } from "@/lib/numberFormat";
 import { AppModal, ModalSection } from "@/components/ui/AppModal";
 import type { StockHolding } from "@/store/portfolioStore";
@@ -39,8 +40,9 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
   const maxAccumulation = 2 * stock.stockLimit;
 
   const sellTarget = (() => {
-    if (stock.analystTarget && stock.analystTarget > 0) {
-      return { price: stock.analystTarget, source: "Analyst Target (Median)" as const };
+    const selectedTarget = selectedAnalystTarget(stock);
+    if (selectedTarget.value && selectedTarget.value > 0) {
+      return { price: selectedTarget.value, source: analystTargetSourceLabel(selectedTarget.tier) };
     }
     if (stock.quantity > 0) {
       const pt = stock.isETF ? etfProfitTarget : stockProfitTarget;

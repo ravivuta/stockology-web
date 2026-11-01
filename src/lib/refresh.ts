@@ -96,6 +96,10 @@ function keepLocalMarketFields(local: StockHolding, incoming: StockHolding): Sto
     next.dailyChangePercent = local.dailyChangePercent;
   }
   if (next.analystTarget == null && local.analystTarget != null) next.analystTarget = local.analystTarget;
+  if (next.analystTargetLow == null && local.analystTargetLow != null) next.analystTargetLow = local.analystTargetLow;
+  if (next.analystTargetMedian == null && local.analystTargetMedian != null) next.analystTargetMedian = local.analystTargetMedian;
+  if (next.analystTargetHigh == null && local.analystTargetHigh != null) next.analystTargetHigh = local.analystTargetHigh;
+  if (next.analystTargetMean == null && local.analystTargetMean != null) next.analystTargetMean = local.analystTargetMean;
   if (next.analystAvg == null && local.analystAvg != null) next.analystAvg = local.analystAvg;
   if (next.marketCap == null && local.marketCap != null) next.marketCap = local.marketCap;
   if (next.peg == null && local.peg != null) next.peg = local.peg;
