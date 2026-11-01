@@ -2178,8 +2178,8 @@ function sellFromWaitFactors({
       passes: gainPct > upside,
     },
     {
-      label: "Cash below the raise-cash floor",
-      detail: `${(cashShare * 100).toFixed(1)}% vs ${(cashFloor * 100).toFixed(0)}%`,
+      label: "Need to increase cash per market outlook",
+      detail: `Have ${(cashShare * 100).toFixed(1)}%, need ${(cashFloor * 100).toFixed(0)}%`,
       passes: cashShare < cashFloor,
     },
   ];
@@ -2249,7 +2249,7 @@ function recommendationFactorGroups(
     }
     const sellForWait = selectiveWaitFactors(context.sellFromWaitFactors, new Set([
       "Outside shortlist and risk gates",
-      "Cash below the raise-cash floor",
+      "Need to increase cash per market outlook",
     ]));
     if (sellForWait.length > 0) {
       groups.push({
