@@ -25,23 +25,56 @@ export async function syncStocksPmAuthUser(supabase: SupabaseClient, fallbackAut
 export async function touchStocksPmLastAppOpen(
   supabase: SupabaseClient,
   dataUserId: string,
-  appBuildVersion = "web"
+  appBuildVersion = "web",
+  fallbackAuthUserId?: string
 ): Promise<void> {
   if (!dataUserId) return;
 
-  const { error } = await supabase.rpc("touch_last_app_open", {
-    p_user_id: dataUserId,
-    p_app_build_version: appBuildVersion,
-  });
+  const touchOnce = async (userId: string): Promise<boolean> => {
+    const { data, error } = await supabase.rpc("touch_last_app_open", {
+      p_user_id: userId,
+      p_app_build_version: appBuildVersion,
+    });
 
-  if (!error) return;
+    if (!error) {
+      if (typeof data === "boolean") {
+        if (data) return true;
+        console.warn("[touchStocksPmLastAppOpen] RPC returned no update for user:", userId);
+        return false;
+      }
 
-  // Backward-compatible fallback for projects that only have the older 1-arg RPC.
-  const legacy = await supabase.rpc("touch_last_app_open", {
-    p_user_id: dataUserId,
-  });
+      // Some older deployments may not return a boolean body even on success.
+      return true;
+    }
 
-  if (legacy.error) {
-    console.warn("[touchStocksPmLastAppOpen] RPC failed (run latest Supabase migration?):", legacy.error.message);
+    // Backward-compatible fallback for projects that only have the older 1-arg RPC.
+    const legacy = await supabase.rpc("touch_last_app_open", {
+      p_user_id: userId,
+    });
+
+    if (legacy.error) {
+      console.warn("[touchStocksPmLastAppOpen] RPC failed (run latest Supabase migration?):", legacy.error.message);
+      return false;
+    }
+
+    if (typeof legacy.data === "boolean") {
+      if (legacy.data) return true;
+      console.warn("[touchStocksPmLastAppOpen] Legacy RPC returned no update for user:", userId);
+      return false;
+    }
+
+    return true;
+  };
+
+  if (await touchOnce(dataUserId)) return;
+
+  const authUserId = fallbackAuthUserId ?? dataUserId;
+  const resolvedUserId = await syncStocksPmAuthUser(supabase, authUserId);
+  if (resolvedUserId !== dataUserId) {
+    console.warn("[touchStocksPmLastAppOpen] Retrying with remapped canonical user:", resolvedUserId);
+  }
+
+  if (!(await touchOnce(resolvedUserId))) {
+    console.warn("[touchStocksPmLastAppOpen] Failed to update last_app_open after re-sync retry for user:", resolvedUserId);
   }
 }

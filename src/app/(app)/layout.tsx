@@ -24,7 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Run all independent operations in parallel — trial check, open-touch, subscription, and snapshot
   const [, , subRow, snapRes] = await Promise.all([
     ensureUserHasWebTrial(dataUserId),
-    touchStocksPmLastAppOpen(supabase, dataUserId, "web"),
+    touchStocksPmLastAppOpen(supabase, dataUserId, "web", user.id),
     getSubscriptionRowForUser(dataUserId),
     // Holdings are AES-256-CBC encrypted at rest; must read via RPC which decrypts server-side.
     supabase.rpc("get_latest_portfolio_snapshot", { p_user_id: dataUserId }),

@@ -13,12 +13,17 @@ import { fixedIncomeTotal } from "@/lib/fixed-income-accounts";
 const MAX_VISIBLE = 4;
 
 function pickActions(stocks: StockHolding[]) {
-  const held = stocks.filter((s) => s.quantity > 0 && isBuyOrSellAction(s.recommendation?.action));
-  const watch = stocks.filter((s) => s.quantity === 0 && isBuyOrSellAction(s.recommendation?.action));
-  const list = held.length > 0 ? held : watch;
-  const source: "holdings" | "watchlist" = held.length > 0 ? "holdings" : "watchlist";
+  const held = stocks
+    .filter((s) => s.quantity > 0 && isBuyOrSellAction(s.recommendation?.action))
+    .sort((a, b) => a.symbol.localeCompare(b.symbol));
+  const watch = stocks
+    .filter((s) => s.quantity === 0 && isBuyOrSellAction(s.recommendation?.action))
+    .sort((a, b) => a.symbol.localeCompare(b.symbol));
+  const source: "holdings" | "watchlist" | "mixed" =
+    held.length > 0 && watch.length > 0 ? "mixed" : held.length > 0 ? "holdings" : "watchlist";
+  const list = source === "mixed" ? [...held, ...watch] : source === "holdings" ? held : watch;
   return {
-    items: [...list].sort((a, b) => a.symbol.localeCompare(b.symbol)),
+    items: list,
     source,
   };
 }

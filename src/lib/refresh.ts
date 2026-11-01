@@ -116,7 +116,8 @@ function keepLocalMarketFields(local: StockHolding, incoming: StockHolding): Sto
   if (
     local.movingAvgComputedOn === today &&
     local.movingAvgPeriod === (local.shortSMA ?? 50) &&
-    (local.movingAvg ?? 0) > 0
+    (local.movingAvg ?? 0) > 0 &&
+    (local.shortSMA ?? 50) === (incoming.shortSMA ?? 50)
   ) {
     next.movingAvg = local.movingAvg;
     next.movingAvgComputedOn = local.movingAvgComputedOn;
