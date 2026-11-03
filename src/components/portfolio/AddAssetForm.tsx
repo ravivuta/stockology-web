@@ -580,9 +580,22 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
         description={
           pendingEtfConfirmation ? (
             <span>
-              {pendingEtfConfirmation.projected.targetStockSlots === 0
-                ? `${pendingEtfConfirmation.sym} is classified as an ETF. With the 4x ETF slot rule, adding it reduces stock shortlist slots to 0 at your current portfolio size. ETFs would use ${pendingEtfConfirmation.projected.etfPenaltySlots} of ${pendingEtfConfirmation.projected.idealWatchlistSize} ideal slots (${Math.round(pendingEtfConfirmation.projected.etfPressureRatio * 100)}% pressure). Recommendation: remove some ETFs from your watchlist to preserve stock shortlist slots. Add anyway?`
-                : `${pendingEtfConfirmation.sym} is classified as an ETF. With the 4x ETF slot rule, stock shortlist slots move from ${pendingEtfConfirmation.current.targetStockSlots} to ${pendingEtfConfirmation.projected.targetStockSlots}. ETF pressure becomes ${pendingEtfConfirmation.projected.etfPenaltySlots}/${pendingEtfConfirmation.projected.idealWatchlistSize} slots (${Math.round(pendingEtfConfirmation.projected.etfPressureRatio * 100)}%). Current stock fill ${pendingEtfConfirmation.current.qualifiedNonETFSlots}/${pendingEtfConfirmation.current.targetStockSlots}, projected fill ${pendingEtfConfirmation.projected.qualifiedNonETFSlots}/${pendingEtfConfirmation.projected.targetStockSlots}. ${pendingEtfConfirmation.projected.isUnderfilled ? "Recommendation: either add more qualified stocks for your risk profile or remove some ETFs from your watchlist." : "Recommendation: remove some ETFs from your watchlist to preserve more stock shortlist slots."} Add anyway?`}
+              {(() => {
+                const hasMaterialEtfPressure =
+                  pendingEtfConfirmation.projected.alertLevel === "warning" ||
+                  pendingEtfConfirmation.projected.alertLevel === "critical";
+                const recommendationText = pendingEtfConfirmation.projected.isUnderfilled
+                  ? hasMaterialEtfPressure
+                    ? "Recommendation: either add more qualified stocks for your risk profile or remove some ETFs from your watchlist."
+                    : "Recommendation: add more qualified stocks for your risk profile."
+                  : "Recommendation: remove some ETFs from your watchlist, those slots will be used for shortlisting more qualified stocks.";
+
+                if (pendingEtfConfirmation.projected.targetStockSlots === 0) {
+                  return `${pendingEtfConfirmation.sym} is classified as an ETF. With the 4x ETF slot rule, adding it reduces stock shortlist slots to 0 at your current portfolio size. ETFs would use ${pendingEtfConfirmation.projected.etfPenaltySlots} of ${pendingEtfConfirmation.projected.idealWatchlistSize} ideal slots (${Math.round(pendingEtfConfirmation.projected.etfPressureRatio * 100)}% pressure). Recommendation: remove some ETFs from your watchlist, those slots will be used for shortlisting more qualified stocks. Add anyway?`;
+                }
+
+                return `${pendingEtfConfirmation.sym} is classified as an ETF. With the 4x ETF slot rule, stock shortlist slots move from ${pendingEtfConfirmation.current.targetStockSlots} to ${pendingEtfConfirmation.projected.targetStockSlots}. ETF share impact becomes ${pendingEtfConfirmation.projected.etfPenaltySlots}/${pendingEtfConfirmation.projected.idealWatchlistSize} slots (${Math.round(pendingEtfConfirmation.projected.etfPressureRatio * 100)}%). Current stock fill ${pendingEtfConfirmation.current.qualifiedNonETFSlots}/${pendingEtfConfirmation.current.targetStockSlots}, projected fill ${pendingEtfConfirmation.projected.qualifiedNonETFSlots}/${pendingEtfConfirmation.projected.targetStockSlots}. ${recommendationText} Add anyway?`;
+              })()}
             </span>
           ) : null
         }
