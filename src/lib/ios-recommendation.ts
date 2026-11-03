@@ -782,6 +782,22 @@ export type AddGateContext = {
   allStocks: IosStockInput[];
 };
 
+export type ShortlistCapacityAlertLevel = "none" | "info" | "warning" | "critical";
+
+export type ShortlistCapacityDiagnostics = {
+  idealWatchlistSize: number;
+  etfPenaltyMultiplier: number;
+  effectiveETFCount: number;
+  etfPenaltySlots: number;
+  targetStockSlots: number;
+  qualifiedNonETFSlots: number;
+  stockSlotShortfall: number;
+  shortlistFillRate: number;
+  etfPressureRatio: number;
+  alertLevel: ShortlistCapacityAlertLevel;
+  isUnderfilled: boolean;
+};
+
 /**
  * Symbols that show as in-shortlist (green) on Portfolio and Watchlist.
  * All eligible ETFs are included and consume top-N slots. When the size limit is off,
@@ -810,7 +826,7 @@ export function preferredSymbolsForShortlistIndicator(
     .sort((a, b) => a.symbol.localeCompare(b.symbol));
   const forcedSymbols = forced.map((stock) => stock.symbol);
   const rankedSlots = Math.max(
-    recommendedWatchlistSize(options.portfolioSize) - etfSymbols.length - forcedSymbols.length,
+    recommendedWatchlistSize(options.portfolioSize) - (etfSymbols.length * 4) - forcedSymbols.length,
     0
   );
   const topStockSymbols = rankedTopWatchlistCandidates(eligible, {
@@ -922,7 +938,65 @@ function rankedStockSlotsForTopN(stocks: IosStockInput[], portfolioSize: number)
       stock.excludeFromShortlist !== true &&
       stock.symbol !== "$CASH"
   ).length;
-  return Math.max(totalSlots - etfSlots, 0);
+  return Math.max(totalSlots - (etfSlots * 4), 0);
+}
+
+export function shortlistCapacityDiagnostics(
+  stocks: IosStockInput[],
+  settings: {
+    limitWatchlistSize: boolean;
+    enableRiskFilter: boolean;
+    riskAppetite: "Low" | "Medium" | "High";
+    portfolioSize: number;
+  },
+  options?: {
+    etfPenaltyMultiplier?: number;
+    additionalETFCount?: number;
+  }
+): ShortlistCapacityDiagnostics {
+  const etfPenaltyMultiplier = Math.max(1, options?.etfPenaltyMultiplier ?? 4);
+  const additionalETFCount = Math.max(0, options?.additionalETFCount ?? 0);
+  const eligible = stocks.filter((stock) => stock.symbol !== "$CASH" && stock.excludeFromShortlist !== true);
+  const currentETFCount = eligible.filter((stock) => stock.isETF === true).length;
+  const effectiveETFCount = currentETFCount + additionalETFCount;
+  const idealWatchlistSize = recommendedWatchlistSize(settings.portfolioSize);
+  const etfPenaltySlots = effectiveETFCount * etfPenaltyMultiplier;
+  const targetStockSlots = Math.max(0, idealWatchlistSize - etfPenaltySlots);
+  const qualifiedNonETFSlots = Math.min(
+    targetStockSlots,
+    rankedTopWatchlistCandidates(eligible, {
+      enableRiskFilter: settings.enableRiskFilter,
+      riskAppetite: settings.riskAppetite,
+    }).length
+  );
+  const stockSlotShortfall = Math.max(0, targetStockSlots - qualifiedNonETFSlots);
+  const shortlistFillRate = targetStockSlots > 0 ? qualifiedNonETFSlots / targetStockSlots : 1;
+  const etfPressureRatio = idealWatchlistSize > 0 ? etfPenaltySlots / idealWatchlistSize : 1;
+
+  let alertLevel: ShortlistCapacityAlertLevel = "none";
+  if (effectiveETFCount > 0 && targetStockSlots === 0) {
+    alertLevel = "critical";
+  } else if (etfPressureRatio >= 0.75) {
+    alertLevel = "warning";
+  } else if (etfPressureRatio >= 0.5) {
+    alertLevel = "info";
+  }
+
+  const isUnderfilled = targetStockSlots > 0 && (stockSlotShortfall >= 3 || shortlistFillRate < 0.7);
+
+  return {
+    idealWatchlistSize,
+    etfPenaltyMultiplier,
+    effectiveETFCount,
+    etfPenaltySlots,
+    targetStockSlots,
+    qualifiedNonETFSlots,
+    stockSlotShortfall,
+    shortlistFillRate,
+    etfPressureRatio,
+    alertLevel,
+    isUnderfilled,
+  };
 }
 
 export function rankInWatchlistScoreUniverse(

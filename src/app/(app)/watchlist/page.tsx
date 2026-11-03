@@ -7,6 +7,7 @@ import { usePortfolioStore } from "@/store/portfolioStore";
 import {
   dividendYieldPercent,
   preferredSymbolsForShortlistIndicator,
+  shortlistCapacityDiagnostics,
   selectedAnalystTarget,
   symbolShortlistTextClass,
 } from "@/lib/ios-recommendation";
@@ -163,6 +164,19 @@ export default function WatchlistPage() {
       }),
     [enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
   );
+  const shortlistCapacity = useMemo(
+    () =>
+      shortlistCapacityDiagnostics(stocks, {
+        limitWatchlistSize,
+        enableRiskFilter,
+        riskAppetite,
+        portfolioSize,
+      }, {
+        etfPenaltyMultiplier: 4,
+      }),
+    [enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
+  );
+  const shouldShowShortlistCapacityAlert = limitWatchlistSize && (shortlistCapacity.alertLevel !== "none" || shortlistCapacity.isUnderfilled);
 
   function isActionable(action: string | undefined): boolean {
     if (!action) return false;
@@ -333,6 +347,33 @@ export default function WatchlistPage() {
           </div>
         ) : null}
       </div>
+
+      {shouldShowShortlistCapacityAlert ? (
+        <div className="rounded-2xl border border-amber-400/35 bg-elevated px-4 py-3">
+          <p className="text-sm font-semibold text-foreground">
+            {shortlistCapacity.alertLevel === "critical"
+              ? "ETF pressure is fully consuming stock slots"
+              : shortlistCapacity.alertLevel === "warning"
+                ? "ETF pressure is reducing stock shortlist capacity"
+                : shortlistCapacity.alertLevel === "info"
+                  ? "ETF pressure is elevated"
+                  : "Shortlist capacity check"}
+          </p>
+          <p className="mt-1 text-xs text-subtle">
+            ETFs use {shortlistCapacity.etfPenaltySlots} of {shortlistCapacity.idealWatchlistSize} ideal slots at 4x each ({Math.round(shortlistCapacity.etfPressureRatio * 100)}% pressure). Remaining stock slots: {shortlistCapacity.targetStockSlots}.
+          </p>
+          <p className="mt-1 text-xs text-subtle">
+            Qualified stock fill: {shortlistCapacity.qualifiedNonETFSlots}/{shortlistCapacity.targetStockSlots}.
+          </p>
+          <p className="mt-1 text-xs text-subtle">
+            {shortlistCapacity.isUnderfilled && shortlistCapacity.alertLevel !== "none"
+              ? "Recommendation: either add more qualified stocks for your risk profile or remove some ETFs from your watchlist."
+              : shortlistCapacity.isUnderfilled
+                ? "Recommendation: add more qualified stocks for your risk profile."
+                : "Recommendation: remove some ETFs from your watchlist to preserve more stock shortlist slots."}
+          </p>
+        </div>
+      ) : null}
 
       <div className="w-full overflow-x-auto rounded-2xl border border-border bg-elevated">
         <table className="w-full table-auto border-collapse text-xs sm:text-sm md:table-fixed">

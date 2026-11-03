@@ -876,7 +876,7 @@ function derivePortfolioState(
       riskAppetite: shortlistCtx.riskAppetite,
     })
       .filter((stock) => !forceIncludedSymbols.has(stock.symbol))
-      .slice(0, Math.max(idealWatchlistSize - etfSymbols.length - forceIncluded.length, 0));
+      .slice(0, Math.max(idealWatchlistSize - (etfSymbols.length * 4) - forceIncluded.length, 0));
 
     for (const stock of holdingSymbols) shortlistedSymbols.add(stock.symbol);
     for (const stock of etfSymbols) shortlistedSymbols.add(stock.symbol);

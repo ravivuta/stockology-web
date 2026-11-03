@@ -57,7 +57,7 @@ const SECTIONS: Section[] = [
   {
     category: "portfolio",
     title: "Enforce Ideal Watchlist Size",
-    body: "Profile setting that limits recommendations and portfolio views to your ideal portfolio size (based on portfolio amount) ranked by composite score. When enabled, only top-scored stocks are included in recommendation display and sizing views. When disabled, all stocks in watchlist are considered. Helps focus on highest-conviction picks. Note: Holdings are always included in recommendations. ETFs are unlimited and don't count toward the size limit, so you can have as many ETFs as you want while still getting stock recommendations up to your ideal watchlist size.",
+    body: "Profile setting that limits recommendations and portfolio views to your ideal portfolio size (based on portfolio amount) ranked by composite score. When enabled, only top-scored stocks are included in recommendation display and sizing views. When disabled, all stocks in watchlist are considered. Helps focus on highest-conviction picks. Note: Holdings are always included in recommendations. ETFs are included first and each ETF consumes weighted shortlist capacity (4 slots per ETF) before remaining stock slots are filled by score rank.",
   },
   {
     category: "portfolio",
@@ -102,7 +102,7 @@ const SECTIONS: Section[] = [
   {
     category: "filters",
     title: "Stock Shortlisting Process",
-    body: "Stocks PM intelligently filters your watchlist to focus on high-quality opportunities. When Shortlist by Risk Appetite is enabled in Settings, stocks are screened based on market capitalization and analyst ratings. Composite score ranking then uses the same score as the rest of the app: analyst rating, market cap, and quality metrics when available. Leftover upside is applied later as the 25% expected-return gate for BUY/ADD, not as a ranking factor. The same filters apply to both watchlist views and live recommendations for consistency. When Shortlist & Limit stocks for Portfolio size is enabled, only the top-scoring stocks (up to your recommended watchlist size) receive BUY/SELL/ADD/REDUCE signals - others show as HOLD or no recommendation. When disabled, all qualifying stocks receive recommendations.",
+    body: "Stocks PM intelligently filters your watchlist to focus on high-quality opportunities. When Shortlist by Risk Appetite is enabled in Settings, stocks are screened based on market capitalization and analyst ratings. Composite score ranking then uses the same score as the rest of the app: analyst rating, market cap, and quality metrics when available. Leftover upside is applied later as the 25% expected-return gate for BUY/ADD, not as a ranking factor. The same filters apply to both watchlist views and live recommendations for consistency. When Shortlist & Limit stocks for Portfolio size is enabled, ETFs are included first and each ETF consumes 4 slots from the ideal watchlist size before non-ETF stock slots are filled by score rank. Names outside the shortlisted set show HOLD or no recommendation. When disabled, all qualifying stocks receive recommendations.",
   },
   {
     category: "signals",

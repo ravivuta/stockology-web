@@ -10,6 +10,7 @@ import { cashByAccount, displayAccount, isCashSymbol, CASH_SYMBOL } from "@/lib/
 import { isValidTicker } from "@/lib/csvPortfolio";
 import { recordExternalCashFlow } from "@/lib/external-cash-flows";
 import { isFixedIncomeSymbol } from "@/lib/fixed-income-accounts";
+import { shortlistCapacityDiagnostics } from "@/lib/ios-recommendation";
 import { formatCurrency } from "@/lib/numberFormat";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { hasPremiumFeatureAccess, trackedStockLimit, trackedStockLimitMessage } from "@/lib/subscription-limits";
@@ -17,11 +18,25 @@ import { withAppBasePath } from "@/lib/base-path";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { fieldInputClass } from "@/lib/field-input";
 import { AppModal } from "@/components/ui/AppModal";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 type AssetKind = "stock" | "cash" | "fixedIncome";
 type AddAssetMode = "full" | "stockOnly";
 const PROFILE_PROMPT = "__pick__";
 const NEW_PROFILE = "__new__";
+
+type PendingEtfConfirmation = {
+  sym: string;
+  exists: boolean;
+  hasTrade: boolean;
+  qty: number;
+  price: number;
+  tradeDate: string;
+  accountName: string;
+  retirementFlag: boolean | null;
+  current: ReturnType<typeof shortlistCapacityDiagnostics>;
+  projected: ReturnType<typeof shortlistCapacityDiagnostics>;
+};
 
 const RETURN_RATE_KEY = "fixedIncomeReturnRateByAccount.v1";
 
@@ -49,6 +64,10 @@ function rememberReturnRate(account: string, rate: number) {
 
 export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mode?: AddAssetMode }) {
   const stocks = usePortfolioStore((s) => s.stocks);
+  const portfolioSize = usePortfolioStore((s) => s.portfolioSize);
+  const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
+  const enableRiskFilter = usePortfolioStore((s) => s.enableRiskFilter);
+  const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
   const fixedIncomeByAccount = usePortfolioStore((s) => s.fixedIncomeByAccount);
   const addStock = usePortfolioStore((s) => s.addStock);
@@ -74,6 +93,7 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [pendingEtfConfirmation, setPendingEtfConfirmation] = useState<PendingEtfConfirmation | null>(null);
 
   useEffect(() => {
     if (mode === "stockOnly") {
@@ -125,6 +145,59 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
     setTradeDate(todayInputDate());
   }
 
+  async function preflightETFClassification(sym: string): Promise<boolean | null> {
+    const existing = stocks.find((stock) => stock.symbol.toUpperCase() === sym);
+    if (typeof existing?.isETF === "boolean") return existing.isETF;
+
+    const supabase = createClient();
+    const { data, error: lookupError } = await supabase
+      .from("ticker_data")
+      .select("is_etf")
+      .eq("symbol", sym)
+      .maybeSingle();
+    if (lookupError) {
+      console.warn("ETF preflight lookup failed:", lookupError.message);
+      return null;
+    }
+    if (data?.is_etf === true) return true;
+    if (data?.is_etf === false) return false;
+    return null;
+  }
+
+  async function executeStockAdd(args: {
+    sym: string;
+    exists: boolean;
+    hasTrade: boolean;
+    qty: number;
+    price: number;
+    tradeDate: string;
+    accountName: string;
+    retirementFlag: boolean | null;
+  }) {
+    const { sym, exists, hasTrade, qty, price, tradeDate, accountName, retirementFlag } = args;
+    setSaving(true);
+    if (!exists) {
+      addStock({
+        symbol: sym,
+        quantity: 0,
+        averageCost: 0,
+        lastPrice: hasTrade ? price : 0,
+        pendingOptimization: true,
+      });
+    }
+    if (hasTrade) {
+      recordTrade(sym, "BUY", qty, price, tradeDate, {
+        account: accountName,
+        isRetirementAccount: retirementFlag,
+      });
+    }
+    recalc();
+    await flushCurrentPortfolioSnapshotNow(true);
+    setSaving(false);
+    setStatus(hasTrade ? `Added ${qty} ${sym} @ ${formatCurrency(price)}.` : `Added ${sym} without a holding.`);
+    resetStockFields();
+  }
+
   async function submitStock() {
     const sym = symbol.trim().toUpperCase();
     if (!isValidTicker(sym)) {
@@ -172,27 +245,52 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
       return;
     }
 
-    setSaving(true);
-    if (!exists) {
-      addStock({
-        symbol: sym,
-        quantity: 0,
-        averageCost: 0,
-        lastPrice: mode === "full" || hasQty ? price : 0,
-        pendingOptimization: true,
-      });
+    const hasTrade = mode === "full" || hasQty;
+    if (!exists && limitWatchlistSize) {
+      const isEtf = await preflightETFClassification(sym);
+      if (isEtf === true) {
+        setPendingEtfConfirmation({
+          sym,
+          exists,
+          hasTrade,
+          qty,
+          price,
+          tradeDate,
+          accountName,
+          retirementFlag,
+          current: shortlistCapacityDiagnostics(stocks, {
+            limitWatchlistSize,
+            enableRiskFilter,
+            riskAppetite,
+            portfolioSize,
+          }, {
+            etfPenaltyMultiplier: 4,
+            additionalETFCount: 0,
+          }),
+          projected: shortlistCapacityDiagnostics(stocks, {
+            limitWatchlistSize,
+            enableRiskFilter,
+            riskAppetite,
+            portfolioSize,
+          }, {
+            etfPenaltyMultiplier: 4,
+            additionalETFCount: 1,
+          }),
+        });
+        return;
+      }
     }
-    if (mode === "full" || hasQty) {
-      recordTrade(sym, "BUY", qty, price, tradeDate, {
-        account: accountName,
-        isRetirementAccount: retirementFlag,
-      });
-    }
-    recalc();
-    await flushCurrentPortfolioSnapshotNow(true);
-    setSaving(false);
-    setStatus(mode === "full" || hasQty ? `Added ${qty} ${sym} @ ${formatCurrency(price)}.` : `Added ${sym} without a holding.`);
-    resetStockFields();
+
+    await executeStockAdd({
+      sym,
+      exists,
+      hasTrade,
+      qty,
+      price,
+      tradeDate,
+      accountName,
+      retirementFlag,
+    });
   }
 
   async function submitCashLike() {
@@ -457,6 +555,38 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
       <button type="button" disabled={isSubmitDisabled} onClick={() => void submit()} className={appCtaButton("ui-hover-pop px-3 py-2 text-sm")}>
         {saving ? "Saving..." : kind === "stock" ? "Add stock" : kind === "cash" ? "Add cash" : "Add fixed income"}
       </button>
+
+      <ConfirmModal
+        open={pendingEtfConfirmation != null}
+        onClose={() => setPendingEtfConfirmation(null)}
+        onConfirm={() => {
+          const pending = pendingEtfConfirmation;
+          if (!pending) return;
+          void executeStockAdd({
+            sym: pending.sym,
+            exists: pending.exists,
+            hasTrade: pending.hasTrade,
+            qty: pending.qty,
+            price: pending.price,
+            tradeDate: pending.tradeDate,
+            accountName: pending.accountName,
+            retirementFlag: pending.retirementFlag,
+          });
+          setPendingEtfConfirmation(null);
+        }}
+        title="This looks like an ETF"
+        confirmLabel="Add ETF"
+        cancelLabel="Cancel"
+        description={
+          pendingEtfConfirmation ? (
+            <span>
+              {pendingEtfConfirmation.projected.targetStockSlots === 0
+                ? `${pendingEtfConfirmation.sym} is classified as an ETF. With the 4x ETF slot rule, adding it reduces stock shortlist slots to 0 at your current portfolio size. ETFs would use ${pendingEtfConfirmation.projected.etfPenaltySlots} of ${pendingEtfConfirmation.projected.idealWatchlistSize} ideal slots (${Math.round(pendingEtfConfirmation.projected.etfPressureRatio * 100)}% pressure). Recommendation: remove some ETFs from your watchlist to preserve stock shortlist slots. Add anyway?`
+                : `${pendingEtfConfirmation.sym} is classified as an ETF. With the 4x ETF slot rule, stock shortlist slots move from ${pendingEtfConfirmation.current.targetStockSlots} to ${pendingEtfConfirmation.projected.targetStockSlots}. ETF pressure becomes ${pendingEtfConfirmation.projected.etfPenaltySlots}/${pendingEtfConfirmation.projected.idealWatchlistSize} slots (${Math.round(pendingEtfConfirmation.projected.etfPressureRatio * 100)}%). Current stock fill ${pendingEtfConfirmation.current.qualifiedNonETFSlots}/${pendingEtfConfirmation.current.targetStockSlots}, projected fill ${pendingEtfConfirmation.projected.qualifiedNonETFSlots}/${pendingEtfConfirmation.projected.targetStockSlots}. ${pendingEtfConfirmation.projected.isUnderfilled ? "Recommendation: either add more qualified stocks for your risk profile or remove some ETFs from your watchlist." : "Recommendation: remove some ETFs from your watchlist to preserve more stock shortlist slots."} Add anyway?`}
+            </span>
+          ) : null
+        }
+      />
     </div>
   );
 }
