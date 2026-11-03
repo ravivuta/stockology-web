@@ -249,35 +249,44 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
     if (!exists && limitWatchlistSize) {
       const isEtf = await preflightETFClassification(sym);
       if (isEtf === true) {
-        setPendingEtfConfirmation({
-          sym,
-          exists,
-          hasTrade,
-          qty,
-          price,
-          tradeDate,
-          accountName,
-          retirementFlag,
-          current: shortlistCapacityDiagnostics(stocks, {
-            limitWatchlistSize,
-            enableRiskFilter,
-            riskAppetite,
-            portfolioSize,
-          }, {
-            etfPenaltyMultiplier: 4,
-            additionalETFCount: 0,
-          }),
-          projected: shortlistCapacityDiagnostics(stocks, {
-            limitWatchlistSize,
-            enableRiskFilter,
-            riskAppetite,
-            portfolioSize,
-          }, {
-            etfPenaltyMultiplier: 4,
-            additionalETFCount: 1,
-          }),
+        const current = shortlistCapacityDiagnostics(stocks, {
+          limitWatchlistSize,
+          enableRiskFilter,
+          riskAppetite,
+          portfolioSize,
+        }, {
+          etfPenaltyMultiplier: 4,
+          additionalETFCount: 0,
         });
-        return;
+        const projected = shortlistCapacityDiagnostics(stocks, {
+          limitWatchlistSize,
+          enableRiskFilter,
+          riskAppetite,
+          portfolioSize,
+        }, {
+          etfPenaltyMultiplier: 4,
+          additionalETFCount: 1,
+        });
+        const shouldConfirmEtfAdd =
+          projected.targetStockSlots === 0 ||
+          projected.alertLevel === "warning" ||
+          projected.alertLevel === "critical" ||
+          projected.isAboveETFMaximumRange;
+        if (shouldConfirmEtfAdd) {
+          setPendingEtfConfirmation({
+            sym,
+            exists,
+            hasTrade,
+            qty,
+            price,
+            tradeDate,
+            accountName,
+            retirementFlag,
+            current,
+            projected,
+          });
+          return;
+        }
       }
     }
 
@@ -584,14 +593,17 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
                 const hasMaterialEtfPressure =
                   pendingEtfConfirmation.projected.alertLevel === "warning" ||
                   pendingEtfConfirmation.projected.alertLevel === "critical";
+                const etfPressureTargetPercent = Math.round(pendingEtfConfirmation.projected.etfMaxTargetRatio * 100);
+                const removeEtfRecommendation =
+                  `remove some ETFs from your watchlist (to bring ETF slots below ${etfPressureTargetPercent}% of your portfolio target)`;
                 const recommendationText = pendingEtfConfirmation.projected.isUnderfilled
                   ? hasMaterialEtfPressure
-                    ? "Recommendation: either add more qualified stocks for your risk profile or remove some ETFs from your watchlist."
+                    ? `Recommendation: either add more qualified stocks for your risk profile or ${removeEtfRecommendation}.`
                     : "Recommendation: add more qualified stocks for your risk profile."
-                  : "Recommendation: remove some ETFs from your watchlist, those slots will be used for shortlisting more qualified stocks.";
+                  : `Recommendation: ${removeEtfRecommendation}, those slots will be used for shortlisting more qualified stocks.`;
 
                 if (pendingEtfConfirmation.projected.targetStockSlots === 0) {
-                  return `${pendingEtfConfirmation.sym} is classified as an ETF. With the 4x ETF slot rule, adding it reduces stock shortlist slots to 0 at your current portfolio size. ETFs would use ${pendingEtfConfirmation.projected.etfPenaltySlots} of ${pendingEtfConfirmation.projected.idealWatchlistSize} ideal slots (${Math.round(pendingEtfConfirmation.projected.etfPressureRatio * 100)}% pressure). Recommendation: remove some ETFs from your watchlist, those slots will be used for shortlisting more qualified stocks. Add anyway?`;
+                  return `${pendingEtfConfirmation.sym} is classified as an ETF. With the 4x ETF slot rule, adding it reduces stock shortlist slots to 0 at your current portfolio size. ETFs would use ${pendingEtfConfirmation.projected.etfPenaltySlots} of ${pendingEtfConfirmation.projected.idealWatchlistSize} ideal slots (${Math.round(pendingEtfConfirmation.projected.etfPressureRatio * 100)}% pressure). Recommendation: ${removeEtfRecommendation}, those slots will be used for shortlisting more qualified stocks. Add anyway?`;
                 }
 
                 return `${pendingEtfConfirmation.sym} is classified as an ETF. With the 4x ETF slot rule, stock shortlist slots move from ${pendingEtfConfirmation.current.targetStockSlots} to ${pendingEtfConfirmation.projected.targetStockSlots}. ETF share impact becomes ${pendingEtfConfirmation.projected.etfPenaltySlots}/${pendingEtfConfirmation.projected.idealWatchlistSize} slots (${Math.round(pendingEtfConfirmation.projected.etfPressureRatio * 100)}%). Current stock fill ${pendingEtfConfirmation.current.qualifiedNonETFSlots}/${pendingEtfConfirmation.current.targetStockSlots}, projected fill ${pendingEtfConfirmation.projected.qualifiedNonETFSlots}/${pendingEtfConfirmation.projected.targetStockSlots}. ${recommendationText} Add anyway?`;

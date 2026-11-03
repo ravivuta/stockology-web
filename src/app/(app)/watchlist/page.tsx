@@ -36,11 +36,13 @@ import {
 } from "@/lib/portfolio-snapshot-client";
 
 type SortKey = "symbol" | "lastPrice" | "change" | "analyst" | "peg" | "debt" | "upside" | "yield" | "score" | "signal";
+type CandidatePickerMode = "stocks" | "etfs";
 type QualifiedStockCandidate = {
   symbol: string;
   upside: number;
   analyst_average: number;
   market_cap: number;
+  company_name?: string | null;
 };
 
 const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
@@ -195,6 +197,7 @@ export default function WatchlistPage() {
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
   const [qualifiedPickerOpen, setQualifiedPickerOpen] = useState(false);
+  const [qualifiedPickerMode, setQualifiedPickerMode] = useState<CandidatePickerMode>("stocks");
   const [loadingQualified, setLoadingQualified] = useState(false);
   const [qualifiedError, setQualifiedError] = useState<string | null>(null);
   const [qualifiedCandidates, setQualifiedCandidates] = useState<QualifiedStockCandidate[]>([]);
@@ -231,37 +234,66 @@ export default function WatchlistPage() {
     shortlistCapacity.isBelowETFMinimumRange
   );
 
-  async function loadQualifiedCandidates() {
+  async function loadQualifiedCandidates(mode: CandidatePickerMode) {
     setLoadingQualified(true);
     setQualifiedError(null);
     try {
       const supabase = createClient();
-      const { data, error } = await supabase.rpc("get_top_recommended_stocks");
-      if (error) throw new Error(error.message);
       const existing = new Set(
         watchlistStocks.map((stock) => stock.symbol.trim().toUpperCase())
       );
-      const raw = (data ?? []) as QualifiedStockCandidate[];
-      const deduped = new Map<string, QualifiedStockCandidate>();
-      for (const row of raw) {
-        const symbol = String(row.symbol ?? "").trim().toUpperCase();
-        if (!symbol || existing.has(symbol)) continue;
-        const candidate: QualifiedStockCandidate = {
-          symbol,
-          upside: Number(row.upside) || 0,
-          analyst_average: Number(row.analyst_average) || 0,
-          market_cap: Number(row.market_cap) || 0,
-        };
-        if (enableRiskFilter && !candidatePassesRisk(candidate, riskAppetite)) continue;
-        const prior = deduped.get(symbol);
-        if (!prior || candidate.upside > prior.upside) deduped.set(symbol, candidate);
+      if (mode === "stocks") {
+        const { data, error } = await supabase.rpc("get_top_recommended_stocks");
+        if (error) throw new Error(error.message);
+        const raw = (data ?? []) as QualifiedStockCandidate[];
+        const deduped = new Map<string, QualifiedStockCandidate>();
+        for (const row of raw) {
+          const symbol = String(row.symbol ?? "").trim().toUpperCase();
+          if (!symbol || existing.has(symbol)) continue;
+          const candidate: QualifiedStockCandidate = {
+            symbol,
+            upside: Number(row.upside) || 0,
+            analyst_average: Number(row.analyst_average) || 0,
+            market_cap: Number(row.market_cap) || 0,
+          };
+          if (enableRiskFilter && !candidatePassesRisk(candidate, riskAppetite)) continue;
+          const prior = deduped.get(symbol);
+          if (!prior || candidate.upside > prior.upside) deduped.set(symbol, candidate);
+        }
+        const filtered = [...deduped.values()]
+          .sort((a, b) => (b.upside - a.upside) || (b.market_cap - a.market_cap) || a.symbol.localeCompare(b.symbol))
+          .slice(0, 30);
+        setQualifiedCandidates(filtered);
+      } else {
+        const { data, error } = await supabase
+          .from("ticker_data")
+          .select("symbol, company_name, market_cap")
+          .eq("is_etf", true)
+          .eq("sync_skip", false)
+          .order("market_cap", { ascending: false })
+          .limit(150);
+        if (error) throw new Error(error.message);
+        const raw = (data ?? []) as Array<{ symbol: string; company_name: string | null; market_cap: number | null }>;
+        const filtered = raw
+          .map((row) => ({
+            symbol: String(row.symbol ?? "").trim().toUpperCase(),
+            company_name: row.company_name,
+            market_cap: Number(row.market_cap) || 0,
+            upside: 0,
+            analyst_average: 0,
+          }))
+          .filter((row) => row.symbol.length > 0 && !existing.has(row.symbol))
+          .slice(0, 30);
+        setQualifiedCandidates(filtered);
       }
-      const filtered = [...deduped.values()]
-        .sort((a, b) => (b.upside - a.upside) || (b.market_cap - a.market_cap) || a.symbol.localeCompare(b.symbol))
-        .slice(0, 30);
-      setQualifiedCandidates(filtered);
     } catch (error) {
-      setQualifiedError(error instanceof Error ? error.message : "Unable to load qualified stocks.");
+      setQualifiedError(
+        error instanceof Error
+          ? error.message
+          : mode === "stocks"
+            ? "Unable to load qualified stocks."
+            : "Unable to load ETFs."
+      );
       setQualifiedCandidates([]);
     } finally {
       setLoadingQualified(false);
@@ -469,15 +501,24 @@ export default function WatchlistPage() {
             const etfPressureTargetPercent =
               Math.round(shortlistCapacity.etfMaxTargetRatio * 100);
             const etfMinTargetPercent = Math.round(shortlistCapacity.etfMinTargetRatio * 100);
+            const etfSlotsNeededForMinimum = Math.max(
+              0,
+              Math.ceil((shortlistCapacity.etfMinTargetRatio * shortlistCapacity.idealWatchlistSize) - shortlistCapacity.etfPenaltySlots)
+            );
+            const etfsToAddForMinimum = Math.max(
+              0,
+              Math.ceil(etfSlotsNeededForMinimum / Math.max(1, shortlistCapacity.etfPenaltyMultiplier))
+            );
+            const etfNoun = etfsToAddForMinimum === 1 ? "ETF" : "ETFs";
             const removeEtfRecommendation =
               `remove some ETFs from your watchlist (to bring ETF slots below ${etfPressureTargetPercent}% of your portfolio target)`;
             const addEtfRecommendation =
-              `add more ETFs to bring ETF slots into your risk-profile target range (${etfMinTargetPercent}-${etfPressureTargetPercent}%)`;
+              `add ${etfsToAddForMinimum} ${etfNoun} to reach at least ${etfMinTargetPercent}% ETF slots first`;
             const recommendationText = shortlistCapacity.isUnderfilled
               ? hasMaterialEtfPressure
                 ? "Recommendation: either add more qualified stocks for your risk profile or remove some ETFs from your watchlist."
                 : shortlistCapacity.isBelowETFMinimumRange
-                  ? `Recommendation: either add more qualified stocks for your risk profile or ${addEtfRecommendation}.`
+                  ? `Recommendation: ${addEtfRecommendation}. After that, pick qualified stocks to fill remaining slots.`
                   : "Recommendation: add more qualified stocks for your risk profile."
               : `Recommendation: ${removeEtfRecommendation}, those slots will be used for shortlisting more qualified stocks.`;
             const finalRecommendationText =
@@ -508,12 +549,26 @@ export default function WatchlistPage() {
           <p className="mt-1 text-xs text-subtle">
             {finalRecommendationText}
           </p>
-          {shortlistCapacity.isUnderfilled ? (
+          {shortlistCapacity.isBelowETFMinimumRange ? (
             <button
               type="button"
               onClick={() => {
+                setQualifiedPickerMode("etfs");
                 setQualifiedPickerOpen(true);
-                void loadQualifiedCandidates();
+                void loadQualifiedCandidates("etfs");
+              }}
+              className="ui-hover-text mt-1 inline-flex text-xs font-semibold text-primary underline underline-offset-2"
+            >
+              Pick ETFs from list
+            </button>
+          ) : null}
+          {shortlistCapacity.isUnderfilled && !shortlistCapacity.isBelowETFMinimumRange ? (
+            <button
+              type="button"
+              onClick={() => {
+                setQualifiedPickerMode("stocks");
+                setQualifiedPickerOpen(true);
+                void loadQualifiedCandidates("stocks");
               }}
               className="ui-hover-text mt-1 inline-flex text-xs font-semibold text-primary underline underline-offset-2"
             >
@@ -736,7 +791,9 @@ export default function WatchlistPage() {
 
       <AppModal open={qualifiedPickerOpen} onClose={() => setQualifiedPickerOpen(false)} size="md" stagger={false}>
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h2 className="text-base font-semibold text-foreground">Qualified stocks from Supabase</h2>
+          <h2 className="text-base font-semibold text-foreground">
+            {qualifiedPickerMode === "stocks" ? "Qualified stocks from Supabase" : "Suggested ETFs from Supabase"}
+          </h2>
           <button
             type="button"
             onClick={() => setQualifiedPickerOpen(false)}
@@ -746,13 +803,17 @@ export default function WatchlistPage() {
           </button>
         </div>
         <div className="overflow-y-auto px-4 py-3">
-          {loadingQualified ? <p className="text-sm text-subtle">Loading qualified stocks…</p> : null}
+          {loadingQualified ? (
+            <p className="text-sm text-subtle">
+              {qualifiedPickerMode === "stocks" ? "Loading qualified stocks…" : "Loading ETFs…"}
+            </p>
+          ) : null}
           {!loadingQualified && qualifiedError ? (
             <div className="space-y-2">
               <p className="text-sm text-error">{qualifiedError}</p>
               <button
                 type="button"
-                onClick={() => void loadQualifiedCandidates()}
+                onClick={() => void loadQualifiedCandidates(qualifiedPickerMode)}
                 className="ui-hover-pop rounded-lg border border-border px-3 py-1.5 text-sm text-foreground"
               >
                 Retry
@@ -760,7 +821,11 @@ export default function WatchlistPage() {
             </div>
           ) : null}
           {!loadingQualified && !qualifiedError && qualifiedCandidates.length === 0 ? (
-            <p className="text-sm text-subtle">No additional qualified stocks found right now.</p>
+            <p className="text-sm text-subtle">
+              {qualifiedPickerMode === "stocks"
+                ? "No additional qualified stocks found right now."
+                : "No additional ETFs found right now."}
+            </p>
           ) : null}
           {!loadingQualified && !qualifiedError && qualifiedCandidates.length > 0 ? (
             <div className="divide-y divide-border">
@@ -769,7 +834,9 @@ export default function WatchlistPage() {
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground">{candidate.symbol}</p>
                     <p className="text-xs text-subtle">
-                      Upside {formatPercent(candidate.upside, true)} · Analyst {formatDecimal(candidate.analyst_average)} · Cap {formatMarketCapCompact(candidate.market_cap)}
+                      {qualifiedPickerMode === "stocks"
+                        ? `Upside ${formatPercent(candidate.upside, true)} · Analyst ${formatDecimal(candidate.analyst_average)} · Cap ${formatMarketCapCompact(candidate.market_cap)}`
+                        : `${candidate.company_name ?? "ETF"} · Cap ${formatMarketCapCompact(candidate.market_cap)}`}
                     </p>
                   </div>
                   <button
@@ -778,7 +845,11 @@ export default function WatchlistPage() {
                     disabled={addingQualifiedSymbols[candidate.symbol] === true}
                     className="ui-hover-pop rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground disabled:opacity-60"
                   >
-                    {addingQualifiedSymbols[candidate.symbol] ? "Adding…" : "Add"}
+                    {addingQualifiedSymbols[candidate.symbol]
+                      ? "Adding…"
+                      : qualifiedPickerMode === "stocks"
+                        ? "Add Stock"
+                        : "Add ETF"}
                   </button>
                 </div>
               ))}
