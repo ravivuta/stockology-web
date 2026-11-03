@@ -374,8 +374,8 @@ export default function WatchlistPage() {
           </p>
           <p className="mt-1 text-xs text-subtle">
             {shortlistCapacity.isUnderfilled
-              ? "You do not have enough risk-qualified stocks."
-              : "You have enough risk-qualified stocks."}
+              ? `You have ${shortlistCapacity.qualifiedNonETFSlots} qualified stocks, and do not have enough risk-qualified stocks.`
+              : `You have ${shortlistCapacity.qualifiedNonETFSlots} qualified stocks, and have enough risk-qualified stocks.`}
           </p>
           <p className="mt-1 text-xs text-subtle">
             {recommendationText}
