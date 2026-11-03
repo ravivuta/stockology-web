@@ -397,8 +397,8 @@ export default function DashboardPage() {
                       style={{ backgroundColor: p.color }}
                       aria-hidden
                     />
-                    <span className="min-w-0 flex-1 truncate font-medium text-foreground">{p.name}</span>
-                    <span className="shrink-0 tabular-nums text-subtle">{formatCompactCurrency(segmentValue)} · {pctLabel}</span>
+                    <span className="min-w-0 flex-1 truncate font-bold text-foreground">{p.name}</span>
+                    <span className="shrink-0 tabular-nums font-bold text-subtle">{formatCompactCurrency(segmentValue)} · {pctLabel}</span>
                   </li>
                 );
               })}
