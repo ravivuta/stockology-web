@@ -724,8 +724,8 @@ export function stockPassesRiskAppetiteOnly(
   const marketCap = stock.marketCap ?? 0;
   const analystRating = parseFloat(stock.analystAvg ?? "0") || 0;
   const score = stock.score ?? 0;
-  const lowCap = 100_000_000_000;
-  const mediumCap = 50_000_000_000;
+  const lowCap = 50_000_000_000;
+  const mediumCap = 10_000_000_000;
   const up = upsidePercent ?? 0;
   const scoreOk = (minimum: number) => !includeScoreThreshold || score === 0 || score >= minimum;
 

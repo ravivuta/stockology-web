@@ -130,8 +130,8 @@ function candidatePassesRisk(
   const marketCap = Number(candidate.market_cap) || 0;
   const analystRating = Number(candidate.analyst_average) || 0;
   const upside = Number(candidate.upside) || 0;
-  const lowCap = 100_000_000_000;
-  const mediumCap = 50_000_000_000;
+  const lowCap = 50_000_000_000;
+  const mediumCap = 10_000_000_000;
 
   if (riskAppetite === "Low") {
     return marketCap >= lowCap && analystRating >= 4.5;
