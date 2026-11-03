@@ -460,11 +460,17 @@ export default function WatchlistPage() {
           {(() => {
             const hasMaterialEtfPressure =
               shortlistCapacity.alertLevel === "warning" || shortlistCapacity.alertLevel === "critical";
+            const etfPressureTargetPercent =
+              shortlistCapacity.alertLevel === "warning" || shortlistCapacity.alertLevel === "critical"
+                ? 75
+                : 50;
+            const removeEtfRecommendation =
+              `remove some ETFs from your watchlist (to bring ETF slots below ${etfPressureTargetPercent}% of your portfolio target)`;
             const recommendationText = shortlistCapacity.isUnderfilled
               ? hasMaterialEtfPressure
                 ? "Recommendation: either add more qualified stocks for your risk profile or remove some ETFs from your watchlist."
                 : "Recommendation: add more qualified stocks for your risk profile."
-              : "Recommendation: remove some ETFs from your watchlist, those slots will be used for shortlisting more qualified stocks.";
+              : `Recommendation: ${removeEtfRecommendation}, those slots will be used for shortlisting more qualified stocks.`;
             return (
               <>
           <p className="text-sm font-semibold text-foreground">
