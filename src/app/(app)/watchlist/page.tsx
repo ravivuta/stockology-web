@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Paintbrush } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import {
   dividendYieldPercent,
@@ -18,6 +19,7 @@ import { CsvImportExportBar } from "@/components/portfolio/CsvImportExportBar";
 import { AddAssetButton } from "@/components/portfolio/AddAssetForm";
 import { StockDetailModal } from "@/components/stock/StockDetailModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { AppModal } from "@/components/ui/AppModal";
 import { SortableHeaderCell, type SortDirection } from "@/components/ui/SortableHeaderCell";
 import { fieldInputClass } from "@/lib/field-input";
 import {
@@ -34,6 +36,12 @@ import {
 } from "@/lib/portfolio-snapshot-client";
 
 type SortKey = "symbol" | "lastPrice" | "change" | "analyst" | "peg" | "debt" | "upside" | "yield" | "score" | "signal";
+type QualifiedStockCandidate = {
+  symbol: string;
+  upside: number;
+  analyst_average: number;
+  market_cap: number;
+};
 
 const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
   symbol: "asc",
@@ -115,6 +123,40 @@ function filterIconButtonClass(active: boolean, tone: "green" | "gold") {
   return `${base} border-transparent bg-[#f3c74a] text-black`;
 }
 
+function candidatePassesRisk(
+  candidate: QualifiedStockCandidate,
+  riskAppetite: "Low" | "Medium" | "High"
+): boolean {
+  const marketCap = Number(candidate.market_cap) || 0;
+  const analystRating = Number(candidate.analyst_average) || 0;
+  const upside = Number(candidate.upside) || 0;
+  const lowCap = 100_000_000_000;
+  const mediumCap = 50_000_000_000;
+
+  if (riskAppetite === "Low") {
+    return marketCap >= lowCap && analystRating >= 4.5;
+  }
+  if (riskAppetite === "Medium") {
+    const meetsLow = marketCap >= lowCap && analystRating >= 4.5;
+    const meetsMedium = marketCap >= mediumCap && analystRating >= 4.0;
+    return meetsLow || meetsMedium;
+  }
+
+  const meetsLow = marketCap >= lowCap && analystRating >= 4.5;
+  const meetsMedium = marketCap >= mediumCap && analystRating >= 4.0;
+  const hasHighUpside = upside > 25;
+  const smallerCapOk = marketCap >= 10_000_000_000 && analystRating >= 3.5;
+  return meetsLow || meetsMedium || hasHighUpside || smallerCapOk;
+}
+
+function formatMarketCapCompact(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "—";
+  if (value >= 1_000_000_000_000) return `$${(value / 1_000_000_000_000).toFixed(1)}T`;
+  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  return `$${Math.round(value)}`;
+}
+
 /**
  * Watchlist matches iOS: holdings and unowned names. Holdings are green when
  * shortlisted and red when they fall outside that list. Unowned names stay the normal color.
@@ -126,6 +168,8 @@ export default function WatchlistPage() {
   const enableRiskFilter = usePortfolioStore((s) => s.enableRiskFilter);
   const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
   const removeStock = usePortfolioStore((s) => s.removeStock);
+  const addStock = usePortfolioStore((s) => s.addStock);
+  const recalc = usePortfolioStore((s) => s.recalcMetrics);
   const [query, setQuery] = useState("");
   const [showShortlisted, setShowShortlisted] = useState(limitWatchlistSize);
 
@@ -150,6 +194,11 @@ export default function WatchlistPage() {
   }, [qualityCellHighlightEnabled]);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
+  const [qualifiedPickerOpen, setQualifiedPickerOpen] = useState(false);
+  const [loadingQualified, setLoadingQualified] = useState(false);
+  const [qualifiedError, setQualifiedError] = useState<string | null>(null);
+  const [qualifiedCandidates, setQualifiedCandidates] = useState<QualifiedStockCandidate[]>([]);
+  const [addingQualifiedSymbols, setAddingQualifiedSymbols] = useState<Record<string, boolean>>({});
   const watchlistStocks = useMemo(
     () => stocks.filter((s) => s.symbol !== "$CASH"),
     [stocks]
@@ -177,6 +226,64 @@ export default function WatchlistPage() {
     [enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
   );
   const shouldShowShortlistCapacityAlert = limitWatchlistSize && (shortlistCapacity.alertLevel !== "none" || shortlistCapacity.isUnderfilled);
+
+  async function loadQualifiedCandidates() {
+    setLoadingQualified(true);
+    setQualifiedError(null);
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc("get_top_recommended_stocks");
+      if (error) throw new Error(error.message);
+      const existing = new Set(
+        watchlistStocks.map((stock) => stock.symbol.trim().toUpperCase())
+      );
+      const raw = (data ?? []) as QualifiedStockCandidate[];
+      const deduped = new Map<string, QualifiedStockCandidate>();
+      for (const row of raw) {
+        const symbol = String(row.symbol ?? "").trim().toUpperCase();
+        if (!symbol || existing.has(symbol)) continue;
+        const candidate: QualifiedStockCandidate = {
+          symbol,
+          upside: Number(row.upside) || 0,
+          analyst_average: Number(row.analyst_average) || 0,
+          market_cap: Number(row.market_cap) || 0,
+        };
+        if (enableRiskFilter && !candidatePassesRisk(candidate, riskAppetite)) continue;
+        const prior = deduped.get(symbol);
+        if (!prior || candidate.upside > prior.upside) deduped.set(symbol, candidate);
+      }
+      const filtered = [...deduped.values()]
+        .sort((a, b) => (b.upside - a.upside) || (b.market_cap - a.market_cap) || a.symbol.localeCompare(b.symbol))
+        .slice(0, 30);
+      setQualifiedCandidates(filtered);
+    } catch (error) {
+      setQualifiedError(error instanceof Error ? error.message : "Unable to load qualified stocks.");
+      setQualifiedCandidates([]);
+    } finally {
+      setLoadingQualified(false);
+    }
+  }
+
+  async function addQualifiedCandidate(symbol: string) {
+    if (addingQualifiedSymbols[symbol]) return;
+    setAddingQualifiedSymbols((prev) => ({ ...prev, [symbol]: true }));
+    try {
+      addStock({
+        symbol,
+        quantity: 0,
+        averageCost: 0,
+        lastPrice: 0,
+        pendingOptimization: true,
+      });
+      recalc();
+      await flushCurrentPortfolioSnapshotNow(true);
+      setQualifiedCandidates((prev) => prev.filter((item) => item.symbol !== symbol));
+    } catch (error) {
+      setQualifiedError(error instanceof Error ? error.message : "Unable to add symbol.");
+    } finally {
+      setAddingQualifiedSymbols((prev) => ({ ...prev, [symbol]: false }));
+    }
+  }
 
   function isActionable(action: string | undefined): boolean {
     if (!action) return false;
@@ -381,12 +488,16 @@ export default function WatchlistPage() {
             {recommendationText}
           </p>
           {shortlistCapacity.isUnderfilled ? (
-            <AddAssetButton
-              idPrefix="watchlist-alert-add"
-              mode="stockOnly"
-              label="Pick stocks from list"
-              className="ui-hover-text mt-1 inline-flex rounded-none border-0 bg-transparent p-0 text-xs font-semibold text-primary underline underline-offset-2"
-            />
+            <button
+              type="button"
+              onClick={() => {
+                setQualifiedPickerOpen(true);
+                void loadQualifiedCandidates();
+              }}
+              className="ui-hover-text mt-1 inline-flex text-xs font-semibold text-primary underline underline-offset-2"
+            >
+              Pick stocks from list
+            </button>
           ) : null}
               </>
             );
@@ -601,6 +712,59 @@ export default function WatchlistPage() {
         cancelLabel="Keep"
         variant="danger"
       />
+
+      <AppModal open={qualifiedPickerOpen} onClose={() => setQualifiedPickerOpen(false)} size="md" stagger={false}>
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <h2 className="text-base font-semibold text-foreground">Qualified stocks from Supabase</h2>
+          <button
+            type="button"
+            onClick={() => setQualifiedPickerOpen(false)}
+            className="rounded-lg px-2 py-1 text-sm text-subtle hover:bg-muted/60 hover:text-foreground"
+          >
+            Close
+          </button>
+        </div>
+        <div className="overflow-y-auto px-4 py-3">
+          {loadingQualified ? <p className="text-sm text-subtle">Loading qualified stocks…</p> : null}
+          {!loadingQualified && qualifiedError ? (
+            <div className="space-y-2">
+              <p className="text-sm text-error">{qualifiedError}</p>
+              <button
+                type="button"
+                onClick={() => void loadQualifiedCandidates()}
+                className="ui-hover-pop rounded-lg border border-border px-3 py-1.5 text-sm text-foreground"
+              >
+                Retry
+              </button>
+            </div>
+          ) : null}
+          {!loadingQualified && !qualifiedError && qualifiedCandidates.length === 0 ? (
+            <p className="text-sm text-subtle">No additional qualified stocks found right now.</p>
+          ) : null}
+          {!loadingQualified && !qualifiedError && qualifiedCandidates.length > 0 ? (
+            <div className="divide-y divide-border">
+              {qualifiedCandidates.map((candidate) => (
+                <div key={candidate.symbol} className="flex items-center justify-between gap-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">{candidate.symbol}</p>
+                    <p className="text-xs text-subtle">
+                      Upside {formatPercent(candidate.upside, true)} · Analyst {formatDecimal(candidate.analyst_average)} · Cap {formatMarketCapCompact(candidate.market_cap)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void addQualifiedCandidate(candidate.symbol)}
+                    disabled={addingQualifiedSymbols[candidate.symbol] === true}
+                    className="ui-hover-pop rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground disabled:opacity-60"
+                  >
+                    {addingQualifiedSymbols[candidate.symbol] ? "Adding…" : "Add"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </AppModal>
 
       <StockDetailModal symbol={detailSymbol} onClose={() => setDetailSymbol(null)} />
     </div>
