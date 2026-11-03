@@ -784,7 +784,7 @@ export type AddGateContext = {
 
 /**
  * Symbols that show as in-shortlist (green) on Portfolio and Watchlist.
- * ETF holdings are included and consume top-N slots. When the size limit is off,
+ * All eligible ETFs are included and consume top-N slots. When the size limit is off,
  * every eligible name is in the set; Portfolio still paints every holding green.
  */
 export function preferredSymbolsForShortlistIndicator(
@@ -802,15 +802,15 @@ export function preferredSymbolsForShortlistIndicator(
   if (!options.limitWatchlistSize) {
     return new Set(eligible.map((stock) => stock.symbol));
   }
-  const etfHoldingSymbols = eligible
-    .filter((stock) => stock.isETF === true && stock.quantity > 0)
+  const etfSymbols = eligible
+    .filter((stock) => stock.isETF === true)
     .map((stock) => stock.symbol);
   const forced = eligible
     .filter((stock) => stock.quantity <= 0 && stock.isETF !== true && stock.includeInShortlist === true)
     .sort((a, b) => a.symbol.localeCompare(b.symbol));
   const forcedSymbols = forced.map((stock) => stock.symbol);
   const rankedSlots = Math.max(
-    recommendedWatchlistSize(options.portfolioSize) - etfHoldingSymbols.length - forcedSymbols.length,
+    recommendedWatchlistSize(options.portfolioSize) - etfSymbols.length - forcedSymbols.length,
     0
   );
   const topStockSymbols = rankedTopWatchlistCandidates(eligible, {
@@ -820,7 +820,7 @@ export function preferredSymbolsForShortlistIndicator(
     .filter((stock) => !forcedSymbols.includes(stock.symbol))
     .slice(0, rankedSlots)
     .map((stock) => stock.symbol);
-  return new Set([...etfHoldingSymbols, ...forcedSymbols, ...topStockSymbols]);
+  return new Set([...etfSymbols, ...forcedSymbols, ...topStockSymbols]);
 }
 
 /**
@@ -916,14 +916,13 @@ function rankInTopWatchlist(
 
 function rankedStockSlotsForTopN(stocks: IosStockInput[], portfolioSize: number): number {
   const totalSlots = recommendedWatchlistSize(portfolioSize);
-  const etfHoldingSlots = stocks.filter(
+  const etfSlots = stocks.filter(
     (stock) =>
       stock.isETF === true &&
-      stock.quantity > 0 &&
       stock.excludeFromShortlist !== true &&
       stock.symbol !== "$CASH"
   ).length;
-  return Math.max(totalSlots - etfHoldingSlots, 0);
+  return Math.max(totalSlots - etfSlots, 0);
 }
 
 export function rankInWatchlistScoreUniverse(

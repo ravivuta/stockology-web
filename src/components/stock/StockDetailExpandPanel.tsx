@@ -415,7 +415,13 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     () => (points ?? []).map((point) => point.close).filter((value) => Number.isFinite(value)),
     [points]
   );
-  const isShortlistedForPortfolio = stock?.isShortlisted ?? ((stock?.quantity ?? 0) > 0 || stock?.isETF === true);
+  const isShortlistedForPortfolio = useMemo(() => {
+    if (!stock) return false;
+    if (stock.excludeFromShortlist === true) return false;
+    if (stock.isETF === true) return true;
+    if ((stock.quantity ?? 0) > 0) return true;
+    return stock.isShortlisted === true;
+  }, [stock]);
   const lotSummary = useMemo(() => {
     const openLots = [...(lots?.open ?? [])].sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate));
     const soldLots = [...(lots?.sold ?? [])].sort((a, b) => b.saleDate.localeCompare(a.saleDate));
@@ -468,6 +474,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   ]);
   const rec = useMemo(() => {
     if (!stock) return undefined;
+    if (!isShortlistedForPortfolio) return undefined;
     if (closes.length <= 0 && !(stock.movingAvg != null && Number.isFinite(stock.movingAvg) && stock.movingAvg > 0)) {
       if (storedRec && histLoading && isInsufficientHistoryComment(storedRec.comments)) {
         return {
@@ -531,6 +538,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     stock,
     stockProfitTarget,
     storedRec,
+    isShortlistedForPortfolio,
     useAISentimentForRecommendations,
     useRSIGatingForRecommendations,
     traderModeEnabled,
@@ -624,7 +632,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     if (stock.isETF === true) {
       const rows = [
         {
-          label: "Because, either you are holding a position of this stock",
+          label: "Because either you are holding a position of this stock",
           detail: stock.quantity > 0 ? "Yes" : "No",
           passes: stock.quantity > 0,
         },
@@ -649,7 +657,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     const riskPasses = stock.isVisibleInRisk === true;
     const rows = [
       {
-        label: "Because, either you are holding a position of this stock",
+        label: "Because either you are holding a position of this stock",
         detail: stock.quantity > 0 ? "Yes" : "No",
         passes: stock.quantity > 0,
       },
@@ -1540,7 +1548,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                             detail={factor.detail}
                             passes={factor.passes}
                           />
-                          {index === 0 && stock?.isETF !== true && shortlistFactors.length > 1 ? (
+                          {index === 0 && shortlistFactors.length > 1 ? (
                             <p className={cn("py-0.5 text-center font-semibold tracking-wide text-subtle", dense ? "text-[10px]" : "text-xs")}>
                               OR
                             </p>

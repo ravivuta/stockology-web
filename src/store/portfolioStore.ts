@@ -858,8 +858,8 @@ function derivePortfolioState(
 
   if (shortlistCtx.limitWatchlistSize) {
     const holdingSymbols = stocksWithRisk.filter((stock) => stock.quantity > 0 && stock.excludeFromShortlist !== true);
-    const etfHoldingSymbols = stocksWithRisk.filter(
-      (stock) => stock.quantity > 0 && stock.isETF === true && stock.excludeFromShortlist !== true
+    const etfSymbols = stocksWithRisk.filter(
+      (stock) => stock.isETF === true && stock.excludeFromShortlist !== true
     );
     const forceIncluded = stocksWithRisk
       .filter(
@@ -876,10 +876,10 @@ function derivePortfolioState(
       riskAppetite: shortlistCtx.riskAppetite,
     })
       .filter((stock) => !forceIncludedSymbols.has(stock.symbol))
-      .slice(0, Math.max(idealWatchlistSize - etfHoldingSymbols.length - forceIncluded.length, 0));
+      .slice(0, Math.max(idealWatchlistSize - etfSymbols.length - forceIncluded.length, 0));
 
     for (const stock of holdingSymbols) shortlistedSymbols.add(stock.symbol);
-    for (const stock of etfHoldingSymbols) shortlistedSymbols.add(stock.symbol);
+    for (const stock of etfSymbols) shortlistedSymbols.add(stock.symbol);
     for (const stock of forceIncluded) shortlistedSymbols.add(stock.symbol);
     for (const stock of topN) shortlistedSymbols.add(stock.symbol);
   } else {
