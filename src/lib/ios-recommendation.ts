@@ -789,11 +789,15 @@ export type ShortlistCapacityDiagnostics = {
   etfPenaltyMultiplier: number;
   effectiveETFCount: number;
   etfPenaltySlots: number;
+  etfMinTargetRatio: number;
+  etfMaxTargetRatio: number;
   targetStockSlots: number;
   qualifiedNonETFSlots: number;
   stockSlotShortfall: number;
   shortlistFillRate: number;
   etfPressureRatio: number;
+  isBelowETFMinimumRange: boolean;
+  isAboveETFMaximumRange: boolean;
   alertLevel: ShortlistCapacityAlertLevel;
   isUnderfilled: boolean;
 };
@@ -962,6 +966,12 @@ export function shortlistCapacityDiagnostics(
   const idealWatchlistSize = recommendedWatchlistSize(settings.portfolioSize);
   const etfPenaltySlots = effectiveETFCount * etfPenaltyMultiplier;
   const targetStockSlots = Math.max(0, idealWatchlistSize - etfPenaltySlots);
+  const [etfMinTargetRatio, etfMaxTargetRatio] =
+    settings.riskAppetite === "Low"
+      ? [0.4, 0.6]
+      : settings.riskAppetite === "Medium"
+        ? [0.2, 0.4]
+        : [0.0, 0.2];
   const qualifiedNonETFSlots = Math.min(
     targetStockSlots,
     rankedTopWatchlistCandidates(eligible, {
@@ -972,6 +982,8 @@ export function shortlistCapacityDiagnostics(
   const stockSlotShortfall = Math.max(0, targetStockSlots - qualifiedNonETFSlots);
   const shortlistFillRate = targetStockSlots > 0 ? qualifiedNonETFSlots / targetStockSlots : 1;
   const etfPressureRatio = idealWatchlistSize > 0 ? etfPenaltySlots / idealWatchlistSize : 1;
+  const isBelowETFMinimumRange = etfPressureRatio < etfMinTargetRatio;
+  const isAboveETFMaximumRange = etfPressureRatio > etfMaxTargetRatio;
 
   let alertLevel: ShortlistCapacityAlertLevel = "none";
   if (effectiveETFCount > 0 && targetStockSlots === 0) {
@@ -989,11 +1001,15 @@ export function shortlistCapacityDiagnostics(
     etfPenaltyMultiplier,
     effectiveETFCount,
     etfPenaltySlots,
+    etfMinTargetRatio,
+    etfMaxTargetRatio,
     targetStockSlots,
     qualifiedNonETFSlots,
     stockSlotShortfall,
     shortlistFillRate,
     etfPressureRatio,
+    isBelowETFMinimumRange,
+    isAboveETFMaximumRange,
     alertLevel,
     isUnderfilled,
   };
