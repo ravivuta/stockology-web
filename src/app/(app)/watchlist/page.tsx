@@ -374,12 +374,20 @@ export default function WatchlistPage() {
           </p>
           <p className="mt-1 text-xs text-subtle">
             {shortlistCapacity.isUnderfilled
-              ? `You have ${shortlistCapacity.qualifiedNonETFSlots} qualified stocks, and do not have enough risk-qualified stocks.`
+              ? `You have ${shortlistCapacity.qualifiedNonETFSlots} qualified stocks, and do not have enough risk-qualified stocks. Add ${shortlistCapacity.stockSlotShortfall} more qualified stocks.`
               : `You have ${shortlistCapacity.qualifiedNonETFSlots} qualified stocks, and have enough risk-qualified stocks.`}
           </p>
           <p className="mt-1 text-xs text-subtle">
             {recommendationText}
           </p>
+          {shortlistCapacity.isUnderfilled ? (
+            <AddAssetButton
+              idPrefix="watchlist-alert-add"
+              mode="stockOnly"
+              label="Pick stocks from list"
+              className="ui-hover-text mt-1 inline-flex rounded-none border-0 bg-transparent p-0 text-xs font-semibold text-primary underline underline-offset-2"
+            />
+          ) : null}
               </>
             );
           })()}

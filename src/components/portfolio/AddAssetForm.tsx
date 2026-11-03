@@ -604,7 +604,17 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
   );
 }
 
-export function AddAssetButton({ idPrefix, className, mode = "full" }: { idPrefix: string; className?: string; mode?: AddAssetMode }) {
+export function AddAssetButton({
+  idPrefix,
+  className,
+  mode = "full",
+  label = "Add",
+}: {
+  idPrefix: string;
+  className?: string;
+  mode?: AddAssetMode;
+  label?: string;
+}) {
   const [open, setOpen] = useState(false);
   const titleId = `${idPrefix}-title`;
 
@@ -615,7 +625,7 @@ export function AddAssetButton({ idPrefix, className, mode = "full" }: { idPrefi
         onClick={() => setOpen(true)}
         className={className ?? appCtaButton("ui-hover-pop px-3 py-1.5 text-sm")}
       >
-        Add
+        {label}
       </button>
       <AppModal open={open} onClose={() => setOpen(false)} size="lg" stagger={false} titleId={titleId}>
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
