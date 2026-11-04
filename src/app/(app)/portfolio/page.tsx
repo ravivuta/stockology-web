@@ -427,7 +427,7 @@ export default function PortfolioPage() {
                   return (
                     <tr
                       key={s.symbol}
-                      className="cursor-pointer transition-colors duration-150 odd:bg-[color:var(--theme-surface)] even:bg-[color:var(--theme-background)] hover:bg-muted/50 dark:hover:bg-white/[0.04]"
+                      className="cursor-pointer transition-colors duration-150 odd:bg-white/90 even:bg-zinc-50/90 hover:bg-muted/50 dark:odd:bg-[#171c26] dark:even:bg-[#111827] dark:hover:bg-white/[0.04]"
                       onClick={() => setDetailSymbol(s.symbol)}
                     >
                       <td className="px-2 py-2.5 align-middle text-center md:px-4 md:py-3">
