@@ -21,9 +21,22 @@ export function formatNumberMax2(value: number | null | undefined): string {
   return MAX_2.format(value);
 }
 
+function truncateToPrecision(value: number, decimals: number): number {
+  const factor = 10 ** decimals;
+  return Math.trunc(value * factor) / factor;
+}
+
 export function formatCurrency(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
   return `$${formatDecimal(value)}`;
+}
+
+export function formatCurrencyTruncated(value: number | null | undefined, decimals = 2): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return `$${new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: decimals,
+  }).format(truncateToPrecision(value, decimals))}`;
 }
 
 export function formatWholeCurrency(value: number | null | undefined): string {
