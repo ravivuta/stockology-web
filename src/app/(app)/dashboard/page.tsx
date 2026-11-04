@@ -21,7 +21,7 @@ import {
   type NetWorthPoint,
 } from "@/lib/portfolio-net-worth-series";
 import { isUsMarketTradingDay } from "@/lib/market-hours";
-import { formatAbsPercent, formatCompactCurrency, formatCompactNumber, formatCurrency, formatCurrencyTruncated, formatPercent } from "@/lib/numberFormat";
+import { formatCompactNumber, formatCurrency, formatWholeCurrency, formatWholePercent } from "@/lib/numberFormat";
 import { cashByAccount, displayAccount, isCashSymbol, preferredAccountLabel } from "@/lib/cash-accounts";
 import { fixedIncomeTotal } from "@/lib/fixed-income-accounts";
 
@@ -379,7 +379,7 @@ export default function DashboardPage() {
             >
               <PortfolioDonut
                 segments={pieData.map((p) => ({ name: p.name, value: p.value, color: p.color }))}
-                totalValue={formatCurrencyTruncated(totalBalance)}
+                totalValue={formatWholeCurrency(totalBalance)}
                 totalLabelClassName="text-[color:var(--dashboard-chart-center-text)]"
                 totalValueClassName="text-[color:var(--dashboard-chart-center-text)]"
               />
@@ -412,7 +412,7 @@ export default function DashboardPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <span className="min-w-0 truncate font-bold text-foreground">{p.name}</span>
-                        <span className="shrink-0 tabular-nums font-bold text-subtle">{formatCompactCurrency(segmentValue)} · {pctLabel}</span>
+                        <span className="shrink-0 tabular-nums font-bold text-subtle">{formatWholeCurrency(segmentValue)} · {pctLabel}</span>
                       </div>
                       {p.name === "Cost" || p.name === "Cost basis" ? (
                         <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] font-semibold">
@@ -436,7 +436,7 @@ export default function DashboardPage() {
           <dl className="grid w-full grid-cols-1 gap-0">
             <StatRow
               label="Cash"
-              value={formatCurrencyTruncated(cash)}
+              value={formatWholeCurrency(cash)}
               labelClassName="text-[color:var(--dashboard-chart-cash)]"
               valueClassName="text-[color:var(--dashboard-chart-cash)]"
               labelAction={(
@@ -451,7 +451,7 @@ export default function DashboardPage() {
             />
             <StatRow
               label="Fixed income"
-              value={formatCurrencyTruncated(fixedIncomeValue)}
+              value={formatWholeCurrency(fixedIncomeValue)}
               labelClassName="text-[color:#0f9aa7]"
               valueClassName="text-[color:#0f9aa7]"
               labelAction={(
@@ -475,16 +475,16 @@ export default function DashboardPage() {
                   <span className="text-[10px]">{showCostBasisBreakdown ? "▾" : "▸"}</span>
                 </span>
                 <span className="text-sm tabular-nums text-[color:var(--dashboard-chart-cost-basis)]">
-                  {`${formatCurrencyTruncated(holdingsCostBasis)} (${shareOfRow(holdingsCostBasis, totalBalance)})`}
+                  {`${formatWholeCurrency(holdingsCostBasis)} (${shareOfRow(holdingsCostBasis, totalBalance)})`}
                 </span>
               </button>
               {showCostBasisBreakdown ? (
                 <div className="mt-1 flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs">
                   <span className="font-semibold text-[color:#2f9eff]">
-                    ETF: {`${formatCurrencyTruncated(etfCostBasis)} (${shareOfRow(etfCostBasis, holdingsCostBasis)})`}
+                    ETF: {`${formatWholeCurrency(etfCostBasis)} (${shareOfRow(etfCostBasis, holdingsCostBasis)})`}
                   </span>
                   <span className="font-semibold text-[color:#1f8f46]">
-                    Stocks: {`${formatCurrencyTruncated(stockCostBasisOnly)} (${shareOfRow(stockCostBasisOnly, holdingsCostBasis)})`}
+                    Stocks: {`${formatWholeCurrency(stockCostBasisOnly)} (${shareOfRow(stockCostBasisOnly, holdingsCostBasis)})`}
                   </span>
                 </div>
               ) : null}
@@ -501,16 +501,16 @@ export default function DashboardPage() {
                   <span className="text-[10px]">{showCurrentValueBreakdown ? "▾" : "▸"}</span>
                 </span>
                 <span className="text-sm tabular-nums text-[color:#14b8a6]">
-                  {`${formatCurrencyTruncated(holdingsValue)} (${shareOfRow(holdingsValue, totalBalance)})`}
+                  {`${formatWholeCurrency(holdingsValue)} (${shareOfRow(holdingsValue, totalBalance)})`}
                 </span>
               </button>
               {showCurrentValueBreakdown ? (
                 <div className="mt-1 flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs">
                   <span className="font-semibold text-[color:#2f9eff]">
-                    ETF: {`${formatCurrencyTruncated(etfValue)} (${shareOfRow(etfValue, holdingsValue)})`}
+                    ETF: {`${formatWholeCurrency(etfValue)} (${shareOfRow(etfValue, holdingsValue)})`}
                   </span>
                   <span className="font-semibold text-[color:#1f8f46]">
-                    Stocks: {`${formatCurrencyTruncated(stockValueOnly)} (${shareOfRow(stockValueOnly, holdingsValue)})`}
+                    Stocks: {`${formatWholeCurrency(stockValueOnly)} (${shareOfRow(stockValueOnly, holdingsValue)})`}
                   </span>
                 </div>
               ) : null}
@@ -519,7 +519,7 @@ export default function DashboardPage() {
             {isProfitable ? (
               <StatRow
                 label="Gain"
-                value={`${formatCurrencyTruncated(holdingsPnL)} (${formatAbsPercent(totalPnLPct)})`}
+                value={`${formatWholeCurrency(holdingsPnL)} (${formatWholePercent(totalPnLPct)})`}
                 labelClassName="text-[color:var(--dashboard-chart-gain)]"
                 valueClassName="font-semibold text-[color:var(--dashboard-chart-gain)]"
                 last={!showTodayChange}
@@ -527,7 +527,7 @@ export default function DashboardPage() {
             ) : (
               <StatRow
                 label="Loss"
-                value={`${formatCurrencyTruncated(Math.abs(holdingsPnL))} (${formatAbsPercent(totalPnLPct)})`}
+                value={`${formatWholeCurrency(Math.abs(holdingsPnL))} (${formatWholePercent(totalPnLPct)})`}
                 labelClassName="text-[color:var(--dashboard-chart-loss)]"
                 valueClassName="font-semibold text-[color:var(--dashboard-chart-loss)]"
                 last={!showTodayChange}
@@ -536,7 +536,7 @@ export default function DashboardPage() {
             {showTodayChange ? (
               <StatRow
                 label="Today"
-                value={`${formatCurrencyTruncated(Math.abs(todayChange.change))} (${formatPercent(todayChange.percent, true)})`}
+                value={`${formatWholeCurrency(Math.abs(todayChange.change))} (${formatWholePercent(todayChange.percent, true)})`}
                 valueClassName={todayValueClassName}
                 last
               />

@@ -6,7 +6,7 @@ import { cashByAccount, displayAccount, knownCashAccounts, CASH_SYMBOL } from "@
 import { recordExternalCashFlow } from "@/lib/external-cash-flows";
 import { snapshotSaveBlockReason } from "@/lib/portfolio-cloud-sync";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
-import { formatCurrency } from "@/lib/numberFormat";
+import { formatWholeCurrency } from "@/lib/numberFormat";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { fieldInputClass } from "@/lib/field-input";
 
@@ -134,7 +134,7 @@ export function CashAccountsEditor({
         </div>
         <div className="mt-4 flex items-center justify-between border-t border-border/80 pt-3 text-sm">
           <span className="font-semibold text-foreground">Total</span>
-          <span className="tabular-nums font-semibold text-[color:var(--dashboard-chart-cash)]">{formatCurrency(total)}</span>
+          <span className="tabular-nums font-semibold text-[color:var(--dashboard-chart-cash)]">{formatWholeCurrency(total)}</span>
         </div>
         {saveError ? <p className="mt-3 text-sm text-error">{saveError}</p> : null}
         <div className="mt-4 flex justify-end gap-2">
