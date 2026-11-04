@@ -37,7 +37,7 @@ export function CashAccountsEditor({
         startingCash[account] ??
         Object.entries(startingCash).find(([name]) => displayAccount(name).toLowerCase() === accountKey)?.[1] ??
         0;
-      return [account, amount > 0.005 ? String(amount) : ""];
+      return [account, amount > 0.005 ? String(Math.trunc(amount)) : ""];
     })
   );
 
@@ -50,7 +50,7 @@ export function CashAccountsEditor({
 
   function parseAmount(raw: string): number {
     const n = parseFloat(raw.replace(/,/g, "").replace(/\$/g, "").trim());
-    return Number.isFinite(n) && n > 0 ? n : 0;
+    return Number.isFinite(n) && n > 0 ? Math.trunc(n) : 0;
   }
 
   function snapshotFailureText(reason: string | null): string | null {

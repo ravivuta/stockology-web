@@ -21,7 +21,7 @@ import {
   type NetWorthPoint,
 } from "@/lib/portfolio-net-worth-series";
 import { isUsMarketTradingDay } from "@/lib/market-hours";
-import { formatCompactNumber, formatCurrency, formatWholeCurrency, formatWholePercent } from "@/lib/numberFormat";
+import { formatCompactNumber, formatWholeCurrency, formatWholePercent } from "@/lib/numberFormat";
 import { cashByAccount, displayAccount, isCashSymbol, preferredAccountLabel } from "@/lib/cash-accounts";
 import { fixedIncomeTotal } from "@/lib/fixed-income-accounts";
 
@@ -607,7 +607,7 @@ export default function DashboardPage() {
                       {row.account}
                     </span>
                     <span className="shrink-0 tabular-nums font-medium text-foreground">
-                      {`${formatCurrency(rowTotal)} (${Math.round(pct)}%)`}
+                      {`${formatWholeCurrency(rowTotal)} (${Math.round(pct)}%)`}
                     </span>
                   </div>
 
@@ -689,23 +689,23 @@ export default function DashboardPage() {
 
                   <p className="mt-1.5 text-[11px] font-bold leading-snug tabular-nums">
                     <span className="text-[color:var(--dashboard-chart-cost-basis)]">
-                      Cost {formatCurrency(row.costBasis)} ({shareOfRow(row.costBasis, rowTotal)})
+                      Cost {formatWholeCurrency(row.costBasis)} ({shareOfRow(row.costBasis, rowTotal)})
                     </span>
                     <span className="text-subtle"> · </span>
                     <span className={pnlClass}>
-                      P/L {formatCurrency(pnl)} ({`${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%`})
+                      P/L {formatWholeCurrency(pnl)} ({`${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%`})
                     </span>
                     {row.fixedIncome > 0 ? (
                       <>
                         <span className="text-subtle"> · </span>
                         <span className="text-[color:var(--dashboard-chart-fixed-income)]">
-                          Fixed Income {formatCurrency(row.fixedIncome)} ({shareOfRow(row.fixedIncome, rowTotal)})
+                          Fixed Income {formatWholeCurrency(row.fixedIncome)} ({shareOfRow(row.fixedIncome, rowTotal)})
                         </span>
                       </>
                     ) : null}
                     <span className="text-subtle"> · </span>
                     <span className="text-[color:var(--dashboard-chart-cash)]">
-                      Cash {formatCurrency(row.cash)} ({shareOfRow(row.cash, rowTotal)})
+                      Cash {formatWholeCurrency(row.cash)} ({shareOfRow(row.cash, rowTotal)})
                     </span>
                   </p>
 

@@ -41,7 +41,7 @@ export function formatCurrencyTruncated(value: number | null | undefined, decima
 
 export function formatWholeCurrency(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
-  return `$${WHOLE.format(value)}`;
+  return WHOLE.format(Math.trunc(value));
 }
 
 export function formatSignedCurrency(value: number | null | undefined): string {
