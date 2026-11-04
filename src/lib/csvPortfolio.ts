@@ -21,7 +21,7 @@ export const CSV_IMPORT_FIELDS: CsvImportField[] = [
   { key: "qty", label: "Quantity", description: "Optional. Use with Price for holdings." },
   { key: "price", label: "Price", description: "Optional. Use with Quantity for holdings." },
   { key: "transaction", label: "Transaction", description: "Optional. BUY/ADD creates holdings. SELL/SOLD/REDUCE records a sale and credits qty × sale price to that account." },
-  { key: "purchaseDate", label: "Purchase Date", description: "Optional lot purchase date." },
+  { key: "purchaseDate", label: "Transaction Date", description: "Optional transaction date (buy or sell)." },
   { key: "account", label: "Account", description: "Optional account/profile name." },
   { key: "retirementAccount", label: "Retirement", description: "Optional tax-exempt yes/no column." },
   { key: "name", label: "Name", description: "Optional company name." },
@@ -1014,7 +1014,13 @@ export function exportWatchlistCsv(stocks: CsvExportStock[]): string {
 
 export function exportPortfolioCsv(
   stocks: CsvExportStock[],
-  lotsBySymbol?: Record<string, { open: Array<{ quantity: number; costBasis: number; purchaseDate: string; account?: string; isRetirementAccount?: boolean | null }>; sold: unknown[] }>
+  lotsBySymbol?: Record<
+    string,
+    {
+      open: Array<{ quantity: number; costBasis: number; purchaseDate: string; account?: string; isRetirementAccount?: boolean | null }>;
+      sold: Array<{ quantity: number; saleDate?: string; salePrice: number; account?: string }>;
+    }
+  >
 ): string {
   const header = "purchaseDate,transaction,symbol,qty,price,account,retirementAccount";
   const esc = (f: string) => {
@@ -1025,6 +1031,8 @@ export function exportPortfolioCsv(
   for (const s of stocks) {
     const bundle = lotsBySymbol?.[s.symbol];
     const openLots = bundle?.open ?? [];
+    const soldLots = bundle?.sold ?? [];
+
     if (openLots.length > 0) {
       for (const lot of openLots) {
         const row = [
@@ -1038,11 +1046,25 @@ export function exportPortfolioCsv(
         ].map(esc);
         lines.push(row.join(","));
       }
-      continue;
     }
 
-    const row = ["", "BUY", s.symbol, String(s.quantity), s.averageCost.toFixed(2), "", ""].map(esc);
-    lines.push(row.join(","));
+    for (const lot of soldLots) {
+      const row = [
+        lot.saleDate || "",
+        "SELL",
+        s.symbol,
+        String(lot.quantity),
+        lot.salePrice.toFixed(2),
+        lot.account ?? "",
+        "",
+      ].map(esc);
+      lines.push(row.join(","));
+    }
+
+    if (openLots.length === 0 && soldLots.length === 0) {
+      const row = ["", "BUY", s.symbol, String(s.quantity), s.averageCost.toFixed(2), "", ""].map(esc);
+      lines.push(row.join(","));
+    }
   }
   return lines.join("\n");
 }

@@ -45,6 +45,8 @@ export default function DashboardPage() {
   const [bars, setBars] = useState(true);
   const [showCashEditor, setShowCashEditor] = useState(false);
   const [showFixedIncomeEditor, setShowFixedIncomeEditor] = useState(false);
+  const [showCurrentValueBreakdown, setShowCurrentValueBreakdown] = useState(false);
+  const [showCostBasisBreakdown, setShowCostBasisBreakdown] = useState(false);
   const [dashStockDetail, setDashStockDetail] = useState<string | null>(null);
   const [summaryTab, setSummaryTab] = useState<"summary" | "performance">("summary");
   // Pre-seed from the same cache used by DashboardReturnComparison for instant today-value display
@@ -62,6 +64,16 @@ export default function DashboardPage() {
   const holdingsCostBasis = useMemo(() => held.reduce((a, s) => a + s.quantity * s.averageCost, 0), [held]);
   const fixedIncomeValue = useMemo(() => fixedIncomeTotal(fixedIncomeByAccount), [fixedIncomeByAccount]);
   const holdingsPnL = holdingsValue - holdingsCostBasis;
+  const etfValue = useMemo(
+    () => held.filter((stock) => stock.isETF === true).reduce((sum, stock) => sum + stock.quantity * (stock.lastPrice ?? 0), 0),
+    [held]
+  );
+  const etfCostBasis = useMemo(
+    () => held.filter((stock) => stock.isETF === true).reduce((sum, stock) => sum + stock.quantity * stock.averageCost, 0),
+    [held]
+  );
+  const stockValueOnly = Math.max(0, holdingsValue - etfValue);
+  const stockCostBasisOnly = Math.max(0, holdingsCostBasis - etfCostBasis);
   const totalBalance = holdingsValue + cash + fixedIncomeValue;
   const isProfitable = holdingsPnL >= 0;
   const totalPnLPct = holdingsCostBasis > 0 ? (holdingsPnL / holdingsCostBasis) * 100 : 0;
@@ -397,8 +409,24 @@ export default function DashboardPage() {
                       style={{ backgroundColor: p.color }}
                       aria-hidden
                     />
-                    <span className="min-w-0 flex-1 truncate font-bold text-foreground">{p.name}</span>
-                    <span className="shrink-0 tabular-nums font-bold text-subtle">{formatCompactCurrency(segmentValue)} · {pctLabel}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate font-bold text-foreground">{p.name}</span>
+                        <span className="shrink-0 tabular-nums font-bold text-subtle">{formatCompactCurrency(segmentValue)} · {pctLabel}</span>
+                      </div>
+                      {p.name === "Cost" || p.name === "Cost basis" ? (
+                        <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] font-semibold">
+                          <span className="text-[color:#2f9eff]">ETF {shareOfRow(etfCostBasis, holdingsCostBasis)}</span>
+                          <span className="text-[color:#1f8f46]">Stocks {shareOfRow(stockCostBasisOnly, holdingsCostBasis)}</span>
+                        </div>
+                      ) : null}
+                      {p.name === "Holdings" ? (
+                        <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] font-semibold">
+                          <span className="text-[color:#2f9eff]">ETF {shareOfRow(etfValue, holdingsValue)}</span>
+                          <span className="text-[color:#1f8f46]">Stocks {shareOfRow(stockValueOnly, holdingsValue)}</span>
+                        </div>
+                      ) : null}
+                    </div>
                   </li>
                 );
               })}
@@ -420,11 +448,6 @@ export default function DashboardPage() {
                   Edit
                 </button>
               )}
-              secondaryLabel="Current value"
-              secondaryValue={formatCurrency(holdingsValue)}
-              secondaryLabelClassName="text-[color:#14b8a6]"
-              secondaryValueClassName="text-[color:#14b8a6]"
-              secondarySeparator
             />
             <StatRow
               label="Fixed income"
@@ -441,38 +464,74 @@ export default function DashboardPage() {
                 </button>
               )}
             />
+            <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
+              <button
+                type="button"
+                onClick={() => setShowCostBasisBreakdown((value) => !value)}
+                className="flex w-full items-center justify-between gap-4"
+              >
+                <span className="flex items-center gap-1 text-sm font-medium text-[color:var(--dashboard-chart-cost-basis)]">
+                  Cost Basis
+                  <span className="text-[10px]">{showCostBasisBreakdown ? "▾" : "▸"}</span>
+                </span>
+                <span className="text-sm tabular-nums text-[color:var(--dashboard-chart-cost-basis)]">
+                  {`${formatCurrency(holdingsCostBasis)} (${shareOfRow(holdingsCostBasis, totalBalance)})`}
+                </span>
+              </button>
+              {showCostBasisBreakdown ? (
+                <div className="mt-1 flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs">
+                  <span className="font-semibold text-[color:#2f9eff]">
+                    ETF: {`${formatCurrency(etfCostBasis)} (${shareOfRow(etfCostBasis, holdingsCostBasis)})`}
+                  </span>
+                  <span className="font-semibold text-[color:#1f8f46]">
+                    Stocks: {`${formatCurrency(stockCostBasisOnly)} (${shareOfRow(stockCostBasisOnly, holdingsCostBasis)})`}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
+              <button
+                type="button"
+                onClick={() => setShowCurrentValueBreakdown((value) => !value)}
+                className="flex w-full items-center justify-between gap-4"
+              >
+                <span className="flex items-center gap-1 text-sm font-medium text-[color:#14b8a6]">
+                  Current value
+                  <span className="text-[10px]">{showCurrentValueBreakdown ? "▾" : "▸"}</span>
+                </span>
+                <span className="text-sm tabular-nums text-[color:#14b8a6]">
+                  {`${formatCurrency(holdingsValue)} (${shareOfRow(holdingsValue, totalBalance)})`}
+                </span>
+              </button>
+              {showCurrentValueBreakdown ? (
+                <div className="mt-1 flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs">
+                  <span className="font-semibold text-[color:#2f9eff]">
+                    ETF: {`${formatCurrency(etfValue)} (${shareOfRow(etfValue, holdingsValue)})`}
+                  </span>
+                  <span className="font-semibold text-[color:#1f8f46]">
+                    Stocks: {`${formatCurrency(stockValueOnly)} (${shareOfRow(stockValueOnly, holdingsValue)})`}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+
             {isProfitable ? (
-              <>
-                <StatRow
-                  label="Cost"
-                  value={formatCurrency(holdingsCostBasis)}
-                  labelClassName="text-[color:var(--dashboard-chart-cost-basis)]"
-                  valueClassName="text-[color:var(--dashboard-chart-cost-basis)]"
-                />
-                <StatRow
-                  label="Gain"
-                  value={`${formatCurrency(holdingsPnL)} (${formatAbsPercent(totalPnLPct)})`}
-                  labelClassName="text-[color:var(--dashboard-chart-gain)]"
-                  valueClassName="font-semibold text-[color:var(--dashboard-chart-gain)]"
-                  last={!showTodayChange}
-                />
-              </>
+              <StatRow
+                label="Gain"
+                value={`${formatCurrency(holdingsPnL)} (${formatAbsPercent(totalPnLPct)})`}
+                labelClassName="text-[color:var(--dashboard-chart-gain)]"
+                valueClassName="font-semibold text-[color:var(--dashboard-chart-gain)]"
+                last={!showTodayChange}
+              />
             ) : (
-              <>
-                <StatRow
-                  label="Cost basis"
-                  value={formatCurrency(holdingsCostBasis)}
-                  labelClassName="text-[color:var(--dashboard-chart-cost-basis)]"
-                  valueClassName="text-[color:var(--dashboard-chart-cost-basis)]"
-                />
-                <StatRow
-                  label="Loss"
-                  value={`${formatCurrency(Math.abs(holdingsPnL))} (${formatAbsPercent(totalPnLPct)})`}
-                  labelClassName="text-[color:var(--dashboard-chart-loss)]"
-                  valueClassName="font-semibold text-[color:var(--dashboard-chart-loss)]"
-                  last={!showTodayChange}
-                />
-              </>
+              <StatRow
+                label="Loss"
+                value={`${formatCurrency(Math.abs(holdingsPnL))} (${formatAbsPercent(totalPnLPct)})`}
+                labelClassName="text-[color:var(--dashboard-chart-loss)]"
+                valueClassName="font-semibold text-[color:var(--dashboard-chart-loss)]"
+                last={!showTodayChange}
+              />
             )}
             {showTodayChange ? (
               <StatRow

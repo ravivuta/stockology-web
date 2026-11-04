@@ -720,7 +720,12 @@ export function CsvImportExportBar({
   }
 
   function onExport() {
-    const holdings = toExport.filter((s) => s.quantity > 0 || (lotsBySymbol[s.symbol]?.open.length ?? 0) > 0);
+    const holdings = toExport.filter(
+      (s) =>
+        s.quantity > 0 ||
+        (lotsBySymbol[s.symbol]?.open.length ?? 0) > 0 ||
+        (lotsBySymbol[s.symbol]?.sold.length ?? 0) > 0
+    );
     if (holdings.length === 0) {
       setFlash({ kind: "err", text: "No holdings to export yet." });
       return;

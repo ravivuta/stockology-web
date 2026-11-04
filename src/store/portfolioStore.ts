@@ -476,6 +476,39 @@ function reduceOpenLotsFifo(openLots: TradeLot[], qtyToSell: number): TradeLot[]
     .sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate));
 }
 
+function reduceOpenLotsFifoForAccount(
+  openLots: TradeLot[],
+  qtyToSell: number,
+  account: string
+): { openLots: TradeLot[]; soldQty: number } {
+  let remaining = Math.max(0, qtyToSell);
+  let soldQty = 0;
+  const targetKey = normalizeAccountKey(account);
+  const next = [...openLots]
+    .map((lot) => ({ ...lot }))
+    .sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate));
+
+  for (let i = 0; i < next.length && remaining > 0; i += 1) {
+    const lot = next[i];
+    if (normalizeAccountKey(lot.account) !== targetKey) continue;
+
+    const soldFromLot = Math.min(remaining, lot.quantity);
+    if (soldFromLot <= 0) continue;
+
+    lot.quantity -= soldFromLot;
+    lot.status = lot.quantity <= 1e-6 ? "fullySold" : "partiallySold";
+    remaining -= soldFromLot;
+    soldQty += soldFromLot;
+  }
+
+  return {
+    openLots: next
+      .filter((lot) => lot.quantity > 1e-6)
+      .sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate)),
+    soldQty,
+  };
+}
+
 function reduceOpenLotById(openLots: TradeLot[], lotId: string, qtyToSell: number): TradeLot[] {
   const next = openLots.map((lot) => ({ ...lot }));
   const target = next.find((lot) => lot.id === lotId);
@@ -559,8 +592,8 @@ function cashDeltasFromDetectedQtyChanges(
   pre: Map<string, { name: string; qty: number; basis: number }>,
   post: Map<string, { name: string; qty: number; basis: number }>,
   options?: {
-    explicitSoldQtyBySymbol?: Map<string, number>;
-    explicitSoldProceedsBySymbol?: Map<string, number>;
+    explicitSoldQtyByAccountSymbol?: Map<string, number>;
+    explicitSoldProceedsByAccountSymbol?: Map<string, number>;
     lastPriceBySymbol?: Map<string, number>;
   }
 ): Map<string, { name: string; delta: number }> {
@@ -573,8 +606,8 @@ function cashDeltasFromDetectedQtyChanges(
     else cash.set(key, { name, delta: amount });
   };
 
-  const remainingExplicitSoldBySymbol = new Map(options?.explicitSoldQtyBySymbol ?? []);
-  const remainingExplicitProceedsBySymbol = new Map(options?.explicitSoldProceedsBySymbol ?? []);
+  const remainingExplicitSoldByAccountSymbol = new Map(options?.explicitSoldQtyByAccountSymbol ?? []);
+  const remainingExplicitProceedsByAccountSymbol = new Map(options?.explicitSoldProceedsByAccountSymbol ?? []);
   const keys = new Set<string>([...pre.keys(), ...post.keys()]);
   for (const key of keys) {
     const before = pre.get(key);
@@ -587,14 +620,14 @@ function cashDeltasFromDetectedQtyChanges(
     const postBasis = after?.basis ?? 0;
     const soldQty = Math.max(0, preQty - postQty);
     const boughtQty = Math.max(0, postQty - preQty);
-    const remainingExplicitQty = remainingExplicitSoldBySymbol.get(symbol) ?? 0;
+    const remainingExplicitQty = remainingExplicitSoldByAccountSymbol.get(key) ?? 0;
     const claimedExplicit = Math.min(soldQty, remainingExplicitQty);
     if (claimedExplicit > 1e-6 && remainingExplicitQty > 1e-6) {
-      const remainingProceeds = remainingExplicitProceedsBySymbol.get(symbol) ?? 0;
+      const remainingProceeds = remainingExplicitProceedsByAccountSymbol.get(key) ?? 0;
       const explicitPrice = remainingProceeds / remainingExplicitQty;
       add(name, claimedExplicit * explicitPrice);
-      remainingExplicitSoldBySymbol.set(symbol, remainingExplicitQty - claimedExplicit);
-      remainingExplicitProceedsBySymbol.set(symbol, remainingProceeds - claimedExplicit * explicitPrice);
+      remainingExplicitSoldByAccountSymbol.set(key, remainingExplicitQty - claimedExplicit);
+      remainingExplicitProceedsByAccountSymbol.set(key, remainingProceeds - claimedExplicit * explicitPrice);
     }
     const inferredSoldQty = Math.max(0, soldQty - claimedExplicit);
     if (inferredSoldQty > 1e-6 && preQty > 1e-6) {
@@ -608,16 +641,20 @@ function cashDeltasFromDetectedQtyChanges(
       add(name, -(Math.max(0, postBasis - remainingAtOldCost)));
     }
   }
-  for (const [symbol, leftoverQty] of remainingExplicitSoldBySymbol.entries()) {
+  for (const [accountSymbolKey, leftoverQty] of remainingExplicitSoldByAccountSymbol.entries()) {
     if (leftoverQty <= 1e-6) continue;
-    const leftoverProceeds = remainingExplicitProceedsBySymbol.get(symbol) ?? 0;
+    const leftoverProceeds = remainingExplicitProceedsByAccountSymbol.get(accountSymbolKey) ?? 0;
     if (leftoverProceeds <= 1e-6) continue;
-    const suffix = `|${symbol}`;
-    const match = [...pre.entries()].find(([key]) => key.endsWith(suffix))
-      ?? [...post.entries()].find(([key]) => key.endsWith(suffix));
-    add(match?.[1].name ?? DEFAULT_ACCOUNT, leftoverProceeds);
+    const accountName = pre.get(accountSymbolKey)?.name
+      ?? post.get(accountSymbolKey)?.name
+      ?? DEFAULT_ACCOUNT;
+    add(accountName, leftoverProceeds);
   }
   return cash;
+}
+
+function explicitSellKey(account: string, symbol: string): string {
+  return `${normalizeAccountKey(account)}|${symbol.toUpperCase()}`;
 }
 
 function accountForImportedSell(
@@ -2098,8 +2135,8 @@ export const usePortfolioStore = create<State>()(
         const netUpdatesMap = new Map<string, number>();
         const lotDetailUpdateSymbols = new Set<string>();
         const accountSaleEvents: Array<{ symbol: string; account: string; qty: number }> = [];
-        const explicitSoldQtyBySymbol = new Map<string, number>();
-        const explicitSellProceedsBySymbol = new Map<string, number>();
+        const explicitSoldQtyByAccountSymbol = new Map<string, number>();
+        const explicitSellProceedsByAccountSymbol = new Map<string, number>();
 
         if (mode === "portfolio") {
           for (const [symbol, symbolRows] of grouped.entries()) {
@@ -2419,27 +2456,19 @@ export const usePortfolioStore = create<State>()(
               importedTradeCount += 1;
               const lastPrice = lastPriceBySymbol.get(symbol) ?? 0;
               const salePrice = trade.price > 0 ? trade.price : lastPrice;
-              explicitSoldQtyBySymbol.set(symbol, (explicitSoldQtyBySymbol.get(symbol) ?? 0) + qty);
-              explicitSellProceedsBySymbol.set(
-                symbol,
-                (explicitSellProceedsBySymbol.get(symbol) ?? 0) + qty * Math.max(0, salePrice)
-              );
-
-              if (holdingsSymbols.has(symbol)) {
-                accountSaleEvents.push({
-                  symbol,
-                  account: displayAccount(accountForImportedSell(trade, prePositionsByAccountSymbol)),
-                  qty,
-                });
-                continue;
-              }
 
               const bundle = lotsBySymbol[symbol] ?? { open: [], sold: [] };
-              const openBefore = bundle.open.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0);
-              bundle.open = reduceOpenLotsFifo(bundle.open, qty);
-              const openAfter = bundle.open.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0);
-              const soldQty = Math.max(0, openBefore - openAfter);
+              const sellAccount = accountForImportedSell(trade, prePositionsByAccountSymbol);
+              const reduction = reduceOpenLotsFifoForAccount(bundle.open, qty, sellAccount);
+              bundle.open = reduction.openLots;
+              const soldQty = reduction.soldQty;
               if (soldQty > 0) {
+                const sellKey = explicitSellKey(sellAccount, symbol);
+                explicitSoldQtyByAccountSymbol.set(sellKey, (explicitSoldQtyByAccountSymbol.get(sellKey) ?? 0) + soldQty);
+                explicitSellProceedsByAccountSymbol.set(
+                  sellKey,
+                  (explicitSellProceedsByAccountSymbol.get(sellKey) ?? 0) + soldQty * Math.max(0, salePrice)
+                );
                 bundle.sold.unshift({
                   saleDate: trade.tradeDate || defaultImportPurchaseDate(),
                   quantity: soldQty,
@@ -2448,7 +2477,7 @@ export const usePortfolioStore = create<State>()(
                 });
                 accountSaleEvents.push({
                   symbol,
-                  account: displayAccount(accountForImportedSell(trade, prePositionsByAccountSymbol)),
+                  account: displayAccount(sellAccount),
                   qty: soldQty,
                 });
               }
@@ -2548,8 +2577,8 @@ export const usePortfolioStore = create<State>()(
               prePositionsByAccountSymbol,
               postPositionsByAccountSymbol,
               {
-                explicitSoldQtyBySymbol,
-                explicitSoldProceedsBySymbol: explicitSellProceedsBySymbol,
+                explicitSoldQtyByAccountSymbol,
+                explicitSoldProceedsByAccountSymbol: explicitSellProceedsByAccountSymbol,
                 lastPriceBySymbol,
               }
             );
