@@ -650,7 +650,7 @@ export default function WatchlistPage() {
                 return (
                   <tr
                     key={s.symbol}
-                    className="cursor-pointer transition-colors duration-150 hover:bg-muted/50 dark:hover:bg-white/[0.04]"
+                    className="cursor-pointer transition-colors duration-150 odd:bg-[color:var(--theme-surface)] even:bg-[color:var(--theme-background)] hover:bg-muted/50 dark:hover:bg-white/[0.04]"
                     onClick={() => setDetailSymbol(s.symbol)}
                   >
                     <td className="min-w-[5.5rem] px-1.5 py-2.5 align-middle font-medium text-foreground sm:min-w-[6.5rem] sm:px-3 sm:py-3">
