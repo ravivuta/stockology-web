@@ -224,7 +224,7 @@ export default function WatchlistPage() {
         riskAppetite,
         portfolioSize,
       }, {
-        etfPenaltyMultiplier: 4,
+        etfPenaltyMultiplier: 3,
       }),
     [enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
   );
