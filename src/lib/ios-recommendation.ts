@@ -830,7 +830,7 @@ export function preferredSymbolsForShortlistIndicator(
     .sort((a, b) => a.symbol.localeCompare(b.symbol));
   const forcedSymbols = forced.map((stock) => stock.symbol);
   const rankedSlots = Math.max(
-    recommendedWatchlistSize(options.portfolioSize) - (etfSymbols.length * 4) - forcedSymbols.length,
+    recommendedWatchlistSize(options.portfolioSize) - (etfSymbols.length * 3) - forcedSymbols.length,
     0
   );
   const topStockSymbols = rankedTopWatchlistCandidates(eligible, {
@@ -942,7 +942,7 @@ function rankedStockSlotsForTopN(stocks: IosStockInput[], portfolioSize: number)
       stock.excludeFromShortlist !== true &&
       stock.symbol !== "$CASH"
   ).length;
-  return Math.max(totalSlots - (etfSlots * 4), 0);
+  return Math.max(totalSlots - (etfSlots * 3), 0);
 }
 
 export function shortlistCapacityDiagnostics(
@@ -958,7 +958,7 @@ export function shortlistCapacityDiagnostics(
     additionalETFCount?: number;
   }
 ): ShortlistCapacityDiagnostics {
-  const etfPenaltyMultiplier = Math.max(1, options?.etfPenaltyMultiplier ?? 4);
+  const etfPenaltyMultiplier = Math.max(1, options?.etfPenaltyMultiplier ?? 3);
   const additionalETFCount = Math.max(0, options?.additionalETFCount ?? 0);
   const eligible = stocks.filter((stock) => stock.symbol !== "$CASH" && stock.excludeFromShortlist !== true);
   const currentETFCount = eligible.filter((stock) => stock.isETF === true).length;
