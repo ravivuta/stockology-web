@@ -1783,7 +1783,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
   if (currentPrice <= 0) {
     return {
       action: stock.quantity === 0 ? "WAIT_BUY" : "WAIT_ADD",
-      comments: "Unable to fetch current price. Pull down to refresh or try again later.",
+      comments: "Unable to fetch current price. Please try again later.",
       nextBuyPrice: 0,
       movingAvg: 0,
       expectedReturnPct: 0,
@@ -1816,7 +1816,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
       const nextBuyPrice = stock.averageCost || currentPrice;
       return {
         action: stock.quantity === 0 ? "WAIT_BUY" : "WAIT_ADD",
-        comments: `Insufficient historical data (${closes.length}/${minClosesRequired} days). Pull down to refresh or try again later.`,
+        comments: `Insufficient historical data (${closes.length}/${minClosesRequired} days). Please try again later.`,
         nextBuyPrice,
         movingAvg: 0,
         expectedReturnPct: 0,
