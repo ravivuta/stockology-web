@@ -58,7 +58,11 @@ export function formatPercent(value: number | null | undefined, signed = false):
 export function formatWholePercent(value: number | null | undefined, signed = false): string {
   if (value == null || !Number.isFinite(value)) return "—";
   const sign = signed && value >= 0 ? "+" : value < 0 ? "−" : "";
-  return `${sign}${WHOLE.format(Math.abs(value))}%`;
+  const oneDecimal = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
+  return `${sign}${oneDecimal.format(Math.abs(value))}%`;
 }
 
 export function formatAbsPercent(value: number | null | undefined): string {
