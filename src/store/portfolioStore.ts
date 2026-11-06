@@ -659,10 +659,19 @@ function explicitSellKey(account: string, symbol: string): string {
 
 function accountForImportedSell(
   trade: { symbol: string; account?: string },
-  pre: Map<string, { name: string; qty: number; basis: number }>
+  pre: Map<string, { name: string; qty: number; basis: number }>,
+  importedAccountsBySymbol?: Map<string, Set<string>>
 ): string {
   const explicit = trade.account?.trim();
   if (explicit) return displayAccount(explicit);
+  const symbolKey = trade.symbol.toUpperCase();
+  const importedAccounts = importedAccountsBySymbol?.get(symbolKey);
+  if (importedAccounts && importedAccounts.size === 1) {
+    const [onlyImportedAccount] = importedAccounts;
+    if (onlyImportedAccount) {
+      return onlyImportedAccount;
+    }
+  }
   const suffix = `|${trade.symbol.toUpperCase()}`;
   const matching = [...pre.entries()].filter(([key]) => key.endsWith(suffix));
   if (matching.length === 1) return matching[0][1].name;
@@ -2132,6 +2141,7 @@ export const usePortfolioStore = create<State>()(
         let liquidationCashCredited = 0;
         let cashAdjustedBy = 0;
         const importedSymbolsByAccount = new Map<string, Set<string>>();
+        const importedAccountsBySymbol = new Map<string, Set<string>>();
         const netUpdatesMap = new Map<string, number>();
         const lotDetailUpdateSymbols = new Set<string>();
         const accountSaleEvents: Array<{ symbol: string; account: string; qty: number }> = [];
@@ -2142,13 +2152,32 @@ export const usePortfolioStore = create<State>()(
           for (const [symbol, symbolRows] of grouped.entries()) {
             for (const row of symbolRows) {
               if (Math.max(0, row.qty) <= 0) continue;
-              const key = normalizeAccountKey(row.account);
+              const accountName = displayAccount(row.account);
+              const key = normalizeAccountKey(accountName);
               const symbols = importedSymbolsByAccount.get(key);
               if (symbols) {
                 symbols.add(symbol);
               } else {
                 importedSymbolsByAccount.set(key, new Set([symbol]));
               }
+              const accounts = importedAccountsBySymbol.get(symbol);
+              if (accounts) {
+                accounts.add(accountName);
+              } else {
+                importedAccountsBySymbol.set(symbol, new Set([accountName]));
+              }
+            }
+          }
+          for (const trade of trades) {
+            const symbol = trade.symbol.toUpperCase();
+            const explicitAccount = trade.account?.trim();
+            if (!explicitAccount) continue;
+            const accountName = displayAccount(explicitAccount);
+            const accounts = importedAccountsBySymbol.get(symbol);
+            if (accounts) {
+              accounts.add(accountName);
+            } else {
+              importedAccountsBySymbol.set(symbol, new Set([accountName]));
             }
           }
         }
@@ -2163,7 +2192,9 @@ export const usePortfolioStore = create<State>()(
           if (mode === "portfolio") {
             for (const trade of trades) {
               const symbol = trade.symbol.toUpperCase();
-              const key = normalizeAccountKey(accountForImportedSell(trade, prePositionsByAccountSymbol));
+              const key = normalizeAccountKey(
+                accountForImportedSell(trade, prePositionsByAccountSymbol, importedAccountsBySymbol)
+              );
               const symbols = importedSymbolsByAccount.get(key);
               if (symbols) symbols.add(symbol);
               else importedSymbolsByAccount.set(key, new Set([symbol]));
@@ -2458,7 +2489,11 @@ export const usePortfolioStore = create<State>()(
               const salePrice = trade.price > 0 ? trade.price : lastPrice;
 
               const bundle = lotsBySymbol[symbol] ?? { open: [], sold: [] };
-              const sellAccount = accountForImportedSell(trade, prePositionsByAccountSymbol);
+              const sellAccount = accountForImportedSell(
+                trade,
+                prePositionsByAccountSymbol,
+                importedAccountsBySymbol
+              );
               const reduction = reduceOpenLotsFifoForAccount(bundle.open, qty, sellAccount);
               bundle.open = reduction.openLots;
               const soldQty = reduction.soldQty;
