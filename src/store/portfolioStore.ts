@@ -641,15 +641,10 @@ function cashDeltasFromDetectedQtyChanges(
       add(name, -(Math.max(0, postBasis - remainingAtOldCost)));
     }
   }
-  for (const [accountSymbolKey, leftoverQty] of remainingExplicitSoldByAccountSymbol.entries()) {
-    if (leftoverQty <= 1e-6) continue;
-    const leftoverProceeds = remainingExplicitProceedsByAccountSymbol.get(accountSymbolKey) ?? 0;
-    if (leftoverProceeds <= 1e-6) continue;
-    const accountName = pre.get(accountSymbolKey)?.name
-      ?? post.get(accountSymbolKey)?.name
-      ?? DEFAULT_ACCOUNT;
-    add(accountName, leftoverProceeds);
-  }
+  // Do not auto-credit unmatched explicit SELL proceeds.
+  // If imported trades don't correspond to an actual quantity reduction this pass
+  // (for example, replaying the same CSV snapshot again), crediting leftovers would
+  // inflate cash on every re-import.
   return cash;
 }
 
@@ -675,7 +670,27 @@ function accountForImportedSell(
   const suffix = `|${trade.symbol.toUpperCase()}`;
   const matching = [...pre.entries()].filter(([key]) => key.endsWith(suffix));
   if (matching.length === 1) return matching[0][1].name;
-  if (matching[0]) return matching[0][1].name;
+  if (matching.length > 1) {
+    if (importedAccounts && importedAccounts.size > 1) {
+      const intersecting = matching
+        .map(([, value]) => value.name)
+        .filter((name) => importedAccounts.has(name));
+      if (intersecting.length === 1) {
+        return intersecting[0];
+      }
+    }
+
+    const ranked = matching
+      .map(([, value]) => value)
+      .sort((lhs, rhs) => {
+        if (Math.abs(lhs.qty - rhs.qty) > 1e-6) return rhs.qty - lhs.qty;
+        const lhsDefault = lhs.name === DEFAULT_ACCOUNT;
+        const rhsDefault = rhs.name === DEFAULT_ACCOUNT;
+        if (lhsDefault !== rhsDefault) return lhsDefault ? 1 : -1;
+        return lhs.name.localeCompare(rhs.name);
+      });
+    if (ranked[0]) return ranked[0].name;
+  }
   return DEFAULT_ACCOUNT;
 }
 
