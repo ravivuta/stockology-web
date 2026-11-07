@@ -535,7 +535,8 @@ export function CsvImportExportBar({
     rows: CsvImportRow[],
     skipped: string[],
     defaults?: { defaultRetirementAccount?: boolean; defaultAccountName?: string },
-    importedTrades: CsvImportTrade[] = []
+    importedTrades: CsvImportTrade[] = [],
+    rowErrors: string[] = []
   ) {
     const importedSymbols = [...new Set(rows.map((row) => row.symbol.toUpperCase()))];
     const currentSymbols = new Set(storeStocks.map((stock) => stock.symbol.toUpperCase()));
@@ -597,6 +598,10 @@ export function CsvImportExportBar({
       skipped.length > 0
         ? ` Skipped invalid tickers: ${skipped.slice(0, 8).join(", ")}${skipped.length > 8 ? "…" : ""}.`
         : "";
+    const rowErrorNote =
+      rowErrors.length > 0
+        ? `Skipped invalid rows (${rowErrors.length}): ${rowErrors.slice(0, 8).join(" | ")}${rowErrors.length > 8 ? " | …" : ""}`
+        : "";
 
     if (importMode === "watchlist") {
       const alreadyTracked = normalizedRows.length - outcome.addedCount;
@@ -608,7 +613,7 @@ export function CsvImportExportBar({
         preservedHoldings > 0 ? ` Preserved ${preservedHoldings} existing holding${preservedHoldings === 1 ? "" : "s"} and lot history.` : "";
       setFlash({
         kind: "ok",
-        text: `Imported ${outcome.addedCount} new watchlist symbol(s).${trackedNote}${preservedNote}${invalidNote}`,
+        text: `Imported ${outcome.addedCount} new watchlist symbol(s).${trackedNote}${preservedNote}${invalidNote}${rowErrorNote ? `\n${rowErrorNote}` : ""}`,
       });
       return;
     }
@@ -658,7 +663,7 @@ export function CsvImportExportBar({
 
     setFlash({
       kind: "ok",
-      text: [summaryText, prunedNote.trim(), invalidNote.trim(), snapshotWarning ?? ""].filter(Boolean).join("\n"),
+      text: [summaryText, prunedNote.trim(), invalidNote.trim(), rowErrorNote, snapshotWarning ?? ""].filter(Boolean).join("\n"),
     });
   }
 
@@ -703,7 +708,7 @@ export function CsvImportExportBar({
               finishImportProgress();
               return;
             }
-            await applyImport(res.rows, res.skipped, undefined, res.trades);
+            await applyImport(res.rows, res.skipped, undefined, res.trades, res.rowErrors);
           }
           updateImportProgress("Finishing import", 100);
         } catch (error) {
@@ -1064,7 +1069,8 @@ export function CsvImportExportBar({
                           ? undefined
                           : pendingMappingImport.defaultRetirementAccount === "yes",
                     },
-                    res.trades
+                    res.trades,
+                    res.rowErrors
                   );
                   updateImportProgress("Finishing import", 100);
                   setPendingMappingImport(null);

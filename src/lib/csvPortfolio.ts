@@ -85,6 +85,7 @@ export type CsvImportTrade = {
   tradeDate: string;
   account?: string;
   isRetirementAccount?: boolean;
+  sourceOrder?: number;
 };
 
 function parseSymbolOnlyText(text: string): { ok: true; rows: CsvImportRow[]; skipped: string[] } | null {
@@ -300,9 +301,13 @@ function normalizeImportedAccountName(raw: string | undefined): string | undefin
   return normalized.slice(0, 50);
 }
 
-function validateImportedDate(symbol: string, raw: string | undefined): string | null {
-  const value = raw?.trim();
-  if (!value) return null;
+function validateImportedDate(symbol: string, raw: string | undefined, normalized: string | undefined): string | null {
+  const original = raw?.trim();
+  if (!original) return null;
+  const value = normalized?.trim();
+  if (!value) {
+    return `Invalid date format '${original}' for ${symbol} (expected YYYY-MM-DD, MM/DD/YYYY, or 'Nov 6, 2024').`;
+  }
   const ms = Date.parse(value);
   if (!Number.isFinite(ms)) return `Invalid date format '${value}' for ${symbol}.`;
   const tenYearsAgo = new Date();
@@ -608,8 +613,12 @@ function isSellTransaction(text: string): boolean {
 function isBuyTransaction(text: string): boolean {
   const u = text.toUpperCase();
   if (!u || u === "NONE" || u === "NULL" || u === "N/A" || u === "-") return true;
-  if (u.includes("CASH")) return false;
   return u.includes("BUY") || u.includes("BOUGHT") || u.includes("ADD");
+}
+
+function isCashPlaceholderRow(symbol: string, qtyText: string, priceText: string): boolean {
+  const sym = symbol.trim().toUpperCase();
+  return sym === "CASH" || sym === "$CASH" || (qtyText.trim() === "" && priceText.trim() === "");
 }
 
 function hasRecognizableTransactionValues(data: Record<string, unknown>[], headerKey: string | null): boolean {
@@ -653,7 +662,7 @@ function normalizeImportedDate(raw: string): string | undefined {
     return `${isoWithTimeMatch[1]}-${isoWithTimeMatch[2].padStart(2, "0")}-${isoWithTimeMatch[3].padStart(2, "0")}`;
   }
 
-  return value;
+  return undefined;
 }
 
 function parseRetirementAccountFlag(raw: string): boolean | undefined {
@@ -688,15 +697,15 @@ function parseRetirementAccountFlag(raw: string): boolean | undefined {
 export async function parsePortfolioCsv(
   text: string,
   options?: { columnMapping?: CsvColumnMapping }
-): Promise<{ ok: true; rows: CsvImportRow[]; trades: CsvImportTrade[]; skipped: string[] } | { ok: false; error: string }> {
+): Promise<{ ok: true; rows: CsvImportRow[]; trades: CsvImportTrade[]; skipped: string[]; rowErrors: string[] } | { ok: false; error: string }> {
   const symbolOnly = parseSymbolOnlyText(text);
-  if (symbolOnly) return { ...symbolOnly, trades: [] };
+  if (symbolOnly) return { ...symbolOnly, trades: [], rowErrors: [] };
   const mapping = options?.columnMapping;
 
   const parsed = await parseCsvRecords(text);
   if (parsed.error) {
     const fallback = parseSymbolOnlyText(text);
-    if (fallback) return { ...fallback, trades: [] };
+    if (fallback) return { ...fallback, trades: [], rowErrors: [] };
     return { ok: false, error: parsed.error };
   }
 
@@ -721,6 +730,7 @@ export async function parsePortfolioCsv(
   const out: CsvImportRow[] = [];
   const trades: CsvImportTrade[] = [];
   const validationErrors: string[] = [];
+  let tradeSourceOrder = 0;
 
   const isExtended =
     keySet.has("symbol") &&
@@ -761,7 +771,8 @@ export async function parsePortfolioCsv(
       const transactionLimit = parseNumber(getCell(row, kTL ?? "")) ?? undefined;
       const targetPrice = parseNumber(getCell(row, kTp ?? "")) ?? undefined;
       const nameRaw = getCell(row, kName ?? "");
-      const purchaseDate = normalizeImportedDate(getCell(row, kDate ?? ""));
+      const rawDate = getCell(row, kDate ?? "");
+      const purchaseDate = normalizeImportedDate(rawDate);
       const account = normalizeImportedAccountName(getCell(row, kAccount ?? ""));
       const isRetirementAccount = parseRetirementAccountFlag(getCell(row, kRetirement ?? ""));
       const accountError = account ? validateImportedAccountName(sym, account) : null;
@@ -769,7 +780,7 @@ export async function parsePortfolioCsv(
         validationErrors.push(accountError);
         continue;
       }
-      const dateError = validateImportedDate(sym, purchaseDate);
+      const dateError = validateImportedDate(sym, rawDate, purchaseDate);
       if (dateError) {
         validationErrors.push(dateError);
         continue;
@@ -790,6 +801,7 @@ export async function parsePortfolioCsv(
           tradeDate: normalizeTradeDate(purchaseDate),
           account,
           isRetirementAccount,
+          sourceOrder: tradeSourceOrder++,
         });
         continue;
       }
@@ -809,11 +821,11 @@ export async function parsePortfolioCsv(
       });
     }
     if (out.length === 0) {
-      if (trades.length > 0) return { ok: true, rows: [], trades, skipped };
+      if (trades.length > 0) return { ok: true, rows: [], trades, skipped, rowErrors: validationErrors };
       if (validationErrors.length > 0) return { ok: false, error: validationErrors.join(" ") };
       return { ok: false, error: "No valid symbol rows in extended CSV." };
     }
-    return { ok: true, rows: out, trades, skipped };
+    return { ok: true, rows: out, trades, skipped, rowErrors: validationErrors };
   }
 
   const kSymLot = resolveMappedHeaderKey(headers, mapping, "symbol", ["symbol", "Symbol", "ticker"]);
@@ -834,16 +846,21 @@ export async function parsePortfolioCsv(
     for (const row of data) {
       const sym = getCell(row, kSym).toUpperCase();
       if (!sym) continue;
+      if (sym === "CASH" || sym === "$CASH") continue;
       if (!isImportableEquitySymbol(sym)) {
         skipped.push(sym);
         continue;
       }
       const txn = kTxn ? getCell(row, kTxn) : "";
-      const isSell = txn ? isSellTransaction(txn) : false;
-      if (txn && !isSell && !isBuyTransaction(txn)) continue;
-
       const rawQty = kQty ? getCell(row, kQty) : "";
       const rawPrice = kPrice ? getCell(row, kPrice) : "";
+      const isCashPlaceholder = isCashPlaceholderRow(sym, rawQty, rawPrice);
+      const isSell = txn ? isSellTransaction(txn) : false;
+      if (txn) {
+        const normalizedTxn = txn.toUpperCase();
+        if (normalizedTxn.includes("CASH") && isCashPlaceholder) continue;
+        if (!isSell && !isBuyTransaction(txn) && !normalizedTxn.includes("CASH")) continue;
+      }
       const hasQty = rawQty.length > 0;
       const hasPrice = rawPrice.length > 0;
       if (hasQty !== hasPrice) {
@@ -855,7 +872,8 @@ export async function parsePortfolioCsv(
 
       const qty = hasQty ? parseNumber(rawQty) ?? 0 : 0;
       const price = hasPrice ? perSharePriceFromCell(parseNumber(rawPrice) ?? 0, Math.abs(qty), kPrice) : 0;
-      const purchaseDate = normalizeImportedDate(getCell(row, kDate ?? ""));
+      const rawDate = getCell(row, kDate ?? "");
+      const purchaseDate = normalizeImportedDate(rawDate);
       const account = normalizeImportedAccountName(getCell(row, kAccount ?? ""));
       const isRetirementAccount = parseRetirementAccountFlag(getCell(row, kRetirement ?? ""));
       const accountError = account ? validateImportedAccountName(sym, account) : null;
@@ -863,7 +881,7 @@ export async function parsePortfolioCsv(
         validationErrors.push(accountError);
         continue;
       }
-      const dateError = validateImportedDate(sym, purchaseDate);
+      const dateError = validateImportedDate(sym, rawDate, purchaseDate);
       if (dateError) {
         validationErrors.push(dateError);
         continue;
@@ -888,6 +906,7 @@ export async function parsePortfolioCsv(
           tradeDate: normalizeTradeDate(purchaseDate),
           account,
           isRetirementAccount,
+          sourceOrder: tradeSourceOrder++,
         });
         continue;
       }
@@ -901,11 +920,11 @@ export async function parsePortfolioCsv(
       });
     }
     if (out.length === 0) {
-      if (trades.length > 0) return { ok: true, rows: [], trades, skipped };
+      if (trades.length > 0) return { ok: true, rows: [], trades, skipped, rowErrors: validationErrors };
       if (validationErrors.length > 0) return { ok: false, error: validationErrors.join(" ") };
       return { ok: false, error: "No importable rows (invalid symbols or empty)." };
     }
-    return { ok: true, rows: out, trades, skipped };
+    return { ok: true, rows: out, trades, skipped, rowErrors: validationErrors };
   }
 
   /* Simple / broker-style */
@@ -923,12 +942,21 @@ export async function parsePortfolioCsv(
   for (const row of data) {
     const sym = getCell(row, kSym).toUpperCase();
     if (!sym) continue;
+    if (sym === "CASH" || sym === "$CASH") continue;
     if (!isImportableEquitySymbol(sym)) {
       skipped.push(sym);
       continue;
     }
+    const txn = kTxn ? getCell(row, kTxn) : "";
     const rawQty = kQty ? getCell(row, kQty) : "";
     const rawPrice = kPrice ? getCell(row, kPrice) : "";
+    const isCashPlaceholder = isCashPlaceholderRow(sym, rawQty, rawPrice);
+    const isSell = txn ? isSellTransaction(txn) : false;
+    if (txn) {
+      const normalizedTxn = txn.toUpperCase();
+      if (normalizedTxn.includes("CASH") && isCashPlaceholder) continue;
+      if (!isSell && !isBuyTransaction(txn) && !normalizedTxn.includes("CASH")) continue;
+    }
     const hasQty = rawQty.length > 0;
     const hasPrice = rawPrice.length > 0;
     if (hasQty !== hasPrice) {
@@ -940,10 +968,8 @@ export async function parsePortfolioCsv(
 
     const qty = hasQty ? parseNumber(rawQty) ?? 0 : 0;
     const price = hasPrice ? perSharePriceFromCell(parseNumber(rawPrice) ?? 0, Math.abs(qty), kPrice) : 0;
-    const txn = kTxn ? getCell(row, kTxn) : "";
-    const isSell = txn ? isSellTransaction(txn) : false;
-    if (txn && !isSell && !isBuyTransaction(txn)) continue;
-    const purchaseDate = normalizeImportedDate(getCell(row, kDate ?? ""));
+    const rawDate = getCell(row, kDate ?? "");
+    const purchaseDate = normalizeImportedDate(rawDate);
     const account = normalizeImportedAccountName(getCell(row, kAccount ?? ""));
     const isRetirementAccount = parseRetirementAccountFlag(getCell(row, kRetirement ?? ""));
     const accountError = account ? validateImportedAccountName(sym, account) : null;
@@ -951,7 +977,7 @@ export async function parsePortfolioCsv(
       validationErrors.push(accountError);
       continue;
     }
-    const dateError = validateImportedDate(sym, purchaseDate);
+    const dateError = validateImportedDate(sym, rawDate, purchaseDate);
     if (dateError) {
       validationErrors.push(dateError);
       continue;
@@ -976,6 +1002,7 @@ export async function parsePortfolioCsv(
         tradeDate: normalizeTradeDate(purchaseDate),
         account,
         isRetirementAccount,
+        sourceOrder: tradeSourceOrder++,
       });
       continue;
     }
@@ -990,11 +1017,11 @@ export async function parsePortfolioCsv(
   }
 
   if (out.length === 0) {
-    if (trades.length > 0) return { ok: true, rows: [], trades, skipped };
+    if (trades.length > 0) return { ok: true, rows: [], trades, skipped, rowErrors: validationErrors };
     if (validationErrors.length > 0) return { ok: false, error: validationErrors.join(" ") };
     return { ok: false, error: "No valid symbol rows found." };
   }
-  return { ok: true, rows: out, trades, skipped };
+  return { ok: true, rows: out, trades, skipped, rowErrors: validationErrors };
 }
 
 /** Matches iOS `PortfolioPageView.generateCSV`, including account metadata. */

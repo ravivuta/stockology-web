@@ -479,11 +479,13 @@ function reduceOpenLotsFifo(openLots: TradeLot[], qtyToSell: number): TradeLot[]
 function reduceOpenLotsFifoForAccount(
   openLots: TradeLot[],
   qtyToSell: number,
-  account: string
+  account: string,
+  options?: { saleDate?: string }
 ): { openLots: TradeLot[]; soldQty: number } {
   let remaining = Math.max(0, qtyToSell);
   let soldQty = 0;
   const targetKey = normalizeAccountKey(account);
+  const saleDateCutoff = parseCsvIsoDateToEpoch(options?.saleDate);
   const next = [...openLots]
     .map((lot) => ({ ...lot }))
     .sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate));
@@ -491,6 +493,10 @@ function reduceOpenLotsFifoForAccount(
   for (let i = 0; i < next.length && remaining > 0; i += 1) {
     const lot = next[i];
     if (normalizeAccountKey(lot.account) !== targetKey) continue;
+    if (saleDateCutoff != null) {
+      const lotDate = parseCsvIsoDateToEpoch(lot.purchaseDate);
+      if (lotDate != null && lotDate > saleDateCutoff) continue;
+    }
 
     const soldFromLot = Math.min(remaining, lot.quantity);
     if (soldFromLot <= 0) continue;
@@ -499,6 +505,14 @@ function reduceOpenLotsFifoForAccount(
     lot.status = lot.quantity <= 1e-6 ? "fullySold" : "partiallySold";
     remaining -= soldFromLot;
     soldQty += soldFromLot;
+  }
+
+  function parseCsvIsoDateToEpoch(value: string | undefined): number | null {
+    const raw = value?.trim();
+    if (!raw) return null;
+    const normalized = raw.length >= 10 ? raw.slice(0, 10) : raw;
+    const ms = Date.parse(normalized);
+    return Number.isFinite(ms) ? ms : null;
   }
 
   return {
@@ -2488,7 +2502,14 @@ export const usePortfolioStore = create<State>()(
                 .filter((stock) => !isCashSymbol(stock.symbol))
                 .map((stock) => [stock.symbol.toUpperCase(), stock.lastPrice ?? 0] as const)
             );
-            for (const trade of trades) {
+            const sortedTrades = [...trades].sort((lhs, rhs) => {
+              const leftDate = parseCsvIsoDateToEpoch(lhs.tradeDate) ?? Number.POSITIVE_INFINITY;
+              const rightDate = parseCsvIsoDateToEpoch(rhs.tradeDate) ?? Number.POSITIVE_INFINITY;
+              if (leftDate !== rightDate) return leftDate - rightDate;
+              return (lhs.sourceOrder ?? 0) - (rhs.sourceOrder ?? 0);
+            });
+
+            for (const trade of sortedTrades) {
               const symbol = trade.symbol.toUpperCase();
               const qty = Math.max(0, trade.qty);
               if (qty <= 0) continue;
@@ -2502,7 +2523,9 @@ export const usePortfolioStore = create<State>()(
                 prePositionsByAccountSymbol,
                 importedAccountsBySymbol
               );
-              const reduction = reduceOpenLotsFifoForAccount(bundle.open, qty, sellAccount);
+              const reduction = reduceOpenLotsFifoForAccount(bundle.open, qty, sellAccount, {
+                saleDate: trade.tradeDate,
+              });
               bundle.open = reduction.openLots;
               const soldQty = reduction.soldQty;
               if (soldQty > 0) {
