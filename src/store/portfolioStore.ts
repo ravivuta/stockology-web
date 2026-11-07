@@ -320,9 +320,25 @@ function preserveImportedMetadata(existing: StockHolding | undefined) {
 
 function lotIdentityKey(account: string | undefined, symbol: string, purchaseDate: string | undefined, quantity: number, price: number): string {
   const normalizedAccount = normalizeAccountKey(account);
-  const dateKey = (purchaseDate ?? "").trim() || defaultImportPurchaseDate();
+  const dateKey = canonicalLotPurchaseDate(purchaseDate);
   const fmt = (value: number) => Number.isFinite(value) ? value.toFixed(6) : "0.000000";
   return [normalizedAccount, symbol.toUpperCase(), dateKey, fmt(quantity), fmt(price)].join("|");
+}
+
+function canonicalLotPurchaseDate(value: string | undefined): string {
+  const raw = value?.trim();
+  if (!raw) return defaultImportPurchaseDate();
+
+  const datePrefix = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (datePrefix) {
+    const [, year, month, day] = datePrefix;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  const parsed = Date.parse(raw);
+  if (Number.isFinite(parsed)) return new Date(parsed).toISOString().slice(0, 10);
+
+  return raw;
 }
 
 function buildImportedOpenLots(rows: CsvImportRow[]): {
@@ -352,7 +368,7 @@ function buildImportedOpenLots(rows: CsvImportRow[]): {
       quantity: qty,
       costBasis: price,
       initialQuantity: qty,
-      purchaseDate: row.purchaseDate || defaultImportPurchaseDate(),
+      purchaseDate: canonicalLotPurchaseDate(row.purchaseDate),
       account: displayAccount(row.account),
       isRetirementAccount: row.isRetirementAccount ?? null,
       status: "open",
@@ -2335,6 +2351,7 @@ export const usePortfolioStore = create<State>()(
               const preservedOpenLots =
                 existingLots?.open.map((lot) => ({
                   ...cloneTradeLot(lot),
+                  purchaseDate: canonicalLotPurchaseDate(lot.purchaseDate),
                   isRetirementAccount:
                     lot.isRetirementAccount == null ? preferredRetirement : lot.isRetirementAccount,
                 })) ?? [];
