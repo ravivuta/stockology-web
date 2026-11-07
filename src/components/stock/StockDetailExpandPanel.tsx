@@ -1090,7 +1090,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                     </p>
                   </div>
                   {lotSummary.openLots.length > 0 ? (
-                    <div className="max-h-80 overflow-y-auto overflow-x-auto pr-1">
+                    <div className="h-[190px] overflow-y-auto overflow-x-auto pr-1">
                       <table className="min-w-[620px] w-full text-left">
                         <thead className="border-b border-border/60 text-[11px] uppercase tracking-[0.12em] text-subtle dark:border-white/[0.06]">
                           <tr>
