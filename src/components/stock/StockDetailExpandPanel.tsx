@@ -1041,20 +1041,20 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                 </span>
               ) : null}
             </div>
-            <div className={cn("mt-2 flex flex-wrap items-start gap-x-3 gap-y-1.5", dense ? "mt-2" : "sm:gap-x-4")}>
-              <div className="space-y-0.5">
-                <span
-                  className={cn("block font-semibold tabular-nums tracking-tight text-foreground", dense ? "text-3xl" : "text-5xl leading-none")}
-                >
-                  {formatCurrency(last)}
-                </span>
-                {stock.dailyChangePercent != null ? (
-                  <p className={cn("font-semibold tabular-nums", dense ? "text-sm" : "text-lg", valueTone(stock.dailyChangePercent))}>
-                    {formatPercent(stock.dailyChangePercent, true)} today
-                  </p>
-                ) : null}
-              </div>
-              <div className="space-y-0.5">
+            <div className={cn("mt-2 flex items-start gap-3", dense ? "mt-2 flex-col" : "sm:gap-4")}>
+              <div className="space-y-2">
+                <div className="space-y-0.5">
+                  <span
+                    className={cn("block font-semibold tabular-nums tracking-tight text-foreground", dense ? "text-3xl" : "text-5xl leading-none")}
+                  >
+                    {formatCurrency(last)}
+                  </span>
+                  {stock.dailyChangePercent != null ? (
+                    <p className={cn("font-semibold tabular-nums", dense ? "text-sm" : "text-lg", valueTone(stock.dailyChangePercent))}>
+                      {formatPercent(stock.dailyChangePercent, true)} today
+                    </p>
+                  ) : null}
+                </div>
                 {hasPosition ? (
                   <div className={cn("space-y-0.5", dense ? "text-[11px]" : "text-sm")}>
                     <p className="tabular-nums text-foreground/88">
@@ -1078,80 +1078,68 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                     Record Buy Trade
                   </button>
                 </div>
-                {hasPosition ? (
-                  <div className="mt-3 rounded-xl border border-border/70 bg-background/60 p-3 dark:border-white/[0.08] dark:bg-white/[0.04]">
-                    <div className="mb-2">
-                      <p className={cn("font-semibold text-foreground", dense ? "text-[11px]" : "text-xs uppercase tracking-[0.12em]")}>
-                        Open lots
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-subtle">
-                        Active lots for {stock.symbol}. Scroll for more rows.
-                      </p>
-                    </div>
-                    {lotSummary.openLots.length > 0 ? (
-                      <div className="max-h-80 overflow-y-auto overflow-x-auto pr-1">
-                        <table className="min-w-[740px] w-full text-left">
-                          <thead className="border-b border-border/60 text-[11px] uppercase tracking-[0.12em] text-subtle dark:border-white/[0.06]">
-                            <tr>
-                              <th className="pb-2 pr-3 font-semibold">Bought</th>
-                              <th className="pb-2 pr-3 text-right font-semibold">Qty</th>
-                              <th className="pb-2 pr-3 text-right font-semibold">Cost/share</th>
-                              <th className="pb-2 pr-3 text-right font-semibold">Value</th>
-                              <th className="pb-2 pr-3 text-right font-semibold">P/L</th>
-                              <th className="pb-2 pr-3 font-semibold">Account type</th>
-                              <th className="pb-2 pr-3 font-semibold">Account</th>
-                              <th className="pb-2 pr-3 text-right font-semibold">Action</th>
-                              <th className="pb-2 text-right font-semibold">Edit</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {lotSummary.openLots.map((lot) => {
-                              const lotMarketValue = lot.quantity * last;
-                              const lotCostBasis = lot.quantity * lot.costBasis;
-                              const lotUnrealized = lotMarketValue - lotCostBasis;
-
-                              return (
-                                <tr key={lot.id} className="border-b border-border/50 text-foreground last:border-b-0 dark:border-white/[0.06]">
-                                  <td className="py-2 pr-3 text-sm">{formatDateLabel(lot.purchaseDate)}</td>
-                                  <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatNumberMax2(lot.quantity)}</td>
-                                  <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatCurrency(lot.costBasis)}</td>
-                                  <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatCurrency(lotMarketValue)}</td>
-                                  <td className={cn("py-2 pr-3 text-right text-sm tabular-nums", lotUnrealized >= 0 ? "text-primary" : "text-error")}>
-                                    {formatCurrency(lotUnrealized)}
-                                  </td>
-                                  <td className="py-2 pr-3 text-sm">{formatAccountType(lot.isRetirementAccount)}</td>
-                                  <td className="py-2 pr-3 text-sm text-subtle">{lot.account?.trim() || "—"}</td>
-                                  <td className="py-2 pr-3 text-right">
-                                    <button
-                                      type="button"
-                                      onClick={() => openLotSellDialog(lot)}
-                                      className="inline-flex items-center gap-1 rounded-lg border border-red-300/70 px-2.5 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-300/30 dark:text-red-200 dark:hover:bg-red-500/10"
-                                    >
-                                      Sell
-                                    </button>
-                                  </td>
-                                  <td className="py-2 text-right">
-                                    <button
-                                      type="button"
-                                      onClick={() => openLotEditor(lot)}
-                                      className="inline-flex items-center gap-1 rounded-lg border border-border/70 px-2.5 py-1 text-xs text-foreground hover:bg-background/70 dark:border-white/[0.08] dark:hover:bg-white/[0.05]"
-                                    >
-                                      <Pencil className="h-3.5 w-3.5" />
-                                      Edit
-                                    </button>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-subtle">No open lot records are available for this symbol yet.</p>
-                    )}
-                  </div>
-                ) : null}
               </div>
+              {hasPosition ? (
+                <div className="min-w-0 flex-1 rounded-xl border border-border/70 bg-background/60 p-3 dark:border-white/[0.08] dark:bg-white/[0.04]">
+                  <div className="mb-2">
+                    <p className={cn("font-semibold text-foreground", dense ? "text-[11px]" : "text-xs uppercase tracking-[0.12em]")}>
+                      Open lots
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-subtle">
+                      Active lots for {stock.symbol}. Scroll for more rows.
+                    </p>
+                  </div>
+                  {lotSummary.openLots.length > 0 ? (
+                    <div className="max-h-80 overflow-y-auto overflow-x-auto pr-1">
+                      <table className="min-w-[620px] w-full text-left">
+                        <thead className="border-b border-border/60 text-[11px] uppercase tracking-[0.12em] text-subtle dark:border-white/[0.06]">
+                          <tr>
+                            <th className="pb-2 pr-3 font-semibold">Bought</th>
+                            <th className="pb-2 pr-3 text-right font-semibold">Qty</th>
+                            <th className="pb-2 pr-3 text-right font-semibold">Cost/share</th>
+                            <th className="pb-2 pr-3 font-semibold">Account type</th>
+                            <th className="pb-2 pr-3 font-semibold">Account</th>
+                            <th className="pb-2 pr-3 text-right font-semibold">Action</th>
+                            <th className="pb-2 text-right font-semibold">Edit</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {lotSummary.openLots.map((lot) => (
+                            <tr key={lot.id} className="border-b border-border/50 text-foreground last:border-b-0 dark:border-white/[0.06]">
+                              <td className="py-2 pr-3 text-sm">{formatDateLabel(lot.purchaseDate)}</td>
+                              <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatNumberMax2(lot.quantity)}</td>
+                              <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatCurrency(lot.costBasis)}</td>
+                              <td className="py-2 pr-3 text-sm">{formatAccountType(lot.isRetirementAccount)}</td>
+                              <td className="py-2 pr-3 text-sm text-subtle">{lot.account?.trim() || "—"}</td>
+                              <td className="py-2 pr-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => openLotSellDialog(lot)}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-red-300/70 px-2.5 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-300/30 dark:text-red-200 dark:hover:bg-red-500/10"
+                                >
+                                  Sell
+                                </button>
+                              </td>
+                              <td className="py-2 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => openLotEditor(lot)}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-border/70 px-2.5 py-1 text-xs text-foreground hover:bg-background/70 dark:border-white/[0.08] dark:hover:bg-white/[0.05]"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                  Edit
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-subtle">No open lot records are available for this symbol yet.</p>
+                  )}
+                </div>
+              ) : null}
             </div>
           </div>
           <div className="min-w-0 rounded-xl border border-border/70 bg-background/72 p-2 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.04]">
