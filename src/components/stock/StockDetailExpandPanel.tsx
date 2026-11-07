@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Info, Pencil, PlusCircle, RefreshCw, Settings, Trash2, X, XCircle } from "lucide-react";
+import { CheckCircle2, Info, Pencil, PlusCircle, RefreshCw, Settings, X, XCircle } from "lucide-react";
 import {
   analystTargetSourceLabel,
   computeRecommendationFactors,
@@ -324,7 +324,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const recordTrade = usePortfolioStore((s) => s.recordTrade);
   const recordSellFromLot = usePortfolioStore((s) => s.recordSellFromLot);
   const editOpenLot = usePortfolioStore((s) => s.editOpenLot);
-  const removeOpenLot = usePortfolioStore((s) => s.removeOpenLot);
   const updateStock = usePortfolioStore((s) => s.updateStock);
   const optimizeStock = usePortfolioStore((s) => s.optimizeStock);
   const optimizing = usePortfolioStore((s) => s.optimizing);
@@ -392,7 +391,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const [sellLotPrice, setSellLotPrice] = useState("");
   const [sellLotDate, setSellLotDate] = useState(new Date().toISOString().slice(0, 10));
   const [sellLotError, setSellLotError] = useState<string | null>(null);
-  const [lotPendingDeleteId, setLotPendingDeleteId] = useState<string | null>(null);
   const [aiNewsItems, setAiNewsItems] = useState<StockSentimentNewsItem[]>([]);
   const [aiNewsLoading, setAiNewsLoading] = useState(false);
   const [optimizationMessage, setOptimizationMessage] = useState<string | null>(null);
@@ -443,10 +441,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const sellingLot = useMemo(
     () => lotSummary.openLots.find((lot) => lot.id === sellingLotId) ?? null,
     [lotSummary.openLots, sellingLotId]
-  );
-  const lotPendingDelete = useMemo(
-    () => lotSummary.openLots.find((lot) => lot.id === lotPendingDeleteId) ?? null,
-    [lotPendingDeleteId, lotSummary.openLots]
   );
   const storedRec = stock?.recommendation;
   const fixedIncomeTotal = useMemo(
@@ -886,24 +880,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     setSellLotError(null);
   }
 
-  function requestLotDelete(lotId: string) {
-    setLotPendingDeleteId(lotId);
-  }
-
-  function cancelLotDelete() {
-    setLotPendingDeleteId(null);
-  }
-
-  function confirmLotDelete() {
-    if (!lotPendingDelete) return;
-    removeOpenLot(symbol, lotPendingDelete.id);
-    void flushCurrentPortfolioSnapshotNow(true);
-    if (editingLot?.id === lotPendingDelete.id) {
-      closeLotEditor();
-    }
-    setLotPendingDeleteId(null);
-  }
-
   function saveLotSell() {
     if (!sellingLot) return;
 
@@ -1033,7 +1009,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
           dense ? "px-3 py-3" : "px-4 py-3.5 sm:px-5 sm:py-4"
         )}
       >
-        <div className={cn("grid items-start gap-3", dense ? "grid-cols-1" : "lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.95fr)] lg:gap-3")}>
+        <div className={cn("grid items-stretch gap-3", dense ? "grid-cols-1" : "lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.95fr)] lg:gap-3")}>
           <div className="min-w-0">
             {showBackLink && (
               <Link
@@ -1114,13 +1090,12 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                     </div>
                     {lotSummary.openLots.length > 0 ? (
                       <div className="max-h-80 overflow-y-auto overflow-x-auto pr-1">
-                        <table className="min-w-[820px] w-full text-left">
+                        <table className="min-w-[740px] w-full text-left">
                           <thead className="border-b border-border/60 text-[11px] uppercase tracking-[0.12em] text-subtle dark:border-white/[0.06]">
                             <tr>
                               <th className="pb-2 pr-3 font-semibold">Bought</th>
                               <th className="pb-2 pr-3 text-right font-semibold">Qty</th>
                               <th className="pb-2 pr-3 text-right font-semibold">Cost/share</th>
-                              <th className="pb-2 pr-3 text-right font-semibold">Basis</th>
                               <th className="pb-2 pr-3 text-right font-semibold">Value</th>
                               <th className="pb-2 pr-3 text-right font-semibold">P/L</th>
                               <th className="pb-2 pr-3 font-semibold">Account type</th>
@@ -1140,7 +1115,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                                   <td className="py-2 pr-3 text-sm">{formatDateLabel(lot.purchaseDate)}</td>
                                   <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatNumberMax2(lot.quantity)}</td>
                                   <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatCurrency(lot.costBasis)}</td>
-                                  <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatCurrency(lotCostBasis)}</td>
                                   <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatCurrency(lotMarketValue)}</td>
                                   <td className={cn("py-2 pr-3 text-right text-sm tabular-nums", lotUnrealized >= 0 ? "text-primary" : "text-error")}>
                                     {formatCurrency(lotUnrealized)}
@@ -1157,24 +1131,14 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                                     </button>
                                   </td>
                                   <td className="py-2 text-right">
-                                    <div className="inline-flex items-center gap-1.5">
-                                      <button
-                                        type="button"
-                                        onClick={() => openLotEditor(lot)}
-                                        className="inline-flex items-center gap-1 rounded-lg border border-border/70 px-2.5 py-1 text-xs text-foreground hover:bg-background/70 dark:border-white/[0.08] dark:hover:bg-white/[0.05]"
-                                      >
-                                        <Pencil className="h-3.5 w-3.5" />
-                                        Edit
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => requestLotDelete(lot.id)}
-                                        className="inline-flex items-center gap-1 rounded-lg border border-red-300/70 px-2.5 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-300/30 dark:text-red-200 dark:hover:bg-red-500/10"
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                        Delete
-                                      </button>
-                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => openLotEditor(lot)}
+                                      className="inline-flex items-center gap-1 rounded-lg border border-border/70 px-2.5 py-1 text-xs text-foreground hover:bg-background/70 dark:border-white/[0.08] dark:hover:bg-white/[0.05]"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                      Edit
+                                    </button>
                                   </td>
                                 </tr>
                               );
@@ -1190,7 +1154,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
               </div>
             </div>
           </div>
-          <div className="rounded-xl border border-border/70 bg-background/72 p-2 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.04]">
+          <div className="min-w-0 rounded-xl border border-border/70 bg-background/72 p-2 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.04]">
               <div className="mb-1 flex items-center justify-between gap-3">
                 <div>
                   <p className={cn("font-semibold text-foreground", dense ? "text-xs" : "text-sm")}>Price chart</p>
@@ -1206,7 +1170,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                 points={pointsWithToday}
                 loading={histLoading}
                 error={histError}
-                compact
               />
           </div>
         </div>
@@ -1821,40 +1784,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
             disabled={qty.trim().length === 0 || price.trim().length === 0}
           >
             Save
-          </button>
-        </ModalSection>
-      </AppModal>
-
-      <AppModal open={lotPendingDelete != null} onClose={cancelLotDelete} size="md" titleId="delete-lot-modal-title">
-        <ModalSection className="border-b border-border bg-elevated px-4 py-3 dark:border-foreground/10">
-          <h3 id="delete-lot-modal-title" className="text-base font-semibold tracking-tight text-foreground">
-            Delete Lot
-          </h3>
-        </ModalSection>
-        <ModalSection className="space-y-3 px-4 py-4 text-sm text-foreground">
-          <p>
-            {lotPendingDelete
-              ? `Delete ${formatNumberMax2(lotPendingDelete.quantity)} shares from ${formatDateLabel(lotPendingDelete.purchaseDate)} @ ${formatCurrency(lotPendingDelete.costBasis)}?`
-              : "Delete this lot?"}
-          </p>
-          <div className="rounded-lg border border-red-300/50 bg-red-50/60 px-3 py-3 text-xs text-red-700 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-200">
-            Deleting a lot does not add cash to cash balance. If this is a real sale, use Sell from this lot instead. Delete only for intentional data correction.
-          </div>
-        </ModalSection>
-        <ModalSection className="flex items-center justify-end gap-2 border-t border-border bg-elevated px-4 py-3 dark:border-foreground/10">
-          <button
-            type="button"
-            onClick={cancelLotDelete}
-            className="rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-background/70"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={confirmLotDelete}
-            className="rounded-lg border border-red-500/40 bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
-          >
-            Delete lot
           </button>
         </ModalSection>
       </AppModal>
