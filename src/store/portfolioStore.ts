@@ -2204,17 +2204,10 @@ export const usePortfolioStore = create<State>()(
           const preOpenCostBasis = totalOpenCostBasis(preImportStockMap, st.lotsBySymbol);
           const prePositionsByAccountSymbol = positionsByAccountSymbol(preImportStockMap, st.lotsBySymbol);
 
-          if (mode === "portfolio") {
-            for (const trade of trades) {
-              const symbol = trade.symbol.toUpperCase();
-              const key = normalizeAccountKey(
-                accountForImportedSell(trade, prePositionsByAccountSymbol, importedAccountsBySymbol)
-              );
-              const symbols = importedSymbolsByAccount.get(key);
-              if (symbols) symbols.add(symbol);
-              else importedSymbolsByAccount.set(key, new Set([symbol]));
-            }
-          }
+          // Do not treat trade-only rows as account snapshot membership.
+          // Missing-symbol liquidation should be driven only by imported holding rows;
+          // otherwise re-importing a standalone SELL row can look like a fresh account snapshot
+          // and keep trying to liquidate/credit unrelated positions.
 
           for (const stock of st.stocks) {
             const lots = st.lotsBySymbol[stock.symbol];
