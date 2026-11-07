@@ -2667,9 +2667,7 @@ export const usePortfolioStore = create<State>()(
             if (seen.has(event.symbol)) {
               const match = netUpdates.find((update) => update.action === "SELL" && update.symbol === event.symbol && !update.account);
               if (match && !match.account) match.account = event.account;
-              continue;
             }
-            netUpdates.push({ symbol: event.symbol, action: "SELL", qty: event.qty, account: event.account });
           }
         }
 
