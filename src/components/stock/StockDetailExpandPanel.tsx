@@ -1236,59 +1236,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                   </div>
                 </SectionCard>
 
-                <SectionCard
-                  compact={dense}
-                  title={
-                    <span className="flex items-center justify-between gap-3">
-                      <span>Score:</span>
-                      <span className={cn("tabular-nums", dense ? "text-sm" : "text-base", scoreTone(stock.score))}>
-                        {formatScoreDisplay(stock.score)}
-                      </span>
-                    </span>
-                  }
-                >
-                  <div className={dense ? "space-y-3" : "space-y-3"}>
-                    <div>
-                      <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Score inputs</p>
-                      {scoreRows ? (
-                        <div className={dense ? "mt-3 space-y-2" : "mt-3 space-y-2"}>
-                          <SnapshotRow
-                            compact={dense}
-                            label="Analyst rating"
-                            value={scoreRows.analystLine}
-                            hint={scoreRows.analystPoints}
-                            valueClassName={analystRatingTone(stock.analystAvg)}
-                          />
-                          <SnapshotRow compact={dense} label="Market cap" value={scoreRows.capLine} hint={scoreRows.capPoints} />
-                          {scoreRows.qualityMetrics.length > 0 ? (
-                            <>
-                              <SnapshotRow compact={dense} label="Quality" hint={scoreRows.qualityPoints} />
-                              {scoreRows.qualityMetrics.map((metric) => (
-                                <SnapshotRow
-                                  key={metric.label}
-                                  compact={dense}
-                                  indent
-                                  nested
-                                  label={metric.label}
-                                  value={metric.value}
-                                  hint={metric.points}
-                                />
-                              ))}
-                            </>
-                          ) : null}
-                          {scoreRows.dividendBonusLine && scoreRows.dividendBonusPoints ? (
-                            <SnapshotRow
-                              compact={dense}
-                              label="Dividend bonus"
-                              value={scoreRows.dividendBonusLine}
-                              hint={scoreRows.dividendBonusPoints}
-                            />
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                </SectionCard>
               </div>
 
               <SectionCard
@@ -1622,6 +1569,60 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                       </span>
                     </label>
                   ) : null}
+                </div>
+              </SectionCard>
+
+              <SectionCard
+                compact={dense}
+                title={
+                  <span className="flex items-center justify-between gap-3">
+                    <span>Score:</span>
+                    <span className={cn("tabular-nums", dense ? "text-sm" : "text-base", scoreTone(stock.score))}>
+                      {formatScoreDisplay(stock.score)}
+                    </span>
+                  </span>
+                }
+              >
+                <div className={dense ? "space-y-3" : "space-y-3"}>
+                  <div>
+                    <p className={cn("font-semibold text-foreground", dense ? "text-sm" : "text-base")}>Score inputs</p>
+                    {scoreRows ? (
+                      <div className={dense ? "mt-3 space-y-2" : "mt-3 space-y-2"}>
+                        <SnapshotRow
+                          compact={dense}
+                          label="Analyst rating"
+                          value={scoreRows.analystLine}
+                          hint={scoreRows.analystPoints}
+                          valueClassName={analystRatingTone(stock.analystAvg)}
+                        />
+                        <SnapshotRow compact={dense} label="Market cap" value={scoreRows.capLine} hint={scoreRows.capPoints} />
+                        {scoreRows.qualityMetrics.length > 0 ? (
+                          <>
+                            <SnapshotRow compact={dense} label="Quality" hint={scoreRows.qualityPoints} />
+                            {scoreRows.qualityMetrics.map((metric) => (
+                              <SnapshotRow
+                                key={metric.label}
+                                compact={dense}
+                                indent
+                                nested
+                                label={metric.label}
+                                value={metric.value}
+                                hint={metric.points}
+                              />
+                            ))}
+                          </>
+                        ) : null}
+                        {scoreRows.dividendBonusLine && scoreRows.dividendBonusPoints ? (
+                          <SnapshotRow
+                            compact={dense}
+                            label="Dividend bonus"
+                            value={scoreRows.dividendBonusLine}
+                            hint={scoreRows.dividendBonusPoints}
+                          />
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               </SectionCard>
             </div>
