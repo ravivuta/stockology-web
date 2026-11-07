@@ -284,16 +284,29 @@ function DetailFieldGrid({
 }: {
   items: DetailField[];
   compact?: boolean;
-  columns?: 2 | 3;
+  columns?: 2 | 3 | 4;
 }) {
+  const gridColumnsClass =
+    columns === 4
+      ? "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+      : columns === 3
+        ? "sm:grid-cols-2 xl:grid-cols-3"
+        : "sm:grid-cols-2";
+  const fullWidthClass =
+    columns === 4
+      ? "sm:col-span-2 lg:col-span-3 xl:col-span-4"
+      : columns === 3
+        ? "sm:col-span-2 xl:col-span-3"
+        : "sm:col-span-2";
+
   return (
-    <dl className={cn("grid gap-x-4 gap-y-2", columns === 3 ? "sm:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2")}>
+    <dl className={cn("grid gap-x-4 gap-y-2", gridColumnsClass)}>
       {items.map((item, index) => (
         <div
           key={`${item.label}-${index}`}
           className={cn(
             "border-b border-border/50 pb-2 last:border-b-0 dark:border-white/[0.06]",
-            item.fullWidth && columns === 3 ? "sm:col-span-2 xl:col-span-3" : item.fullWidth ? "sm:col-span-2" : ""
+            item.fullWidth ? fullWidthClass : ""
           )}
         >
           <dt className={cn("font-semibold uppercase tracking-[0.12em] text-subtle", compact ? "text-[9px]" : "text-[11px]")}>
@@ -1180,63 +1193,60 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
         <div className={dense ? "space-y-3" : "space-y-3"}>
           <div className={cn("grid items-start", dense ? "gap-3" : "gap-3 xl:grid-cols-[minmax(0,1.9fr)_minmax(0,1.15fr)]")}>
             <div className={dense ? "space-y-3" : "space-y-3"}>
-              <div className={cn(dense ? "space-y-3" : "grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)]")}>
-                <SectionCard
-                  compact={dense}
-                  title="Snapshot"
-                  description="Latest quote context and core fundamentals."
-                >
-                  <div className="rounded-xl border border-border/60 bg-background/35 p-3 dark:border-white/[0.07] dark:bg-white/[0.02]">
-                    <DetailFieldGrid
-                      compact={dense}
-                      columns={2}
-                      items={[
-                        { label: "Beta", value: stock.beta != null ? formatDecimal(stock.beta) : "—" },
-                        { label: "Market cap", value: stock.marketCap != null ? formatCompactCurrency(stock.marketCap) : "—" },
-                        { label: "PEG ratio", value: stock.peg != null ? formatDecimal(stock.peg) : "—" },
-                        {
-                          label: "ROE",
-                          value: stock.returnOnEquity != null ? formatPercent(stock.returnOnEquity * 100) : "—",
-                        },
-                        {
-                          label: "Profit margin",
-                          value: stock.profitMargin != null ? formatPercent(stock.profitMargin * 100) : "—",
-                        },
-                        { label: "P/E ratio", value: stock.trailingPE != null ? formatNumberMax2(stock.trailingPE) : "—" },
-                        {
-                          label: "Debt/Equity",
-                          value: stock.debtToEquity != null ? formatNumberMax2(stock.debtToEquity) : "—",
-                        },
-                        {
-                          label: "Dividend yield",
-                          value: stock.dividendYield != null ? formatPercent(dividendYieldPercent(stock.dividendYield)) : "—",
-                        },
-                        {
-                          label: "Payout ratio",
-                          value: stock.payoutRatio != null ? formatPercent(payoutRatioDecimal(stock.payoutRatio) * 100) : "—",
-                        },
-                        {
-                          label: "Analyst avg",
-                          value: stock.analystAvg?.trim() || "—",
-                          valueClassName: analystRatingTone(stock.analystAvg),
-                        },
-                        {
-                          label: selectedTarget.value != null ? analystTargetSourceLabel(selectedTarget.tier) : "Analyst target",
-                          value: selectedTarget.value != null ? formatCurrency(selectedTarget.value) : "—",
-                          detail: formatUpsidePct(analystTargetUpsidePct(stock.lastPrice, selectedTarget.value)),
-                          valueClassName: valueTone(analystTargetUpsidePct(stock.lastPrice, selectedTarget.value)),
-                        },
-                        {
-                          label: `SMA(${stock.shortSMA})`,
-                          value: smaForSnapshot != null ? formatCurrency(smaForSnapshot) : "—",
-                          detail: stock.isETF ? "ETF" : "Stock",
-                        },
-                      ]}
-                    />
-                  </div>
-                </SectionCard>
-
-              </div>
+              <SectionCard
+                compact={dense}
+                title="Snapshot"
+                description="Latest quote context and core fundamentals."
+              >
+                <div className="rounded-xl border border-border/60 bg-background/35 p-3 dark:border-white/[0.07] dark:bg-white/[0.02]">
+                  <DetailFieldGrid
+                    compact={dense}
+                    columns={dense ? 2 : 4}
+                    items={[
+                      { label: "Beta", value: stock.beta != null ? formatDecimal(stock.beta) : "—" },
+                      { label: "Market cap", value: stock.marketCap != null ? formatCompactCurrency(stock.marketCap) : "—" },
+                      { label: "PEG ratio", value: stock.peg != null ? formatDecimal(stock.peg) : "—" },
+                      {
+                        label: "ROE",
+                        value: stock.returnOnEquity != null ? formatPercent(stock.returnOnEquity * 100) : "—",
+                      },
+                      {
+                        label: "Profit margin",
+                        value: stock.profitMargin != null ? formatPercent(stock.profitMargin * 100) : "—",
+                      },
+                      { label: "P/E ratio", value: stock.trailingPE != null ? formatNumberMax2(stock.trailingPE) : "—" },
+                      {
+                        label: "Debt/Equity",
+                        value: stock.debtToEquity != null ? formatNumberMax2(stock.debtToEquity) : "—",
+                      },
+                      {
+                        label: "Dividend yield",
+                        value: stock.dividendYield != null ? formatPercent(dividendYieldPercent(stock.dividendYield)) : "—",
+                      },
+                      {
+                        label: "Payout ratio",
+                        value: stock.payoutRatio != null ? formatPercent(payoutRatioDecimal(stock.payoutRatio) * 100) : "—",
+                      },
+                      {
+                        label: "Analyst avg",
+                        value: stock.analystAvg?.trim() || "—",
+                        valueClassName: analystRatingTone(stock.analystAvg),
+                      },
+                      {
+                        label: selectedTarget.value != null ? analystTargetSourceLabel(selectedTarget.tier) : "Analyst target",
+                        value: selectedTarget.value != null ? formatCurrency(selectedTarget.value) : "—",
+                        detail: formatUpsidePct(analystTargetUpsidePct(stock.lastPrice, selectedTarget.value)),
+                        valueClassName: valueTone(analystTargetUpsidePct(stock.lastPrice, selectedTarget.value)),
+                      },
+                      {
+                        label: `SMA(${stock.shortSMA})`,
+                        value: smaForSnapshot != null ? formatCurrency(smaForSnapshot) : "—",
+                        detail: stock.isETF ? "ETF" : "Stock",
+                      },
+                    ]}
+                  />
+                </div>
+              </SectionCard>
 
               <SectionCard
                 compact={dense}
