@@ -476,6 +476,14 @@ function reduceOpenLotsFifo(openLots: TradeLot[], qtyToSell: number): TradeLot[]
     .sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate));
 }
 
+function parseCsvIsoDateToEpoch(value: string | undefined): number | null {
+  const raw = value?.trim();
+  if (!raw) return null;
+  const normalized = raw.length >= 10 ? raw.slice(0, 10) : raw;
+  const ms = Date.parse(normalized);
+  return Number.isFinite(ms) ? ms : null;
+}
+
 function reduceOpenLotsFifoForAccount(
   openLots: TradeLot[],
   qtyToSell: number,
@@ -505,14 +513,6 @@ function reduceOpenLotsFifoForAccount(
     lot.status = lot.quantity <= 1e-6 ? "fullySold" : "partiallySold";
     remaining -= soldFromLot;
     soldQty += soldFromLot;
-  }
-
-  function parseCsvIsoDateToEpoch(value: string | undefined): number | null {
-    const raw = value?.trim();
-    if (!raw) return null;
-    const normalized = raw.length >= 10 ? raw.slice(0, 10) : raw;
-    const ms = Date.parse(normalized);
-    return Number.isFinite(ms) ? ms : null;
   }
 
   return {
