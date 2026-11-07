@@ -2321,10 +2321,14 @@ export const usePortfolioStore = create<State>()(
             const existing = stockMap.get(symbol);
             const existingLots = lotsBySymbol[symbol];
             const hasExistingLotHistory = !!existingLots && (existingLots.open.length > 0 || existingLots.sold.length > 0);
-            const imported = buildImportedOpenLots(
-              symbolRows.map((row) => ({ ...row, account: canonicalAccount(row.account, knownAccounts) }))
-            );
+            const normalizedSymbolRows = symbolRows.map((row) => ({ ...row, account: canonicalAccount(row.account, knownAccounts) }));
+            const imported = buildImportedOpenLots(normalizedSymbolRows);
             const hasImportedHoldings = imported.totalQty > 0;
+            const explicitDateAccounts = new Set(
+              normalizedSymbolRows
+                .filter((row) => !!row.purchaseDate?.trim())
+                .map((row) => normalizeAccountKey(displayAccount(row.account)))
+            );
 
             const preferredRetirement =
               symbolRows
@@ -2379,6 +2383,7 @@ export const usePortfolioStore = create<State>()(
 
                 if (importedLots.length === 1) {
                   const importedLot = importedLots[0];
+                  const hasExplicitPurchaseDate = explicitDateAccounts.has(accountKey);
                   const importedQty = Math.max(0, importedLot.quantity);
                   const existingQty = existingAccountLots.reduce((sum, lot) => sum + Math.max(0, lot.quantity), 0);
                   const existingBasis = existingAccountLots.reduce(
@@ -2405,6 +2410,11 @@ export const usePortfolioStore = create<State>()(
                       [...importedLotKeys].some((key) => !existingLotKeys.has(key)));
 
                   if (existingAccountLots.length === 0) {
+                    mergedOpenLots.push(importedLot);
+                    continue;
+                  }
+
+                  if (hasExplicitPurchaseDate) {
                     mergedOpenLots.push(importedLot);
                     continue;
                   }
