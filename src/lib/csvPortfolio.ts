@@ -50,10 +50,17 @@ const CSV_IMPORT_CANDIDATES: Record<CsvColumnStandard, string[]> = {
   purchaseDate: [
     "purchaseDate",
     "purchase date",
+    "date purchased",
+    "purchased",
     "tradeDate",
     "trade date",
+    "transaction date",
+    "execution date",
     "opening date",
+    "opened",
     "date acquired",
+    "acquired date",
+    "acquired on",
     "date",
     "buy date",
   ],
@@ -179,10 +186,17 @@ const PER_SHARE_COST_HEADER_PRIORITY = [
 
 const DATE_HEADER_PRIORITY = [
   "purchasedate",
+  "datepurchased",
+  "purchased",
   "tradedate",
+  "transactiondate",
+  "executiondate",
   "buydate",
   "openingdate",
+  "opened",
   "dateacquired",
+  "acquireddate",
+  "acquiredon",
   "acquireddate",
   "opendate",
   "date",
@@ -205,6 +219,13 @@ function findDateHeader(headers: string[]): string | null {
     const hit = headers.find((header) => compactHeaderKey(header) === preferred);
     if (hit) return hit;
   }
+  const heuristic = headers.find((header) => {
+    const key = compactHeaderKey(header);
+    if (!key.includes("date")) return false;
+    if (key.includes("updated") || key.includes("lastupdated") || key.includes("nextdate")) return false;
+    return true;
+  });
+  if (heuristic) return heuristic;
   return null;
 }
 
