@@ -585,9 +585,21 @@ export function CsvImportExportBar({
 
     let snapshotWarning: string | null = null;
 
+    const importMutatedPortfolio =
+      outcome.importedCount > 0 ||
+      outcome.importedTradeCount > 0 ||
+      outcome.netUpdates.length > 0 ||
+      outcome.lotDetailUpdates.length > 0 ||
+      outcome.prunedWatchlistCount > 0 ||
+      Math.abs(outcome.cashAdjustedBy) > 1e-6 ||
+      Math.abs(outcome.liquidationCashCredited) > 1e-6;
+
     if (outcome.importedSymbols.length > 0) {
       updateImportProgress("Loading market data", 76);
       await hydrateImportedSymbols(outcome.importedSymbols);
+    }
+
+    if (importMutatedPortfolio) {
       recalc();
       usePortfolioStore.setState({ lastRefreshAt: new Date().toISOString() });
       updateImportProgress("Saving snapshot", 92);
