@@ -80,12 +80,6 @@ function formatDateLabel(value: string | undefined): string {
   });
 }
 
-function formatAccountType(isRetirementAccount: boolean | null | undefined): string {
-  if (isRetirementAccount === true) return "Retirement";
-  if (isRetirementAccount === false) return "Taxable";
-  return "Unknown type";
-}
-
 function formatScoreDisplay(score: number | undefined | null): string {
   return formatScore(score);
 }
@@ -434,6 +428,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       soldLots,
     };
   }, [lots, stock]);
+  const shouldScrollOpenLots = lotSummary.openLots.length > 4;
   const editingLot = useMemo(
     () => lotSummary.openLots.find((lot) => lot.id === editingLotId) ?? null,
     [editingLotId, lotSummary.openLots]
@@ -1086,21 +1081,20 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                       Open lots
                     </p>
                     <p className="mt-0.5 text-[11px] text-subtle">
-                      Active lots for {stock.symbol}. Scroll for more rows.
+                      Active lots for {stock.symbol}.{shouldScrollOpenLots ? " Scroll for more rows." : ""}
                     </p>
                   </div>
                   {lotSummary.openLots.length > 0 ? (
-                    <div className="h-[190px] overflow-y-auto overflow-x-auto pr-1">
-                      <table className="min-w-[620px] w-full text-left">
+                    <div className={cn("pr-1", shouldScrollOpenLots ? "h-[190px] overflow-y-auto" : "overflow-y-visible")}>
+                      <table className="w-full text-left">
                         <thead className="border-b border-border/60 text-[11px] uppercase tracking-[0.12em] text-subtle dark:border-white/[0.06]">
                           <tr>
-                            <th className="pb-2 pr-3 font-semibold">Bought</th>
-                            <th className="pb-2 pr-3 text-right font-semibold">Qty</th>
-                            <th className="pb-2 pr-3 text-right font-semibold">Cost/share</th>
-                            <th className="pb-2 pr-3 font-semibold">Account type</th>
-                            <th className="pb-2 pr-3 font-semibold">Account</th>
-                            <th className="pb-2 pr-3 text-right font-semibold">Action</th>
-                            <th className="pb-2 text-right font-semibold">Edit</th>
+                            <th className="sticky top-0 z-10 bg-background/95 pb-2 pr-3 font-semibold backdrop-blur">Bought</th>
+                            <th className="sticky top-0 z-10 bg-background/95 pb-2 pr-3 text-right font-semibold backdrop-blur">Qty</th>
+                            <th className="sticky top-0 z-10 bg-background/95 pb-2 pr-3 text-right font-semibold backdrop-blur">Cost/share</th>
+                            <th className="sticky top-0 z-10 bg-background/95 pb-2 pr-3 font-semibold backdrop-blur">Account</th>
+                            <th className="sticky top-0 z-10 bg-background/95 pb-2 pr-3 text-right font-semibold backdrop-blur">Action</th>
+                            <th className="sticky top-0 z-10 bg-background/95 pb-2 text-right font-semibold backdrop-blur">Edit</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1109,7 +1103,6 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                               <td className="py-2 pr-3 text-sm">{formatDateLabel(lot.purchaseDate)}</td>
                               <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatNumberMax2(lot.quantity)}</td>
                               <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatCurrency(lot.costBasis)}</td>
-                              <td className="py-2 pr-3 text-sm">{formatAccountType(lot.isRetirementAccount)}</td>
                               <td className="py-2 pr-3 text-sm text-subtle">{lot.account?.trim() || "—"}</td>
                               <td className="py-2 pr-3 text-right">
                                 <button
