@@ -749,7 +749,7 @@ export async function parsePortfolioCsv(
     const kTL = findHeaderKey(headers, ["TransactionLimit", "transaction limit"]);
     const kTp = findHeaderKey(headers, ["TargetPrice", "target price"]);
     const kName = resolveMappedHeaderKey(headers, mapping, "name", ["Name", "name"]);
-    const kDate = resolveMappedHeaderKey(headers, mapping, "purchaseDate", ["purchaseDate", "purchase date", "tradeDate", "trade date"]);
+    const kDate = resolveMappedHeaderKey(headers, mapping, "purchaseDate", CSV_IMPORT_CANDIDATES.purchaseDate);
     const kAccount = resolveExplicitOptionalHeader("account", ["account", "Account", "profile", "profileName", "accountName"]);
     const kRetirement = resolveExplicitOptionalHeader("retirementAccount", ["retirementAccount", "retirement account", "accountType", "account type"]);
     if (!kSymbol || !kQty || !kAvg) {
