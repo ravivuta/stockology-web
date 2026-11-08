@@ -36,6 +36,11 @@ const PALETTE = {
   loss: "var(--dashboard-chart-loss)",
 } as const;
 
+const ETF_PATTERN_PRIMARY =
+  "color-mix(in srgb, var(--dashboard-chart-cost-basis) 72%, black)";
+const ETF_PATTERN_SECONDARY =
+  "color-mix(in srgb, var(--dashboard-chart-cost-basis) 52%, black)";
+
 export default function DashboardPage() {
   const reduceMotion = useReducedMotion();
   const stocks = usePortfolioStore((s) => s.stocks);
@@ -416,13 +421,13 @@ export default function DashboardPage() {
                       </div>
                       {p.name === "Cost" || p.name === "Cost basis" ? (
                         <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] font-semibold">
-                          <span className="text-[color:#2f9eff]">ETF {shareOfRow(etfCostBasis, holdingsCostBasis)}</span>
+                          <span style={{ color: ETF_PATTERN_PRIMARY }}>ETF {shareOfRow(etfCostBasis, holdingsCostBasis)}</span>
                           <span className="text-[color:#1f8f46]">Stocks {shareOfRow(stockCostBasisOnly, holdingsCostBasis)}</span>
                         </div>
                       ) : null}
                       {p.name === "Holdings" ? (
                         <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] font-semibold">
-                          <span className="text-[color:#2f9eff]">ETF {shareOfRow(etfValue, holdingsValue)}</span>
+                          <span style={{ color: ETF_PATTERN_PRIMARY }}>ETF {shareOfRow(etfValue, holdingsValue)}</span>
                           <span className="text-[color:#1f8f46]">Stocks {shareOfRow(stockValueOnly, holdingsValue)}</span>
                         </div>
                       ) : null}
@@ -480,7 +485,7 @@ export default function DashboardPage() {
               </button>
               {showCostBasisBreakdown ? (
                 <div className="mt-1 flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs">
-                  <span className="font-semibold text-[color:#2f9eff]">
+                  <span className="font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
                     ETF: {`${formatWholeCurrency(etfCostBasis)} (${shareOfRow(etfCostBasis, holdingsCostBasis)})`}
                   </span>
                   <span className="font-semibold text-[color:#1f8f46]">
@@ -506,7 +511,7 @@ export default function DashboardPage() {
               </button>
               {showCurrentValueBreakdown ? (
                 <div className="mt-1 flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs">
-                  <span className="font-semibold text-[color:#2f9eff]">
+                  <span className="font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
                     ETF: {`${formatWholeCurrency(etfValue)} (${shareOfRow(etfValue, holdingsValue)})`}
                   </span>
                   <span className="font-semibold text-[color:#1f8f46]">
@@ -598,7 +603,8 @@ export default function DashboardPage() {
               const fixedIncomeOriginPct = holdingsSpanPct;
               const cashOriginPct = fixedIncomeOriginPct + fixedIncomeWidthPct;
               const etfHatch =
-                "repeating-linear-gradient(-45deg, transparent 0 2px, color-mix(in srgb, var(--dashboard-chart-cost-basis) 70%, white) 2px 3.5px)";
+                `repeating-linear-gradient(-45deg, transparent 0 2px, ${ETF_PATTERN_PRIMARY} 2px 4px), ` +
+                `repeating-linear-gradient(45deg, transparent 0 6px, ${ETF_PATTERN_SECONDARY} 6px 7.5px)`;
 
               return (
                 <div key={`${row.account}-${index}`} className="text-sm">
