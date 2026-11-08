@@ -473,21 +473,21 @@ export default function DashboardPage() {
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="min-w-0 truncate font-bold text-foreground">{p.name}</span>
-                        <span className="shrink-0 tabular-nums font-bold text-subtle">
+                        <span className="min-w-0 truncate font-bold" style={{ color: p.color }}>{p.name}</span>
+                        <span className="shrink-0 tabular-nums font-bold" style={{ color: p.color }}>
                           {homeShowsAmountValues ? `${formatWholeCurrency(segmentValue)} · ${pctLabel}` : pctLabel}
                         </span>
                       </div>
                       {p.name === "Cost" || p.name === "Cost basis" ? (
                         <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] font-semibold">
                           <span style={{ color: ETF_PATTERN_PRIMARY }}>ETF {shareOfRow(etfCostBasis, holdingsCostBasis)}</span>
-                          <span className="text-[color:#1f8f46]">Stocks {shareOfRow(stockCostBasisOnly, holdingsCostBasis)}</span>
+                          <span className="text-[color:var(--dashboard-chart-cost-basis)]">Stocks {shareOfRow(stockCostBasisOnly, holdingsCostBasis)}</span>
                         </div>
                       ) : null}
                       {p.name === "Holdings" ? (
                         <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] font-semibold">
                           <span style={{ color: ETF_PATTERN_PRIMARY }}>ETF {shareOfRow(etfValue, holdingsValue)}</span>
-                          <span className="text-[color:#1f8f46]">Stocks {shareOfRow(stockValueOnly, holdingsValue)}</span>
+                          <span className="text-[color:var(--dashboard-chart-holdings)]">Stocks {shareOfRow(stockValueOnly, holdingsValue)}</span>
                         </div>
                       ) : null}
                     </div>
