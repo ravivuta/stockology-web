@@ -47,8 +47,8 @@ function etfPatternPrimaryFor(baseColor: string): string {
 function etfHatchFor(baseColor: string): string {
   const primary = etfPatternPrimaryFor(baseColor);
   return (
-    `repeating-linear-gradient(-45deg, transparent 0 3px, ${primary} 3px 4.9px), ` +
-    `repeating-linear-gradient(45deg, transparent 0 3px, ${primary} 3px 4.9px)`
+    `repeating-linear-gradient(45deg, ${primary} 0 1px, transparent 1px 7px), ` +
+    `repeating-linear-gradient(135deg, ${primary} 0 1px, transparent 1px 7px)`
   );
 }
 
@@ -499,9 +499,9 @@ export default function DashboardPage() {
           <dl className="grid w-full grid-cols-1 gap-0">
             <div className="grid grid-cols-[minmax(0,1fr)_auto_1.25rem_auto] items-center gap-x-3 border-b border-border/90 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/10">
               <span />
-              <span className="justify-self-end text-right">Current</span>
+              <span className="justify-self-end w-[14ch] text-right">Current</span>
               <span aria-hidden />
-              <span className="justify-self-end text-right">Invested</span>
+              <span className="justify-self-end w-[14ch] text-right">Invested</span>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
               <div className="grid grid-cols-[minmax(0,1fr)_auto_1.25rem_auto] items-center gap-x-3">
@@ -515,11 +515,11 @@ export default function DashboardPage() {
                     Edit
                   </button>
                 </span>
-                <span className="justify-self-end text-right text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
+                <span className="justify-self-end w-[14ch] text-right text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
                   {homeAmountWithPercent(homeShowsAmountValues, cash, shareOfRow(cash, totalBalance))}
                 </span>
                 <span aria-hidden />
-                <span className="justify-self-end text-right text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
+                <span className="justify-self-end w-[14ch] text-right text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
                   {homeAmountWithPercent(homeShowsAmountValues, cash, shareOfRow(cash, totalInvested))}
                 </span>
               </div>
@@ -536,11 +536,11 @@ export default function DashboardPage() {
                     Edit
                   </button>
                 </span>
-                <span className="justify-self-end text-right text-sm tabular-nums text-[color:#0f9aa7]">
+                <span className="justify-self-end w-[14ch] text-right text-sm tabular-nums text-[color:#0f9aa7]">
                   {homeAmountWithPercent(homeShowsAmountValues, fixedIncomeValue, shareOfRow(fixedIncomeValue, totalBalance))}
                 </span>
                 <span aria-hidden />
-                <span className="justify-self-end text-right text-sm tabular-nums text-[color:#0f9aa7]">
+                <span className="justify-self-end w-[14ch] text-right text-sm tabular-nums text-[color:#0f9aa7]">
                   {homeAmountWithPercent(homeShowsAmountValues, fixedIncomeValue, shareOfRow(fixedIncomeValue, totalInvested))}
                 </span>
               </div>
@@ -550,29 +550,29 @@ export default function DashboardPage() {
                 <span className="flex items-center gap-1 text-sm font-medium text-[color:#14b8a6]">
                   Value
                 </span>
-                <span className="justify-self-end text-right text-sm tabular-nums text-[color:#14b8a6]">
+                <span className="justify-self-end w-[14ch] text-right text-sm tabular-nums text-[color:#14b8a6]">
                   {homeAmountWithPercent(homeShowsAmountValues, holdingsValue, shareOfRow(holdingsValue, totalBalance))}
                 </span>
                 <span aria-hidden />
-                <span className="justify-self-end text-right text-sm tabular-nums text-[color:#14b8a6]">
+                <span className="justify-self-end w-[14ch] text-right text-sm tabular-nums text-[color:#14b8a6]">
                   {homeAmountWithPercent(homeShowsAmountValues, holdingsCostBasis, shareOfRow(holdingsCostBasis, totalInvested))}
                 </span>
               </div>
               <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_1.25rem_auto] items-center gap-x-3 gap-y-1 text-xs">
                 <span className="pl-4 font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
-                <span className="whitespace-nowrap text-right font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
+                <span className="justify-self-end w-[14ch] whitespace-nowrap text-right font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
                   {homeAmountWithPercent(homeShowsAmountValues, etfValue, shareOfRow(etfValue, totalBalance))}
                 </span>
                 <span aria-hidden />
-                <span className="whitespace-nowrap text-right font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
+                <span className="justify-self-end w-[14ch] whitespace-nowrap text-right font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
                   {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, holdingsCostBasis))}
                 </span>
                 <span className="pl-4 font-semibold text-[color:#14b8a6]">Stocks:</span>
-                <span className="whitespace-nowrap text-right font-semibold text-[color:#14b8a6]">
+                <span className="justify-self-end w-[14ch] whitespace-nowrap text-right font-semibold text-[color:#14b8a6]">
                   {homeAmountWithPercent(homeShowsAmountValues, stockValueOnly, shareOfRow(stockValueOnly, totalBalance))}
                 </span>
                 <span aria-hidden />
-                <span className="whitespace-nowrap text-right font-semibold text-[color:#14b8a6]">
+                <span className="justify-self-end w-[14ch] whitespace-nowrap text-right font-semibold text-[color:#14b8a6]">
                   {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, holdingsCostBasis))}
                 </span>
               </div>
