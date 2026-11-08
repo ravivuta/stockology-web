@@ -398,6 +398,39 @@ export default function DashboardPage() {
             >
               <PortfolioDonut
                 segments={pieData.map((p) => ({ name: p.name, value: p.value, color: p.color }))}
+                etfOverlays={
+                  isProfitable
+                    ? [
+                        {
+                          segment: "Cost",
+                          fraction: Math.min(etfCostBasis, holdingsCostBasis) / Math.max(totalBalance, 0.0001),
+                        },
+                        {
+                          segment: "Gain",
+                          fraction:
+                            Math.min(
+                              Math.max(0, etfValue - etfCostBasis),
+                              Math.max(0, holdingsPnL)
+                            ) / Math.max(totalBalance, 0.0001),
+                        },
+                      ]
+                    : [
+                        {
+                          segment: "Holdings",
+                          fraction:
+                            Math.min(etfValue, holdingsValue) /
+                            Math.max(cash + fixedIncomeValue + holdingsCostBasis, 0.0001),
+                        },
+                        {
+                          segment: "Loss",
+                          fraction:
+                            Math.min(
+                              Math.max(0, etfCostBasis - etfValue),
+                              Math.max(0, Math.abs(holdingsPnL))
+                            ) / Math.max(cash + fixedIncomeValue + holdingsCostBasis, 0.0001),
+                        },
+                      ]
+                }
                 totalValue={homeShowsAmountValues ? formatWholeCurrency(totalBalance) : "••••"}
                 totalLabelClassName="text-[color:var(--dashboard-chart-center-text)]"
                 totalValueClassName="text-[color:var(--dashboard-chart-center-text)]"
@@ -655,6 +688,12 @@ export default function DashboardPage() {
                     {etfValuePct > 0 ? (
                       <div className="absolute inset-y-0 left-0" style={{ width: `${etfValuePct}%`, backgroundImage: etfHatch }} />
                     ) : null}
+                    {etfValuePct > 0 && etfValuePct < 100 ? (
+                      <div
+                        className="absolute inset-y-0 w-px"
+                        style={{ left: `calc(${etfValuePct}% - 0.5px)`, backgroundColor: ETF_PATTERN_PRIMARY }}
+                      />
+                    ) : null}
                     {profitWidthPct > 0 ? (
                       <div
                         className="absolute inset-y-0"
@@ -671,6 +710,12 @@ export default function DashboardPage() {
                         style={{ left: `${costWidthPct}%`, width: `${etfProfitPct}%`, backgroundImage: etfHatch }}
                       />
                     ) : null}
+                    {etfProfitPct > 0 ? (
+                      <div
+                        className="absolute inset-y-0 w-px"
+                        style={{ left: `calc(${costWidthPct + etfProfitPct}% - 0.5px)`, backgroundColor: ETF_PATTERN_PRIMARY }}
+                      />
+                    ) : null}
                     {lossWidthPct > 0 ? (
                       <div
                         className="absolute inset-y-0"
@@ -685,6 +730,12 @@ export default function DashboardPage() {
                       <div
                         className="absolute inset-y-0"
                         style={{ left: `${valueWidthPct}%`, width: `${etfLossPct}%`, backgroundImage: etfHatch }}
+                      />
+                    ) : null}
+                    {etfLossPct > 0 ? (
+                      <div
+                        className="absolute inset-y-0 w-px"
+                        style={{ left: `calc(${valueWidthPct + etfLossPct}% - 0.5px)`, backgroundColor: ETF_PATTERN_PRIMARY }}
                       />
                     ) : null}
                     {fixedIncomeWidthPct > 0 ? (

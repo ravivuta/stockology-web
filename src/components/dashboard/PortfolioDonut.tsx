@@ -9,6 +9,11 @@ type Segment = {
   color: string;
 };
 
+type ETFOverlay = {
+  segment: string;
+  fraction: number;
+};
+
 function polarToCartesian(cx: number, cy: number, radius: number, angleDeg: number) {
   const a = ((angleDeg - 90) * Math.PI) / 180;
   return { x: cx + radius * Math.cos(a), y: cy + radius * Math.sin(a) };
@@ -35,6 +40,7 @@ const CY = VIEW / 2;
 
 export function PortfolioDonut({
   segments,
+  etfOverlays = [],
   totalLabel = "Total",
   totalValue,
   className = "",
@@ -42,6 +48,7 @@ export function PortfolioDonut({
   totalValueClassName = "",
 }: {
   segments: Segment[];
+  etfOverlays?: ETFOverlay[];
   totalLabel?: string;
   totalValue: string;
   className?: string;
@@ -59,7 +66,7 @@ export function PortfolioDonut({
   const arcs = useMemo(() => {
     const total = segments.reduce((s, x) => s + x.value, 0);
     if (total <= 0) {
-      return [] as { d: string; color: string; name: string; midAngle: number; fraction: number }[];
+      return [] as { d: string; color: string; name: string; midAngle: number; fraction: number; startDeg: number; endDeg: number }[];
     }
 
     const norm = segments.map((s) => ({ ...s, f: s.value / total }));
@@ -73,19 +80,46 @@ export function PortfolioDonut({
     }
 
     if (significant.length === 1 && significant[0].f >= 0.998) {
-      return [{ d: fullRingD(CX, CY, midR), color: significant[0].color, name: significant[0].name, midAngle: 0, fraction: 1 }];
+      return [{
+        d: fullRingD(CX, CY, midR),
+        color: significant[0].color,
+        name: significant[0].name,
+        midAngle: 0,
+        fraction: 1,
+        startDeg: 0,
+        endDeg: 360,
+      }];
     }
 
     let cursor = 0;
-    const out: { d: string; color: string; name: string; midAngle: number; fraction: number }[] = [];
+    const out: { d: string; color: string; name: string; midAngle: number; fraction: number; startDeg: number; endDeg: number }[] = [];
     for (const s of significant) {
       const span = 360 * s.f;
       const d = arcStrokeD(CX, CY, midR, cursor, cursor + span);
-      if (d) out.push({ d, color: s.color, name: s.name, midAngle: cursor + span / 2, fraction: s.f });
+      if (d) {
+        out.push({
+          d,
+          color: s.color,
+          name: s.name,
+          midAngle: cursor + span / 2,
+          fraction: s.f,
+          startDeg: cursor,
+          endDeg: cursor + span,
+        });
+      }
       cursor += span;
     }
     return out;
   }, [segments, midR]);
+
+  const etfOverlayMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const overlay of etfOverlays) {
+      if (!overlay.segment) continue;
+      map.set(overlay.segment, Math.max(0, overlay.fraction));
+    }
+    return map;
+  }, [etfOverlays]);
 
   const transition = (i: number) =>
     reduceMotion
@@ -135,6 +169,42 @@ export function PortfolioDonut({
             transition={transition(i)}
           />
         ))}
+        {arcs.map((arc) => {
+          const etfFraction = Math.min(arc.fraction, etfOverlayMap.get(arc.name) ?? 0);
+          if (etfFraction <= 0) return null;
+          const etfSpan = (etfFraction / arc.fraction) * (arc.endDeg - arc.startDeg);
+          const etfEndDeg = Math.min(arc.endDeg, arc.startDeg + etfSpan);
+          const etfD = arcStrokeD(CX, CY, midR, arc.startDeg, etfEndDeg);
+          const boundaryD = arcStrokeD(CX, CY, midR, Math.max(arc.startDeg, etfEndDeg - 0.7), Math.min(arc.endDeg, etfEndDeg + 0.7));
+          return (
+            <g key={`etf-overlay-${arc.name}`}>
+              <path
+                d={etfD}
+                fill="none"
+                stroke="rgba(0,0,0,0.62)"
+                strokeWidth={strokeW}
+                strokeLinecap="butt"
+                strokeDasharray="1.2 2.1"
+              />
+              <path
+                d={etfD}
+                fill="none"
+                stroke="rgba(255,255,255,0.35)"
+                strokeWidth={strokeW}
+                strokeLinecap="butt"
+                strokeDasharray="3.8 4.6"
+                strokeDashoffset="0.8"
+              />
+              <path
+                d={boundaryD}
+                fill="none"
+                stroke="rgba(0,0,0,0.74)"
+                strokeWidth={strokeW}
+                strokeLinecap="butt"
+              />
+            </g>
+          );
+        })}
         {arcs.map((arc) => {
           if (arc.fraction < 0.06) return null;
           const labelR = 58;
