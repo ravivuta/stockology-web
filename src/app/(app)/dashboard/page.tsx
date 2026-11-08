@@ -44,16 +44,11 @@ function etfPatternPrimaryFor(baseColor: string): string {
   return `color-mix(in srgb, ${baseColor} 72%, black)`;
 }
 
-function etfPatternSecondaryFor(baseColor: string): string {
-  return `color-mix(in srgb, ${baseColor} 52%, black)`;
-}
-
 function etfHatchFor(baseColor: string): string {
   const primary = etfPatternPrimaryFor(baseColor);
-  const secondary = etfPatternSecondaryFor(baseColor);
   return (
     `repeating-linear-gradient(-45deg, transparent 0 3px, ${primary} 3px 4.9px), ` +
-    `repeating-linear-gradient(45deg, transparent 0 7px, color-mix(in srgb, ${secondary} 74%, transparent) 7px 8.25px)`
+    `repeating-linear-gradient(45deg, transparent 0 3px, ${primary} 3px 4.9px)`
   );
 }
 

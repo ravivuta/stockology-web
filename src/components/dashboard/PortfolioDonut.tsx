@@ -19,8 +19,7 @@ type ETFOverlayArc = {
   d: string;
   boundaryD: string;
   patternId: string;
-  primaryStroke: string;
-  secondaryStroke: string;
+  stroke: string;
 };
 
 function polarToCartesian(cx: number, cy: number, radius: number, angleDeg: number) {
@@ -146,8 +145,7 @@ export function PortfolioDonut({
         d,
         boundaryD: arcStrokeD(CX, CY, midR, Math.max(arc.startDeg, etfEndDeg - 0.7), Math.min(arc.endDeg, etfEndDeg + 0.7)),
         patternId: `etf-pattern-${patternIdSeed}-${i}`,
-        primaryStroke: `color-mix(in srgb, ${arc.color} 72%, black)`,
-        secondaryStroke: `color-mix(in srgb, ${arc.color} 52%, black)`,
+        stroke: `color-mix(in srgb, ${arc.color} 72%, black)`,
       });
     }
     return overlays;
@@ -182,18 +180,10 @@ export function PortfolioDonut({
         {etfOverlayArcs.map((overlay) => (
           <pattern key={overlay.patternId} id={overlay.patternId} patternUnits="userSpaceOnUse" width="7" height="7">
             <path
-              d="M -2,7 L 7,-2 M 1,8 L 8,1 M 4,8 L 8,4"
+              d="M -2,7 L 7,-2 M 1,8 L 8,1 M 4,8 L 8,4 M -2,0 L 7,9 M -2,3 L 4,9 M 1,-2 L 9,6"
               fill="none"
-              stroke={overlay.primaryStroke}
+              stroke={overlay.stroke}
               strokeWidth="1.9"
-              strokeLinecap="square"
-            />
-            <path
-              d="M -2,0 L 7,9 M -2,3 L 4,9 M 1,-2 L 9,6"
-              fill="none"
-              stroke={overlay.secondaryStroke}
-              strokeOpacity="0.74"
-              strokeWidth="1.25"
               strokeLinecap="square"
             />
           </pattern>
@@ -235,7 +225,7 @@ export function PortfolioDonut({
               <path
                 d={overlay.boundaryD}
                 fill="none"
-                stroke={overlay.primaryStroke}
+                stroke={overlay.stroke}
                 strokeWidth={strokeW}
                 strokeLinecap="butt"
               />
