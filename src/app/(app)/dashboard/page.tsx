@@ -499,9 +499,9 @@ export default function DashboardPage() {
           <dl className="grid w-full grid-cols-1 gap-0">
             <div className="grid grid-cols-[minmax(0,1fr)_auto_1.25rem_auto] items-center gap-x-3 border-b border-border/90 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/10">
               <span />
-              <span className="text-right">Current</span>
+              <span className="justify-self-end text-right">Current</span>
               <span aria-hidden />
-              <span className="text-right">Invested</span>
+              <span className="justify-self-end text-right">Invested</span>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
               <div className="grid grid-cols-[minmax(0,1fr)_auto_1.25rem_auto] items-center gap-x-3">
@@ -515,11 +515,11 @@ export default function DashboardPage() {
                     Edit
                   </button>
                 </span>
-                <span className="text-right text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
+                <span className="justify-self-end text-right text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
                   {homeAmountWithPercent(homeShowsAmountValues, cash, shareOfRow(cash, totalBalance))}
                 </span>
                 <span aria-hidden />
-                <span className="text-right text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
+                <span className="justify-self-end text-right text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
                   {homeAmountWithPercent(homeShowsAmountValues, cash, shareOfRow(cash, totalInvested))}
                 </span>
               </div>
@@ -536,11 +536,11 @@ export default function DashboardPage() {
                     Edit
                   </button>
                 </span>
-                <span className="text-right text-sm tabular-nums text-[color:#0f9aa7]">
+                <span className="justify-self-end text-right text-sm tabular-nums text-[color:#0f9aa7]">
                   {homeAmountWithPercent(homeShowsAmountValues, fixedIncomeValue, shareOfRow(fixedIncomeValue, totalBalance))}
                 </span>
                 <span aria-hidden />
-                <span className="text-right text-sm tabular-nums text-[color:#0f9aa7]">
+                <span className="justify-self-end text-right text-sm tabular-nums text-[color:#0f9aa7]">
                   {homeAmountWithPercent(homeShowsAmountValues, fixedIncomeValue, shareOfRow(fixedIncomeValue, totalInvested))}
                 </span>
               </div>
@@ -550,11 +550,11 @@ export default function DashboardPage() {
                 <span className="flex items-center gap-1 text-sm font-medium text-[color:#14b8a6]">
                   Value
                 </span>
-                <span className="text-right text-sm tabular-nums text-[color:#14b8a6]">
+                <span className="justify-self-end text-right text-sm tabular-nums text-[color:#14b8a6]">
                   {homeAmountWithPercent(homeShowsAmountValues, holdingsValue, shareOfRow(holdingsValue, totalBalance))}
                 </span>
                 <span aria-hidden />
-                <span className="text-right text-sm tabular-nums text-[color:#14b8a6]">
+                <span className="justify-self-end text-right text-sm tabular-nums text-[color:#14b8a6]">
                   {homeAmountWithPercent(homeShowsAmountValues, holdingsCostBasis, shareOfRow(holdingsCostBasis, totalInvested))}
                 </span>
               </div>
