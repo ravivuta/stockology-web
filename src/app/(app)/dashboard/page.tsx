@@ -96,7 +96,7 @@ export default function DashboardPage() {
   const totalBalance = holdingsValue + cash + fixedIncomeValue;
   const totalInvested = holdingsCostBasis + cash + fixedIncomeValue;
   const isProfitable = holdingsPnL >= 0;
-  const totalPnLPct = totalBalance > 0.0001 ? (holdingsPnL / totalBalance) * 100 : 0;
+  const totalPnLPct = totalInvested > 0.0001 ? (holdingsPnL / totalInvested) * 100 : 0;
   const todaySnapshotChange = useMemo(
     () => computeTodayChangeFromHistory(cloudHistory ?? [], totalBalance),
     [cloudHistory, totalBalance]
@@ -521,7 +521,7 @@ export default function DashboardPage() {
                   </button>
                 </span>
                 <span className="justify-self-end w-[14ch] text-right text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
-                  {homeAmountWithPercent(homeShowsAmountValues, cash, shareOfRow(cash, totalBalance))}
+                  {homeAmountWithPercent(homeShowsAmountValues, cash, shareOfRow(cash, totalInvested))}
                 </span>
                 <span aria-hidden />
                 <span className="justify-self-end w-[14ch] text-right text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
@@ -542,7 +542,7 @@ export default function DashboardPage() {
                   </button>
                 </span>
                 <span className="justify-self-end w-[14ch] text-right text-sm tabular-nums text-[color:#0f9aa7]">
-                  {homeAmountWithPercent(homeShowsAmountValues, fixedIncomeValue, shareOfRow(fixedIncomeValue, totalBalance))}
+                  {homeAmountWithPercent(homeShowsAmountValues, fixedIncomeValue, shareOfRow(fixedIncomeValue, totalInvested))}
                 </span>
                 <span aria-hidden />
                 <span className="justify-self-end w-[14ch] text-right text-sm tabular-nums text-[color:#0f9aa7]">
@@ -556,7 +556,7 @@ export default function DashboardPage() {
                   Value
                 </span>
                 <span className="justify-self-end w-[14ch] text-right text-sm tabular-nums text-[color:#14b8a6]">
-                  {homeAmountWithPercent(homeShowsAmountValues, holdingsValue, shareOfRow(holdingsValue, totalBalance))}
+                  {homeAmountWithPercent(homeShowsAmountValues, holdingsValue, shareOfRow(holdingsValue, totalInvested))}
                 </span>
                 <span aria-hidden />
                 <span className="justify-self-end w-[14ch] text-right text-sm tabular-nums text-[color:#14b8a6]">
@@ -566,19 +566,33 @@ export default function DashboardPage() {
               <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_1.25rem_auto] items-center gap-x-3 gap-y-1 text-xs">
                 <span className="pl-4 font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
                 <span className="justify-self-end w-[14ch] whitespace-nowrap text-right font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
-                  {homeAmountWithPercent(homeShowsAmountValues, etfValue, shareOfRow(etfValue, totalBalance))}
+                  {homeAmountWithPercent(homeShowsAmountValues, etfValue, shareOfRow(etfValue, totalInvested))}
                 </span>
                 <span aria-hidden />
                 <span className="justify-self-end w-[14ch] whitespace-nowrap text-right font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
-                  {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, holdingsCostBasis))}
+                  {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, totalInvested))}
                 </span>
                 <span className="pl-4 font-semibold text-[color:#14b8a6]">Stocks:</span>
                 <span className="justify-self-end w-[14ch] whitespace-nowrap text-right font-semibold text-[color:#14b8a6]">
-                  {homeAmountWithPercent(homeShowsAmountValues, stockValueOnly, shareOfRow(stockValueOnly, totalBalance))}
+                  {homeAmountWithPercent(homeShowsAmountValues, stockValueOnly, shareOfRow(stockValueOnly, totalInvested))}
                 </span>
                 <span aria-hidden />
                 <span className="justify-self-end w-[14ch] whitespace-nowrap text-right font-semibold text-[color:#14b8a6]">
-                  {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, holdingsCostBasis))}
+                  {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, totalInvested))}
+                </span>
+              </div>
+            </div>
+            <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_1.25rem_auto] items-center gap-x-3">
+                <span className="flex items-center gap-1 text-sm font-medium text-[color:#14b8a6]">
+                  Total
+                </span>
+                <span className="justify-self-end w-[14ch] text-right text-sm tabular-nums text-[color:#14b8a6]">
+                  {homeAmountWithPercent(homeShowsAmountValues, totalBalance, shareOfRow(totalBalance, totalInvested))}
+                </span>
+                <span aria-hidden />
+                <span className="justify-self-end w-[14ch] text-right text-sm tabular-nums text-[color:#14b8a6]">
+                  {homeAmountWithPercent(homeShowsAmountValues, totalInvested, shareOfRow(totalInvested, totalInvested))}
                 </span>
               </div>
             </div>
