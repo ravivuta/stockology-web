@@ -457,28 +457,32 @@ export default function DashboardPage() {
           </div>
 
           <dl className="grid w-full grid-cols-1 gap-0">
-            <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_0.5rem_9ch] items-center gap-x-1.5 border-b border-border/90 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/10">
+            <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_0.5rem_9ch_0.5rem_9ch] items-center gap-x-1.5 border-b border-border/90 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/10">
               <span />
               <span className="justify-self-start whitespace-nowrap text-left">Current</span>
               <span aria-hidden />
               <span className="justify-self-start whitespace-nowrap text-left">Invested</span>
+              <span aria-hidden />
+              <span className="justify-self-start whitespace-nowrap text-left">Gain/Loss</span>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_0.5rem_9ch] items-center gap-x-1.5">
+              <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_0.5rem_9ch_0.5rem_9ch] items-center gap-x-1.5">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#14b8a6]">
                   Total
                 </span>
                 <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
-                  {homeAmountWithPercent(homeShowsAmountValues, totalBalance, shareOfRow(totalBalance, totalBalance))}
+                  {homeAmountWithPercent(homeShowsAmountValues, totalBalance, shareOfRowOneDecimal(totalBalance, totalBalance))}
                 </span>
                 <span aria-hidden />
                 <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
-                  {homeAmountWithPercent(homeShowsAmountValues, totalInvested, shareOfRow(totalInvested, totalInvested))}
+                  {homeAmountWithPercent(homeShowsAmountValues, totalInvested, shareOfRowOneDecimal(totalInvested, totalInvested))}
                 </span>
+                <span aria-hidden />
+                <span aria-hidden />
               </div>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_0.5rem_9ch] items-center gap-x-1.5">
+              <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_0.5rem_9ch_0.5rem_9ch] items-center gap-x-1.5">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:var(--dashboard-chart-cash)]">
                   Cash
                   <button
@@ -496,10 +500,12 @@ export default function DashboardPage() {
                 <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
                   {homeAmountWithPercent(homeShowsAmountValues, cash, shareOfRow(cash, totalInvested))}
                 </span>
+                <span aria-hidden />
+                <span aria-hidden />
               </div>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_0.5rem_9ch] items-center gap-x-1.5">
+              <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_0.5rem_9ch_0.5rem_9ch] items-center gap-x-1.5">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#0f9aa7]">
                   Bonds/CDs
                   <button
@@ -517,10 +523,12 @@ export default function DashboardPage() {
                 <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:#0f9aa7]">
                   {homeAmountWithPercent(homeShowsAmountValues, fixedIncomeValue, shareOfRow(fixedIncomeValue, totalInvested))}
                 </span>
+                <span aria-hidden />
+                <span aria-hidden />
               </div>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_0.5rem_9ch] items-center gap-x-1.5">
+              <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_0.5rem_9ch_0.5rem_9ch] items-center gap-x-1.5">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#14b8a6]">
                   Value
                 </span>
@@ -531,63 +539,41 @@ export default function DashboardPage() {
                 <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
                   {homeAmountWithPercent(homeShowsAmountValues, holdingsCostBasis, shareOfRow(holdingsCostBasis, totalInvested))}
                 </span>
-              </div>
-              <div className="mt-1 grid grid-cols-[minmax(8.5rem,1fr)_9ch_0.5rem_9ch] items-center gap-x-1.5 gap-y-1 text-xs">
-                <span className="pl-4 font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
-                <div className="justify-self-start text-left leading-tight">
-                  <div className="whitespace-nowrap font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
-                    {homeAmountWithPercent(homeShowsAmountValues, etfValue, shareOfRow(etfValue, totalInvested))}
-                  </div>
-                  <div
-                    className={`whitespace-nowrap text-[10px] font-semibold ${etfPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}
-                  >
-                    {homeAmountWithPercent(homeShowsAmountValues, etfPnL, formatWholePercent(etfPnLPct, true))}
-                  </div>
-                </div>
                 <span aria-hidden />
-                <div className="justify-self-start text-left leading-tight">
-                  <div className="whitespace-nowrap font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
-                    {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, totalInvested))}
-                  </div>
-                  <div
-                    className={`whitespace-nowrap text-[10px] font-semibold ${etfPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}
-                  >
-                    {homeAmountWithPercent(homeShowsAmountValues, etfPnL, formatWholePercent(etfPnLPct, true))}
-                  </div>
-                </div>
-                <span className="pl-4 font-semibold text-[color:#14b8a6]">Stocks:</span>
-                <div className="justify-self-start text-left leading-tight">
-                  <div className="whitespace-nowrap font-semibold text-[color:#14b8a6]">
-                    {homeAmountWithPercent(homeShowsAmountValues, stockValueOnly, shareOfRow(stockValueOnly, totalInvested))}
-                  </div>
-                  <div
-                    className={`whitespace-nowrap text-[10px] font-semibold ${stockPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}
-                  >
-                    {homeAmountWithPercent(homeShowsAmountValues, stockPnL, formatWholePercent(stockPnLPct, true))}
-                  </div>
-                </div>
-                <span aria-hidden />
-                <div className="justify-self-start text-left leading-tight">
-                  <div className="whitespace-nowrap font-semibold text-[color:#14b8a6]">
-                    {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, totalInvested))}
-                  </div>
-                  <div
-                    className={`whitespace-nowrap text-[10px] font-semibold ${stockPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}
-                  >
-                    {homeAmountWithPercent(homeShowsAmountValues, stockPnL, formatWholePercent(stockPnLPct, true))}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className={`py-2.5 ${showTodayChange ? "" : "border-b border-border/90 dark:border-foreground/10"}`}>
-              <div className="flex items-center justify-between gap-4">
-                <span className={`text-sm font-medium ${isProfitable ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}>
-                  {isProfitable ? "Gain" : "Loss"}
-                </span>
-                <span className={`text-sm tabular-nums font-semibold ${isProfitable ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}>
+                <span className={`justify-self-start whitespace-nowrap text-left text-xs font-semibold ${isProfitable ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}>
                   {homeShowsAmountValues
                     ? `${formatSummaryNumber(isProfitable ? holdingsPnL : Math.abs(holdingsPnL))} (${formatWholePercent(isProfitable ? totalPnLPct : Math.abs(totalPnLPct))})`
                     : formatWholePercent(isProfitable ? totalPnLPct : Math.abs(totalPnLPct))}
+                </span>
+              </div>
+              <div className="mt-1 grid grid-cols-[minmax(8.5rem,1fr)_9ch_0.5rem_9ch_0.5rem_9ch] items-center gap-x-1.5 gap-y-1 text-xs">
+                <span className="pl-4 font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
+                <span className="justify-self-start whitespace-nowrap text-left font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
+                  {homeAmountWithPercent(homeShowsAmountValues, etfValue, shareOfRow(etfValue, totalInvested))}
+                </span>
+                <span aria-hidden />
+                <span className="justify-self-start whitespace-nowrap text-left font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
+                  {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, totalInvested))}
+                </span>
+                <span aria-hidden />
+                <span
+                  className={`justify-self-start whitespace-nowrap text-left text-[10px] font-semibold ${etfPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}
+                >
+                  {homeAmountWithPercent(homeShowsAmountValues, etfPnL, formatWholePercent(etfPnLPct, true))}
+                </span>
+                <span className="pl-4 font-semibold text-[color:#14b8a6]">Stocks:</span>
+                <span className="justify-self-start whitespace-nowrap text-left font-semibold text-[color:#14b8a6]">
+                  {homeAmountWithPercent(homeShowsAmountValues, stockValueOnly, shareOfRow(stockValueOnly, totalInvested))}
+                </span>
+                <span aria-hidden />
+                <span className="justify-self-start whitespace-nowrap text-left font-semibold text-[color:#14b8a6]">
+                  {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, totalInvested))}
+                </span>
+                <span aria-hidden />
+                <span
+                  className={`justify-self-start whitespace-nowrap text-left text-[10px] font-semibold ${stockPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}
+                >
+                  {homeAmountWithPercent(homeShowsAmountValues, stockPnL, formatWholePercent(stockPnLPct, true))}
                 </span>
               </div>
             </div>
@@ -879,6 +865,11 @@ export default function DashboardPage() {
 function shareOfRow(part: number, total: number): string {
   const pct = total > 0.0001 ? (part / total) * 100 : 0;
   return `${Math.round(pct)}%`;
+}
+
+function shareOfRowOneDecimal(part: number, total: number): string {
+  const pct = total > 0.0001 ? (part / total) * 100 : 0;
+  return `${pct.toFixed(1)}%`;
 }
 
 function homeAmountWithPercent(showAmounts: boolean, value: number, percent: string): string {
