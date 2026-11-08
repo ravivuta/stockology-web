@@ -96,6 +96,7 @@ export default function DashboardPage() {
   const totalBalance = holdingsValue + cash + fixedIncomeValue;
   const totalInvested = holdingsCostBasis + cash + fixedIncomeValue;
   const isProfitable = holdingsPnL >= 0;
+  const holdingsPnLPctVsInvested = holdingsCostBasis > 0.0001 ? (holdingsPnL / holdingsCostBasis) * 100 : 0;
   const totalPnLPct = totalInvested > 0.0001 ? (holdingsPnL / totalInvested) * 100 : 0;
   const etfPnL = etfValue - etfCostBasis;
   const stockPnL = holdingsPnL - etfPnL;
@@ -457,30 +458,40 @@ export default function DashboardPage() {
           </div>
 
           <dl className="grid w-full grid-cols-1 gap-0">
-            <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_9ch_9ch] items-center gap-x-2 border-b border-border/90 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/10">
+            <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_9ch] items-center gap-x-2 border-b border-border/90 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/10">
               <span />
               <span className="justify-self-start whitespace-nowrap text-left">Current</span>
               <span className="justify-self-start whitespace-nowrap text-left">Invested</span>
-              <span className="justify-self-start whitespace-nowrap text-left">Gain/Loss</span>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_9ch_9ch] items-center gap-x-2">
+              <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_9ch] items-center gap-x-2">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#14b8a6]">
                   Total
                 </span>
-                <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
-                  {homeAmountWithPercent(homeShowsAmountValues, totalBalance, shareOfRowOneDecimal(totalBalance, totalBalance))}
+                <span className="justify-self-start text-left text-sm tabular-nums text-[color:#14b8a6]">
+                  {renderSummaryCurrentWithPnL(
+                    homeShowsAmountValues,
+                    totalBalance,
+                    holdingsPnL,
+                    totalPnLPct,
+                    "text-[color:#14b8a6]",
+                    holdingsPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"
+                  )}
                 </span>
-                <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
-                  {homeShowsAmountValues
-                    ? `${formatSummaryNumberThreeDecimal(totalInvested)} (${shareOfRowOneDecimal(totalInvested, totalInvested)})`
-                    : shareOfRowOneDecimal(totalInvested, totalInvested)}
+                <span className="justify-self-start text-left text-sm tabular-nums text-[color:#14b8a6]">
+                  {homeShowsAmountValues ? (
+                    <span className="inline-flex flex-col leading-tight">
+                      <span>{formatSummaryNumberThreeDecimal(totalInvested)}</span>
+                      <span className="text-[10px]">({shareOfRow(totalInvested, totalInvested)})</span>
+                    </span>
+                  ) : (
+                    shareOfRow(totalInvested, totalInvested)
+                  )}
                 </span>
-                <span aria-hidden />
               </div>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_9ch_9ch] items-center gap-x-2">
+              <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_9ch] items-center gap-x-2">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:var(--dashboard-chart-cash)]">
                   Cash
                   <button
@@ -494,14 +505,13 @@ export default function DashboardPage() {
                 <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
                   {homeAmountWithPercent(homeShowsAmountValues, cash, shareOfRow(cash, totalInvested))}
                 </span>
-                <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
-                  {homeAmountWithPercent(homeShowsAmountValues, cash, shareOfRow(cash, totalInvested))}
+                <span className="justify-self-center whitespace-nowrap text-center text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
+                  -
                 </span>
-                <span aria-hidden />
               </div>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_9ch_9ch] items-center gap-x-2">
+              <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_9ch] items-center gap-x-2">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#0f9aa7]">
                   Bonds/CDs
                   <button
@@ -512,56 +522,61 @@ export default function DashboardPage() {
                     Edit
                   </button>
                 </span>
-                <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:#0f9aa7]">
-                  {homeAmountWithPercent(homeShowsAmountValues, fixedIncomeValue, shareOfRow(fixedIncomeValue, totalInvested))}
+                <span className="justify-self-center whitespace-nowrap text-center text-sm tabular-nums text-[color:#0f9aa7]">
+                  -
                 </span>
                 <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:#0f9aa7]">
                   {homeAmountWithPercent(homeShowsAmountValues, fixedIncomeValue, shareOfRow(fixedIncomeValue, totalInvested))}
                 </span>
-                <span aria-hidden />
               </div>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_9ch_9ch] items-center gap-x-2">
+              <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_9ch] items-center gap-x-2">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#14b8a6]">
-                  Value
+                  Stocks
                 </span>
-                <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
-                  {homeAmountWithPercent(homeShowsAmountValues, holdingsValue, shareOfRow(holdingsValue, totalInvested))}
+                <span className="justify-self-start text-left text-sm tabular-nums text-[color:#14b8a6]">
+                  {renderSummaryCurrentWithPnLPercent(
+                    homeShowsAmountValues,
+                    holdingsValue,
+                    holdingsPnLPctVsInvested,
+                    "text-[color:#14b8a6]",
+                    holdingsPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"
+                  )}
                 </span>
                 <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
                   {homeAmountWithPercent(homeShowsAmountValues, holdingsCostBasis, shareOfRow(holdingsCostBasis, totalInvested))}
                 </span>
-                <span className={`justify-self-start whitespace-nowrap text-left text-xs font-semibold ${isProfitable ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}>
-                  {homeShowsAmountValues
-                    ? `${formatSummaryNumber(isProfitable ? holdingsPnL : Math.abs(holdingsPnL))} (${formatWholePercent(isProfitable ? totalPnLPct : Math.abs(totalPnLPct))})`
-                    : formatWholePercent(isProfitable ? totalPnLPct : Math.abs(totalPnLPct))}
-                </span>
               </div>
-              <div className="mt-1 grid grid-cols-[minmax(8.5rem,1fr)_9ch_9ch_9ch] items-center gap-x-2 gap-y-1 text-xs">
+              <div className="mt-1 grid grid-cols-[minmax(8.5rem,1fr)_9ch_9ch] items-center gap-x-2 gap-y-1 text-xs">
                 <span className="pl-4 font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
-                <span className="justify-self-start whitespace-nowrap text-left font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
-                  {homeAmountWithPercent(homeShowsAmountValues, etfValue, shareOfRow(etfValue, holdingsValue))}
+                <span className="justify-self-start text-left font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
+                  {renderSummaryCurrentWithPnL(
+                    homeShowsAmountValues,
+                    etfValue,
+                    etfPnL,
+                    etfPnLPct,
+                    "",
+                    etfPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]",
+                    ETF_PATTERN_PRIMARY
+                  )}
                 </span>
                 <span className="justify-self-start whitespace-nowrap text-left font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
                   {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, holdingsCostBasis))}
                 </span>
-                <span
-                  className={`justify-self-start whitespace-nowrap text-left text-[10px] font-semibold ${etfPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}
-                >
-                  {homeAmountWithPercent(homeShowsAmountValues, etfPnL, formatWholePercent(etfPnLPct, true))}
-                </span>
                 <span className="pl-4 font-semibold text-[color:#14b8a6]">Stocks:</span>
-                <span className="justify-self-start whitespace-nowrap text-left font-semibold text-[color:#14b8a6]">
-                  {homeAmountWithPercent(homeShowsAmountValues, stockValueOnly, shareOfRow(stockValueOnly, holdingsValue))}
+                <span className="justify-self-start text-left font-semibold text-[color:#14b8a6]">
+                  {renderSummaryCurrentWithPnL(
+                    homeShowsAmountValues,
+                    stockValueOnly,
+                    stockPnL,
+                    stockPnLPct,
+                    "text-[color:#14b8a6]",
+                    stockPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"
+                  )}
                 </span>
                 <span className="justify-self-start whitespace-nowrap text-left font-semibold text-[color:var(--dashboard-chart-cost-basis)]">
                   {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, holdingsCostBasis))}
-                </span>
-                <span
-                  className={`justify-self-start whitespace-nowrap text-left text-[10px] font-semibold ${stockPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}
-                >
-                  {homeAmountWithPercent(homeShowsAmountValues, stockPnL, formatWholePercent(stockPnLPct, true))}
                 </span>
               </div>
             </div>
@@ -855,13 +870,56 @@ function shareOfRow(part: number, total: number): string {
   return `${Math.round(pct)}%`;
 }
 
-function shareOfRowOneDecimal(part: number, total: number): string {
-  const pct = total > 0.0001 ? (part / total) * 100 : 0;
-  return `${pct.toFixed(1)}%`;
-}
-
 function homeAmountWithPercent(showAmounts: boolean, value: number, percent: string): string {
   return showAmounts ? `${formatSummaryNumber(value)} (${percent})` : percent;
+}
+
+function formatSummaryPercentForCurrent(value: number): string {
+  const absValue = Math.abs(value);
+  return absValue > 1 ? `${absValue.toFixed(0)}%` : `${absValue.toFixed(1)}%`;
+}
+
+function renderSummaryCurrentWithPnL(
+  showAmounts: boolean,
+  currentValue: number,
+  pnlValue: number,
+  pnlPercent: number,
+  baseClassName: string,
+  pnlClassName: string,
+  baseColor?: string
+): ReactNode {
+  const pnlPercentText = formatSummaryPercentForCurrent(pnlPercent);
+  if (!showAmounts) {
+    return <span className={pnlClassName}>{pnlPercentText}</span>;
+  }
+  const baseStyle = baseColor ? { color: baseColor } : undefined;
+  return (
+    <>
+      <span className={baseClassName} style={baseStyle}>{formatSummaryNumber(currentValue)} (</span>
+      <span className={pnlClassName}>{formatSummaryNumber(Math.abs(pnlValue))}, {pnlPercentText}</span>
+      <span className={baseClassName} style={baseStyle}>)</span>
+    </>
+  );
+}
+
+function renderSummaryCurrentWithPnLPercent(
+  showAmounts: boolean,
+  currentValue: number,
+  pnlPercent: number,
+  baseClassName: string,
+  pnlClassName: string
+): ReactNode {
+  const pnlPercentText = formatSummaryPercentForCurrent(pnlPercent);
+  if (!showAmounts) {
+    return <span className={pnlClassName}>{pnlPercentText}</span>;
+  }
+  return (
+    <>
+      <span className={baseClassName}>{formatSummaryNumber(currentValue)} (</span>
+      <span className={pnlClassName}>{pnlPercentText}</span>
+      <span className={baseClassName}>)</span>
+    </>
+  );
 }
 
 function formatSummaryNumber(value: number): string {
@@ -882,16 +940,11 @@ function formatSummaryNumber(value: number): string {
 function formatSummaryNumberThreeDecimal(value: number): string {
   const absValue = Math.abs(value);
   const sign = value < 0 ? "-" : "";
-  if (absValue >= 1_000_000_000) {
-    return `${sign}${(absValue / 1_000_000_000).toFixed(3)}B`;
-  }
-  if (absValue >= 1_000_000) {
-    return `${sign}${(absValue / 1_000_000).toFixed(3)}M`;
-  }
   if (absValue >= 1_000) {
-    return `${sign}${(absValue / 1_000).toFixed(3)}K`;
+    const thousands = Math.round(absValue / 1_000);
+    return `${sign}${thousands.toLocaleString("en-US")}K`;
   }
-  return `${sign}${absValue.toFixed(3)}`;
+  return `${sign}${Math.round(absValue).toLocaleString("en-US")}`;
 }
 
 function StatRow({
