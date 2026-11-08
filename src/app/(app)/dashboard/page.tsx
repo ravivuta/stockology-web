@@ -61,8 +61,6 @@ export default function DashboardPage() {
   const [bars, setBars] = useState(true);
   const [showCashEditor, setShowCashEditor] = useState(false);
   const [showFixedIncomeEditor, setShowFixedIncomeEditor] = useState(false);
-  const [showCurrentValueBreakdown, setShowCurrentValueBreakdown] = useState(false);
-  const [showCostBasisBreakdown, setShowCostBasisBreakdown] = useState(false);
   const [dashStockDetail, setDashStockDetail] = useState<string | null>(null);
   const [summaryTab, setSummaryTab] = useState<"summary" | "performance">("summary");
   // Pre-seed from the same cache used by DashboardReturnComparison for instant today-value display
@@ -91,6 +89,7 @@ export default function DashboardPage() {
   const stockValueOnly = Math.max(0, holdingsValue - etfValue);
   const stockCostBasisOnly = Math.max(0, holdingsCostBasis - etfCostBasis);
   const totalBalance = holdingsValue + cash + fixedIncomeValue;
+  const totalInvested = holdingsCostBasis + cash + fixedIncomeValue;
   const isProfitable = holdingsPnL >= 0;
   const totalPnLPct = holdingsCostBasis > 0 ? (holdingsPnL / holdingsCostBasis) * 100 : 0;
   const todaySnapshotChange = useMemo(
@@ -498,98 +497,83 @@ export default function DashboardPage() {
           </div>
 
           <dl className="grid w-full grid-cols-1 gap-0">
-            <StatRow
-              label="Cash"
-              value={homeShowsAmountValues ? formatWholeCurrency(cash) : shareOfRow(cash, totalBalance)}
-              labelClassName="text-[color:var(--dashboard-chart-cash)]"
-              valueClassName="text-[color:var(--dashboard-chart-cash)]"
-              labelAction={(
-                <button
-                  type="button"
-                  onClick={() => setShowCashEditor(true)}
-                  className="ml-[5ch] rounded border border-current px-2 py-0.5 text-[11px] font-semibold leading-none text-[color:var(--dashboard-chart-cash)] hover:bg-foreground/5"
-                >
-                  Edit
-                </button>
-              )}
-            />
-            <StatRow
-              label="Fixed income"
-              value={homeShowsAmountValues ? formatWholeCurrency(fixedIncomeValue) : shareOfRow(fixedIncomeValue, totalBalance)}
-              labelClassName="text-[color:#0f9aa7]"
-              valueClassName="text-[color:#0f9aa7]"
-              labelAction={(
-                <button
-                  type="button"
-                  onClick={() => setShowFixedIncomeEditor(true)}
-                  className="ml-[2ch] rounded border border-current px-2 py-0.5 text-[11px] font-semibold leading-none text-[color:#0f9aa7] hover:bg-foreground/5"
-                >
-                  Edit
-                </button>
-              )}
-            />
-            <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <button
-                type="button"
-                onClick={() => setShowCostBasisBreakdown((value) => !value)}
-                className="flex w-full items-center justify-between gap-4"
-              >
-                <span className="flex items-center gap-1 text-sm font-medium text-[color:var(--dashboard-chart-cost-basis)]">
-                  Cost Basis
-                  <span className="text-[10px]">{showCostBasisBreakdown ? "▾" : "▸"}</span>
-                </span>
-                <span className="text-sm tabular-nums text-[color:var(--dashboard-chart-cost-basis)]">
-                  {homeShowsAmountValues
-                    ? `${formatWholeCurrency(holdingsCostBasis)} (${shareOfRow(holdingsCostBasis, totalBalance)})`
-                    : shareOfRow(holdingsCostBasis, totalBalance)}
-                </span>
-              </button>
-              {showCostBasisBreakdown ? (
-                <div className="mt-1 flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs">
-                  <span className="font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
-                    ETF: {homeShowsAmountValues
-                      ? `${formatWholeCurrency(etfCostBasis)} (${shareOfRow(etfCostBasis, holdingsCostBasis)})`
-                      : shareOfRow(etfCostBasis, holdingsCostBasis)}
-                  </span>
-                  <span className="font-semibold text-[color:#1f8f46]">
-                    Stocks: {homeShowsAmountValues
-                      ? `${formatWholeCurrency(stockCostBasisOnly)} (${shareOfRow(stockCostBasisOnly, holdingsCostBasis)})`
-                      : shareOfRow(stockCostBasisOnly, holdingsCostBasis)}
-                  </span>
-                </div>
-              ) : null}
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 border-b border-border/90 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/10">
+              <span />
+              <span className="text-right">Current</span>
+              <span className="text-right">Invested</span>
             </div>
-
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <button
-                type="button"
-                onClick={() => setShowCurrentValueBreakdown((value) => !value)}
-                className="flex w-full items-center justify-between gap-4"
-              >
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3">
+                <span className="flex items-center gap-1 text-sm font-medium text-[color:var(--dashboard-chart-cash)]">
+                  Cash
+                  <button
+                    type="button"
+                    onClick={() => setShowCashEditor(true)}
+                    className="ml-[4ch] rounded border border-current px-2 py-0.5 text-[11px] font-semibold leading-none text-[color:var(--dashboard-chart-cash)] hover:bg-foreground/5"
+                  >
+                    Edit
+                  </button>
+                </span>
+                <span className="text-right text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
+                  {homeAmountWithPercent(homeShowsAmountValues, cash, shareOfRow(cash, totalBalance))}
+                </span>
+                <span className="text-right text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
+                  {homeAmountWithPercent(homeShowsAmountValues, cash, shareOfRow(cash, totalInvested))}
+                </span>
+              </div>
+            </div>
+            <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3">
+                <span className="flex items-center gap-1 text-sm font-medium text-[color:#0f9aa7]">
+                  Fixed income
+                  <button
+                    type="button"
+                    onClick={() => setShowFixedIncomeEditor(true)}
+                    className="ml-[1ch] rounded border border-current px-2 py-0.5 text-[11px] font-semibold leading-none text-[color:#0f9aa7] hover:bg-foreground/5"
+                  >
+                    Edit
+                  </button>
+                </span>
+                <span className="text-right text-sm tabular-nums text-[color:#0f9aa7]">
+                  {homeAmountWithPercent(homeShowsAmountValues, fixedIncomeValue, shareOfRow(fixedIncomeValue, totalBalance))}
+                </span>
+                <span className="text-right text-sm tabular-nums text-[color:#0f9aa7]">
+                  {homeAmountWithPercent(homeShowsAmountValues, fixedIncomeValue, shareOfRow(fixedIncomeValue, totalInvested))}
+                </span>
+              </div>
+            </div>
+            <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3">
                 <span className="flex items-center gap-1 text-sm font-medium text-[color:#14b8a6]">
                   Current value
-                  <span className="text-[10px]">{showCurrentValueBreakdown ? "▾" : "▸"}</span>
                 </span>
-                <span className="text-sm tabular-nums text-[color:#14b8a6]">
-                  {homeShowsAmountValues
-                    ? `${formatWholeCurrency(holdingsValue)} (${shareOfRow(holdingsValue, totalBalance)})`
-                    : shareOfRow(holdingsValue, totalBalance)}
+                <span className="text-right text-sm tabular-nums text-[color:#14b8a6]">
+                  {homeAmountWithPercent(homeShowsAmountValues, holdingsValue, shareOfRow(holdingsValue, totalBalance))}
                 </span>
-              </button>
-              {showCurrentValueBreakdown ? (
-                <div className="mt-1 flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs">
-                  <span className="font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
-                    ETF: {homeShowsAmountValues
-                      ? `${formatWholeCurrency(etfValue)} (${shareOfRow(etfValue, holdingsValue)})`
-                      : shareOfRow(etfValue, holdingsValue)}
+                <span className="text-right text-sm tabular-nums text-[color:#14b8a6]">
+                  {homeAmountWithPercent(homeShowsAmountValues, holdingsCostBasis, shareOfRow(holdingsCostBasis, totalInvested))}
+                </span>
+              </div>
+              <div className="mt-1 flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs">
+                <span className="inline-grid grid-cols-[auto_auto_auto] items-center gap-x-3">
+                  <span className="font-semibold text-[color:#14b8a6]">ETF:</span>
+                  <span className="font-semibold text-right" style={{ color: ETF_PATTERN_PRIMARY }}>
+                    {homeAmountWithPercent(homeShowsAmountValues, etfValue, shareOfRow(etfValue, holdingsValue))}
                   </span>
-                  <span className="font-semibold text-[color:#1f8f46]">
-                    Stocks: {homeShowsAmountValues
-                      ? `${formatWholeCurrency(stockValueOnly)} (${shareOfRow(stockValueOnly, holdingsValue)})`
-                      : shareOfRow(stockValueOnly, holdingsValue)}
+                  <span className="font-semibold text-right" style={{ color: ETF_PATTERN_PRIMARY }}>
+                    {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, holdingsCostBasis))}
                   </span>
-                </div>
-              ) : null}
+                </span>
+                <span className="inline-grid grid-cols-[auto_auto_auto] items-center gap-x-3">
+                  <span className="font-semibold text-[color:#14b8a6]">Stocks:</span>
+                  <span className="font-semibold text-right text-[color:#1f8f46]">
+                    {homeAmountWithPercent(homeShowsAmountValues, stockValueOnly, shareOfRow(stockValueOnly, holdingsValue))}
+                  </span>
+                  <span className="font-semibold text-right text-[color:#1f8f46]">
+                    {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, holdingsCostBasis))}
+                  </span>
+                </span>
+              </div>
             </div>
 
             {isProfitable ? (
@@ -897,6 +881,10 @@ export default function DashboardPage() {
 function shareOfRow(part: number, total: number): string {
   const pct = total > 0.0001 ? (part / total) * 100 : 0;
   return `${Math.round(pct)}%`;
+}
+
+function homeAmountWithPercent(showAmounts: boolean, value: number, percent: string): string {
+  return showAmounts ? `${formatWholeCurrency(value)} (${percent})` : percent;
 }
 
 function StatRow({
