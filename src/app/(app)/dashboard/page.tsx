@@ -554,24 +554,20 @@ export default function DashboardPage() {
                   {homeAmountWithPercent(homeShowsAmountValues, holdingsCostBasis, shareOfRow(holdingsCostBasis, totalInvested))}
                 </span>
               </div>
-              <div className="mt-1 flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs">
-                <span className="inline-grid grid-cols-[auto_auto_auto] items-center gap-x-3">
-                  <span className="font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
-                  <span className="font-semibold text-right" style={{ color: ETF_PATTERN_PRIMARY }}>
-                    {homeAmountWithPercent(homeShowsAmountValues, etfValue, shareOfRow(etfValue, totalBalance))}
-                  </span>
-                  <span className="font-semibold text-right" style={{ color: ETF_PATTERN_PRIMARY }}>
-                    {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, holdingsCostBasis))}
-                  </span>
+              <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1 text-xs">
+                <span className="font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
+                <span className="whitespace-nowrap text-right font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
+                  {homeAmountWithPercent(homeShowsAmountValues, etfValue, shareOfRow(etfValue, totalBalance))}
                 </span>
-                <span className="inline-grid grid-cols-[auto_auto_auto] items-center gap-x-3">
-                  <span className="font-semibold text-[color:#14b8a6]">Stocks:</span>
-                  <span className="font-semibold text-right text-[color:#14b8a6]">
-                    {homeAmountWithPercent(homeShowsAmountValues, stockValueOnly, shareOfRow(stockValueOnly, totalBalance))}
-                  </span>
-                  <span className="font-semibold text-right text-[color:#14b8a6]">
-                    {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, holdingsCostBasis))}
-                  </span>
+                <span className="whitespace-nowrap text-right font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
+                  {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, holdingsCostBasis))}
+                </span>
+                <span className="font-semibold text-[color:#14b8a6]">Stocks:</span>
+                <span className="whitespace-nowrap text-right font-semibold text-[color:#14b8a6]">
+                  {homeAmountWithPercent(homeShowsAmountValues, stockValueOnly, shareOfRow(stockValueOnly, totalBalance))}
+                </span>
+                <span className="whitespace-nowrap text-right font-semibold text-[color:#14b8a6]">
+                  {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, holdingsCostBasis))}
                 </span>
               </div>
             </div>
