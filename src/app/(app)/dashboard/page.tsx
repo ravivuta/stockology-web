@@ -550,7 +550,7 @@ export default function DashboardPage() {
               </div>
               <div className="mt-1 grid grid-cols-[minmax(8.5rem,1fr)_11ch_11ch] items-center gap-x-2 gap-y-1 text-xs">
                 <span className="pl-4 font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
-                <span className="justify-self-start pl-0 text-left font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
+                <span className="-ml-4 justify-self-start pl-0 text-left font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
                   {renderSummaryCurrentWithPnL(
                     homeShowsAmountValues,
                     etfValue,
@@ -561,11 +561,11 @@ export default function DashboardPage() {
                     ETF_PATTERN_PRIMARY
                   )}
                 </span>
-                <span className="justify-self-start whitespace-nowrap text-left font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
+                <span className="-ml-4 justify-self-start whitespace-nowrap text-left font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
                   {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, holdingsCostBasis))}
                 </span>
                 <span className="pl-4 font-semibold text-[color:#14b8a6]">Stocks:</span>
-                <span className="justify-self-start pl-0 text-left font-semibold text-[color:#14b8a6]">
+                <span className="-ml-4 justify-self-start pl-0 text-left font-semibold text-[color:#14b8a6]">
                   {renderSummaryCurrentWithPnL(
                     homeShowsAmountValues,
                     stockValueOnly,
@@ -575,7 +575,7 @@ export default function DashboardPage() {
                     stockPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"
                   )}
                 </span>
-                <span className="justify-self-start whitespace-nowrap text-left font-semibold text-[color:var(--dashboard-chart-cost-basis)]">
+                <span className="-ml-4 justify-self-start whitespace-nowrap text-left font-semibold text-[color:var(--dashboard-chart-cost-basis)]">
                   {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, holdingsCostBasis))}
                 </span>
               </div>
