@@ -497,13 +497,14 @@ export default function DashboardPage() {
           </div>
 
           <dl className="grid w-full grid-cols-1 gap-0">
-            <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 border-b border-border/90 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/10">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_1.25rem_auto] items-center gap-x-3 border-b border-border/90 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/10">
               <span />
               <span className="text-right">Current</span>
+              <span aria-hidden />
               <span className="text-right">Invested</span>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_1.25rem_auto] items-center gap-x-3">
                 <span className="flex items-center gap-1 text-sm font-medium text-[color:var(--dashboard-chart-cash)]">
                   Cash
                   <button
@@ -517,13 +518,14 @@ export default function DashboardPage() {
                 <span className="text-right text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
                   {homeAmountWithPercent(homeShowsAmountValues, cash, shareOfRow(cash, totalBalance))}
                 </span>
+                <span aria-hidden />
                 <span className="text-right text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
                   {homeAmountWithPercent(homeShowsAmountValues, cash, shareOfRow(cash, totalInvested))}
                 </span>
               </div>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_1.25rem_auto] items-center gap-x-3">
                 <span className="flex items-center gap-1 text-sm font-medium text-[color:#0f9aa7]">
                   Bonds/CDs
                   <button
@@ -537,35 +539,39 @@ export default function DashboardPage() {
                 <span className="text-right text-sm tabular-nums text-[color:#0f9aa7]">
                   {homeAmountWithPercent(homeShowsAmountValues, fixedIncomeValue, shareOfRow(fixedIncomeValue, totalBalance))}
                 </span>
+                <span aria-hidden />
                 <span className="text-right text-sm tabular-nums text-[color:#0f9aa7]">
                   {homeAmountWithPercent(homeShowsAmountValues, fixedIncomeValue, shareOfRow(fixedIncomeValue, totalInvested))}
                 </span>
               </div>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_1.25rem_auto] items-center gap-x-3">
                 <span className="flex items-center gap-1 text-sm font-medium text-[color:#14b8a6]">
                   Value
                 </span>
                 <span className="text-right text-sm tabular-nums text-[color:#14b8a6]">
                   {homeAmountWithPercent(homeShowsAmountValues, holdingsValue, shareOfRow(holdingsValue, totalBalance))}
                 </span>
+                <span aria-hidden />
                 <span className="text-right text-sm tabular-nums text-[color:#14b8a6]">
                   {homeAmountWithPercent(homeShowsAmountValues, holdingsCostBasis, shareOfRow(holdingsCostBasis, totalInvested))}
                 </span>
               </div>
-              <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1 text-xs">
-                <span className="font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
+              <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_1.25rem_auto] items-center gap-x-3 gap-y-1 text-xs">
+                <span className="pl-4 font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
                 <span className="whitespace-nowrap text-right font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
                   {homeAmountWithPercent(homeShowsAmountValues, etfValue, shareOfRow(etfValue, totalBalance))}
                 </span>
+                <span aria-hidden />
                 <span className="whitespace-nowrap text-right font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
                   {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, holdingsCostBasis))}
                 </span>
-                <span className="font-semibold text-[color:#14b8a6]">Stocks:</span>
+                <span className="pl-4 font-semibold text-[color:#14b8a6]">Stocks:</span>
                 <span className="whitespace-nowrap text-right font-semibold text-[color:#14b8a6]">
                   {homeAmountWithPercent(homeShowsAmountValues, stockValueOnly, shareOfRow(stockValueOnly, totalBalance))}
                 </span>
+                <span aria-hidden />
                 <span className="whitespace-nowrap text-right font-semibold text-[color:#14b8a6]">
                   {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, holdingsCostBasis))}
                 </span>
