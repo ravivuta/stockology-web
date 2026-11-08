@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { Eye, EyeOff } from "lucide-react";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { PortfolioDonut } from "@/components/dashboard/PortfolioDonut";
@@ -101,6 +102,8 @@ export default function DashboardPage() {
     todayChange.change >= 0
       ? "font-semibold text-[color:var(--dashboard-chart-gain)]"
       : "font-semibold text-[color:var(--dashboard-chart-loss)]";
+  const homeShowsAmountValues = usePortfolioStore((s) => s.homeShowsAmountValues);
+  const setHomeShowsAmountValues = usePortfolioStore((s) => s.setHomeShowsAmountValues);
   const todayStatusLoading = cloudHistory === null && hasSupabaseConfig();
 
   const pieData = useMemo(() => {
@@ -345,33 +348,44 @@ export default function DashboardPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1], delay: reduceMotion ? 0 : 0.05 }}
       >
-        <div
-            className="flex w-full gap-1 rounded-full border border-white/50 bg-white/25 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] backdrop-blur-xl dark:border-white/15 dark:bg-white/[0.07] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
-            role="tablist"
-            aria-label="Portfolio section"
+        <div className="flex items-center gap-3">
+          <div
+              className="flex w-full gap-1 rounded-full border border-white/50 bg-white/25 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] backdrop-blur-xl dark:border-white/15 dark:bg-white/[0.07] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
+              role="tablist"
+              aria-label="Portfolio section"
+            >
+              {(
+                [
+                  { id: "summary", label: "Portfolio Summary" },
+                  { id: "performance", label: "Performance" },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={summaryTab === tab.id}
+                  onClick={() => setSummaryTab(tab.id)}
+                  className={
+                    summaryTab === tab.id
+                      ? "flex-1 rounded-full border border-white/70 bg-white/60 px-4 py-2 text-sm font-semibold text-foreground shadow-[0_6px_18px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-md dark:border-white/25 dark:bg-white/15 dark:shadow-[0_8px_20px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.22)]"
+                      : "flex-1 rounded-full px-4 py-2 text-sm font-semibold text-subtle transition-colors hover:bg-white/25 hover:text-foreground dark:hover:bg-white/10"
+                  }
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          <button
+            type="button"
+            onClick={() => setHomeShowsAmountValues(!homeShowsAmountValues)}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-background/80 text-subtle transition-colors hover:text-foreground dark:bg-white/5"
+            aria-label={homeShowsAmountValues ? "Hide amounts" : "Show amounts"}
+            title={homeShowsAmountValues ? "Hide amounts" : "Show amounts"}
           >
-            {(
-              [
-                { id: "summary", label: "Portfolio Summary" },
-                { id: "performance", label: "Performance" },
-              ] as const
-            ).map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={summaryTab === tab.id}
-                onClick={() => setSummaryTab(tab.id)}
-                className={
-                  summaryTab === tab.id
-                    ? "flex-1 rounded-full border border-white/70 bg-white/60 px-4 py-2 text-sm font-semibold text-foreground shadow-[0_6px_18px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-md dark:border-white/25 dark:bg-white/15 dark:shadow-[0_8px_20px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.22)]"
-                    : "flex-1 rounded-full px-4 py-2 text-sm font-semibold text-subtle transition-colors hover:bg-white/25 hover:text-foreground dark:hover:bg-white/10"
-                }
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+            {homeShowsAmountValues ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+          </button>
+        </div>
         {summaryTab === "summary" ? (
         <>
         <div className="mt-5 grid items-center gap-8 lg:grid-cols-[auto_minmax(12rem,1fr)_minmax(18rem,1.35fr)] lg:gap-10">
@@ -384,7 +398,7 @@ export default function DashboardPage() {
             >
               <PortfolioDonut
                 segments={pieData.map((p) => ({ name: p.name, value: p.value, color: p.color }))}
-                totalValue={formatWholeCurrency(totalBalance)}
+                totalValue={homeShowsAmountValues ? formatWholeCurrency(totalBalance) : "••••"}
                 totalLabelClassName="text-[color:var(--dashboard-chart-center-text)]"
                 totalValueClassName="text-[color:var(--dashboard-chart-center-text)]"
               />
@@ -417,7 +431,9 @@ export default function DashboardPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <span className="min-w-0 truncate font-bold text-foreground">{p.name}</span>
-                        <span className="shrink-0 tabular-nums font-bold text-subtle">{formatWholeCurrency(segmentValue)} · {pctLabel}</span>
+                        <span className="shrink-0 tabular-nums font-bold text-subtle">
+                          {homeShowsAmountValues ? `${formatWholeCurrency(segmentValue)} · ${pctLabel}` : pctLabel}
+                        </span>
                       </div>
                       {p.name === "Cost" || p.name === "Cost basis" ? (
                         <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] font-semibold">
@@ -441,7 +457,7 @@ export default function DashboardPage() {
           <dl className="grid w-full grid-cols-1 gap-0">
             <StatRow
               label="Cash"
-              value={formatWholeCurrency(cash)}
+              value={homeShowsAmountValues ? formatWholeCurrency(cash) : shareOfRow(cash, totalBalance)}
               labelClassName="text-[color:var(--dashboard-chart-cash)]"
               valueClassName="text-[color:var(--dashboard-chart-cash)]"
               labelAction={(
@@ -456,7 +472,7 @@ export default function DashboardPage() {
             />
             <StatRow
               label="Fixed income"
-              value={formatWholeCurrency(fixedIncomeValue)}
+              value={homeShowsAmountValues ? formatWholeCurrency(fixedIncomeValue) : shareOfRow(fixedIncomeValue, totalBalance)}
               labelClassName="text-[color:#0f9aa7]"
               valueClassName="text-[color:#0f9aa7]"
               labelAction={(
@@ -480,16 +496,22 @@ export default function DashboardPage() {
                   <span className="text-[10px]">{showCostBasisBreakdown ? "▾" : "▸"}</span>
                 </span>
                 <span className="text-sm tabular-nums text-[color:var(--dashboard-chart-cost-basis)]">
-                  {`${formatWholeCurrency(holdingsCostBasis)} (${shareOfRow(holdingsCostBasis, totalBalance)})`}
+                  {homeShowsAmountValues
+                    ? `${formatWholeCurrency(holdingsCostBasis)} (${shareOfRow(holdingsCostBasis, totalBalance)})`
+                    : shareOfRow(holdingsCostBasis, totalBalance)}
                 </span>
               </button>
               {showCostBasisBreakdown ? (
                 <div className="mt-1 flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs">
                   <span className="font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
-                    ETF: {`${formatWholeCurrency(etfCostBasis)} (${shareOfRow(etfCostBasis, holdingsCostBasis)})`}
+                    ETF: {homeShowsAmountValues
+                      ? `${formatWholeCurrency(etfCostBasis)} (${shareOfRow(etfCostBasis, holdingsCostBasis)})`
+                      : shareOfRow(etfCostBasis, holdingsCostBasis)}
                   </span>
                   <span className="font-semibold text-[color:#1f8f46]">
-                    Stocks: {`${formatWholeCurrency(stockCostBasisOnly)} (${shareOfRow(stockCostBasisOnly, holdingsCostBasis)})`}
+                    Stocks: {homeShowsAmountValues
+                      ? `${formatWholeCurrency(stockCostBasisOnly)} (${shareOfRow(stockCostBasisOnly, holdingsCostBasis)})`
+                      : shareOfRow(stockCostBasisOnly, holdingsCostBasis)}
                   </span>
                 </div>
               ) : null}
@@ -506,16 +528,22 @@ export default function DashboardPage() {
                   <span className="text-[10px]">{showCurrentValueBreakdown ? "▾" : "▸"}</span>
                 </span>
                 <span className="text-sm tabular-nums text-[color:#14b8a6]">
-                  {`${formatWholeCurrency(holdingsValue)} (${shareOfRow(holdingsValue, totalBalance)})`}
+                  {homeShowsAmountValues
+                    ? `${formatWholeCurrency(holdingsValue)} (${shareOfRow(holdingsValue, totalBalance)})`
+                    : shareOfRow(holdingsValue, totalBalance)}
                 </span>
               </button>
               {showCurrentValueBreakdown ? (
                 <div className="mt-1 flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs">
                   <span className="font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
-                    ETF: {`${formatWholeCurrency(etfValue)} (${shareOfRow(etfValue, holdingsValue)})`}
+                    ETF: {homeShowsAmountValues
+                      ? `${formatWholeCurrency(etfValue)} (${shareOfRow(etfValue, holdingsValue)})`
+                      : shareOfRow(etfValue, holdingsValue)}
                   </span>
                   <span className="font-semibold text-[color:#1f8f46]">
-                    Stocks: {`${formatWholeCurrency(stockValueOnly)} (${shareOfRow(stockValueOnly, holdingsValue)})`}
+                    Stocks: {homeShowsAmountValues
+                      ? `${formatWholeCurrency(stockValueOnly)} (${shareOfRow(stockValueOnly, holdingsValue)})`
+                      : shareOfRow(stockValueOnly, holdingsValue)}
                   </span>
                 </div>
               ) : null}
@@ -524,7 +552,7 @@ export default function DashboardPage() {
             {isProfitable ? (
               <StatRow
                 label="Gain"
-                value={`${formatWholeCurrency(holdingsPnL)} (${formatWholePercent(totalPnLPct)})`}
+                value={homeShowsAmountValues ? `${formatWholeCurrency(holdingsPnL)} (${formatWholePercent(totalPnLPct)})` : formatWholePercent(totalPnLPct)}
                 labelClassName="text-[color:var(--dashboard-chart-gain)]"
                 valueClassName="font-semibold text-[color:var(--dashboard-chart-gain)]"
                 last={!showTodayChange}
@@ -532,7 +560,7 @@ export default function DashboardPage() {
             ) : (
               <StatRow
                 label="Loss"
-                value={`${formatWholeCurrency(Math.abs(holdingsPnL))} (${formatWholePercent(totalPnLPct)})`}
+                value={homeShowsAmountValues ? `${formatWholeCurrency(Math.abs(holdingsPnL))} (${formatWholePercent(totalPnLPct)})` : formatWholePercent(totalPnLPct)}
                 labelClassName="text-[color:var(--dashboard-chart-loss)]"
                 valueClassName="font-semibold text-[color:var(--dashboard-chart-loss)]"
                 last={!showTodayChange}
@@ -541,7 +569,9 @@ export default function DashboardPage() {
             {showTodayChange ? (
               <StatRow
                 label="Today"
-                value={`${formatWholeCurrency(Math.abs(todayChange.change))} (${formatWholePercent(todayChange.percent, true)})`}
+                value={homeShowsAmountValues
+                  ? `${formatWholeCurrency(Math.abs(todayChange.change))} (${formatWholePercent(todayChange.percent, true)})`
+                  : formatWholePercent(todayChange.percent, true)}
                 valueClassName={todayValueClassName}
                 last
               />
@@ -613,7 +643,7 @@ export default function DashboardPage() {
                       {row.account}
                     </span>
                     <span className="shrink-0 tabular-nums font-medium text-foreground">
-                      {`${formatWholeCurrency(rowTotal)} (${Math.round(pct)}%)`}
+                      {homeShowsAmountValues ? `${formatWholeCurrency(rowTotal)} (${Math.round(pct)}%)` : `${Math.round(pct)}%`}
                     </span>
                   </div>
 
@@ -695,23 +725,31 @@ export default function DashboardPage() {
 
                   <p className="mt-1.5 text-[11px] font-bold leading-snug tabular-nums">
                     <span className="text-[color:var(--dashboard-chart-cost-basis)]">
-                      Cost {formatWholeCurrency(row.costBasis)} ({shareOfRow(row.costBasis, rowTotal)})
+                      {homeShowsAmountValues
+                        ? `Cost ${formatWholeCurrency(row.costBasis)} (${shareOfRow(row.costBasis, rowTotal)})`
+                        : `Cost ${shareOfRow(row.costBasis, rowTotal)}`}
                     </span>
                     <span className="text-subtle"> · </span>
                     <span className={pnlClass}>
-                      P/L {formatWholeCurrency(pnl)} ({`${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%`})
+                      {homeShowsAmountValues
+                        ? `P/L ${formatWholeCurrency(pnl)} (${`${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%`})`
+                        : `P/L ${`${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%`}`}
                     </span>
                     {row.fixedIncome > 0 ? (
                       <>
                         <span className="text-subtle"> · </span>
                         <span className="text-[color:var(--dashboard-chart-fixed-income)]">
-                          Fixed Income {formatWholeCurrency(row.fixedIncome)} ({shareOfRow(row.fixedIncome, rowTotal)})
+                          {homeShowsAmountValues
+                            ? `Fixed Income ${formatWholeCurrency(row.fixedIncome)} (${shareOfRow(row.fixedIncome, rowTotal)})`
+                            : `Fixed Income ${shareOfRow(row.fixedIncome, rowTotal)}`}
                         </span>
                       </>
                     ) : null}
                     <span className="text-subtle"> · </span>
                     <span className="text-[color:var(--dashboard-chart-cash)]">
-                      Cash {formatWholeCurrency(row.cash)} ({shareOfRow(row.cash, rowTotal)})
+                      {homeShowsAmountValues
+                        ? `Cash ${formatWholeCurrency(row.cash)} (${shareOfRow(row.cash, rowTotal)})`
+                        : `Cash ${shareOfRow(row.cash, rowTotal)}`}
                     </span>
                   </p>
 

@@ -144,6 +144,7 @@ type State = {
   marketOutlookCashTargetSevere: number;
   marketOutlook: MarketOutlook | null;
   traderModeEnabled: boolean;
+  homeShowsAmountValues: boolean;
   timezone: string;
   region: string;
   stocks: StockHolding[];
@@ -201,6 +202,7 @@ type State = {
   resetAll: () => void;
   setOptimizing: (v: boolean) => void;
   setOnboardingComplete: (v: boolean) => void;
+  setHomeShowsAmountValues: (v: boolean) => void;
   optimizeStock: (symbol: string) => Promise<{ ok: boolean; error?: string }>;
   optimizePendingStocks: () => Promise<number>;
   markAllPendingOptimization: () => number;
@@ -1099,6 +1101,7 @@ export const usePortfolioStore = create<State>()(
       marketOutlookCashTargetSevere: 90,
       marketOutlook: null,
       traderModeEnabled: false,
+      homeShowsAmountValues: true,
       timezone: "America/New_York",
       region: "US",
       stocks: [],
@@ -2006,6 +2009,7 @@ export const usePortfolioStore = create<State>()(
       },
       setOptimizing: (v) => set({ optimizing: v }),
       setOnboardingComplete: (v) => set({ onboardingComplete: v }),
+      setHomeShowsAmountValues: (v) => set({ homeShowsAmountValues: v }),
       optimizeStock: async (symbol) => {
         const sym = symbol.trim().toUpperCase();
         const current = get();
