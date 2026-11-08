@@ -38,17 +38,22 @@ const PALETTE = {
 } as const;
 
 const ETF_PATTERN_PRIMARY =
-  "color-mix(in srgb, var(--dashboard-chart-cost-basis) 72%, black)";
+  "color-mix(in srgb, var(--dashboard-chart-cost-basis) 52%, black)";
 
 function etfPatternPrimaryFor(baseColor: string): string {
-  return `color-mix(in srgb, ${baseColor} 72%, black)`;
+  return `color-mix(in srgb, ${baseColor} 52%, black)`;
+}
+
+function etfPatternSecondaryFor(baseColor: string): string {
+  return `color-mix(in srgb, ${baseColor} 52%, black 74%)`;
 }
 
 function etfHatchFor(baseColor: string): string {
   const primary = etfPatternPrimaryFor(baseColor);
+  const secondary = etfPatternSecondaryFor(baseColor);
   return (
-    `repeating-linear-gradient(45deg, ${primary} 0 1px, transparent 1px 7px), ` +
-    `repeating-linear-gradient(135deg, ${primary} 0 1px, transparent 1px 7px)`
+    `repeating-linear-gradient(45deg, ${primary} 0 1.8px, transparent 1.8px 3px), ` +
+    `repeating-linear-gradient(135deg, ${secondary} 0 1.2px, transparent 1.2px 7px)`
   );
 }
 

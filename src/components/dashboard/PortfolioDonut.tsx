@@ -145,7 +145,7 @@ export function PortfolioDonut({
         d,
         boundaryD: arcStrokeD(CX, CY, midR, Math.max(arc.startDeg, etfEndDeg - 0.7), Math.min(arc.endDeg, etfEndDeg + 0.7)),
         patternId: `etf-pattern-${patternIdSeed}-${i}`,
-        stroke: `color-mix(in srgb, ${arc.color} 72%, black)`,
+        stroke: `color-mix(in srgb, ${arc.color} 52%, black)`,
       });
     }
     return overlays;
@@ -178,19 +178,20 @@ export function PortfolioDonut({
       >
       <defs>
         {etfOverlayArcs.map((overlay) => (
-          <pattern key={overlay.patternId} id={overlay.patternId} patternUnits="userSpaceOnUse" width="8" height="8">
+          <pattern key={overlay.patternId} id={overlay.patternId} patternUnits="userSpaceOnUse" width="7" height="7">
             <path
-              d="M -8,8 L 8,-8 M 0,16 L 16,0"
+              d="M -3,7 L 4,0 M 0,7 L 7,0 M 3,7 L 10,0"
               fill="none"
               stroke={overlay.stroke}
-              strokeWidth="1.3"
+              strokeWidth="1.8"
               strokeLinecap="square"
             />
             <path
-              d="M -8,0 L 8,16 M 0,-8 L 16,8"
+              d="M -7,0 L 0,7 M 0,0 L 7,7"
               fill="none"
               stroke={overlay.stroke}
-              strokeWidth="1.3"
+              strokeWidth="1.2"
+              strokeOpacity="0.74"
               strokeLinecap="square"
             />
           </pattern>
