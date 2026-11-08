@@ -99,8 +99,8 @@ export default function DashboardPage() {
   const totalPnLPct = totalInvested > 0.0001 ? (holdingsPnL / totalInvested) * 100 : 0;
   const etfPnL = etfValue - etfCostBasis;
   const stockPnL = holdingsPnL - etfPnL;
-  const etfPnLPct = totalInvested > 0.0001 ? (etfPnL / totalInvested) * 100 : 0;
-  const stockPnLPct = totalInvested > 0.0001 ? (stockPnL / totalInvested) * 100 : 0;
+  const etfPnLPct = etfCostBasis > 0.0001 ? (etfPnL / etfCostBasis) * 100 : 0;
+  const stockPnLPct = stockCostBasisOnly > 0.0001 ? (stockPnL / stockCostBasisOnly) * 100 : 0;
   const todaySnapshotChange = useMemo(
     () => computeTodayChangeFromHistory(cloudHistory ?? [], totalBalance),
     [cloudHistory, totalBalance]
@@ -541,10 +541,10 @@ export default function DashboardPage() {
               <div className="mt-1 grid grid-cols-[minmax(8.5rem,1fr)_9ch_9ch_9ch] items-center gap-x-2 gap-y-1 text-xs">
                 <span className="pl-4 font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
                 <span className="justify-self-start whitespace-nowrap text-left font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
-                  {homeAmountWithPercent(homeShowsAmountValues, etfValue, shareOfRow(etfValue, totalInvested))}
+                  {homeAmountWithPercent(homeShowsAmountValues, etfValue, shareOfRow(etfValue, holdingsValue))}
                 </span>
                 <span className="justify-self-start whitespace-nowrap text-left font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
-                  {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, totalInvested))}
+                  {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, holdingsCostBasis))}
                 </span>
                 <span
                   className={`justify-self-start whitespace-nowrap text-left text-[10px] font-semibold ${etfPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}
@@ -553,10 +553,10 @@ export default function DashboardPage() {
                 </span>
                 <span className="pl-4 font-semibold text-[color:#14b8a6]">Stocks:</span>
                 <span className="justify-self-start whitespace-nowrap text-left font-semibold text-[color:#14b8a6]">
-                  {homeAmountWithPercent(homeShowsAmountValues, stockValueOnly, shareOfRow(stockValueOnly, totalInvested))}
+                  {homeAmountWithPercent(homeShowsAmountValues, stockValueOnly, shareOfRow(stockValueOnly, holdingsValue))}
                 </span>
                 <span className="justify-self-start whitespace-nowrap text-left font-semibold text-[color:var(--dashboard-chart-cost-basis)]">
-                  {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, totalInvested))}
+                  {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, holdingsCostBasis))}
                 </span>
                 <span
                   className={`justify-self-start whitespace-nowrap text-left text-[10px] font-semibold ${stockPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}
