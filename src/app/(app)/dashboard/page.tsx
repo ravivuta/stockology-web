@@ -91,7 +91,7 @@ export default function DashboardPage() {
   const totalBalance = holdingsValue + cash + fixedIncomeValue;
   const totalInvested = holdingsCostBasis + cash + fixedIncomeValue;
   const isProfitable = holdingsPnL >= 0;
-  const totalPnLPct = holdingsCostBasis > 0 ? (holdingsPnL / holdingsCostBasis) * 100 : 0;
+  const totalPnLPct = totalBalance > 0.0001 ? (holdingsPnL / totalBalance) * 100 : 0;
   const todaySnapshotChange = useMemo(
     () => computeTodayChangeFromHistory(cloudHistory ?? [], totalBalance),
     [cloudHistory, totalBalance]
@@ -525,7 +525,7 @@ export default function DashboardPage() {
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
               <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3">
                 <span className="flex items-center gap-1 text-sm font-medium text-[color:#0f9aa7]">
-                  Fixed income
+                  Bonds/CDs
                   <button
                     type="button"
                     onClick={() => setShowFixedIncomeEditor(true)}
@@ -545,7 +545,7 @@ export default function DashboardPage() {
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
               <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3">
                 <span className="flex items-center gap-1 text-sm font-medium text-[color:#14b8a6]">
-                  Current value
+                  Value
                 </span>
                 <span className="text-right text-sm tabular-nums text-[color:#14b8a6]">
                   {homeAmountWithPercent(homeShowsAmountValues, holdingsValue, shareOfRow(holdingsValue, totalBalance))}
@@ -556,9 +556,9 @@ export default function DashboardPage() {
               </div>
               <div className="mt-1 flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs">
                 <span className="inline-grid grid-cols-[auto_auto_auto] items-center gap-x-3">
-                  <span className="font-semibold text-[color:#14b8a6]">ETF:</span>
+                  <span className="font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
                   <span className="font-semibold text-right" style={{ color: ETF_PATTERN_PRIMARY }}>
-                    {homeAmountWithPercent(homeShowsAmountValues, etfValue, shareOfRow(etfValue, holdingsValue))}
+                    {homeAmountWithPercent(homeShowsAmountValues, etfValue, shareOfRow(etfValue, totalBalance))}
                   </span>
                   <span className="font-semibold text-right" style={{ color: ETF_PATTERN_PRIMARY }}>
                     {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, holdingsCostBasis))}
@@ -566,10 +566,10 @@ export default function DashboardPage() {
                 </span>
                 <span className="inline-grid grid-cols-[auto_auto_auto] items-center gap-x-3">
                   <span className="font-semibold text-[color:#14b8a6]">Stocks:</span>
-                  <span className="font-semibold text-right text-[color:#1f8f46]">
-                    {homeAmountWithPercent(homeShowsAmountValues, stockValueOnly, shareOfRow(stockValueOnly, holdingsValue))}
+                  <span className="font-semibold text-right text-[color:#14b8a6]">
+                    {homeAmountWithPercent(homeShowsAmountValues, stockValueOnly, shareOfRow(stockValueOnly, totalBalance))}
                   </span>
-                  <span className="font-semibold text-right text-[color:#1f8f46]">
+                  <span className="font-semibold text-right text-[color:#14b8a6]">
                     {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, holdingsCostBasis))}
                   </span>
                 </span>
@@ -587,7 +587,7 @@ export default function DashboardPage() {
             ) : (
               <StatRow
                 label="Loss"
-                value={homeShowsAmountValues ? `${formatWholeCurrency(Math.abs(holdingsPnL))} (${formatWholePercent(totalPnLPct)})` : formatWholePercent(totalPnLPct)}
+                value={homeShowsAmountValues ? `${formatWholeCurrency(Math.abs(holdingsPnL))} (${formatWholePercent(Math.abs(totalPnLPct))})` : formatWholePercent(Math.abs(totalPnLPct))}
                 labelClassName="text-[color:var(--dashboard-chart-loss)]"
                 valueClassName="font-semibold text-[color:var(--dashboard-chart-loss)]"
                 last={!showTodayChange}
