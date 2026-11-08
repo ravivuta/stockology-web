@@ -454,67 +454,32 @@ export default function DashboardPage() {
                 totalValueClassName="text-[color:var(--dashboard-chart-center-text)]"
               />
             </motion.div>
-            <ul className="min-w-0 w-full space-y-2 text-left" aria-label="Allocation breakdown">
-              {pieData.map((p) => {
-                const pct = p.value * 100;
-                const pctLabel = pct < 0.5 && pct > 0 ? "<1%" : `${Math.round(pct)}%`;
-                const segmentValue =
-                  p.name === "Cash"
-                    ? cash
-                    : p.name === "Fixed Income"
-                      ? fixedIncomeValue
-                    : p.name === "Cost" || p.name === "Cost basis"
-                      ? holdingsCostBasis
-                      : p.name === "Gain"
-                        ? Math.max(holdingsPnL, 0)
-                        : p.name === "Holdings"
-                          ? holdingsValue
-                          : p.name === "Loss"
-                            ? Math.abs(holdingsPnL)
-                            : 0;
-                return (
-                  <li key={p.name} className="flex items-center gap-2.5 text-sm">
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-sm ring-1 ring-inset ring-foreground/12 dark:ring-white/15"
-                      style={{ backgroundColor: p.color }}
-                      aria-hidden
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="min-w-0 truncate font-bold" style={{ color: p.color }}>{p.name}</span>
-                        <span className="shrink-0 tabular-nums font-bold" style={{ color: p.color }}>
-                          {homeShowsAmountValues ? `${formatWholeCurrency(segmentValue)} · ${pctLabel}` : pctLabel}
-                        </span>
-                      </div>
-                      {p.name === "Cost" || p.name === "Cost basis" ? (
-                        <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] font-semibold">
-                          <span style={{ color: ETF_PATTERN_PRIMARY }}>ETF {shareOfRow(etfCostBasis, holdingsCostBasis)}</span>
-                          <span className="text-[color:var(--dashboard-chart-cost-basis)]">Stocks {shareOfRow(stockCostBasisOnly, holdingsCostBasis)}</span>
-                        </div>
-                      ) : null}
-                      {p.name === "Holdings" ? (
-                        <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] font-semibold">
-                          <span style={{ color: ETF_PATTERN_PRIMARY }}>ETF {shareOfRow(etfValue, holdingsValue)}</span>
-                          <span className="text-[color:var(--dashboard-chart-holdings)]">Stocks {shareOfRow(stockValueOnly, holdingsValue)}</span>
-                        </div>
-                      ) : null}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
           </div>
 
           <dl className="grid w-full grid-cols-1 gap-0">
-            <div className="grid grid-cols-[minmax(0,1fr)_auto_1.25rem_auto] items-center gap-x-3 border-b border-border/90 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/10">
+            <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_0.5rem_9ch] items-center gap-x-1.5 border-b border-border/90 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/10">
               <span />
-              <span className="justify-self-start w-[14ch] text-left">Current</span>
+              <span className="justify-self-start whitespace-nowrap text-left">Current</span>
               <span aria-hidden />
-              <span className="justify-self-start w-[14ch] text-left">Invested</span>
+              <span className="justify-self-start whitespace-nowrap text-left">Invested</span>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto_1.25rem_auto] items-center gap-x-3">
-                <span className="flex items-center gap-1 text-sm font-medium text-[color:var(--dashboard-chart-cash)]">
+              <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_0.5rem_9ch] items-center gap-x-1.5">
+                <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#14b8a6]">
+                  Total
+                </span>
+                <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
+                  {homeAmountWithPercent(homeShowsAmountValues, totalBalance, shareOfRow(totalBalance, totalBalance))}
+                </span>
+                <span aria-hidden />
+                <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
+                  {homeAmountWithPercent(homeShowsAmountValues, totalInvested, shareOfRow(totalInvested, totalInvested))}
+                </span>
+              </div>
+            </div>
+            <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
+              <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_0.5rem_9ch] items-center gap-x-1.5">
+                <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:var(--dashboard-chart-cash)]">
                   Cash
                   <button
                     type="button"
@@ -524,18 +489,18 @@ export default function DashboardPage() {
                     Edit
                   </button>
                 </span>
-                <span className="justify-self-start w-[14ch] text-left text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
+                <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
                   {homeAmountWithPercent(homeShowsAmountValues, cash, shareOfRow(cash, totalInvested))}
                 </span>
                 <span aria-hidden />
-                <span className="justify-self-start w-[14ch] text-left text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
+                <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
                   {homeAmountWithPercent(homeShowsAmountValues, cash, shareOfRow(cash, totalInvested))}
                 </span>
               </div>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto_1.25rem_auto] items-center gap-x-3">
-                <span className="flex items-center gap-1 text-sm font-medium text-[color:#0f9aa7]">
+              <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_0.5rem_9ch] items-center gap-x-1.5">
+                <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#0f9aa7]">
                   Bonds/CDs
                   <button
                     type="button"
@@ -545,97 +510,84 @@ export default function DashboardPage() {
                     Edit
                   </button>
                 </span>
-                <span className="justify-self-start w-[14ch] text-left text-sm tabular-nums text-[color:#0f9aa7]">
+                <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:#0f9aa7]">
                   {homeAmountWithPercent(homeShowsAmountValues, fixedIncomeValue, shareOfRow(fixedIncomeValue, totalInvested))}
                 </span>
                 <span aria-hidden />
-                <span className="justify-self-start w-[14ch] text-left text-sm tabular-nums text-[color:#0f9aa7]">
+                <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:#0f9aa7]">
                   {homeAmountWithPercent(homeShowsAmountValues, fixedIncomeValue, shareOfRow(fixedIncomeValue, totalInvested))}
                 </span>
               </div>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto_1.25rem_auto] items-center gap-x-3">
-                <span className="flex items-center gap-1 text-sm font-medium text-[color:#14b8a6]">
+              <div className="grid grid-cols-[minmax(8.5rem,1fr)_9ch_0.5rem_9ch] items-center gap-x-1.5">
+                <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#14b8a6]">
                   Value
                 </span>
-                <span className="justify-self-start w-[14ch] text-left text-sm tabular-nums text-[color:#14b8a6]">
+                <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
                   {homeAmountWithPercent(homeShowsAmountValues, holdingsValue, shareOfRow(holdingsValue, totalInvested))}
                 </span>
                 <span aria-hidden />
-                <span className="justify-self-start w-[14ch] text-left text-sm tabular-nums text-[color:#14b8a6]">
+                <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
                   {homeAmountWithPercent(homeShowsAmountValues, holdingsCostBasis, shareOfRow(holdingsCostBasis, totalInvested))}
                 </span>
               </div>
-              <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_1.25rem_auto] items-center gap-x-3 gap-y-1 text-xs">
+              <div className="mt-1 grid grid-cols-[minmax(8.5rem,1fr)_9ch_0.5rem_9ch] items-center gap-x-1.5 gap-y-1 text-xs">
                 <span className="pl-4 font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
-                <span className="justify-self-start w-[14ch] whitespace-nowrap text-left font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
-                  {homeAmountWithPercent(homeShowsAmountValues, etfValue, shareOfRow(etfValue, totalInvested))}
-                </span>
+                <div className="justify-self-start text-left leading-tight">
+                  <div className="whitespace-nowrap font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
+                    {homeAmountWithPercent(homeShowsAmountValues, etfValue, shareOfRow(etfValue, totalInvested))}
+                  </div>
+                  <div
+                    className={`whitespace-nowrap text-[10px] font-semibold ${etfPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}
+                  >
+                    {homeAmountWithPercent(homeShowsAmountValues, etfPnL, formatWholePercent(etfPnLPct, true))}
+                  </div>
+                </div>
                 <span aria-hidden />
-                <span className="justify-self-start w-[14ch] whitespace-nowrap text-left font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
-                  {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, totalInvested))}
-                </span>
+                <div className="justify-self-start text-left leading-tight">
+                  <div className="whitespace-nowrap font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
+                    {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, totalInvested))}
+                  </div>
+                  <div
+                    className={`whitespace-nowrap text-[10px] font-semibold ${etfPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}
+                  >
+                    {homeAmountWithPercent(homeShowsAmountValues, etfPnL, formatWholePercent(etfPnLPct, true))}
+                  </div>
+                </div>
                 <span className="pl-4 font-semibold text-[color:#14b8a6]">Stocks:</span>
-                <span className="justify-self-start w-[14ch] whitespace-nowrap text-left font-semibold text-[color:#14b8a6]">
-                  {homeAmountWithPercent(homeShowsAmountValues, stockValueOnly, shareOfRow(stockValueOnly, totalInvested))}
-                </span>
+                <div className="justify-self-start text-left leading-tight">
+                  <div className="whitespace-nowrap font-semibold text-[color:#14b8a6]">
+                    {homeAmountWithPercent(homeShowsAmountValues, stockValueOnly, shareOfRow(stockValueOnly, totalInvested))}
+                  </div>
+                  <div
+                    className={`whitespace-nowrap text-[10px] font-semibold ${stockPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}
+                  >
+                    {homeAmountWithPercent(homeShowsAmountValues, stockPnL, formatWholePercent(stockPnLPct, true))}
+                  </div>
+                </div>
                 <span aria-hidden />
-                <span className="justify-self-start w-[14ch] whitespace-nowrap text-left font-semibold text-[color:#14b8a6]">
-                  {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, totalInvested))}
-                </span>
+                <div className="justify-self-start text-left leading-tight">
+                  <div className="whitespace-nowrap font-semibold text-[color:#14b8a6]">
+                    {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, totalInvested))}
+                  </div>
+                  <div
+                    className={`whitespace-nowrap text-[10px] font-semibold ${stockPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}
+                  >
+                    {homeAmountWithPercent(homeShowsAmountValues, stockPnL, formatWholePercent(stockPnLPct, true))}
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto_1.25rem_auto] items-center gap-x-3">
-                <span className="flex items-center gap-1 text-sm font-medium text-[color:#14b8a6]">
-                  Total
-                </span>
-                <span className="justify-self-start w-[14ch] text-left text-sm tabular-nums text-[color:#14b8a6]">
-                  {homeAmountWithPercent(homeShowsAmountValues, totalBalance, shareOfRow(totalBalance, totalBalance))}
-                </span>
-                <span aria-hidden />
-                <span className="justify-self-start w-[14ch] text-left text-sm tabular-nums text-[color:#14b8a6]">
-                  {homeAmountWithPercent(homeShowsAmountValues, totalInvested, shareOfRow(totalInvested, totalInvested))}
-                </span>
-              </div>
-            </div>
-
             <div className={`py-2.5 ${showTodayChange ? "" : "border-b border-border/90 dark:border-foreground/10"}`}>
               <div className="flex items-center justify-between gap-4">
                 <span className={`text-sm font-medium ${isProfitable ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}>
-                  {isProfitable ? "Gain" : "Loss(portfolio value)"}
+                  {isProfitable ? "Gain" : "Loss"}
                 </span>
                 <span className={`text-sm tabular-nums font-semibold ${isProfitable ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}>
                   {homeShowsAmountValues
                     ? `${formatSummaryNumber(isProfitable ? holdingsPnL : Math.abs(holdingsPnL))} (${formatWholePercent(isProfitable ? totalPnLPct : Math.abs(totalPnLPct))})`
                     : formatWholePercent(isProfitable ? totalPnLPct : Math.abs(totalPnLPct))}
-                </span>
-              </div>
-              <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_1.25rem_auto] items-center gap-x-3 gap-y-1 text-xs">
-                <span className="pl-4 font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
-                <span
-                  className={`justify-self-start w-[14ch] whitespace-nowrap text-left font-semibold ${etfPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}
-                >
-                  {homeAmountWithPercent(homeShowsAmountValues, etfPnL, formatWholePercent(etfPnLPct, true))}
-                </span>
-                <span aria-hidden />
-                <span
-                  className={`justify-self-start w-[14ch] whitespace-nowrap text-left font-semibold ${etfPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}
-                >
-                  {homeAmountWithPercent(homeShowsAmountValues, etfPnL, formatWholePercent(etfPnLPct, true))}
-                </span>
-                <span className="pl-4 font-semibold text-[color:#14b8a6]">Stocks:</span>
-                <span
-                  className={`justify-self-start w-[14ch] whitespace-nowrap text-left font-semibold ${stockPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}
-                >
-                  {homeAmountWithPercent(homeShowsAmountValues, stockPnL, formatWholePercent(stockPnLPct, true))}
-                </span>
-                <span aria-hidden />
-                <span
-                  className={`justify-self-start w-[14ch] whitespace-nowrap text-left font-semibold ${stockPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"}`}
-                >
-                  {homeAmountWithPercent(homeShowsAmountValues, stockPnL, formatWholePercent(stockPnLPct, true))}
                 </span>
               </div>
             </div>
