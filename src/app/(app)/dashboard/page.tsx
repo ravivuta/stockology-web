@@ -52,8 +52,8 @@ function etfHatchFor(baseColor: string): string {
   const primary = etfPatternPrimaryFor(baseColor);
   const secondary = etfPatternSecondaryFor(baseColor);
   return (
-    `repeating-linear-gradient(45deg, ${primary} 0 1.8px, transparent 1.8px 3px), ` +
-    `repeating-linear-gradient(135deg, ${secondary} 0 1.2px, transparent 1.2px 7px)`
+    `repeating-linear-gradient(45deg, ${primary} 0 0.9px, transparent 0.9px 1.5px), ` +
+    `repeating-linear-gradient(135deg, ${secondary} 0 0.6px, transparent 0.6px 3.5px)`
   );
 }
 
