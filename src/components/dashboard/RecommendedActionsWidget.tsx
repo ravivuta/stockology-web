@@ -156,12 +156,16 @@ export function RecommendedActionsWidget({ stocks }: { stocks: StockHolding[] })
 
       {outlookOpen && outlook ? (
         <div className="mb-4 rounded-xl border border-border bg-background/60 px-3 py-3 text-sm dark:bg-white/5">
+          {(() => {
+            const backdropToneClass = outlook.preferCash ? "text-amber-700 dark:text-amber-300" : "text-subtle";
+            return (
+              <>
           <p className="font-semibold text-foreground">{outlook.label}</p>
-          <p className={`mt-0.5 text-xs font-semibold ${outlook.preferCash ? "text-amber-700 dark:text-amber-300" : "text-subtle"}`}>
+          <p className={`mt-0.5 text-xs font-semibold ${backdropToneClass}`}>
             {outlook.backdrop}
           </p>
           <p className="mt-2 text-xs leading-relaxed text-subtle">{outlook.explanation}</p>
-          <p className="mt-2 text-xs leading-relaxed text-subtle">
+          <p className={`mt-2 text-xs leading-relaxed ${backdropToneClass}`}>
             {(() => {
               const cashEquivalent = cashBalance + fixedIncomeTotal(fixedIncomeByAccount);
               const cashShare = portfolioSize > 0 ? (cashEquivalent / portfolioSize) * 100 : 0;
@@ -186,6 +190,9 @@ export function RecommendedActionsWidget({ stocks }: { stocks: StockHolding[] })
           <p className="mt-3 text-[10px] text-subtle">
             Outlook computed {new Date(outlook.computedAt).toLocaleString()} · Source: OpenAI
           </p>
+              </>
+            );
+          })()}
         </div>
       ) : null}
 
