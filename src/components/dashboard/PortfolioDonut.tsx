@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
 type Segment = {
@@ -12,6 +12,15 @@ type Segment = {
 type ETFOverlay = {
   segment: string;
   fraction: number;
+};
+
+type ETFOverlayArc = {
+  key: string;
+  d: string;
+  boundaryD: string;
+  patternId: string;
+  primaryStroke: string;
+  secondaryStroke: string;
 };
 
 function polarToCartesian(cx: number, cy: number, radius: number, angleDeg: number) {
@@ -56,6 +65,7 @@ export function PortfolioDonut({
   totalValueClassName?: string;
 }) {
   const reduceMotion = useReducedMotion();
+  const patternIdSeed = useId().replace(/[^a-zA-Z0-9_-]/g, "");
 
   const { midR, strokeW } = useMemo(() => {
     const outer = 42;
@@ -121,6 +131,28 @@ export function PortfolioDonut({
     return map;
   }, [etfOverlays]);
 
+  const etfOverlayArcs = useMemo(() => {
+    const overlays: ETFOverlayArc[] = [];
+    for (let i = 0; i < arcs.length; i++) {
+      const arc = arcs[i];
+      const etfFraction = Math.min(arc.fraction, etfOverlayMap.get(arc.name) ?? 0);
+      if (etfFraction <= 0) continue;
+      const etfSpan = (etfFraction / arc.fraction) * (arc.endDeg - arc.startDeg);
+      const etfEndDeg = Math.min(arc.endDeg, arc.startDeg + etfSpan);
+      const d = arcStrokeD(CX, CY, midR, arc.startDeg, etfEndDeg);
+      if (!d) continue;
+      overlays.push({
+        key: `${arc.name}-${i}`,
+        d,
+        boundaryD: arcStrokeD(CX, CY, midR, Math.max(arc.startDeg, etfEndDeg - 0.7), Math.min(arc.endDeg, etfEndDeg + 0.7)),
+        patternId: `etf-pattern-${patternIdSeed}-${i}`,
+        primaryStroke: `color-mix(in srgb, ${arc.color} 72%, black)`,
+        secondaryStroke: `color-mix(in srgb, ${arc.color} 52%, black)`,
+      });
+    }
+    return overlays;
+  }, [arcs, etfOverlayMap, midR, patternIdSeed]);
+
   const transition = (i: number) =>
     reduceMotion
       ? { duration: 0 }
@@ -146,6 +178,27 @@ export function PortfolioDonut({
         className="h-full w-full overflow-visible text-white dark:text-black drop-shadow-sm dark:drop-shadow-[0_2px_14px_rgba(0,0,0,0.4)]"
         aria-hidden
       >
+      <defs>
+        {etfOverlayArcs.map((overlay) => (
+          <pattern key={overlay.patternId} id={overlay.patternId} patternUnits="userSpaceOnUse" width="7" height="7">
+            <path
+              d="M -2,7 L 7,-2 M 1,8 L 8,1 M 4,8 L 8,4"
+              fill="none"
+              stroke={overlay.primaryStroke}
+              strokeWidth="1.9"
+              strokeLinecap="square"
+            />
+            <path
+              d="M -2,0 L 7,9 M -2,3 L 4,9 M 1,-2 L 9,6"
+              fill="none"
+              stroke={overlay.secondaryStroke}
+              strokeOpacity="0.74"
+              strokeWidth="1.25"
+              strokeLinecap="square"
+            />
+          </pattern>
+        ))}
+      </defs>
       {/* Track ring */}
       <circle
         cx={CX}
@@ -169,36 +222,20 @@ export function PortfolioDonut({
             transition={transition(i)}
           />
         ))}
-        {arcs.map((arc) => {
-          const etfFraction = Math.min(arc.fraction, etfOverlayMap.get(arc.name) ?? 0);
-          if (etfFraction <= 0) return null;
-          const etfSpan = (etfFraction / arc.fraction) * (arc.endDeg - arc.startDeg);
-          const etfEndDeg = Math.min(arc.endDeg, arc.startDeg + etfSpan);
-          const etfD = arcStrokeD(CX, CY, midR, arc.startDeg, etfEndDeg);
-          const boundaryD = arcStrokeD(CX, CY, midR, Math.max(arc.startDeg, etfEndDeg - 0.7), Math.min(arc.endDeg, etfEndDeg + 0.7));
+        {etfOverlayArcs.map((overlay) => {
           return (
-            <g key={`etf-overlay-${arc.name}`}>
+            <g key={`etf-overlay-${overlay.key}`}>
               <path
-                d={etfD}
+                d={overlay.d}
                 fill="none"
-                stroke="rgba(0,0,0,0.62)"
+                stroke={`url(#${overlay.patternId})`}
                 strokeWidth={strokeW}
                 strokeLinecap="butt"
-                strokeDasharray="1.2 2.1"
               />
               <path
-                d={etfD}
+                d={overlay.boundaryD}
                 fill="none"
-                stroke="rgba(255,255,255,0.35)"
-                strokeWidth={strokeW}
-                strokeLinecap="butt"
-                strokeDasharray="3.8 4.6"
-                strokeDashoffset="0.8"
-              />
-              <path
-                d={boundaryD}
-                fill="none"
-                stroke="rgba(0,0,0,0.74)"
+                stroke={overlay.primaryStroke}
                 strokeWidth={strokeW}
                 strokeLinecap="butt"
               />

@@ -39,8 +39,23 @@ const PALETTE = {
 
 const ETF_PATTERN_PRIMARY =
   "color-mix(in srgb, var(--dashboard-chart-cost-basis) 72%, black)";
-const ETF_PATTERN_SECONDARY =
-  "color-mix(in srgb, var(--dashboard-chart-cost-basis) 52%, black)";
+
+function etfPatternPrimaryFor(baseColor: string): string {
+  return `color-mix(in srgb, ${baseColor} 72%, black)`;
+}
+
+function etfPatternSecondaryFor(baseColor: string): string {
+  return `color-mix(in srgb, ${baseColor} 52%, black)`;
+}
+
+function etfHatchFor(baseColor: string): string {
+  const primary = etfPatternPrimaryFor(baseColor);
+  const secondary = etfPatternSecondaryFor(baseColor);
+  return (
+    `repeating-linear-gradient(-45deg, transparent 0 3px, ${primary} 3px 4.9px), ` +
+    `repeating-linear-gradient(45deg, transparent 0 7px, color-mix(in srgb, ${secondary} 74%, transparent) 7px 8.25px)`
+  );
+}
 
 export default function DashboardPage() {
   const reduceMotion = useReducedMotion();
@@ -665,9 +680,9 @@ export default function DashboardPage() {
               const etfLossPct = pnl < 0 ? Math.max(0, (Math.max(0, -etfPnl) / maxReference) * 100) : 0;
               const fixedIncomeOriginPct = holdingsSpanPct;
               const cashOriginPct = fixedIncomeOriginPct + fixedIncomeWidthPct;
-              const etfHatch =
-                `repeating-linear-gradient(-45deg, transparent 0 2px, ${ETF_PATTERN_PRIMARY} 2px 4px), ` +
-                `repeating-linear-gradient(45deg, transparent 0 6px, ${ETF_PATTERN_SECONDARY} 6px 7.5px)`;
+              const etfValueBoundaryColor = etfPatternPrimaryFor("var(--dashboard-chart-cost-basis)");
+              const etfProfitBoundaryColor = etfPatternPrimaryFor("var(--dashboard-chart-gain)");
+              const etfLossBoundaryColor = etfPatternPrimaryFor("var(--dashboard-chart-loss)");
 
               return (
                 <div key={`${row.account}-${index}`} className="text-sm">
@@ -686,12 +701,15 @@ export default function DashboardPage() {
                       style={{ width: `${valueWidthPct}%`, backgroundColor: "var(--dashboard-chart-cost-basis)" }}
                     />
                     {etfValuePct > 0 ? (
-                      <div className="absolute inset-y-0 left-0" style={{ width: `${etfValuePct}%`, backgroundImage: etfHatch }} />
+                      <div
+                        className="absolute inset-y-0 left-0"
+                        style={{ width: `${etfValuePct}%`, backgroundImage: etfHatchFor("var(--dashboard-chart-cost-basis)") }}
+                      />
                     ) : null}
                     {etfValuePct > 0 && etfValuePct < 100 ? (
                       <div
                         className="absolute inset-y-0 w-px"
-                        style={{ left: `calc(${etfValuePct}% - 0.5px)`, backgroundColor: ETF_PATTERN_PRIMARY }}
+                        style={{ left: `calc(${etfValuePct}% - 0.5px)`, backgroundColor: etfValueBoundaryColor }}
                       />
                     ) : null}
                     {profitWidthPct > 0 ? (
@@ -707,13 +725,17 @@ export default function DashboardPage() {
                     {etfProfitPct > 0 ? (
                       <div
                         className="absolute inset-y-0"
-                        style={{ left: `${costWidthPct}%`, width: `${etfProfitPct}%`, backgroundImage: etfHatch }}
+                        style={{
+                          left: `${costWidthPct}%`,
+                          width: `${etfProfitPct}%`,
+                          backgroundImage: etfHatchFor("var(--dashboard-chart-gain)"),
+                        }}
                       />
                     ) : null}
                     {etfProfitPct > 0 ? (
                       <div
                         className="absolute inset-y-0 w-px"
-                        style={{ left: `calc(${costWidthPct + etfProfitPct}% - 0.5px)`, backgroundColor: ETF_PATTERN_PRIMARY }}
+                        style={{ left: `calc(${costWidthPct + etfProfitPct}% - 0.5px)`, backgroundColor: etfProfitBoundaryColor }}
                       />
                     ) : null}
                     {lossWidthPct > 0 ? (
@@ -729,13 +751,17 @@ export default function DashboardPage() {
                     {etfLossPct > 0 ? (
                       <div
                         className="absolute inset-y-0"
-                        style={{ left: `${valueWidthPct}%`, width: `${etfLossPct}%`, backgroundImage: etfHatch }}
+                        style={{
+                          left: `${valueWidthPct}%`,
+                          width: `${etfLossPct}%`,
+                          backgroundImage: etfHatchFor("var(--dashboard-chart-loss)"),
+                        }}
                       />
                     ) : null}
                     {etfLossPct > 0 ? (
                       <div
                         className="absolute inset-y-0 w-px"
-                        style={{ left: `calc(${valueWidthPct + etfLossPct}% - 0.5px)`, backgroundColor: ETF_PATTERN_PRIMARY }}
+                        style={{ left: `calc(${valueWidthPct + etfLossPct}% - 0.5px)`, backgroundColor: etfLossBoundaryColor }}
                       />
                     ) : null}
                     {fixedIncomeWidthPct > 0 ? (
