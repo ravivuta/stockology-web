@@ -458,17 +458,17 @@ export default function DashboardPage() {
           </div>
 
           <dl className="grid w-full grid-cols-1 gap-0">
-            <div className="grid grid-cols-[minmax(8.5rem,1fr)_14ch_14ch] items-center gap-x-2 border-b border-border/90 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/10">
+            <div className="grid grid-cols-[minmax(8.5rem,1fr)_minmax(14ch,1fr)_minmax(14ch,1fr)] items-center gap-x-2 border-b border-border/90 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/10">
               <span />
-              <span className="justify-self-start whitespace-nowrap text-left">Current</span>
-              <span className="justify-self-start whitespace-nowrap text-left">Invested</span>
+              <span className="justify-self-stretch whitespace-nowrap text-left">Current</span>
+              <span className="justify-self-stretch whitespace-nowrap text-left">Invested</span>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(8.5rem,1fr)_14ch_14ch] items-center gap-x-2">
+              <div className="grid grid-cols-[minmax(8.5rem,1fr)_minmax(14ch,1fr)_minmax(14ch,1fr)] items-center gap-x-2">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#14b8a6]">
                   Total
                 </span>
-                <span className="justify-self-start text-left text-sm tabular-nums text-[color:#14b8a6]">
+                <span className="justify-self-stretch text-left text-sm tabular-nums text-[color:#14b8a6]">
                   {renderSummaryCurrentWithPnL(
                     homeShowsAmountValues,
                     totalBalance,
@@ -478,7 +478,7 @@ export default function DashboardPage() {
                     holdingsPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"
                   )}
                 </span>
-                <span className="justify-self-start text-left text-sm tabular-nums text-[color:#14b8a6]">
+                <span className="justify-self-stretch text-left text-sm tabular-nums text-[color:#14b8a6]">
                   {homeShowsAmountValues ? (
                     <span className="inline-flex flex-col leading-tight">
                       <span>{formatSummaryNumberThreeDecimal(totalInvested)}</span>
@@ -491,7 +491,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(8.5rem,1fr)_14ch_14ch] items-center gap-x-2">
+              <div className="grid grid-cols-[minmax(8.5rem,1fr)_minmax(14ch,1fr)_minmax(14ch,1fr)] items-center gap-x-2">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:var(--dashboard-chart-cash)]">
                   Cash
                   <button
@@ -502,7 +502,7 @@ export default function DashboardPage() {
                     Edit
                   </button>
                 </span>
-                <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
+                <span className="justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
                   {homeAmountWithPercent(homeShowsAmountValues, cash, shareOfRow(cash, totalInvested))}
                 </span>
                 <span className="justify-self-center whitespace-nowrap text-center text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
@@ -511,7 +511,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(8.5rem,1fr)_14ch_14ch] items-center gap-x-2">
+              <div className="grid grid-cols-[minmax(8.5rem,1fr)_minmax(14ch,1fr)_minmax(14ch,1fr)] items-center gap-x-2">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#0f9aa7]">
                   Bonds/CDs
                   <button
@@ -525,17 +525,17 @@ export default function DashboardPage() {
                 <span className="justify-self-center whitespace-nowrap text-center text-sm tabular-nums text-[color:#0f9aa7]">
                   -
                 </span>
-                <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:#0f9aa7]">
+                <span className="justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums text-[color:#0f9aa7]">
                   {homeAmountWithPercent(homeShowsAmountValues, fixedIncomeValue, shareOfRow(fixedIncomeValue, totalInvested))}
                 </span>
               </div>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(8.5rem,1fr)_14ch_14ch] items-center gap-x-2">
+              <div className="grid grid-cols-[minmax(8.5rem,1fr)_minmax(14ch,1fr)_minmax(14ch,1fr)] items-center gap-x-2">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#14b8a6]">
                   Stocks
                 </span>
-                <span className="justify-self-start text-left text-sm tabular-nums text-[color:#14b8a6]">
+                <span className="justify-self-stretch text-left text-sm tabular-nums text-[color:#14b8a6]">
                   {renderSummaryCurrentWithPnLPercent(
                     homeShowsAmountValues,
                     holdingsValue,
@@ -544,13 +544,13 @@ export default function DashboardPage() {
                     holdingsPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"
                   )}
                 </span>
-                <span className="justify-self-start whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
+                <span className="justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
                   {homeAmountWithPercent(homeShowsAmountValues, holdingsCostBasis, shareOfRow(holdingsCostBasis, totalInvested))}
                 </span>
               </div>
-              <div className="mt-1 grid grid-cols-[minmax(8.5rem,1fr)_14ch_14ch] items-center gap-x-2 gap-y-1 text-xs">
+              <div className="mt-1 grid grid-cols-[minmax(8.5rem,1fr)_minmax(14ch,1fr)_minmax(14ch,1fr)] items-center gap-x-2 gap-y-1 text-xs">
                 <span className="pl-4 font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
-                <span className="justify-self-start whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
+                <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
                   {renderSummaryCurrentWithPnL(
                     homeShowsAmountValues,
                     etfValue,
@@ -561,11 +561,11 @@ export default function DashboardPage() {
                     ETF_PATTERN_PRIMARY
                   )}
                 </span>
-                <span className="justify-self-start whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
+                <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
                   {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, holdingsCostBasis))}
                 </span>
                 <span className="pl-4 font-semibold text-[color:#14b8a6]">Stocks:</span>
-                <span className="justify-self-start whitespace-nowrap text-left font-semibold tabular-nums text-[color:#14b8a6]">
+                <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums text-[color:#14b8a6]">
                   {renderSummaryCurrentWithPnL(
                     homeShowsAmountValues,
                     stockValueOnly,
@@ -575,7 +575,7 @@ export default function DashboardPage() {
                     stockPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"
                   )}
                 </span>
-                <span className="justify-self-start whitespace-nowrap text-left font-semibold tabular-nums text-[color:var(--dashboard-chart-cost-basis)]">
+                <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums text-[color:var(--dashboard-chart-cost-basis)]">
                   {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, holdingsCostBasis))}
                 </span>
               </div>
