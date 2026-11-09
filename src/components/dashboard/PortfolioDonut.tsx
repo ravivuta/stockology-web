@@ -20,6 +20,8 @@ type ETFOverlayArc = {
   boundaryD: string;
   patternId: string;
   stroke: string;
+  midAngle: number;
+  fraction: number;
 };
 
 function polarToCartesian(cx: number, cy: number, radius: number, angleDeg: number) {
@@ -146,6 +148,8 @@ export function PortfolioDonut({
         boundaryD: arcStrokeD(CX, CY, midR, Math.max(arc.startDeg, etfEndDeg - 0.7), Math.min(arc.endDeg, etfEndDeg + 0.7)),
         patternId: `etf-pattern-${patternIdSeed}-${i}`,
         stroke: `color-mix(in srgb, ${arc.color} 52%, black)`,
+        midAngle: arc.startDeg + (etfEndDeg - arc.startDeg) / 2,
+        fraction: etfFraction,
       });
     }
     return overlays;
@@ -256,6 +260,25 @@ export function PortfolioDonut({
               fill={arc.color}
             >
               {`${Math.round(arc.fraction * 100)}%`}
+            </text>
+          );
+        })}
+        {etfOverlayArcs.map((overlay) => {
+          if (overlay.fraction < 0.015) return null;
+          const labelR = 62;
+          const { x, y } = polarToCartesian(CX, CY, labelR, overlay.midAngle);
+          return (
+            <text
+              key={`etf-label-${overlay.key}`}
+              x={x}
+              y={y}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize={6.6}
+              fontWeight="700"
+              fill={overlay.stroke}
+            >
+              {`${Math.round(overlay.fraction * 100)}% ETF`}
             </text>
           );
         })}

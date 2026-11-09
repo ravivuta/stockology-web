@@ -581,14 +581,17 @@ export default function DashboardPage() {
               </div>
             </div>
             {showTodayChange ? (
-              <StatRow
-                label="Today"
-                value={homeShowsAmountValues
-                  ? `${formatWholeCurrency(Math.abs(todayChange.change))} (${formatWholePercent(todayChange.percent, true)})`
-                  : formatWholePercent(todayChange.percent, true)}
-                valueClassName={todayValueClassName}
-                last
-              />
+              <div className="py-2.5">
+                <div className="grid grid-cols-[minmax(8.5rem,1fr)_minmax(14ch,1fr)_minmax(14ch,1fr)] items-center gap-x-2">
+                  <span className={`whitespace-nowrap text-sm font-medium ${todayValueClassName}`}>Today</span>
+                  <span className={`justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums ${todayValueClassName}`}>
+                    {homeShowsAmountValues
+                      ? `${formatWholeCurrency(Math.abs(todayChange.change))} (${formatWholePercent(todayChange.percent, true)})`
+                      : formatWholePercent(todayChange.percent, true)}
+                  </span>
+                  <span aria-hidden />
+                </div>
+              </div>
             ) : null}
           </dl>
         </div>
@@ -945,68 +948,6 @@ function formatSummaryNumberThreeDecimal(value: number): string {
     return `${sign}${thousands.toLocaleString("en-US")}K`;
   }
   return `${sign}${Math.round(absValue).toLocaleString("en-US")}`;
-}
-
-function StatRow({
-  label,
-  value,
-  labelClassName,
-  valueClassName,
-  labelAction,
-  secondaryLabel,
-  secondaryValue,
-  secondaryLabelClassName,
-  secondaryValueClassName,
-  secondarySeparator,
-  last,
-}: {
-  label: string;
-  value: string;
-  labelClassName?: string;
-  valueClassName?: string;
-  labelAction?: ReactNode;
-  secondaryLabel?: string;
-  secondaryValue?: string;
-  secondaryLabelClassName?: string;
-  secondaryValueClassName?: string;
-  secondarySeparator?: boolean;
-  last?: boolean;
-}) {
-  return (
-    <div
-      className={`flex items-baseline justify-between gap-4 py-2.5 ${
-        last ? "" : "border-b border-border/90 dark:border-foreground/10"
-      }`}
-    >
-      <div className="min-w-0 flex-1 space-y-1">
-        <dt className={`flex items-center text-sm font-medium ${labelClassName ?? "text-subtle"}`}>
-          <span>{label}</span>
-          {labelAction}
-        </dt>
-        {secondaryLabel ? (
-          <dt
-            className={`text-sm font-medium ${secondaryLabelClassName ?? "text-subtle"} ${
-              secondarySeparator ? "border-t border-border/80 pt-1.5 dark:border-foreground/10" : ""
-            }`}
-          >
-            {secondaryLabel}
-          </dt>
-        ) : null}
-      </div>
-      <div className="space-y-1 text-right">
-        <dd className={`text-sm tabular-nums ${valueClassName ?? "text-subtle"}`}>{value}</dd>
-        {secondaryValue ? (
-          <dd
-            className={`text-sm tabular-nums ${secondaryValueClassName ?? "text-subtle"} ${
-              secondarySeparator ? "border-t border-border/80 pt-1.5 dark:border-foreground/10" : ""
-            }`}
-          >
-            {secondaryValue}
-          </dd>
-        ) : null}
-      </div>
-    </div>
-  );
 }
 
 type Row = {
