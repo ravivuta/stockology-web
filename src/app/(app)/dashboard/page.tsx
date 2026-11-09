@@ -458,13 +458,13 @@ export default function DashboardPage() {
           </div>
 
           <dl className="grid w-full grid-cols-1 gap-0">
-            <div className="grid grid-cols-[minmax(8.5rem,1fr)_11ch_11ch] items-center gap-x-2 border-b border-border/90 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/10">
+            <div className="grid grid-cols-[minmax(8.5rem,1fr)_14ch_14ch] items-center gap-x-2 border-b border-border/90 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/10">
               <span />
               <span className="justify-self-start whitespace-nowrap text-left">Current</span>
               <span className="justify-self-start whitespace-nowrap text-left">Invested</span>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(8.5rem,1fr)_11ch_11ch] items-center gap-x-2">
+              <div className="grid grid-cols-[minmax(8.5rem,1fr)_14ch_14ch] items-center gap-x-2">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#14b8a6]">
                   Total
                 </span>
@@ -491,7 +491,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(8.5rem,1fr)_11ch_11ch] items-center gap-x-2">
+              <div className="grid grid-cols-[minmax(8.5rem,1fr)_14ch_14ch] items-center gap-x-2">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:var(--dashboard-chart-cash)]">
                   Cash
                   <button
@@ -511,7 +511,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(8.5rem,1fr)_11ch_11ch] items-center gap-x-2">
+              <div className="grid grid-cols-[minmax(8.5rem,1fr)_14ch_14ch] items-center gap-x-2">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#0f9aa7]">
                   Bonds/CDs
                   <button
@@ -531,7 +531,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(8.5rem,1fr)_11ch_11ch] items-center gap-x-2">
+              <div className="grid grid-cols-[minmax(8.5rem,1fr)_14ch_14ch] items-center gap-x-2">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#14b8a6]">
                   Stocks
                 </span>
@@ -548,9 +548,9 @@ export default function DashboardPage() {
                   {homeAmountWithPercent(homeShowsAmountValues, holdingsCostBasis, shareOfRow(holdingsCostBasis, totalInvested))}
                 </span>
               </div>
-              <div className="mt-1 grid grid-cols-[minmax(8.5rem,1fr)_11ch_11ch] items-center gap-x-2 gap-y-1 text-xs">
+              <div className="mt-1 grid grid-cols-[minmax(8.5rem,1fr)_14ch_14ch] items-center gap-x-2 gap-y-1 text-xs">
                 <span className="pl-4 font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
-                <span className="-ml-4 justify-self-start pl-0 text-left font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
+                <span className="justify-self-start whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
                   {renderSummaryCurrentWithPnL(
                     homeShowsAmountValues,
                     etfValue,
@@ -561,11 +561,11 @@ export default function DashboardPage() {
                     ETF_PATTERN_PRIMARY
                   )}
                 </span>
-                <span className="-ml-4 justify-self-start whitespace-nowrap text-left font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>
+                <span className="justify-self-start whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
                   {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, holdingsCostBasis))}
                 </span>
                 <span className="pl-4 font-semibold text-[color:#14b8a6]">Stocks:</span>
-                <span className="-ml-4 justify-self-start pl-0 text-left font-semibold text-[color:#14b8a6]">
+                <span className="justify-self-start whitespace-nowrap text-left font-semibold tabular-nums text-[color:#14b8a6]">
                   {renderSummaryCurrentWithPnL(
                     homeShowsAmountValues,
                     stockValueOnly,
@@ -575,7 +575,7 @@ export default function DashboardPage() {
                     stockPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"
                   )}
                 </span>
-                <span className="-ml-4 justify-self-start whitespace-nowrap text-left font-semibold text-[color:var(--dashboard-chart-cost-basis)]">
+                <span className="justify-self-start whitespace-nowrap text-left font-semibold tabular-nums text-[color:var(--dashboard-chart-cost-basis)]">
                   {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, holdingsCostBasis))}
                 </span>
               </div>
