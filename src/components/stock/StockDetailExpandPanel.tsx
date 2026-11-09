@@ -9,7 +9,7 @@ import {
   dividendYieldPercent,
   payoutRatioDecimal,
   rankInWatchlistScoreUniverse,
-  recommendedWatchlistSize,
+  rankedStockSlotsForTopN,
   selectedAnalystTarget,
   scoreBreakdownRows,
   sentimentLabelForScore,
@@ -28,7 +28,7 @@ import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-clien
 import { parseSuggestedQuantity, suggestedTradeType } from "@/lib/tradePrefill";
 import { usePortfolioStore, type StockHolding } from "@/store/portfolioStore";
 import { useSupabaseStockHistory } from "@/hooks/useSupabaseStockHistory";
-import { lastSma } from "@/lib/stock-chart";
+import { appendOrReplaceIntradayPricePoint, lastSma } from "@/lib/stock-chart";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { cn } from "@/lib/utils";
 import { AppModal, ModalSection } from "@/components/ui/AppModal";
@@ -367,15 +367,11 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   );
   const { points, loading: histLoading, error: histError } = useSupabaseStockHistory(stock ? symbol : null);
 
-  // Append today's live price as the last data point when it differs from the last historical close
+  // Keep chart endpoint aligned with iOS: update or append today's ET row with live price.
   const pointsWithToday = useMemo(() => {
     if (!points || points.length === 0) return points;
     const livePrice = stock?.lastPrice ?? 0;
-    if (livePrice <= 0) return points;
-    const lastClose = points[points.length - 1]!.close;
-    if (Math.abs(livePrice - lastClose) <= 0.001) return points;
-    const todayStr = new Date().toISOString().slice(0, 10);
-    return [...points, { date: todayStr, close: livePrice }];
+    return appendOrReplaceIntradayPricePoint(points, livePrice);
   }, [points, stock?.lastPrice]);
 
   const [strategyOpen, setStrategyOpen] = useState(false);
@@ -669,15 +665,16 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       },
     ];
     if (riskPasses) {
-      const topN = recommendedWatchlistSize(portfolioSize);
+      const topN = rankedStockSlotsForTopN(stocks, portfolioSize);
       const rank = rankInWatchlistScoreUniverse(stocks, stock.symbol, {
         enableRiskFilter,
         riskAppetite,
       });
-      const rankLabel =
-        rank != null ? `Ranked ${rank} in top ${topN}` : `Not ranked in top ${topN}`;
+      const rankLabel = rank != null
+        ? `Ranked ${rank} (effective top slots: ${topN})`
+        : `Not ranked in effective top slots (${topN})`;
       rows.push({
-        label: `Score-Driven Top ${topN} Watchlist`,
+        label: `Score-Driven Effective Top Slots (${topN})`,
         detail: limitWatchlistSize ? rankLabel : "Limit disabled",
         passes: limitWatchlistSize ? stock.isInWatchlistSize === true : true,
       });
@@ -703,15 +700,15 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     if (!stock.isETF && stock.isVisibleInRisk === false) {
       reasons.push("Does not meet the current risk appetite criteria.");
     } else if (!stock.isETF && limitWatchlistSize && stock.isInWatchlistSize === false) {
-      const topN = recommendedWatchlistSize(portfolioSize);
+      const topN = rankedStockSlotsForTopN(stocks, portfolioSize);
       const rank = rankInWatchlistScoreUniverse(stocks, stock.symbol, {
         enableRiskFilter,
         riskAppetite,
       });
       reasons.push(
         rank != null
-          ? `Ranked ${rank} in top ${topN} watchlist.`
-          : `Score ranks below the top ${topN} watchlist limit.`
+          ? `Ranked ${rank}; outside effective top slots (${topN}).`
+          : `Score ranks below the effective top slots limit (${topN}).`
       );
     }
     return reasons;

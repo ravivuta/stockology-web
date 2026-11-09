@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Eye, EyeOff } from "lucide-react";
+import { ChevronDown, ChevronRight, Eye, EyeOff } from "lucide-react";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { PortfolioDonut } from "@/components/dashboard/PortfolioDonut";
@@ -66,6 +66,7 @@ export default function DashboardPage() {
   const [bars, setBars] = useState(true);
   const [showCashEditor, setShowCashEditor] = useState(false);
   const [showFixedIncomeEditor, setShowFixedIncomeEditor] = useState(false);
+  const [stocksSummaryExpanded, setStocksSummaryExpanded] = useState(true);
   const [dashStockDetail, setDashStockDetail] = useState<string | null>(null);
   const [summaryTab, setSummaryTab] = useState<"summary" | "performance">("summary");
   // Pre-seed from the same cache used by DashboardReturnComparison for instant today-value display
@@ -533,7 +534,16 @@ export default function DashboardPage() {
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
               <div className="grid grid-cols-[minmax(8.5rem,1fr)_minmax(14ch,1fr)_minmax(14ch,1fr)] items-center gap-x-2">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#14b8a6]">
-                  Stocks
+                  <button
+                    type="button"
+                    onClick={() => setStocksSummaryExpanded((current) => !current)}
+                    className="inline-flex items-center gap-1 text-left"
+                    aria-expanded={stocksSummaryExpanded}
+                    aria-label={stocksSummaryExpanded ? "Collapse stocks breakdown" : "Expand stocks breakdown"}
+                  >
+                    {stocksSummaryExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                    <span>Stocks</span>
+                  </button>
                 </span>
                 <span className="justify-self-stretch text-left text-sm tabular-nums text-[color:#14b8a6]">
                   {renderSummaryCurrentWithPnLPercent(
@@ -548,37 +558,39 @@ export default function DashboardPage() {
                   {homeAmountWithPercent(homeShowsAmountValues, holdingsCostBasis, shareOfRow(holdingsCostBasis, totalInvested))}
                 </span>
               </div>
-              <div className="mt-1 grid grid-cols-[minmax(8.5rem,1fr)_minmax(14ch,1fr)_minmax(14ch,1fr)] items-center gap-x-2 gap-y-1 text-xs">
-                <span className="pl-4 font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
-                <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
-                  {renderSummaryCurrentWithPnL(
-                    homeShowsAmountValues,
-                    etfValue,
-                    etfPnL,
-                    etfPnLPct,
-                    "",
-                    etfPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]",
-                    ETF_PATTERN_PRIMARY
-                  )}
-                </span>
-                <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
-                  {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, holdingsCostBasis))}
-                </span>
-                <span className="pl-4 font-semibold text-[color:#14b8a6]">Stocks:</span>
-                <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums text-[color:#14b8a6]">
-                  {renderSummaryCurrentWithPnL(
-                    homeShowsAmountValues,
-                    stockValueOnly,
-                    stockPnL,
-                    stockPnLPct,
-                    "text-[color:#14b8a6]",
-                    stockPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"
-                  )}
-                </span>
-                <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums text-[color:var(--dashboard-chart-cost-basis)]">
-                  {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, holdingsCostBasis))}
-                </span>
-              </div>
+              {stocksSummaryExpanded ? (
+                <div className="mt-1 grid grid-cols-[minmax(8.5rem,1fr)_minmax(14ch,1fr)_minmax(14ch,1fr)] items-center gap-x-2 gap-y-1 text-xs">
+                  <span className="pl-4 font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
+                  <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
+                    {renderSummaryCurrentWithPnL(
+                      homeShowsAmountValues,
+                      etfValue,
+                      etfPnL,
+                      etfPnLPct,
+                      "",
+                      etfPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]",
+                      ETF_PATTERN_PRIMARY
+                    )}
+                  </span>
+                  <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
+                    {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, holdingsCostBasis))}
+                  </span>
+                  <span className="pl-4 font-semibold text-[color:#14b8a6]">Stocks:</span>
+                  <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums text-[color:#14b8a6]">
+                    {renderSummaryCurrentWithPnL(
+                      homeShowsAmountValues,
+                      stockValueOnly,
+                      stockPnL,
+                      stockPnLPct,
+                      "text-[color:#14b8a6]",
+                      stockPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"
+                    )}
+                  </span>
+                  <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums text-[color:var(--dashboard-chart-cost-basis)]">
+                    {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, holdingsCostBasis))}
+                  </span>
+                </div>
+              ) : null}
             </div>
             {showTodayChange ? (
               <div className="py-2.5">

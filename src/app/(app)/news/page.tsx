@@ -18,7 +18,7 @@ import { safeHttpUrlForHref } from "@/lib/safe-external-url";
 import { useSupabaseStockHistory } from "@/hooks/useSupabaseStockHistory";
 import { StockHistoricalChart } from "@/components/stock/StockHistoricalChart";
 import { formatCurrency } from "@/lib/numberFormat";
-import type { PricePoint } from "@/lib/stock-chart";
+import { appendOrReplaceIntradayPricePoint, type PricePoint } from "@/lib/stock-chart";
 
 type FeedFilter = "all" | "macro" | "portfolio";
 
@@ -136,12 +136,7 @@ export default function NewsPage() {
 
   const spyPointsWithToday = useMemo<PricePoint[] | null>(() => {
     if (!spyPoints) return null;
-    if (!spyLivePrice) return spyPoints;
-    const today = new Date().toISOString().slice(0, 10);
-    // Only append if today's point is not already in the history
-    const lastPoint = spyPoints[spyPoints.length - 1];
-    if (lastPoint?.date === today) return spyPoints;
-    return [...spyPoints, { date: today, close: spyLivePrice }];
+    return appendOrReplaceIntradayPricePoint(spyPoints, spyLivePrice ?? 0);
   }, [spyPoints, spyLivePrice]);
   const load = useCallback(async () => {
     if (!hasSupabaseConfig()) {

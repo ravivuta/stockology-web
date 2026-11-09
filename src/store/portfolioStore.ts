@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { setLocalStorageItem } from "@/lib/local-storage-quota";
-import { calculateTradingLimits, computeRiskReturnScore, localCalendarDay, rankedTopWatchlistCandidates, recommendedWatchlistSize, selectedAnalystTarget, stockPassesRiskFilter, offloadHoldingOutsideShortlistIfNeeded, raiseCashForMarketOutlookIfNeeded } from "@/lib/ios-recommendation";
+import { calculateTradingLimits, computeRiskReturnScore, localCalendarDay, rankedTopWatchlistCandidates, recommendedWatchlistSize, selectedAnalystTarget, stockPassesRiskFilter, offloadHoldingOutsideShortlistIfNeeded, preferredSymbolsForShortlistIndicator, raiseCashForMarketOutlookIfNeeded } from "@/lib/ios-recommendation";
 import { getRecommendationHistoryCloses } from "@/lib/recommendation-history-cache";
 import { buildRecommendation } from "@/lib/recommendation";
 import type { CsvImportRow, CsvImportTrade } from "@/lib/csvPortfolio";
@@ -948,6 +948,12 @@ function derivePortfolioState(
   }));
 
   const shortlistedSymbols = new Set<string>();
+  const preferredShortlistSymbols = preferredSymbolsForShortlistIndicator(stocksWithRisk, {
+    limitWatchlistSize: shortlistCtx.limitWatchlistSize,
+    enableRiskFilter: shortlistCtx.enableRiskFilter,
+    riskAppetite: shortlistCtx.riskAppetite,
+    portfolioSize,
+  });
 
   if (shortlistCtx.limitWatchlistSize) {
     const holdingSymbols = stocksWithRisk.filter((stock) => stock.quantity > 0 && stock.excludeFromShortlist !== true);
@@ -986,6 +992,9 @@ function derivePortfolioState(
 
   const stocks = stocksWithRisk.map((stock) => {
     const isShortlisted = shortlistedSymbols.has(stock.symbol);
+    const isInWatchlistSize = shortlistCtx.limitWatchlistSize
+      ? preferredShortlistSymbols.has(stock.symbol)
+      : true;
     const gatedRec = isShortlisted
       ? raiseCashForMarketOutlookIfNeeded(
           offloadHoldingOutsideShortlistIfNeeded(stock.recommendation, stock, {
@@ -1019,7 +1028,7 @@ function derivePortfolioState(
     return {
       ...stock,
       isShortlisted,
-      isInWatchlistSize: isShortlisted,
+      isInWatchlistSize,
       recommendation: gatedRec,
     };
   });

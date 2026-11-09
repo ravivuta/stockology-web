@@ -5,12 +5,46 @@ export type ChartRange = (typeof CHART_RANGES)[number];
 
 const MS_DAY = 86400000;
 
+function etCalendarDateString(date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value ?? "";
+  const month = parts.find((part) => part.type === "month")?.value ?? "";
+  const day = parts.find((part) => part.type === "day")?.value ?? "";
+  return `${year}-${month}-${day}`;
+}
+
 /** Parse YYYY-MM-DD to UTC noon ms for chart x-axis / range math. */
 export function parseYmdToUtcNoon(date: string): number {
   const d = date.trim().slice(0, 10);
   const p = d.split("-").map((x) => parseInt(x, 10));
   if (p.length !== 3 || p.some((n) => !Number.isFinite(n))) return NaN;
   return Date.UTC(p[0], p[1] - 1, p[2], 12, 0, 0);
+}
+
+export function appendOrReplaceIntradayPricePoint(
+  points: PricePoint[],
+  livePrice: number,
+  now = new Date()
+): PricePoint[] {
+  if (!Number.isFinite(livePrice) || livePrice <= 0 || points.length === 0) return points;
+
+  const todayEt = etCalendarDateString(now);
+  const next = [...points];
+  const idx = next.findIndex((point) => point.date.slice(0, 10) === todayEt);
+  if (idx >= 0) {
+    const current = next[idx]!;
+    if (Math.abs(current.close - livePrice) <= 0.001) return points;
+    next[idx] = { ...current, date: todayEt, close: livePrice };
+    return next;
+  }
+  const lastClose = next.at(-1)?.close ?? 0;
+  if (Math.abs(lastClose - livePrice) <= 0.001) return points;
+  return [...next, { date: todayEt, close: livePrice }];
 }
 
 /**

@@ -31,6 +31,7 @@ import { evenlySpacedTimeTickValues, evenlySpacedValueTicks } from "@/lib/chart-
 import { APP_CTA_FILL } from "@/lib/appCtaClasses";
 import { formatCompactCurrency, formatCurrency, formatPercent, formatWholeCurrency } from "@/lib/numberFormat";
 import { cn } from "@/lib/utils";
+import { appendOrReplaceIntradayPricePoint } from "@/lib/stock-chart";
 import {
   adjustNetWorthPointsForExternalCashFlows,
   appendOrReplaceLiveSpyComparisonRow,
@@ -93,26 +94,19 @@ function toSpyPriceRows(
   range: ChartRangePreset,
   liveQuote: SpyLiveQuote | null
 ): { rows: ComparisonChartRow[]; usedFullHistoryFallback: boolean } {
-  const withT = spySeries
+  const spyWithIntraday = liveQuote
+    ? appendOrReplaceIntradayPricePoint(
+        spySeries.map((row) => ({ date: row.date, close: row.close })),
+        liveQuote.lastPrice
+      )
+    : spySeries.map((row) => ({ date: row.date, close: row.close }));
+
+  const withT = spyWithIntraday
     .map((s) => ({ t: spyDateToMs(s.date), value: s.close }))
     .filter((p) => p.t > 0 && Number.isFinite(p.value) && p.value > 0)
     .sort((a, b) => a.t - b.t);
   if (withT.length === 0) {
     return { rows: [], usedFullHistoryFallback: false };
-  }
-
-  if (liveQuote && Number.isFinite(liveQuote.lastPrice) && liveQuote.lastPrice > 0) {
-    const nowMs = Date.now();
-    const todayYmd = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(nowMs));
-    const last = withT.at(-1);
-    const lastYmd = last
-      ? new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(last.t))
-      : null;
-    if (last && lastYmd === todayYmd) {
-      last.value = liveQuote.lastPrice;
-    } else {
-      withT.push({ t: nowMs, value: liveQuote.lastPrice });
-    }
   }
 
   const closes = withT.map((p) => p.value);

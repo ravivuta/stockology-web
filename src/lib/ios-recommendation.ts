@@ -934,7 +934,7 @@ function rankInTopWatchlist(
   return index >= 0 ? index + 1 : null;
 }
 
-function rankedStockSlotsForTopN(stocks: IosStockInput[], portfolioSize: number): number {
+export function rankedStockSlotsForTopN(stocks: IosStockInput[], portfolioSize: number): number {
   const totalSlots = recommendedWatchlistSize(portfolioSize);
   const etfSlots = stocks.filter(
     (stock) =>
@@ -1038,6 +1038,9 @@ export function holdingQualifiesForAdd(stock: IosStockInput, ctx: AddGateContext
   if (stock.isETF === true) return true;
 
   if (ctx.limitWatchlistSize) {
+    if (ctx.enableRiskFilter && !stockPassesRiskAppetiteOnly(stock, ctx.riskAppetite, upsidePct(stock), false)) {
+      return false;
+    }
     if ((stock.score ?? 0) <= 50) return false;
     const rank = rankInTopWatchlist(ctx.allStocks, stock.symbol, ctx);
     const size = rankedStockSlotsForTopN(ctx.allStocks, ctx.portfolioSize);
