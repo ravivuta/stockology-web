@@ -506,7 +506,7 @@ export default function DashboardPage() {
                 <span className="justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
                   {homeAmountWithPercent(homeShowsAmountValues, cash, shareOfRow(cash, totalInvested))}
                 </span>
-                <span className="justify-self-center whitespace-nowrap text-center text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
+                <span className="justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
                   -
                 </span>
               </div>
@@ -523,7 +523,7 @@ export default function DashboardPage() {
                     Edit
                   </button>
                 </span>
-                <span className="justify-self-center whitespace-nowrap text-center text-sm tabular-nums text-[color:#0f9aa7]">
+                <span className="justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums text-[color:#0f9aa7]">
                   -
                 </span>
                 <span className="justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums text-[color:#0f9aa7]">
