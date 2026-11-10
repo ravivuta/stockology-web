@@ -592,7 +592,7 @@ export default function DashboardPage() {
             </div>
             {showTodayChange ? (
               <div className="py-2.5">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center gap-2">
                   <span className={`whitespace-nowrap text-sm font-medium ${todayValueClassName}`}>Today:</span>
                   <span className={`whitespace-nowrap text-sm tabular-nums ${todayValueClassName}`}>
                     {homeShowsAmountValues
