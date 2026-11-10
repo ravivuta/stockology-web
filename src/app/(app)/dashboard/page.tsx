@@ -66,7 +66,7 @@ export default function DashboardPage() {
   const [bars, setBars] = useState(true);
   const [showCashEditor, setShowCashEditor] = useState(false);
   const [showFixedIncomeEditor, setShowFixedIncomeEditor] = useState(false);
-  const [stocksSummaryExpanded, setStocksSummaryExpanded] = useState(true);
+  const [stocksSummaryExpanded, setStocksSummaryExpanded] = useState(false);
   const [dashStockDetail, setDashStockDetail] = useState<string | null>(null);
   const [summaryTab, setSummaryTab] = useState<"summary" | "performance">("summary");
   // Pre-seed from the same cache used by DashboardReturnComparison for instant today-value display
@@ -408,7 +408,7 @@ export default function DashboardPage() {
         </div>
         {summaryTab === "summary" ? (
         <>
-        <div className="mt-5 grid items-center gap-8 lg:grid-cols-[auto_minmax(12rem,1fr)_minmax(18rem,1.35fr)] lg:gap-10">
+        <div className="mt-5 grid items-center gap-8 lg:grid-cols-[auto_minmax(42rem,1fr)] lg:gap-16">
           <div className="flex flex-wrap items-center justify-center gap-5 sm:gap-6 lg:contents">
             <motion.div
               className="shrink-0"
@@ -459,13 +459,13 @@ export default function DashboardPage() {
           </div>
 
           <dl className="grid w-full grid-cols-1 gap-0">
-            <div className="grid grid-cols-[minmax(8.5rem,1fr)_minmax(14ch,1fr)_minmax(14ch,1fr)] items-center gap-x-2 border-b border-border/90 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/10">
+            <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4 border-b border-border/90 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/10">
               <span />
               <span className="justify-self-stretch whitespace-nowrap text-left">Current</span>
               <span className="justify-self-stretch whitespace-nowrap text-left">Invested</span>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(8.5rem,1fr)_minmax(14ch,1fr)_minmax(14ch,1fr)] items-center gap-x-2">
+              <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#14b8a6]">
                   Total
                 </span>
@@ -492,7 +492,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(8.5rem,1fr)_minmax(14ch,1fr)_minmax(14ch,1fr)] items-center gap-x-2">
+              <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:var(--dashboard-chart-cash)]">
                   Cash
                   <button
@@ -512,7 +512,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(8.5rem,1fr)_minmax(14ch,1fr)_minmax(14ch,1fr)] items-center gap-x-2">
+              <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#0f9aa7]">
                   Bonds/CDs
                   <button
@@ -532,19 +532,17 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
-              <div className="grid grid-cols-[minmax(8.5rem,1fr)_minmax(14ch,1fr)_minmax(14ch,1fr)] items-center gap-x-2">
-                <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#14b8a6]">
-                  <button
-                    type="button"
-                    onClick={() => setStocksSummaryExpanded((current) => !current)}
-                    className="inline-flex items-center gap-1 text-left"
-                    aria-expanded={stocksSummaryExpanded}
-                    aria-label={stocksSummaryExpanded ? "Collapse stocks breakdown" : "Expand stocks breakdown"}
-                  >
-                    {stocksSummaryExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                    <span>Stocks</span>
-                  </button>
-                </span>
+              <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
+                <button
+                  type="button"
+                  onClick={() => setStocksSummaryExpanded((current) => !current)}
+                  className="inline-flex items-center justify-start gap-1 whitespace-nowrap text-left text-sm font-medium text-[color:#14b8a6] hover:opacity-90"
+                  aria-expanded={stocksSummaryExpanded}
+                  aria-label={stocksSummaryExpanded ? "Collapse stocks breakdown" : "Expand stocks breakdown"}
+                >
+                  <span>Stocks</span>
+                  {stocksSummaryExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                </button>
                 <span className="justify-self-stretch text-left text-sm tabular-nums text-[color:#14b8a6]">
                   {renderSummaryCurrentWithPnLPercent(
                     homeShowsAmountValues,
@@ -559,7 +557,7 @@ export default function DashboardPage() {
                 </span>
               </div>
               {stocksSummaryExpanded ? (
-                <div className="mt-1 grid grid-cols-[minmax(8.5rem,1fr)_minmax(14ch,1fr)_minmax(14ch,1fr)] items-center gap-x-2 gap-y-1 text-xs">
+                <div className="mt-1 grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4 gap-y-1 text-xs">
                   <span className="pl-4 font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
                   <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
                     {renderSummaryCurrentWithPnL(
@@ -594,7 +592,7 @@ export default function DashboardPage() {
             </div>
             {showTodayChange ? (
               <div className="py-2.5">
-                <div className="grid grid-cols-[minmax(8.5rem,1fr)_minmax(14ch,1fr)_minmax(14ch,1fr)] items-center gap-x-2">
+                <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
                   <span className={`whitespace-nowrap text-sm font-medium ${todayValueClassName}`}>Today</span>
                   <span className={`justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums ${todayValueClassName}`}>
                     {homeShowsAmountValues
