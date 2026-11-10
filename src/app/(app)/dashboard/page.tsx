@@ -592,14 +592,13 @@ export default function DashboardPage() {
             </div>
             {showTodayChange ? (
               <div className="py-2.5">
-                <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
-                  <span className={`whitespace-nowrap text-sm font-medium ${todayValueClassName}`}>Today</span>
-                  <span className={`justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums ${todayValueClassName}`}>
+                <div className="flex items-center gap-2">
+                  <span className={`whitespace-nowrap text-sm font-medium ${todayValueClassName}`}>Today:</span>
+                  <span className={`whitespace-nowrap text-sm tabular-nums ${todayValueClassName}`}>
                     {homeShowsAmountValues
                       ? `${formatWholeCurrency(Math.abs(todayChange.change))} (${formatWholePercent(todayChange.percent, true)})`
                       : formatWholePercent(todayChange.percent, true)}
                   </span>
-                  <span aria-hidden />
                 </div>
               </div>
             ) : null}
