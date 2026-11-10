@@ -459,12 +459,12 @@ export default function DashboardPage() {
           </div>
 
           <dl className="grid w-full grid-cols-1 gap-0">
-            <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4 border-b border-border/90 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/10">
+            <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4 border-b border-border/35 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/6">
               <span />
               <span className="justify-self-stretch whitespace-nowrap text-left">Current</span>
               <span className="justify-self-stretch whitespace-nowrap text-left">Invested</span>
             </div>
-            <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
+            <div className="border-b border-border/35 py-2.5 dark:border-foreground/6">
               <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#14b8a6]">
                   Total
@@ -491,7 +491,7 @@ export default function DashboardPage() {
                 </span>
               </div>
             </div>
-            <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
+            <div className="border-b border-border/35 py-2.5 dark:border-foreground/6">
               <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:var(--dashboard-chart-cash)]">
                   Cash
@@ -511,7 +511,7 @@ export default function DashboardPage() {
                 </span>
               </div>
             </div>
-            <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
+            <div className="border-b border-border/35 py-2.5 dark:border-foreground/6">
               <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
                 <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#0f9aa7]">
                   Bonds/CDs
@@ -531,7 +531,7 @@ export default function DashboardPage() {
                 </span>
               </div>
             </div>
-            <div className="border-b border-border/90 py-2.5 dark:border-foreground/10">
+            <div className="border-b border-border/35 py-2.5 dark:border-foreground/6">
               <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
                 <button
                   type="button"
