@@ -743,7 +743,9 @@ export async function parsePortfolioCsv(
     fallback: string[]
   ): string | null => {
     const configured = mapping?.[standard];
-    if (!configured || configured.toLowerCase() === "none") return null;
+    if (configured && configured.toLowerCase() !== "none") {
+      return resolveMappedHeaderKey(headers, mapping, standard, fallback);
+    }
     return resolveMappedHeaderKey(headers, mapping, standard, fallback);
   };
 

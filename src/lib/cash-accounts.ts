@@ -85,14 +85,14 @@ function uid(): string {
 }
 
 export function cashLotQuantity(lots: CashLotBundle | undefined): number {
-  return Math.max(0, (lots?.open ?? []).reduce((sum, lot) => sum + Math.max(0, Number(lot.quantity) || 0), 0));
+  return Math.max(0, (lots?.open ?? []).reduce((sum, lot) => sum + (Number(lot.quantity) || 0), 0));
 }
 
 export function cashByAccount(lots: CashLotBundle | undefined): Record<string, number> {
   const totals = new Map<string, { name: string; amount: number }>();
   for (const lot of lots?.open ?? []) {
     const qty = Number(lot.quantity) || 0;
-    if (qty <= EPSILON) continue;
+    if (Math.abs(qty) <= EPSILON) continue;
     const name = displayAccount(lot.account);
     const key = accountKey(name);
     const existing = totals.get(key);
@@ -116,12 +116,12 @@ export function knownCashAccounts(
   };
 
   for (const lot of lotsBySymbol[CASH_SYMBOL]?.open ?? []) {
-    if ((Number(lot.quantity) || 0) > EPSILON) remember(lot.account);
+    if (Math.abs(Number(lot.quantity) || 0) > EPSILON) remember(lot.account);
   }
   for (const symbol of stockSymbols) {
     if (isCashSymbol(symbol)) continue;
     for (const lot of lotsBySymbol[symbol]?.open ?? []) {
-      if ((Number(lot.quantity) || 0) > EPSILON) remember(lot.account);
+      if (Math.abs(Number(lot.quantity) || 0) > EPSILON) remember(lot.account);
     }
   }
 
@@ -140,7 +140,7 @@ export function migrateCashLots(
   fallbackCash: number
 ): Record<string, CashLotBundle> {
   const existing = lotsBySymbol[CASH_SYMBOL];
-  const hasLots = (existing?.open ?? []).some((lot) => (Number(lot.quantity) || 0) > EPSILON);
+  const hasLots = (existing?.open ?? []).some((lot) => Math.abs(Number(lot.quantity) || 0) > EPSILON);
   if (hasLots) return lotsBySymbol;
   const cash = Math.max(0, fallbackCash);
   if (cash <= EPSILON) return lotsBySymbol;
@@ -213,7 +213,26 @@ export function applyCashDelta(
         }
       }
     }
-    bundle.open = bundle.open.filter((lot) => lot.quantity > EPSILON);
+    if (options?.confineToAccount && remaining > EPSILON) {
+      const key = accountKey(preferred);
+      const index = bundle.open.findIndex((lot) => accountKey(lot.account) === key);
+      if (index >= 0) {
+        bundle.open[index].quantity -= remaining;
+      } else {
+        bundle.open.push({
+          id: uid(),
+          quantity: -remaining,
+          initialQuantity: 0,
+          costBasis: CASH_UNIT_PRICE,
+          purchaseDate: new Date().toISOString(),
+          account: preferred,
+          isRetirementAccount: null,
+          status: "open",
+        });
+      }
+      remaining = 0;
+    }
+    bundle.open = bundle.open.filter((lot) => Math.abs(lot.quantity) > EPSILON);
   }
   return next;
 }
