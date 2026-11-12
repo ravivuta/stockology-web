@@ -1080,6 +1080,11 @@ export function exportPortfolioCsv(
     const bundle = lotsBySymbol?.[s.symbol];
     const openLots = bundle?.open ?? [];
     const soldLots = bundle?.sold ?? [];
+    const fallbackAccount = openLots.find((lot) => (lot.account ?? "").trim().length > 0)?.account;
+    const fallbackRetirement =
+      openLots.length > 0 && openLots.every((lot) => lot.isRetirementAccount === openLots[0]?.isRetirementAccount)
+        ? (openLots[0]?.isRetirementAccount ?? null)
+        : null;
 
     if (openLots.length > 0) {
       for (const lot of openLots) {
@@ -1097,14 +1102,16 @@ export function exportPortfolioCsv(
     }
 
     for (const lot of soldLots) {
+      const soldAccount = (lot.account ?? "").trim() || fallbackAccount || "";
+      const soldRetirement = lot.isRetirementAccount == null ? fallbackRetirement : lot.isRetirementAccount;
       const row = [
         lot.saleDate || "",
         "SELL",
         s.symbol,
         String(lot.quantity),
         lot.salePrice.toFixed(2),
-        lot.account ?? "",
-        lot.isRetirementAccount == null ? "" : lot.isRetirementAccount ? "yes" : "no",
+        soldAccount,
+        soldRetirement == null ? "" : soldRetirement ? "yes" : "no",
       ].map(esc);
       lines.push(row.join(","));
     }

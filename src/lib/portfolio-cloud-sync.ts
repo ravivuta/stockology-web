@@ -84,13 +84,17 @@ function encodeSoldLot(symbol: string, lot: SoldLot): Record<string, unknown> | 
   }
   const originalCostBasis = salePrice - realizedGainLoss / quantity;
   if (!Number.isFinite(originalCostBasis)) return null;
-  return {
+  const payload: Record<string, unknown> = {
     symbol,
     saleDateIntervalSince1970: Date.parse(saleDateIso) / 1000,
     salePrice,
     quantity,
     originalCostBasis,
   };
+  const account = lot.account?.trim();
+  if (account) payload.account = account;
+  if (typeof lot.isRetirementAccount === "boolean") payload.isRetirementAccount = lot.isRetirementAccount;
+  return payload;
 }
 
 function encodeLotHistory(
@@ -221,7 +225,7 @@ export function portfolioSyncFingerprint(state: PortfolioSlice): string {
       .map(([symbol, lots]) => [
         symbol,
         lots.open.map((lot) => [lot.purchaseDate, lot.quantity, lot.costBasis, lot.status, lot.account ?? "", lot.isRetirementAccount ?? null]),
-        lots.sold.map((lot) => [lot.saleDate, lot.quantity, lot.salePrice, lot.realizedGainLoss]),
+        lots.sold.map((lot) => [lot.saleDate, lot.quantity, lot.salePrice, lot.realizedGainLoss, lot.account ?? "", lot.isRetirementAccount ?? null]),
       ]),
   });
 }
@@ -248,7 +252,7 @@ export function portfolioHoldingsIdentityFingerprint(state: PortfolioSlice): str
       .map(([symbol, lots]) => [
         symbol,
         lots.open.map((lot) => [lot.purchaseDate, lot.quantity, lot.costBasis, lot.status, lot.account ?? "", lot.isRetirementAccount ?? null]),
-        lots.sold.map((lot) => [lot.saleDate, lot.quantity, lot.salePrice, lot.realizedGainLoss]),
+        lots.sold.map((lot) => [lot.saleDate, lot.quantity, lot.salePrice, lot.realizedGainLoss, lot.account ?? "", lot.isRetirementAccount ?? null]),
       ]),
   });
 }
@@ -373,7 +377,7 @@ export function portfolioHoldingsStructuralFingerprint(state: PortfolioSlice): s
       .map(([symbol, lots]) => [
         symbol,
         lots.open.map((lot) => [lot.purchaseDate, lot.quantity, lot.costBasis, lot.status, lot.account ?? "", lot.isRetirementAccount ?? null]),
-        lots.sold.map((lot) => [lot.saleDate, lot.quantity, lot.salePrice, lot.realizedGainLoss]),
+        lots.sold.map((lot) => [lot.saleDate, lot.quantity, lot.salePrice, lot.realizedGainLoss, lot.account ?? "", lot.isRetirementAccount ?? null]),
       ]),
   });
 }
