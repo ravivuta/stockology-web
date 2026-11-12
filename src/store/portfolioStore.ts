@@ -2589,7 +2589,7 @@ export const usePortfolioStore = create<State>()(
                   salePrice: Math.max(0, salePrice),
                   realizedGainLoss: 0,
                   account: displayAccount(sellAccount),
-                  isRetirementAccount: null,
+                  isRetirementAccount: trade.isRetirementAccount ?? null,
                 });
                 accountSaleEvents.push({
                   symbol,
