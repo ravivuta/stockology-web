@@ -45,6 +45,8 @@ export type SoldLot = {
   isRetirementAccount?: boolean | null;
 };
 
+const SOLD_LOT_RETENTION_DAYS = 30;
+
 /** One recorded trade — used for history and LIFO undo. */
 export type TradeJournalEntry = {
   id: string;
@@ -205,6 +207,7 @@ type State = {
   setOptimizing: (v: boolean) => void;
   setOnboardingComplete: (v: boolean) => void;
   setHomeShowsAmountValues: (v: boolean) => void;
+  cleanupSoldLotsOlderThanRetention: (retentionDays?: number) => { removedLots: number; cleanedSymbols: number };
   optimizeStock: (symbol: string) => Promise<{ ok: boolean; error?: string }>;
   optimizePendingStocks: () => Promise<number>;
   markAllPendingOptimization: () => number;
@@ -2025,6 +2028,46 @@ export const usePortfolioStore = create<State>()(
       setOptimizing: (v) => set({ optimizing: v }),
       setOnboardingComplete: (v) => set({ onboardingComplete: v }),
       setHomeShowsAmountValues: (v) => set({ homeShowsAmountValues: v }),
+      cleanupSoldLotsOlderThanRetention: (retentionDays = SOLD_LOT_RETENTION_DAYS) => {
+        const validDays = Number.isFinite(retentionDays) && retentionDays > 0 ? retentionDays : SOLD_LOT_RETENTION_DAYS;
+        const cutoffMs = Date.now() - validDays * 24 * 60 * 60 * 1000;
+        let removedLots = 0;
+        let cleanedSymbols = 0;
+
+        set((st) => {
+          let changed = false;
+          const nextLotsBySymbol: State["lotsBySymbol"] = { ...st.lotsBySymbol };
+
+          for (const [symbol, bundle] of Object.entries(st.lotsBySymbol)) {
+            if (!bundle.sold.length) continue;
+
+            const filteredSold = bundle.sold.filter((lot) => {
+              const saleMs = Date.parse(lot.saleDate);
+              if (!Number.isFinite(saleMs)) return true;
+              return saleMs >= cutoffMs;
+            });
+
+            const removedForSymbol = bundle.sold.length - filteredSold.length;
+            if (removedForSymbol <= 0) continue;
+
+            removedLots += removedForSymbol;
+            cleanedSymbols += 1;
+            changed = true;
+            nextLotsBySymbol[symbol] = {
+              open: bundle.open.map(cloneTradeLot),
+              sold: filteredSold.map(cloneSoldLot),
+            };
+          }
+
+          if (!changed) return {};
+          return {
+            lotsBySymbol: nextLotsBySymbol,
+            lastLocalMutationAt: new Date().toISOString(),
+          };
+        });
+
+        return { removedLots, cleanedSymbols };
+      },
       optimizeStock: async (symbol) => {
         const sym = symbol.trim().toUpperCase();
         const current = get();

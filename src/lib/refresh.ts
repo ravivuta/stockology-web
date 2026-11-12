@@ -33,6 +33,8 @@ type RefreshPipelineResponse = {
   stale_symbols?: string[];
 };
 
+const SOLD_LOT_CLEANUP_LAST_ET_DATE_KEY = "stocks-pm-sold-lot-cleanup-last-et-date";
+
 export type RefreshPipelineResult = {
   ok: boolean;
   message?: string;
@@ -144,6 +146,32 @@ function sanitizeSymbols(symbols: string[]): string[] {
     if (out.length >= MAX_REFRESH_SYMBOLS) break;
   }
   return out;
+}
+
+function etCalendarDateString(d = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(d);
+}
+
+async function runDailySoldLotCleanupIfNeeded(): Promise<void> {
+  if (typeof window === "undefined") return;
+
+  const todayEt = etCalendarDateString();
+  try {
+    if (window.localStorage.getItem(SOLD_LOT_CLEANUP_LAST_ET_DATE_KEY) === todayEt) return;
+  } catch {
+    return;
+  }
+
+  const { removedLots } = usePortfolioStore.getState().cleanupSoldLotsOlderThanRetention();
+  try {
+    window.localStorage.setItem(SOLD_LOT_CLEANUP_LAST_ET_DATE_KEY, todayEt);
+  } catch {
+    // Ignore storage write failures; cleanup already ran for this tab.
+  }
+
+  if (removedLots > 0) {
+    await flushCurrentPortfolioSnapshotNow(true);
+  }
 }
 
 export async function runRefreshPipeline(
@@ -267,6 +295,8 @@ export async function runRefreshPipeline(
         await flushCurrentPortfolioSnapshotNow(true);
       }
     }
+
+    await runDailySoldLotCleanupIfNeeded();
 
     usePortfolioStore.setState({
       lastRefreshAt: data.refreshed_at ?? new Date().toISOString(),
