@@ -91,6 +91,8 @@ type RawSoldLot = {
   quantity?: number;
   originalCostBasis?: number;
   saleDateIntervalSince1970?: number;
+  account?: string | null;
+  isRetirementAccount?: boolean | null;
 };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -158,7 +160,14 @@ function mapSoldLot(raw: RawSoldLot): SoldLot | null {
   const saleDate = new Date(interval * 1000).toISOString();
   const realized =
     Number.isFinite(basis) ? (price - basis) * qty : (price - price) * qty;
-  return { saleDate, quantity: qty, salePrice: price, realizedGainLoss: realized };
+  return {
+    saleDate,
+    quantity: qty,
+    salePrice: price,
+    realizedGainLoss: realized,
+    account: typeof raw.account === "string" ? raw.account : "",
+    isRetirementAccount: typeof raw.isRetirementAccount === "boolean" ? raw.isRetirementAccount : null,
+  };
 }
 
 function parseRawHolding(raw: unknown): { stock: StockHolding; lots: { open: TradeLot[]; sold: SoldLot[] } } | null {

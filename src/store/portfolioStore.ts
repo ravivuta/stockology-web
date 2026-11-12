@@ -41,6 +41,8 @@ export type SoldLot = {
   quantity: number;
   salePrice: number;
   realizedGainLoss: number;
+  account?: string;
+  isRetirementAccount?: boolean | null;
 };
 
 /** One recorded trade — used for history and LIFO undo. */
@@ -1653,6 +1655,8 @@ export const usePortfolioStore = create<State>()(
             quantity: sellQty,
             salePrice: price,
             realizedGainLoss,
+            account: displayAccount(creditAccount),
+            isRetirementAccount: null,
           });
           lots[sym] = cur;
           const ctx: RecalcContext = {
@@ -1717,6 +1721,8 @@ export const usePortfolioStore = create<State>()(
               quantity: sellQty,
               salePrice: price,
               realizedGainLoss,
+              account: accountName,
+              isRetirementAccount: targetLot.isRetirementAccount ?? null,
             },
             ...updated.sold,
           ];
@@ -2309,6 +2315,8 @@ export const usePortfolioStore = create<State>()(
                   quantity: removedQty,
                   salePrice: averageCost,
                   realizedGainLoss: 0,
+                  account: accountName,
+                  isRetirementAccount: accountLots[0]?.isRetirementAccount ?? null,
                 });
                 accountSaleEvents.push({ symbol, account: accountName, qty: removedQty });
               }
@@ -2580,6 +2588,8 @@ export const usePortfolioStore = create<State>()(
                   quantity: soldQty,
                   salePrice: Math.max(0, salePrice),
                   realizedGainLoss: 0,
+                  account: displayAccount(sellAccount),
+                  isRetirementAccount: null,
                 });
                 accountSaleEvents.push({
                   symbol,

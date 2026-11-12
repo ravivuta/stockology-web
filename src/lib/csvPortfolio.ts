@@ -1066,7 +1066,7 @@ export function exportPortfolioCsv(
     string,
     {
       open: Array<{ quantity: number; costBasis: number; purchaseDate: string; account?: string; isRetirementAccount?: boolean | null }>;
-      sold: Array<{ quantity: number; saleDate?: string; salePrice: number; account?: string }>;
+      sold: Array<{ quantity: number; saleDate?: string; salePrice: number; account?: string; isRetirementAccount?: boolean | null }>;
     }
   >
 ): string {
@@ -1104,7 +1104,7 @@ export function exportPortfolioCsv(
         String(lot.quantity),
         lot.salePrice.toFixed(2),
         lot.account ?? "",
-        "",
+        lot.isRetirementAccount == null ? "" : lot.isRetirementAccount ? "yes" : "no",
       ].map(esc);
       lines.push(row.join(","));
     }
