@@ -76,6 +76,8 @@ export type CashLotBundle = { open: Array<{
   quantity: number;
   salePrice: number;
   realizedGainLoss: number;
+  account?: string;
+  isRetirementAccount?: boolean | null;
 }> };
 
 function uid(): string {
@@ -249,4 +251,3 @@ function debitAt(bundle: CashLotBundle, index: number, remaining: number): numbe
   bundle.open[index].quantity = Math.max(0, available - take);
   return remaining - take;
 }
-
