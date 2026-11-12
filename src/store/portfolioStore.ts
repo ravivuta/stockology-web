@@ -2596,6 +2596,18 @@ export const usePortfolioStore = create<State>()(
                   account: displayAccount(sellAccount),
                   qty: soldQty,
                 });
+              } else {
+                // Preserve imported historical SELL rows even when no open lots are reducible
+                // for this account/symbol snapshot. This keeps recent sold-lot history available
+                // for 30-day wash-sale checks and CSV round-trips.
+                bundle.sold.unshift({
+                  saleDate: trade.tradeDate || defaultImportPurchaseDate(),
+                  quantity: qty,
+                  salePrice: Math.max(0, salePrice),
+                  realizedGainLoss: 0,
+                  account: displayAccount(sellAccount),
+                  isRetirementAccount: trade.isRetirementAccount ?? null,
+                });
               }
               lotsBySymbol[symbol] = bundle;
               const summary = summarizeOpenLots(bundle.open);
