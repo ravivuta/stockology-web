@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { ChevronDown, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { PortfolioDonut } from "@/components/dashboard/PortfolioDonut";
@@ -77,7 +77,6 @@ export default function DashboardPage() {
   const [bars, setBars] = useState(true);
   const [dashStockDetail, setDashStockDetail] = useState<string | null>(null);
   const [summaryTab, setSummaryTab] = useState<"summary" | "performance">("summary");
-  const [summaryComparisonExpanded, setSummaryComparisonExpanded] = useState(false);
   // Pre-seed from the same cache used by DashboardReturnComparison for instant today-value display
   const [cloudHistory, setCloudHistory] = useState<NetWorthPoint[] | null>(() => {
     try {
@@ -578,45 +577,33 @@ export default function DashboardPage() {
           <div className="space-y-4">
             {summaryComparisonRows.length > 0 ? (
               <div className="w-full rounded-xl border border-border/60 bg-background/70 px-3 py-3 dark:bg-white/[0.04]">
-                <button
-                  type="button"
-                  onClick={() => setSummaryComparisonExpanded((v) => !v)}
-                  className="flex w-full items-center justify-between gap-2 text-left"
-                  aria-expanded={summaryComparisonExpanded}
-                >
-                  <span className="text-xs font-semibold text-foreground">Portfolio % vs recommended %</span>
-                  {summaryComparisonExpanded ? <ChevronDown className="h-3.5 w-3.5 text-subtle" /> : <ChevronRight className="h-3.5 w-3.5 text-subtle" />}
-                </button>
-                {summaryComparisonExpanded ? (
-                  <>
-                    <p className="mt-0.5 text-[11px] text-subtle">Actual % of invested portfolio against target %</p>
-                    <div className="mt-3 space-y-2.5">
-                      {summaryComparisonRows.map((row) => {
-                        const actualPct = Math.max(0, row.actualPct);
-                        const targetPct = Math.max(0, row.targetPct);
-                        return (
-                          <div key={row.key} className="space-y-1">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-[11px] font-semibold text-foreground">{row.label}</p>
-                              <p className="text-[11px] tabular-nums text-subtle">
-                                {Math.round(actualPct)}% / {Math.round(targetPct)}%
-                              </p>
-                            </div>
-                            <div className="h-2.5 overflow-hidden rounded-full bg-muted/70 dark:bg-white/10">
-                              <div className="h-full rounded-full" style={{ width: `${Math.min(actualPct, 100)}%`, backgroundColor: row.color }} />
-                            </div>
-                            <div className="h-1.5 overflow-hidden rounded-full bg-muted/60 dark:bg-white/8">
-                              <div
-                                className="h-full rounded-full"
-                                style={{ width: `${Math.min(targetPct, 100)}%`, backgroundColor: row.targetColor }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                ) : null}
+                <span className="text-xs font-semibold text-foreground">Portfolio % vs recommended %</span>
+                <p className="mt-0.5 text-[11px] text-subtle">Actual % of invested portfolio against target %</p>
+                <div className="mt-3 space-y-2.5">
+                  {summaryComparisonRows.map((row) => {
+                    const actualPct = Math.max(0, row.actualPct);
+                    const targetPct = Math.max(0, row.targetPct);
+                    return (
+                      <div key={row.key} className="space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-[11px] font-semibold text-foreground">{row.label}</p>
+                          <p className="text-[11px] tabular-nums text-subtle">
+                            {Math.round(actualPct)}% / {Math.round(targetPct)}%
+                          </p>
+                        </div>
+                        <div className="h-2.5 overflow-hidden rounded-full bg-muted/70 dark:bg-white/10">
+                          <div className="h-full rounded-full" style={{ width: `${Math.min(actualPct, 100)}%`, backgroundColor: row.color }} />
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-muted/60 dark:bg-white/8">
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${Math.min(targetPct, 100)}%`, backgroundColor: row.targetColor }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             ) : null}
 
@@ -642,7 +629,7 @@ export default function DashboardPage() {
                   )}
                 </span>
                 <span className="justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
-                  {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, holdingsCostBasis))}
+                  {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfPortfolio(stockCostBasisOnly, holdingsCostBasis))}
                 </span>
               </div>
               <div className="mt-1 grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4 text-xs">
@@ -659,7 +646,7 @@ export default function DashboardPage() {
                   )}
                 </span>
                 <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
-                  {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, holdingsCostBasis))}
+                  {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfPortfolio(etfCostBasis, holdingsCostBasis))}
                 </span>
               </div>
               <div className="my-1 border-t border-border/35 dark:border-foreground/6" />
@@ -677,7 +664,7 @@ export default function DashboardPage() {
                   )}
                 </span>
                 <span className="justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
-                  {homeAmountWithPercent(homeShowsAmountValues, holdingsCostBasis, shareOfRow(holdingsCostBasis, totalInvested))}
+                  {homeAmountWithPercent(homeShowsAmountValues, holdingsCostBasis, shareOfPortfolio(holdingsCostBasis, totalInvested))}
                 </span>
               </div>
             </div>
@@ -958,6 +945,10 @@ export default function DashboardPage() {
 function shareOfRow(part: number, total: number): string {
   const pct = total > 0.0001 ? (part / total) * 100 : 0;
   return `${Math.round(pct)}%`;
+}
+
+function shareOfPortfolio(part: number, total: number): string {
+  return `${shareOfRow(part, total)} of portfolio`;
 }
 
 function homeAmountWithPercent(showAmounts: boolean, value: number, percent: string): string {
