@@ -3,15 +3,13 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { ChevronDown, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { PortfolioDonut } from "@/components/dashboard/PortfolioDonut";
 import { StockDetailExpandPanel } from "@/components/stock/StockDetailExpandPanel";
 import { RecommendedActionsWidget } from "@/components/dashboard/RecommendedActionsWidget";
 import { DashboardReturnComparison } from "@/components/dashboard/DashboardReturnComparison";
-import { CashAccountsEditor } from "@/components/dashboard/CashAccountsEditor";
-import { FixedIncomeAccountsEditor } from "@/components/dashboard/FixedIncomeAccountsEditor";
 import { setLocalStorageItem, shouldPersistRegenerableCache } from "@/lib/local-storage-quota";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
@@ -64,9 +62,6 @@ export default function DashboardPage() {
   const fixedIncomeByAccount = usePortfolioStore((s) => s.fixedIncomeByAccount);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
   const [bars, setBars] = useState(true);
-  const [showCashEditor, setShowCashEditor] = useState(false);
-  const [showFixedIncomeEditor, setShowFixedIncomeEditor] = useState(false);
-  const [stocksSummaryExpanded, setStocksSummaryExpanded] = useState(false);
   const [dashStockDetail, setDashStockDetail] = useState<string | null>(null);
   const [summaryTab, setSummaryTab] = useState<"summary" | "performance">("summary");
   // Pre-seed from the same cache used by DashboardReturnComparison for instant today-value display
@@ -125,8 +120,8 @@ export default function DashboardPage() {
   const homeShowsAmountValues = usePortfolioStore((s) => s.homeShowsAmountValues);
   const setHomeShowsAmountValues = usePortfolioStore((s) => s.setHomeShowsAmountValues);
   const todayStatusLoading = cloudHistory === null && hasSupabaseConfig();
-  const cashEquivalent = cash + fixedIncomeValue;
-  const cashEquivalentSharePct = totalBalance > 0.0001 ? (cashEquivalent / totalBalance) * 100 : 0;
+  const cashSharePct = totalBalance > 0.0001 ? (cash / totalBalance) * 100 : 0;
+  const fixedIncomeSharePct = totalBalance > 0.0001 ? (fixedIncomeValue / totalBalance) * 100 : 0;
   const totalPnlTextClass =
     holdingsPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]";
   const todayText = showTodayChange
@@ -452,7 +447,7 @@ export default function DashboardPage() {
         </div>
         {summaryTab === "summary" ? (
         <>
-        <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2 dark:bg-white/[0.04]">
             <p className="text-[11px] font-semibold text-subtle">Total value</p>
             <p className="mt-1 text-sm font-semibold tabular-nums text-[color:#14b8a6]">
@@ -474,11 +469,19 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2 dark:bg-white/[0.04]">
-            <p className="text-[11px] font-semibold text-subtle">Cash-equivalent</p>
+            <p className="text-[11px] font-semibold text-subtle">Cash</p>
             <p className="mt-1 text-sm font-semibold tabular-nums text-[color:var(--dashboard-chart-cash)]">
               {homeShowsAmountValues
-                ? `${formatSummaryNumber(cashEquivalent)} (${Math.round(cashEquivalentSharePct)}%)`
-                : `${Math.round(cashEquivalentSharePct)}%`}
+                ? `${formatSummaryNumber(cash)} (${Math.round(cashSharePct)}%)`
+                : `${Math.round(cashSharePct)}%`}
+            </p>
+          </div>
+          <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2 dark:bg-white/[0.04]">
+            <p className="text-[11px] font-semibold text-subtle">Bonds/CDs</p>
+            <p className="mt-1 text-sm font-semibold tabular-nums text-[#0f9aa7]">
+              {homeShowsAmountValues
+                ? `${formatSummaryNumber(fixedIncomeValue)} (${Math.round(fixedIncomeSharePct)}%)`
+                : `${Math.round(fixedIncomeSharePct)}%`}
             </p>
           </div>
         </div>
@@ -569,83 +572,9 @@ export default function DashboardPage() {
             </div>
             <div className="border-b border-border/35 py-2.5 dark:border-foreground/6">
               <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
-                <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#14b8a6]">
-                  Total
+                <span className="inline-flex items-center justify-start gap-1 whitespace-nowrap text-left text-sm font-medium text-[color:#14b8a6]">
+                  Stocks
                 </span>
-                <span className="justify-self-stretch text-left text-sm tabular-nums text-[color:#14b8a6]">
-                  {renderSummaryCurrentWithPnL(
-                    homeShowsAmountValues,
-                    totalBalance,
-                    holdingsPnL,
-                    totalPnLPct,
-                    "text-[color:#14b8a6]",
-                    holdingsPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"
-                  )}
-                </span>
-                <span className="justify-self-stretch text-left text-sm tabular-nums text-[color:#14b8a6]">
-                  {homeShowsAmountValues ? (
-                    <span className="inline-flex flex-col leading-tight">
-                      <span>{formatSummaryNumberThreeDecimal(totalInvested)}</span>
-                      <span className="text-[10px]">({shareOfRow(totalInvested, totalInvested)})</span>
-                    </span>
-                  ) : (
-                    shareOfRow(totalInvested, totalInvested)
-                  )}
-                </span>
-              </div>
-            </div>
-            <div className="border-b border-border/35 py-2.5 dark:border-foreground/6">
-              <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
-                <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:var(--dashboard-chart-cash)]">
-                  Cash
-                  <button
-                    type="button"
-                    onClick={() => setShowCashEditor(true)}
-                    className="ml-[4ch] rounded border border-current px-2 py-0.5 text-[11px] font-semibold leading-none text-[color:var(--dashboard-chart-cash)] hover:bg-foreground/5"
-                  >
-                    Edit
-                  </button>
-                </span>
-                <span className="justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
-                  {homeAmountWithPercent(homeShowsAmountValues, cash, shareOfRow(cash, totalInvested))}
-                </span>
-                <span className="justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums text-[color:var(--dashboard-chart-cash)]">
-                  -
-                </span>
-              </div>
-            </div>
-            <div className="border-b border-border/35 py-2.5 dark:border-foreground/6">
-              <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
-                <span className="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-[color:#0f9aa7]">
-                  Bonds/CDs
-                  <button
-                    type="button"
-                    onClick={() => setShowFixedIncomeEditor(true)}
-                    className="ml-[1ch] rounded border border-current px-2 py-0.5 text-[11px] font-semibold leading-none text-[color:#0f9aa7] hover:bg-foreground/5"
-                  >
-                    Edit
-                  </button>
-                </span>
-                <span className="justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums text-[color:#0f9aa7]">
-                  -
-                </span>
-                <span className="justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums text-[color:#0f9aa7]">
-                  {homeAmountWithPercent(homeShowsAmountValues, fixedIncomeValue, shareOfRow(fixedIncomeValue, totalInvested))}
-                </span>
-              </div>
-            </div>
-            <div className="border-b border-border/35 py-2.5 dark:border-foreground/6">
-              <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
-                <button
-                  type="button"
-                  onClick={() => setStocksSummaryExpanded((current) => !current)}
-                  className="inline-flex items-center justify-start gap-1 whitespace-nowrap text-left text-sm font-medium text-[color:#14b8a6] hover:opacity-90"
-                  aria-expanded={stocksSummaryExpanded}
-                  aria-label={stocksSummaryExpanded ? "Collapse stocks breakdown" : "Expand stocks breakdown"}
-                >
-                  <span>Stocks</span>
-                  {stocksSummaryExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                </button>
                 <span className="justify-self-stretch text-left text-sm tabular-nums text-[color:#14b8a6]">
                   {renderSummaryCurrentWithPnLPercent(
                     homeShowsAmountValues,
@@ -659,52 +588,38 @@ export default function DashboardPage() {
                   {homeAmountWithPercent(homeShowsAmountValues, holdingsCostBasis, shareOfRow(holdingsCostBasis, totalInvested))}
                 </span>
               </div>
-              {stocksSummaryExpanded ? (
-                <div className="mt-1 grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4 gap-y-1 text-xs">
-                  <span className="pl-4 font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
-                  <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
-                    {renderSummaryCurrentWithPnL(
-                      homeShowsAmountValues,
-                      etfValue,
-                      etfPnL,
-                      etfPnLPct,
-                      "",
-                      etfPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]",
-                      ETF_PATTERN_PRIMARY
-                    )}
-                  </span>
-                  <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
-                    {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, holdingsCostBasis))}
-                  </span>
-                  <span className="pl-4 font-semibold text-[color:#14b8a6]">Stocks:</span>
-                  <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums text-[color:#14b8a6]">
-                    {renderSummaryCurrentWithPnL(
-                      homeShowsAmountValues,
-                      stockValueOnly,
-                      stockPnL,
-                      stockPnLPct,
-                      "text-[color:#14b8a6]",
-                      stockPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"
-                    )}
-                  </span>
-                  <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums text-[color:var(--dashboard-chart-cost-basis)]">
-                    {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, holdingsCostBasis))}
-                  </span>
-                </div>
-              ) : null}
-            </div>
-            {showTodayChange ? (
-              <div className="py-2.5">
-                <div className="flex items-center justify-center gap-2">
-                  <span className={`whitespace-nowrap text-sm font-medium ${todayValueClassName}`}>Today:</span>
-                  <span className={`whitespace-nowrap text-sm tabular-nums ${todayValueClassName}`}>
-                    {homeShowsAmountValues
-                      ? `${formatWholeCurrency(Math.abs(todayChange.change))} (${formatWholePercent(todayChange.percent, true)})`
-                      : formatWholePercent(todayChange.percent, true)}
-                  </span>
-                </div>
+              <div className="mt-1 grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4 gap-y-1 text-xs">
+                <span className="pl-4 font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
+                <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
+                  {renderSummaryCurrentWithPnL(
+                    homeShowsAmountValues,
+                    etfValue,
+                    etfPnL,
+                    etfPnLPct,
+                    "",
+                    etfPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]",
+                    ETF_PATTERN_PRIMARY
+                  )}
+                </span>
+                <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
+                  {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, holdingsCostBasis))}
+                </span>
+                <span className="pl-4 font-semibold text-[color:#14b8a6]">Stocks:</span>
+                <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums text-[color:#14b8a6]">
+                  {renderSummaryCurrentWithPnL(
+                    homeShowsAmountValues,
+                    stockValueOnly,
+                    stockPnL,
+                    stockPnLPct,
+                    "text-[color:#14b8a6]",
+                    stockPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"
+                  )}
+                </span>
+                <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums text-[color:var(--dashboard-chart-cost-basis)]">
+                  {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, holdingsCostBasis))}
+                </span>
               </div>
-            ) : null}
+            </div>
           </dl>
         </div>
         <p className="mt-4 text-[11px] leading-relaxed text-subtle">
@@ -974,8 +889,6 @@ export default function DashboardPage() {
           </div>
         ) : null}
       </motion.section>
-      <CashAccountsEditor open={showCashEditor} onClose={() => setShowCashEditor(false)} />
-      <FixedIncomeAccountsEditor open={showFixedIncomeEditor} onClose={() => setShowFixedIncomeEditor(false)} />
     </div>
   );
 }
@@ -1050,16 +963,6 @@ function formatSummaryNumber(value: number): string {
     return `${sign}${Math.round(absValue / 1_000)}k`;
   }
   return `${sign}${Math.round(absValue)}`;
-}
-
-function formatSummaryNumberThreeDecimal(value: number): string {
-  const absValue = Math.abs(value);
-  const sign = value < 0 ? "-" : "";
-  if (absValue >= 1_000) {
-    const thousands = Math.round(absValue / 1_000);
-    return `${sign}${thousands.toLocaleString("en-US")}K`;
-  }
-  return `${sign}${Math.round(absValue).toLocaleString("en-US")}`;
 }
 
 type Row = {
