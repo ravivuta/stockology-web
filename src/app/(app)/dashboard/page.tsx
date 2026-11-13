@@ -608,12 +608,12 @@ export default function DashboardPage() {
             ) : null}
 
             <dl className="grid w-full grid-cols-1 gap-0">
-            <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4 border-b border-border/25 pb-1 text-[11px] font-semibold text-subtle dark:border-white/8">
+            <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4 border-b border-border/15 pb-1 text-[11px] font-semibold text-subtle dark:border-white/6">
               <span />
               <span className="justify-self-stretch whitespace-nowrap text-left">Current</span>
               <span className="justify-self-stretch whitespace-nowrap text-left">Invested</span>
             </div>
-            <div className="border-b border-border/25 py-2.5 dark:border-white/8">
+            <div className="border-b border-border/15 py-2.5 dark:border-white/6">
               <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
                 <span className="inline-flex items-center justify-start gap-1 whitespace-nowrap text-left text-sm font-semibold text-[color:#14b8a6]">
                   Stocks
@@ -649,7 +649,7 @@ export default function DashboardPage() {
                   {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfPortfolio(etfCostBasis, holdingsCostBasis))}
                 </span>
               </div>
-              <div className="my-1 border-t border-border/25 dark:border-white/8" />
+              <div className="my-1 border-t border-border/15 dark:border-white/6" />
               <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
                 <span className="inline-flex items-center justify-start gap-1 whitespace-nowrap text-left text-sm font-medium text-[color:#14b8a6]">
                   Total Equities
