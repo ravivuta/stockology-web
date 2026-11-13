@@ -125,6 +125,50 @@ export default function DashboardPage() {
   const homeShowsAmountValues = usePortfolioStore((s) => s.homeShowsAmountValues);
   const setHomeShowsAmountValues = usePortfolioStore((s) => s.setHomeShowsAmountValues);
   const todayStatusLoading = cloudHistory === null && hasSupabaseConfig();
+  const cashEquivalent = cash + fixedIncomeValue;
+  const cashEquivalentSharePct = totalBalance > 0.0001 ? (cashEquivalent / totalBalance) * 100 : 0;
+  const totalPnlTextClass =
+    holdingsPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]";
+  const todayText = showTodayChange
+    ? homeShowsAmountValues
+      ? `${formatWholeCurrency(Math.abs(todayChange.change))} (${formatWholePercent(todayChange.percent, true)})`
+      : formatWholePercent(todayChange.percent, true)
+    : "—";
+  const summaryComparisonRows = [
+    {
+      key: "cash",
+      label: "Cash",
+      current: cash,
+      invested: 0,
+      color: "var(--dashboard-chart-cash)",
+      investedColor: "transparent",
+    },
+    {
+      key: "fixed-income",
+      label: "Bonds/CDs",
+      current: fixedIncomeValue,
+      invested: fixedIncomeValue,
+      color: "#0f9aa7",
+      investedColor: "#0f9aa7",
+    },
+    {
+      key: "stocks",
+      label: "Stocks",
+      current: stockValueOnly,
+      invested: stockCostBasisOnly,
+      color: "#14b8a6",
+      investedColor: "var(--dashboard-chart-cost-basis)",
+    },
+    {
+      key: "etf",
+      label: "ETF",
+      current: etfValue,
+      invested: etfCostBasis,
+      color: "var(--dashboard-chart-cost-basis)",
+      investedColor: "var(--dashboard-chart-cost-basis)",
+    },
+  ] as const;
+  const summaryComparisonDenominator = Math.max(totalBalance, totalInvested, 0.0001);
 
   const pieData = useMemo(() => {
     if (isProfitable) {
@@ -408,8 +452,38 @@ export default function DashboardPage() {
         </div>
         {summaryTab === "summary" ? (
         <>
-        <div className="mt-5 grid items-center gap-8 lg:grid-cols-[auto_minmax(42rem,1fr)] lg:gap-16">
-          <div className="flex flex-wrap items-center justify-center gap-5 sm:gap-6 lg:contents">
+        <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2 dark:bg-white/[0.04]">
+            <p className="text-[11px] font-semibold text-subtle">Total value</p>
+            <p className="mt-1 text-sm font-semibold tabular-nums text-[color:#14b8a6]">
+              {homeShowsAmountValues ? formatSummaryNumber(totalBalance) : "••••"}
+            </p>
+          </div>
+          <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2 dark:bg-white/[0.04]">
+            <p className="text-[11px] font-semibold text-subtle">Today</p>
+            <p className={`mt-1 text-sm font-semibold tabular-nums ${showTodayChange ? todayValueClassName : "text-subtle"}`}>
+              {todayText}
+            </p>
+          </div>
+          <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2 dark:bg-white/[0.04]">
+            <p className="text-[11px] font-semibold text-subtle">Total P/L</p>
+            <p className={`mt-1 text-sm font-semibold tabular-nums ${totalPnlTextClass}`}>
+              {homeShowsAmountValues
+                ? `${formatSummaryNumber(holdingsPnL)} (${formatWholePercent(totalPnLPct, true)})`
+                : formatWholePercent(totalPnLPct, true)}
+            </p>
+          </div>
+          <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2 dark:bg-white/[0.04]">
+            <p className="text-[11px] font-semibold text-subtle">Cash-equivalent</p>
+            <p className="mt-1 text-sm font-semibold tabular-nums text-[color:var(--dashboard-chart-cash)]">
+              {homeShowsAmountValues
+                ? `${formatSummaryNumber(cashEquivalent)} (${Math.round(cashEquivalentSharePct)}%)`
+                : `${Math.round(cashEquivalentSharePct)}%`}
+            </p>
+          </div>
+        </div>
+        <div className="mt-5 grid items-center gap-8 xl:grid-cols-[auto_minmax(42rem,1fr)] xl:gap-16">
+          <div className="flex flex-col items-stretch justify-center gap-5 sm:gap-6 lg:flex-row lg:items-center xl:contents">
             <motion.div
               className="shrink-0"
               initial={reduceMotion ? false : { opacity: 0, scale: 0.92 }}
@@ -456,6 +530,35 @@ export default function DashboardPage() {
                 totalValueClassName="text-[color:var(--dashboard-chart-center-text)]"
               />
             </motion.div>
+            <div className="w-full rounded-xl border border-border/60 bg-background/70 px-3 py-3 dark:bg-white/[0.04] lg:min-w-[18rem] lg:max-w-[26rem] xl:max-w-none">
+              <p className="text-xs font-semibold text-foreground">Current vs invested</p>
+              <p className="mt-0.5 text-[11px] text-subtle">Category-level share of portfolio</p>
+              <div className="mt-3 space-y-2.5">
+                {summaryComparisonRows.map((row) => {
+                  const currentPct = Math.max(0, (row.current / summaryComparisonDenominator) * 100);
+                  const investedPct = Math.max(0, (row.invested / summaryComparisonDenominator) * 100);
+                  return (
+                    <div key={row.key} className="space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-semibold text-foreground">{row.label}</p>
+                        <p className="text-[11px] tabular-nums text-subtle">
+                          {Math.round(currentPct)}% / {Math.round(investedPct)}%
+                        </p>
+                      </div>
+                      <div className="h-2.5 overflow-hidden rounded-full bg-muted/70 dark:bg-white/10">
+                        <div className="h-full rounded-full" style={{ width: `${Math.min(currentPct, 100)}%`, backgroundColor: row.color }} />
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-muted/60 dark:bg-white/8">
+                        <div
+                          className="h-full rounded-full"
+                          style={{ width: `${Math.min(investedPct, 100)}%`, backgroundColor: row.investedColor }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           <dl className="grid w-full grid-cols-1 gap-0">
