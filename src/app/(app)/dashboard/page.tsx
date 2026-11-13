@@ -587,7 +587,7 @@ export default function DashboardPage() {
             </p>
           </div>
         </div>
-        <div className="mt-5 flex items-stretch gap-3 sm:gap-8">
+        <div className="mt-5 flex items-center gap-3 sm:gap-8">
           <motion.div
             className="flex h-[169px] shrink-0 items-center sm:h-[184px]"
             initial={reduceMotion ? false : { opacity: 0, scale: 0.92 }}
@@ -634,14 +634,14 @@ export default function DashboardPage() {
               totalValueClassName="text-[color:var(--dashboard-chart-center-text)]"
             />
           </motion.div>
-          <div className="flex h-[169px] min-w-0 flex-1 flex-col justify-between sm:h-[184px]">
-            <dl className="grid h-full w-full grid-cols-1 grid-rows-[auto_1fr_auto] gap-0">
+          <div className="flex min-h-[169px] min-w-0 flex-1 flex-col justify-center sm:min-h-[184px]">
+            <dl className="grid w-full grid-cols-1 gap-1">
             <div className="grid grid-cols-[minmax(4.5rem,1.1fr)_minmax(10ch,1fr)_minmax(10ch,1fr)] items-center gap-x-3 text-[11px] font-semibold text-subtle sm:grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] sm:gap-x-4">
               <span />
               <span className="justify-self-stretch whitespace-nowrap text-left">Current</span>
               <span className="justify-self-stretch whitespace-nowrap text-left">Invested</span>
             </div>
-            <div className="flex min-h-0 flex-col justify-center gap-1">
+            <div className="flex flex-col gap-1">
               <div className="grid grid-cols-[minmax(4.5rem,1.1fr)_minmax(10ch,1fr)_minmax(10ch,1fr)] items-center gap-x-3 sm:grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] sm:gap-x-4">
                 <span className="inline-flex items-center justify-start gap-1 whitespace-nowrap text-left text-xs font-semibold text-[color:#14b8a6] sm:text-sm">
                   Stocks
