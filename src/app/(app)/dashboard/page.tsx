@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Eye, EyeOff } from "lucide-react";
+import { ChevronDown, ChevronRight, Eye, EyeOff } from "lucide-react";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { PortfolioDonut } from "@/components/dashboard/PortfolioDonut";
@@ -77,6 +77,7 @@ export default function DashboardPage() {
   const [bars, setBars] = useState(true);
   const [dashStockDetail, setDashStockDetail] = useState<string | null>(null);
   const [summaryTab, setSummaryTab] = useState<"summary" | "performance">("summary");
+  const [summaryComparisonExpanded, setSummaryComparisonExpanded] = useState(false);
   // Pre-seed from the same cache used by DashboardReturnComparison for instant today-value display
   const [cloudHistory, setCloudHistory] = useState<NetWorthPoint[] | null>(() => {
     try {
@@ -133,12 +134,12 @@ export default function DashboardPage() {
   const homeShowsAmountValues = usePortfolioStore((s) => s.homeShowsAmountValues);
   const setHomeShowsAmountValues = usePortfolioStore((s) => s.setHomeShowsAmountValues);
   const todayStatusLoading = cloudHistory === null && hasSupabaseConfig();
-  const cashSharePct = totalBalance > 0.0001 ? (cash / totalBalance) * 100 : 0;
-  const fixedIncomeSharePct = totalBalance > 0.0001 ? (fixedIncomeValue / totalBalance) * 100 : 0;
+  const cashSharePct = totalInvested > 0.0001 ? (cash / totalInvested) * 100 : 0;
+  const fixedIncomeSharePct = totalInvested > 0.0001 ? (fixedIncomeValue / totalInvested) * 100 : 0;
   const cashEquivalent = cash + fixedIncomeValue;
-  const cashEquivalentSharePct = totalBalance > 0.0001 ? (cashEquivalent / totalBalance) * 100 : 0;
-  const etfSharePct = totalBalance > 0.0001 ? (etfValue / totalBalance) * 100 : 0;
-  const stockSharePct = totalBalance > 0.0001 ? (stockValueOnly / totalBalance) * 100 : 0;
+  const cashEquivalentSharePct = totalInvested > 0.0001 ? (cashEquivalent / totalInvested) * 100 : 0;
+  const etfSharePct = totalInvested > 0.0001 ? (etfValue / totalInvested) * 100 : 0;
+  const stockSharePct = totalInvested > 0.0001 ? (stockValueOnly / totalInvested) * 100 : 0;
   const cashEquivalentTargetPct = marketOutlook
     ? effectiveOutlookCashTargetPct(marketOutlook, {
       riskOn: marketOutlookCashTargetRiskOn,
@@ -483,9 +484,9 @@ export default function DashboardPage() {
         <>
         <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2 dark:bg-white/[0.04]">
-            <p className="text-[11px] font-semibold text-subtle">Total value</p>
+            <p className="text-[11px] font-semibold text-subtle">Portfolio value</p>
             <p className="mt-1 text-sm font-semibold tabular-nums text-[color:#14b8a6]">
-              {homeShowsAmountValues ? formatSummaryNumber(totalBalance) : "••••"}
+              {homeShowsAmountValues ? formatWholeCurrency(totalInvested) : "••••"}
             </p>
           </div>
           <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2 dark:bg-white/[0.04]">
@@ -527,88 +528,99 @@ export default function DashboardPage() {
             </p>
           </div>
         </div>
-        <div className="mt-5 grid items-center gap-8 xl:grid-cols-[auto_minmax(42rem,1fr)] xl:gap-16">
-          <div className="flex flex-col items-stretch justify-center gap-5 sm:gap-6 lg:flex-row lg:items-center xl:contents">
-            <motion.div
-              className="shrink-0"
-              initial={reduceMotion ? false : { opacity: 0, scale: 0.92 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ type: "spring", stiffness: 260, damping: 22, mass: 0.8, delay: reduceMotion ? 0 : 0.08 }}
-            >
-              <PortfolioDonut
-                segments={pieData.map((p) => ({ name: p.name, value: p.value, color: p.color }))}
-                etfOverlays={
-                  isProfitable
-                    ? [
-                        {
-                          segment: "Cost",
-                          fraction: Math.min(etfCostBasis, holdingsCostBasis) / Math.max(totalBalance, 0.0001),
-                        },
-                        {
-                          segment: "Gain",
-                          fraction:
-                            Math.min(
-                              Math.max(0, etfValue - etfCostBasis),
-                              Math.max(0, holdingsPnL)
-                            ) / Math.max(totalBalance, 0.0001),
-                        },
-                      ]
-                    : [
-                        {
-                          segment: "Holdings",
-                          fraction:
-                            Math.min(etfValue, holdingsValue) /
-                            Math.max(cash + fixedIncomeValue + holdingsCostBasis, 0.0001),
-                        },
-                        {
-                          segment: "Loss",
-                          fraction:
-                            Math.min(
-                              Math.max(0, etfCostBasis - etfValue),
-                              Math.max(0, Math.abs(holdingsPnL))
-                            ) / Math.max(cash + fixedIncomeValue + holdingsCostBasis, 0.0001),
-                        },
-                      ]
-                }
-                totalValue={homeShowsAmountValues ? formatWholeCurrency(totalBalance) : "••••"}
-                totalLabelClassName="text-[color:var(--dashboard-chart-center-text)]"
-                totalValueClassName="text-[color:var(--dashboard-chart-center-text)]"
-              />
-            </motion.div>
+        <div className="mt-5 grid items-start gap-8 xl:grid-cols-[auto_minmax(42rem,1fr)] xl:gap-16">
+          <motion.div
+            className="shrink-0"
+            initial={reduceMotion ? false : { opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: "spring", stiffness: 260, damping: 22, mass: 0.8, delay: reduceMotion ? 0 : 0.08 }}
+          >
+            <PortfolioDonut
+              segments={pieData.map((p) => ({ name: p.name, value: p.value, color: p.color }))}
+              etfOverlays={
+                isProfitable
+                  ? [
+                      {
+                        segment: "Cost",
+                        fraction: Math.min(etfCostBasis, holdingsCostBasis) / Math.max(totalBalance, 0.0001),
+                      },
+                      {
+                        segment: "Gain",
+                        fraction:
+                          Math.min(
+                            Math.max(0, etfValue - etfCostBasis),
+                            Math.max(0, holdingsPnL)
+                          ) / Math.max(totalBalance, 0.0001),
+                      },
+                    ]
+                  : [
+                      {
+                        segment: "Holdings",
+                        fraction:
+                          Math.min(etfValue, holdingsValue) /
+                          Math.max(cash + fixedIncomeValue + holdingsCostBasis, 0.0001),
+                      },
+                      {
+                        segment: "Loss",
+                        fraction:
+                          Math.min(
+                            Math.max(0, etfCostBasis - etfValue),
+                            Math.max(0, Math.abs(holdingsPnL))
+                          ) / Math.max(cash + fixedIncomeValue + holdingsCostBasis, 0.0001),
+                      },
+                    ]
+              }
+              totalValue={homeShowsAmountValues ? formatWholeCurrency(totalBalance) : "••••"}
+              totalLabelClassName="text-[color:var(--dashboard-chart-center-text)]"
+              totalValueClassName="text-[color:var(--dashboard-chart-center-text)]"
+            />
+          </motion.div>
+          <div className="space-y-4">
             {summaryComparisonRows.length > 0 ? (
-              <div className="w-full rounded-xl border border-border/60 bg-background/70 px-3 py-3 dark:bg-white/[0.04] lg:min-w-[18rem] lg:max-w-[26rem] xl:max-w-none">
-                <p className="text-xs font-semibold text-foreground">Portfolio % vs recommended %</p>
-                <p className="mt-0.5 text-[11px] text-subtle">Actual % of total portfolio against target %</p>
-                <div className="mt-3 space-y-2.5">
-                  {summaryComparisonRows.map((row) => {
-                    const actualPct = Math.max(0, row.actualPct);
-                    const targetPct = Math.max(0, row.targetPct);
-                    return (
-                      <div key={row.key} className="space-y-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-[11px] font-semibold text-foreground">{row.label}</p>
-                          <p className="text-[11px] tabular-nums text-subtle">
-                            {Math.round(actualPct)}% / {Math.round(targetPct)}%
-                          </p>
-                        </div>
-                        <div className="h-2.5 overflow-hidden rounded-full bg-muted/70 dark:bg-white/10">
-                          <div className="h-full rounded-full" style={{ width: `${Math.min(actualPct, 100)}%`, backgroundColor: row.color }} />
-                        </div>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-muted/60 dark:bg-white/8">
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${Math.min(targetPct, 100)}%`, backgroundColor: row.targetColor }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+              <div className="w-full rounded-xl border border-border/60 bg-background/70 px-3 py-3 dark:bg-white/[0.04]">
+                <button
+                  type="button"
+                  onClick={() => setSummaryComparisonExpanded((v) => !v)}
+                  className="flex w-full items-center justify-between gap-2 text-left"
+                  aria-expanded={summaryComparisonExpanded}
+                >
+                  <span className="text-xs font-semibold text-foreground">Portfolio % vs recommended %</span>
+                  {summaryComparisonExpanded ? <ChevronDown className="h-3.5 w-3.5 text-subtle" /> : <ChevronRight className="h-3.5 w-3.5 text-subtle" />}
+                </button>
+                {summaryComparisonExpanded ? (
+                  <>
+                    <p className="mt-0.5 text-[11px] text-subtle">Actual % of invested portfolio against target %</p>
+                    <div className="mt-3 space-y-2.5">
+                      {summaryComparisonRows.map((row) => {
+                        const actualPct = Math.max(0, row.actualPct);
+                        const targetPct = Math.max(0, row.targetPct);
+                        return (
+                          <div key={row.key} className="space-y-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[11px] font-semibold text-foreground">{row.label}</p>
+                              <p className="text-[11px] tabular-nums text-subtle">
+                                {Math.round(actualPct)}% / {Math.round(targetPct)}%
+                              </p>
+                            </div>
+                            <div className="h-2.5 overflow-hidden rounded-full bg-muted/70 dark:bg-white/10">
+                              <div className="h-full rounded-full" style={{ width: `${Math.min(actualPct, 100)}%`, backgroundColor: row.color }} />
+                            </div>
+                            <div className="h-1.5 overflow-hidden rounded-full bg-muted/60 dark:bg-white/8">
+                              <div
+                                className="h-full rounded-full"
+                                style={{ width: `${Math.min(targetPct, 100)}%`, backgroundColor: row.targetColor }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : null}
               </div>
             ) : null}
-          </div>
 
-          <dl className="grid w-full grid-cols-1 gap-0">
+            <dl className="grid w-full grid-cols-1 gap-0">
             <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4 border-b border-border/35 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/6">
               <span />
               <span className="justify-self-stretch whitespace-nowrap text-left">Current</span>
@@ -616,24 +628,25 @@ export default function DashboardPage() {
             </div>
             <div className="border-b border-border/35 py-2.5 dark:border-foreground/6">
               <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
-                <span className="inline-flex items-center justify-start gap-1 whitespace-nowrap text-left text-sm font-medium text-[color:#14b8a6]">
+                <span className="inline-flex items-center justify-start gap-1 whitespace-nowrap text-left text-sm font-semibold text-[color:#14b8a6]">
                   Stocks
                 </span>
-                <span className="justify-self-stretch text-left text-sm tabular-nums text-[color:#14b8a6]">
-                  {renderSummaryCurrentWithPnLPercent(
+                <span className="justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
+                  {renderSummaryCurrentWithPnL(
                     homeShowsAmountValues,
-                    holdingsValue,
-                    holdingsPnLPctVsInvested,
+                    stockValueOnly,
+                    stockPnL,
+                    stockPnLPct,
                     "text-[color:#14b8a6]",
-                    holdingsPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"
+                    stockPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"
                   )}
                 </span>
                 <span className="justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
-                  {homeAmountWithPercent(homeShowsAmountValues, holdingsCostBasis, shareOfRow(holdingsCostBasis, totalInvested))}
+                  {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, holdingsCostBasis))}
                 </span>
               </div>
-              <div className="mt-1 grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4 gap-y-1 text-xs">
-                <span className="pl-4 font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF:</span>
+              <div className="mt-1 grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4 text-xs">
+                <span className="font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF</span>
                 <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
                   {renderSummaryCurrentWithPnL(
                     homeShowsAmountValues,
@@ -648,23 +661,28 @@ export default function DashboardPage() {
                 <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
                   {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfRow(etfCostBasis, holdingsCostBasis))}
                 </span>
-                <span className="pl-4 font-semibold text-[color:#14b8a6]">Stocks:</span>
-                <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums text-[color:#14b8a6]">
-                  {renderSummaryCurrentWithPnL(
+              </div>
+              <div className="my-1 border-t border-border/35 dark:border-foreground/6" />
+              <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
+                <span className="inline-flex items-center justify-start gap-1 whitespace-nowrap text-left text-sm font-medium text-[color:#14b8a6]">
+                  Total Equities
+                </span>
+                <span className="justify-self-stretch text-left text-sm tabular-nums text-[color:#14b8a6]">
+                  {renderSummaryCurrentWithPnLPercent(
                     homeShowsAmountValues,
-                    stockValueOnly,
-                    stockPnL,
-                    stockPnLPct,
+                    holdingsValue,
+                    holdingsPnLPctVsInvested,
                     "text-[color:#14b8a6]",
-                    stockPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"
+                    holdingsPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"
                   )}
                 </span>
-                <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums text-[color:var(--dashboard-chart-cost-basis)]">
-                  {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfRow(stockCostBasisOnly, holdingsCostBasis))}
+                <span className="justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
+                  {homeAmountWithPercent(homeShowsAmountValues, holdingsCostBasis, shareOfRow(holdingsCostBasis, totalInvested))}
                 </span>
               </div>
             </div>
-          </dl>
+            </dl>
+          </div>
         </div>
         <p className="mt-4 text-[11px] leading-relaxed text-subtle">
           {showTodayChange
