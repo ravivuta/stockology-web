@@ -544,7 +544,10 @@ export default function DashboardPage() {
         <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <div className="rounded-xl border border-border/45 bg-background/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
             <p className="text-[11px] font-semibold text-subtle">Total Investments</p>
-            <p className="mt-1 text-sm font-semibold tabular-nums text-[color:#14b8a6]">
+            <p
+              className="mt-1 text-sm font-semibold tabular-nums"
+              style={{ color: "var(--dashboard-chart-center-value)" }}
+            >
               {homeShowsAmountValues ? formatWholeCurrency(totalInvested) : "••••"}
             </p>
           </div>
@@ -629,9 +632,10 @@ export default function DashboardPage() {
                       },
                     ]
               }
+              totalLabel="Current"
               totalValue={homeShowsAmountValues ? formatWholeCurrency(totalBalance) : "••••"}
-              totalLabelClassName="text-[color:var(--dashboard-chart-center-text)]"
-              totalValueClassName="text-[color:var(--dashboard-chart-center-text)]"
+              totalLabelClassName="text-subtle"
+              totalValueClassName="text-[color:var(--dashboard-chart-center-value)]"
             />
           </motion.div>
           <div className="flex min-h-[169px] min-w-0 flex-1 flex-col justify-center sm:min-h-[184px]">

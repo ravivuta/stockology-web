@@ -51,7 +51,7 @@ const CY = VIEW / 2;
 export function PortfolioDonut({
   segments,
   etfOverlays = [],
-  totalLabel = "Total",
+  totalLabel = "Current",
   totalValue,
   className = "",
   totalLabelClassName = "",
@@ -246,7 +246,7 @@ export function PortfolioDonut({
         })}
         {arcs.map((arc) => {
           if (arc.fraction < 0.06) return null;
-          const labelR = 58;
+          const labelR = 48;
           const { x, y } = polarToCartesian(CX, CY, labelR, arc.midAngle);
           return (
             <text
@@ -265,7 +265,7 @@ export function PortfolioDonut({
         })}
         {etfOverlayArcs.map((overlay) => {
           if (overlay.fraction < 0.015) return null;
-          const labelR = 62;
+          const labelR = 50;
           const { x, y } = polarToCartesian(CX, CY, labelR, overlay.midAngle);
           return (
             <text
@@ -285,13 +285,14 @@ export function PortfolioDonut({
       </svg>
 
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-2 text-center">
-        <span className={`text-[9px] font-semibold uppercase tracking-[0.14em] text-subtle ${totalLabelClassName}`}>{totalLabel}</span>
+        <span className={`text-[9px] font-semibold text-subtle ${totalLabelClassName}`}>{totalLabel}</span>
         <motion.span
           key={totalValue}
           initial={reduceMotion ? false : { opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 420, damping: 32, mass: 0.65 }}
-          className={`mt-0.5 max-w-[5.5rem] truncate text-sm font-bold tabular-nums tracking-tight text-foreground sm:text-[0.95rem] ${totalValueClassName}`}
+          className="mt-0.5 max-w-[5.5rem] truncate text-sm font-bold tabular-nums tracking-tight sm:text-[0.95rem]"
+          style={{ color: "var(--dashboard-chart-center-value)" }}
         >
           {totalValue}
         </motion.span>
