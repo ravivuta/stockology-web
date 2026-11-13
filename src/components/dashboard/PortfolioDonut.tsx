@@ -278,7 +278,7 @@ export function PortfolioDonut({
               fontWeight="700"
               fill={overlay.stroke}
             >
-              {`${Math.round(overlay.fraction * 100)}% ETF`}
+              {`${Math.round(overlay.fraction * 100)}%`}
             </text>
           );
         })}

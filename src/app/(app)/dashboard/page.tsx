@@ -482,19 +482,19 @@ export default function DashboardPage() {
         {summaryTab === "summary" ? (
         <>
         <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2 dark:bg-white/[0.04]">
+          <div className="rounded-xl border border-border/45 bg-background/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
             <p className="text-[11px] font-semibold text-subtle">Portfolio value</p>
             <p className="mt-1 text-sm font-semibold tabular-nums text-[color:#14b8a6]">
               {homeShowsAmountValues ? formatWholeCurrency(totalInvested) : "••••"}
             </p>
           </div>
-          <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2 dark:bg-white/[0.04]">
+          <div className="rounded-xl border border-border/45 bg-background/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
             <p className="text-[11px] font-semibold text-subtle">Today</p>
             <p className={`mt-1 text-sm font-semibold tabular-nums ${showTodayChange ? todayValueClassName : "text-subtle"}`}>
               {todayText}
             </p>
           </div>
-          <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2 dark:bg-white/[0.04]">
+          <div className="rounded-xl border border-border/45 bg-background/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
             <p className="text-[11px] font-semibold text-subtle">Total P/L</p>
             <p className={`mt-1 text-sm font-semibold tabular-nums ${totalPnlTextClass}`}>
               {homeShowsAmountValues
@@ -502,7 +502,7 @@ export default function DashboardPage() {
                 : formatWholePercent(totalPnLPct, true)}
             </p>
           </div>
-          <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2 dark:bg-white/[0.04]">
+          <div className="rounded-xl border border-border/45 bg-background/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
             <p className="text-[11px] font-semibold text-subtle">Cash</p>
             <p className="mt-1 text-sm font-semibold tabular-nums text-[color:var(--dashboard-chart-cash)]">
               {homeShowsAmountValues
@@ -510,7 +510,7 @@ export default function DashboardPage() {
                 : `${Math.round(cashSharePct)}%`}
             </p>
           </div>
-          <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2 dark:bg-white/[0.04]">
+          <div className="rounded-xl border border-border/45 bg-background/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
             <p className="text-[11px] font-semibold text-subtle">Bonds/CDs</p>
             <p className="mt-1 text-sm font-semibold tabular-nums text-[#0f9aa7]">
               {homeShowsAmountValues
@@ -518,7 +518,7 @@ export default function DashboardPage() {
                 : `${Math.round(fixedIncomeSharePct)}%`}
             </p>
           </div>
-          <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2 dark:bg-white/[0.04]">
+          <div className="rounded-xl border border-border/45 bg-background/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
             <p className="text-[11px] font-semibold text-subtle">ETF</p>
             <p className="mt-1 text-sm font-semibold tabular-nums text-[color:var(--dashboard-chart-cost-basis)]">
               {homeShowsAmountValues
@@ -576,7 +576,7 @@ export default function DashboardPage() {
           </motion.div>
           <div className="space-y-4">
             {summaryComparisonRows.length > 0 ? (
-              <div className="w-full rounded-xl border border-border/60 bg-background/70 px-3 py-3 dark:bg-white/[0.04]">
+              <div className="w-full rounded-xl border border-border/45 bg-background/70 px-3 py-3 dark:border-white/10 dark:bg-white/[0.04]">
                 <span className="text-xs font-semibold text-foreground">Portfolio % vs recommended %</span>
                 <p className="mt-0.5 text-[11px] text-subtle">Actual % of invested portfolio against target %</p>
                 <div className="mt-3 space-y-2.5">
@@ -608,12 +608,12 @@ export default function DashboardPage() {
             ) : null}
 
             <dl className="grid w-full grid-cols-1 gap-0">
-            <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4 border-b border-border/35 pb-1 text-[11px] font-semibold text-subtle dark:border-foreground/6">
+            <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4 border-b border-border/25 pb-1 text-[11px] font-semibold text-subtle dark:border-white/8">
               <span />
               <span className="justify-self-stretch whitespace-nowrap text-left">Current</span>
               <span className="justify-self-stretch whitespace-nowrap text-left">Invested</span>
             </div>
-            <div className="border-b border-border/35 py-2.5 dark:border-foreground/6">
+            <div className="border-b border-border/25 py-2.5 dark:border-white/8">
               <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
                 <span className="inline-flex items-center justify-start gap-1 whitespace-nowrap text-left text-sm font-semibold text-[color:#14b8a6]">
                   Stocks
@@ -649,7 +649,7 @@ export default function DashboardPage() {
                   {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfPortfolio(etfCostBasis, holdingsCostBasis))}
                 </span>
               </div>
-              <div className="my-1 border-t border-border/35 dark:border-foreground/6" />
+              <div className="my-1 border-t border-border/25 dark:border-white/8" />
               <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
                 <span className="inline-flex items-center justify-start gap-1 whitespace-nowrap text-left text-sm font-medium text-[color:#14b8a6]">
                   Total Equities
