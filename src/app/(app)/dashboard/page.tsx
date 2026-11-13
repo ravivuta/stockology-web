@@ -586,18 +586,10 @@ export default function DashboardPage() {
                 : `${Math.round(equitiesInvestedPct)}%`}
             </p>
           </div>
-          <div className="hidden rounded-xl border border-border/45 bg-background/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04] xl:block">
-            <p className="text-[11px] font-semibold text-subtle">Stocks</p>
-            <p className="mt-1 text-sm font-semibold tabular-nums text-[color:#14b8a6]">
-              {homeShowsAmountValues
-                ? `${formatSummaryNumber(stockCostBasisOnly)} (${Math.round(stockInvestedPct)}%)`
-                : `${Math.round(stockInvestedPct)}%`}
-            </p>
-          </div>
         </div>
-        <div className="mt-5 grid items-start gap-8 xl:grid-cols-[auto_minmax(42rem,1fr)] xl:gap-16">
+        <div className="mt-5 flex items-stretch gap-3 sm:gap-8">
           <motion.div
-            className="shrink-0"
+            className="flex h-[169px] shrink-0 items-center sm:h-[184px]"
             initial={reduceMotion ? false : { opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ type: "spring", stiffness: 260, damping: 22, mass: 0.8, delay: reduceMotion ? 0 : 0.08 }}
@@ -642,19 +634,19 @@ export default function DashboardPage() {
               totalValueClassName="text-[color:var(--dashboard-chart-center-text)]"
             />
           </motion.div>
-          <div className="space-y-4">
-            <dl className="grid w-full grid-cols-1 gap-0">
-            <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4 border-b border-border/15 pb-1 text-[11px] font-semibold text-subtle dark:border-white/6">
+          <div className="flex h-[169px] min-w-0 flex-1 flex-col justify-between sm:h-[184px]">
+            <dl className="grid h-full w-full grid-cols-1 grid-rows-[auto_1fr_auto] gap-0">
+            <div className="grid grid-cols-[minmax(4.5rem,1.1fr)_minmax(10ch,1fr)_minmax(10ch,1fr)] items-center gap-x-3 text-[11px] font-semibold text-subtle sm:grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] sm:gap-x-4">
               <span />
               <span className="justify-self-stretch whitespace-nowrap text-left">Current</span>
               <span className="justify-self-stretch whitespace-nowrap text-left">Invested</span>
             </div>
-            <div className="border-b border-border/15 py-2.5 dark:border-white/6">
-              <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
-                <span className="inline-flex items-center justify-start gap-1 whitespace-nowrap text-left text-sm font-semibold text-[color:#14b8a6]">
+            <div className="flex min-h-0 flex-col justify-center gap-1">
+              <div className="grid grid-cols-[minmax(4.5rem,1.1fr)_minmax(10ch,1fr)_minmax(10ch,1fr)] items-center gap-x-3 sm:grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] sm:gap-x-4">
+                <span className="inline-flex items-center justify-start gap-1 whitespace-nowrap text-left text-xs font-semibold text-[color:#14b8a6] sm:text-sm">
                   Stocks
                 </span>
-                <span className="justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
+                <span className="justify-self-stretch whitespace-nowrap text-left text-xs tabular-nums text-[color:#14b8a6] sm:text-sm">
                   {renderSummaryCurrentWithPnL(
                     homeShowsAmountValues,
                     stockValueOnly,
@@ -664,11 +656,11 @@ export default function DashboardPage() {
                     stockPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"
                   )}
                 </span>
-                <span className="justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
+                <span className="justify-self-stretch whitespace-nowrap text-left text-xs tabular-nums text-[color:var(--dashboard-chart-cost-basis)] sm:text-sm">
                   {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfPortfolio(stockCostBasisOnly, totalInvested))}
                 </span>
               </div>
-              <div className="mt-1 grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4 text-xs">
+              <div className="grid grid-cols-[minmax(4.5rem,1.1fr)_minmax(10ch,1fr)_minmax(10ch,1fr)] items-center gap-x-3 text-xs sm:grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] sm:gap-x-4">
                 <span className="font-semibold" style={{ color: ETF_PATTERN_PRIMARY }}>ETF</span>
                 <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
                   {renderSummaryCurrentWithPnL(
@@ -681,16 +673,16 @@ export default function DashboardPage() {
                     ETF_PATTERN_PRIMARY
                   )}
                 </span>
-                <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
+                <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: etfPatternPrimaryFor("var(--dashboard-chart-cost-basis)") }}>
                   {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfPortfolio(etfCostBasis, totalInvested))}
                 </span>
               </div>
-              <div className="my-1 border-t border-border/15 dark:border-white/6" />
-              <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4">
-                <span className="inline-flex items-center justify-start gap-1 whitespace-nowrap text-left text-sm font-medium text-[color:#14b8a6]">
+            </div>
+            <div className="grid grid-cols-[minmax(4.5rem,1.1fr)_minmax(10ch,1fr)_minmax(10ch,1fr)] items-center gap-x-3 border-t border-border/15 pt-1 dark:border-white/6 sm:grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] sm:gap-x-4">
+                <span className="inline-flex items-center justify-start gap-1 whitespace-nowrap text-left text-xs font-medium text-[color:#14b8a6] sm:text-sm">
                   Total Equities
                 </span>
-                <span className="justify-self-stretch text-left text-sm tabular-nums text-[color:#14b8a6]">
+                <span className="justify-self-stretch text-left text-xs tabular-nums text-[color:#14b8a6] sm:text-sm">
                   {renderSummaryCurrentWithPnLPercent(
                     homeShowsAmountValues,
                     holdingsValue,
@@ -699,10 +691,9 @@ export default function DashboardPage() {
                     holdingsPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]"
                   )}
                 </span>
-                <span className="justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
+                <span className="justify-self-stretch whitespace-nowrap text-left text-xs tabular-nums text-[color:var(--dashboard-chart-cost-basis)] sm:text-sm">
                   {homeAmountWithPercent(homeShowsAmountValues, holdingsCostBasis, shareOfPortfolio(holdingsCostBasis, totalInvested))}
                 </span>
-              </div>
             </div>
             </dl>
           </div>
