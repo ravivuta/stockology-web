@@ -51,9 +51,11 @@ function etfPatternSecondaryFor(baseColor: string): string {
 function etfHatchFor(baseColor: string): string {
   const primary = etfPatternPrimaryFor(baseColor);
   const secondary = etfPatternSecondaryFor(baseColor);
+  const line = 0.85;
+  const period = 1.7;
   return (
-    `repeating-linear-gradient(45deg, ${primary} 0 0.9px, transparent 0.9px 1.5px), ` +
-    `repeating-linear-gradient(135deg, ${secondary} 0 0.6px, transparent 0.6px 3.5px)`
+    `repeating-linear-gradient(45deg, ${primary} 0 ${line}px, transparent ${line}px ${period}px), ` +
+    `repeating-linear-gradient(135deg, ${secondary} 0 ${line}px, transparent ${line}px ${period}px)`
   );
 }
 
@@ -228,7 +230,7 @@ export default function DashboardPage() {
     ...(showCashEquivalentBar
       ? [{
           key: "cash-equivalent",
-          label: "Cash-equivalent",
+          label: "Cash-equivalent (Cash+Bonds/CDs)",
           actualPct: cashEquivalentSharePct,
           recommendedPct: cashEquivalentTargetPct,
           color: PALETTE.cash,

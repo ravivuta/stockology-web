@@ -182,19 +182,19 @@ export function PortfolioDonut({
       >
       <defs>
         {etfOverlayArcs.map((overlay) => (
-          <pattern key={overlay.patternId} id={overlay.patternId} patternUnits="userSpaceOnUse" width="7" height="7">
+          <pattern key={overlay.patternId} id={overlay.patternId} patternUnits="userSpaceOnUse" width="4" height="4">
             <path
-              d="M -3,7 L 4,0 M 0,7 L 7,0 M 3,7 L 10,0"
+              d="M -2,4 L 2,0 M 0,4 L 4,0 M 2,4 L 6,0"
               fill="none"
               stroke={overlay.stroke}
-              strokeWidth="1.8"
+              strokeWidth="0.95"
               strokeLinecap="square"
             />
             <path
-              d="M -7,0 L 0,7 M 0,0 L 7,7"
+              d="M -2,0 L 2,4 M 0,0 L 4,4 M 2,0 L 6,4"
               fill="none"
               stroke={overlay.stroke}
-              strokeWidth="1.2"
+              strokeWidth="0.95"
               strokeOpacity="0.74"
               strokeLinecap="square"
             />
