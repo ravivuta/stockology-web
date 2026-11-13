@@ -30,7 +30,7 @@ const CURRENT_VALUE_COLOR = "#14b8a6";
 
 const PALETTE = {
   cash: "var(--dashboard-chart-cash)",
-  fixedIncome: "#0f9aa7",
+  fixedIncome: "var(--dashboard-chart-fixed-income)",
   costBasis: "var(--dashboard-chart-cost-basis)",
   gain: "var(--dashboard-chart-gain)",
   holdingsValue: CURRENT_VALUE_COLOR,
@@ -54,6 +54,61 @@ function etfHatchFor(baseColor: string): string {
   return (
     `repeating-linear-gradient(45deg, ${primary} 0 0.9px, transparent 0.9px 1.5px), ` +
     `repeating-linear-gradient(135deg, ${secondary} 0 0.6px, transparent 0.6px 3.5px)`
+  );
+}
+
+type SummaryComparisonSegment = {
+  key: string;
+  label: string;
+  actualPct: number;
+  recommendedPct: number;
+  color: string;
+  usesETFPattern: boolean;
+};
+
+function SummaryStackedTrack({
+  label,
+  items,
+  percentKey,
+}: {
+  label: string;
+  items: SummaryComparisonSegment[];
+  percentKey: "actualPct" | "recommendedPct";
+}) {
+  const total = Math.max(
+    items.reduce((sum, item) => sum + Math.max(0, item[percentKey]), 0),
+    0.0001
+  );
+  const scale = total > 100 ? 100 / total : 1;
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="w-[5.75rem] shrink-0 text-[9px] font-semibold leading-tight text-subtle">{label}</span>
+      <div className="flex h-3 min-w-0 flex-1 overflow-hidden rounded-[3px] bg-white/20 dark:bg-white/10">
+        {items.map((item) => {
+          const widthPct = Math.max(0, item[percentKey]) * scale;
+          if (widthPct < 0.1) return null;
+          return (
+            <div
+              key={item.key}
+              className="relative h-full shrink-0"
+              style={{
+                width: `${Math.min(widthPct, 100)}%`,
+                backgroundColor: item.color,
+                backgroundImage: item.usesETFPattern ? etfHatchFor(item.color) : undefined,
+              }}
+            >
+              {item.usesETFPattern ? (
+                <span
+                  className="absolute inset-y-0 right-0 w-0.5"
+                  style={{ backgroundColor: etfPatternPrimaryFor(item.color) }}
+                />
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -137,8 +192,10 @@ export default function DashboardPage() {
   const fixedIncomeSharePct = totalInvested > 0.0001 ? (fixedIncomeValue / totalInvested) * 100 : 0;
   const cashEquivalent = cash + fixedIncomeValue;
   const cashEquivalentSharePct = totalInvested > 0.0001 ? (cashEquivalent / totalInvested) * 100 : 0;
-  const etfSharePct = totalInvested > 0.0001 ? (etfValue / totalInvested) * 100 : 0;
-  const stockSharePct = totalInvested > 0.0001 ? (stockValueOnly / totalInvested) * 100 : 0;
+  const etfInvestedPct = totalInvested > 0.0001 ? (etfCostBasis / totalInvested) * 100 : 0;
+  const stockInvestedPct = totalInvested > 0.0001 ? (stockCostBasisOnly / totalInvested) * 100 : 0;
+  const equitiesCostBasis = stockCostBasisOnly + etfCostBasis;
+  const equitiesInvestedPct = totalInvested > 0.0001 ? (equitiesCostBasis / totalInvested) * 100 : 0;
   const cashEquivalentTargetPct = marketOutlook
     ? effectiveOutlookCashTargetPct(marketOutlook, {
       riskOn: marketOutlookCashTargetRiskOn,
@@ -166,34 +223,37 @@ export default function DashboardPage() {
       ? `${formatWholeCurrency(Math.abs(todayChange.change))} (${formatWholePercent(todayChange.percent, true)})`
       : formatWholePercent(todayChange.percent, true)
     : "—";
-  const summaryComparisonRows = [
+  const costBasisColor = PALETTE.costBasis;
+  const summaryComparisonSegments: SummaryComparisonSegment[] = [
     ...(showCashEquivalentBar
       ? [{
           key: "cash-equivalent",
           label: "Cash-equivalent",
           actualPct: cashEquivalentSharePct,
-          targetPct: cashEquivalentTargetPct,
-          color: "var(--dashboard-chart-cash)",
-          targetColor: "var(--dashboard-chart-cash)",
+          recommendedPct: cashEquivalentTargetPct,
+          color: PALETTE.cash,
+          usesETFPattern: false,
         }]
       : []),
     ...(showEtfAndStockBars
       ? [
-          {
-            key: "etf",
-            label: "ETF",
-            actualPct: etfSharePct,
-            targetPct: etfTargetPct,
-            color: "var(--dashboard-chart-cost-basis)",
-            targetColor: "var(--dashboard-chart-cost-basis)",
-          },
+          ...(etfInvestedPct >= 0.5 || etfTargetPct >= 0.5
+            ? [{
+                key: "etf",
+                label: "ETF",
+                actualPct: etfInvestedPct,
+                recommendedPct: etfTargetPct,
+                color: costBasisColor,
+                usesETFPattern: true,
+              }]
+            : []),
           {
             key: "stocks",
-            label: "Stocks (non-ETF)",
-            actualPct: stockSharePct,
-            targetPct: stockTargetPct,
-            color: "#14b8a6",
-            targetColor: "#14b8a6",
+            label: "Stocks",
+            actualPct: stockInvestedPct,
+            recommendedPct: stockTargetPct,
+            color: costBasisColor,
+            usesETFPattern: false,
           },
         ]
       : []),
@@ -483,15 +543,9 @@ export default function DashboardPage() {
         <>
         <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <div className="rounded-xl border border-border/45 bg-background/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
-            <p className="text-[11px] font-semibold text-subtle">Portfolio value</p>
+            <p className="text-[11px] font-semibold text-subtle">Total Investments</p>
             <p className="mt-1 text-sm font-semibold tabular-nums text-[color:#14b8a6]">
               {homeShowsAmountValues ? formatWholeCurrency(totalInvested) : "••••"}
-            </p>
-          </div>
-          <div className="rounded-xl border border-border/45 bg-background/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
-            <p className="text-[11px] font-semibold text-subtle">Today</p>
-            <p className={`mt-1 text-sm font-semibold tabular-nums ${showTodayChange ? todayValueClassName : "text-subtle"}`}>
-              {todayText}
             </p>
           </div>
           <div className="rounded-xl border border-border/45 bg-background/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
@@ -500,6 +554,12 @@ export default function DashboardPage() {
               {homeShowsAmountValues
                 ? `${formatSummaryNumber(holdingsPnL)} (${formatWholePercent(totalPnLPct, true)})`
                 : formatWholePercent(totalPnLPct, true)}
+            </p>
+          </div>
+          <div className="rounded-xl border border-border/45 bg-background/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
+            <p className="text-[11px] font-semibold text-subtle">Today&apos;s change</p>
+            <p className={`mt-1 text-sm font-semibold tabular-nums ${showTodayChange ? todayValueClassName : "text-subtle"}`}>
+              {todayText}
             </p>
           </div>
           <div className="rounded-xl border border-border/45 bg-background/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
@@ -512,18 +572,26 @@ export default function DashboardPage() {
           </div>
           <div className="rounded-xl border border-border/45 bg-background/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
             <p className="text-[11px] font-semibold text-subtle">Bonds/CDs</p>
-            <p className="mt-1 text-sm font-semibold tabular-nums text-[#0f9aa7]">
+            <p className="mt-1 text-sm font-semibold tabular-nums text-[color:var(--dashboard-chart-fixed-income)]">
               {homeShowsAmountValues
                 ? `${formatSummaryNumber(fixedIncomeValue)} (${Math.round(fixedIncomeSharePct)}%)`
                 : `${Math.round(fixedIncomeSharePct)}%`}
             </p>
           </div>
           <div className="rounded-xl border border-border/45 bg-background/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
-            <p className="text-[11px] font-semibold text-subtle">ETF</p>
+            <p className="text-[11px] font-semibold text-subtle">Equities</p>
             <p className="mt-1 text-sm font-semibold tabular-nums text-[color:var(--dashboard-chart-cost-basis)]">
               {homeShowsAmountValues
-                ? `${formatSummaryNumber(etfValue)} (${Math.round(etfSharePct)}%)`
-                : `${Math.round(etfSharePct)}%`}
+                ? `${formatSummaryNumber(equitiesCostBasis)} (${Math.round(equitiesInvestedPct)}%)`
+                : `${Math.round(equitiesInvestedPct)}%`}
+            </p>
+          </div>
+          <div className="hidden rounded-xl border border-border/45 bg-background/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04] xl:block">
+            <p className="text-[11px] font-semibold text-subtle">Stocks</p>
+            <p className="mt-1 text-sm font-semibold tabular-nums text-[color:#14b8a6]">
+              {homeShowsAmountValues
+                ? `${formatSummaryNumber(stockCostBasisOnly)} (${Math.round(stockInvestedPct)}%)`
+                : `${Math.round(stockInvestedPct)}%`}
             </p>
           </div>
         </div>
@@ -575,38 +643,6 @@ export default function DashboardPage() {
             />
           </motion.div>
           <div className="space-y-4">
-            {summaryComparisonRows.length > 0 ? (
-              <div className="w-full rounded-xl border border-border/45 bg-background/70 px-3 py-3 dark:border-white/10 dark:bg-white/[0.04]">
-                <span className="text-xs font-semibold text-foreground">Portfolio % vs recommended %</span>
-                <p className="mt-0.5 text-[11px] text-subtle">Actual % of invested portfolio against target %</p>
-                <div className="mt-3 space-y-2.5">
-                  {summaryComparisonRows.map((row) => {
-                    const actualPct = Math.max(0, row.actualPct);
-                    const targetPct = Math.max(0, row.targetPct);
-                    return (
-                      <div key={row.key} className="space-y-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-[11px] font-semibold text-foreground">{row.label}</p>
-                          <p className="text-[11px] tabular-nums text-subtle">
-                            {Math.round(actualPct)}% / {Math.round(targetPct)}%
-                          </p>
-                        </div>
-                        <div className="h-2.5 overflow-hidden rounded-full bg-muted/70 dark:bg-white/10">
-                          <div className="h-full rounded-full" style={{ width: `${Math.min(actualPct, 100)}%`, backgroundColor: row.color }} />
-                        </div>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-muted/60 dark:bg-white/8">
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${Math.min(targetPct, 100)}%`, backgroundColor: row.targetColor }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : null}
-
             <dl className="grid w-full grid-cols-1 gap-0">
             <div className="grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4 border-b border-border/15 pb-1 text-[11px] font-semibold text-subtle dark:border-white/6">
               <span />
@@ -629,7 +665,7 @@ export default function DashboardPage() {
                   )}
                 </span>
                 <span className="justify-self-stretch whitespace-nowrap text-left text-sm tabular-nums text-[color:#14b8a6]">
-                  {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfPortfolio(stockCostBasisOnly, holdingsCostBasis))}
+                  {homeAmountWithPercent(homeShowsAmountValues, stockCostBasisOnly, shareOfPortfolio(stockCostBasisOnly, totalInvested))}
                 </span>
               </div>
               <div className="mt-1 grid grid-cols-[minmax(12rem,1.2fr)_minmax(18ch,1fr)_minmax(18ch,1fr)] items-center gap-x-4 text-xs">
@@ -646,7 +682,7 @@ export default function DashboardPage() {
                   )}
                 </span>
                 <span className="justify-self-stretch whitespace-nowrap text-left font-semibold tabular-nums" style={{ color: ETF_PATTERN_PRIMARY }}>
-                  {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfPortfolio(etfCostBasis, holdingsCostBasis))}
+                  {homeAmountWithPercent(homeShowsAmountValues, etfCostBasis, shareOfPortfolio(etfCostBasis, totalInvested))}
                 </span>
               </div>
               <div className="my-1 border-t border-border/15 dark:border-white/6" />
@@ -671,6 +707,47 @@ export default function DashboardPage() {
             </dl>
           </div>
         </div>
+        {summaryComparisonSegments.length > 0 ? (
+          <div className="-mx-3 mt-4 w-[calc(100%+1.5rem)] rounded-lg bg-white/32 px-1.5 py-2 dark:bg-white/[0.045] sm:-mx-0 sm:w-full">
+            <p className="text-xs font-semibold text-foreground">
+              Current allocation vs Recommended (per user settings)
+            </p>
+            <p className="mt-0.5 text-[11px] text-subtle">
+              Share of invested amount (cost basis) vs recommended mix
+            </p>
+            <div className="mt-2 space-y-2">
+              <div className="space-y-1.5">
+                <SummaryStackedTrack
+                  label="Current allocation"
+                  items={summaryComparisonSegments}
+                  percentKey="actualPct"
+                />
+                <SummaryStackedTrack
+                  label="Recommended"
+                  items={summaryComparisonSegments}
+                  percentKey="recommendedPct"
+                />
+              </div>
+              <div className="space-y-1">
+                {summaryComparisonSegments.map((segment) => (
+                  <div key={segment.key} className="flex items-center gap-1.5">
+                    <span
+                      className="relative h-3 w-3 shrink-0 overflow-hidden rounded-[2px]"
+                      style={{
+                        backgroundColor: segment.color,
+                        backgroundImage: segment.usesETFPattern ? etfHatchFor(segment.color) : undefined,
+                      }}
+                    />
+                    <span className="text-[11px] font-semibold text-foreground">{segment.label}</span>
+                    <span className="ml-auto text-[10px] font-semibold tabular-nums text-subtle">
+                      {Math.round(Math.max(0, segment.actualPct))}% / {Math.round(Math.max(0, segment.recommendedPct))}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
         <p className="mt-4 text-[11px] leading-relaxed text-subtle">
           {showTodayChange
             ? todayQuoteChange.hasBaseline
