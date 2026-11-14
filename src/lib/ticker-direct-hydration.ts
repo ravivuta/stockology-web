@@ -131,6 +131,53 @@ export function mapTickerHydrationPriceRowToPatch(
   return patch;
 }
 
+export async function fetchSectorsBySymbol(
+  supabase: SupabaseClient,
+  symbols: string[]
+): Promise<Record<string, string>> {
+  const upper = [...new Set(symbols.map((s) => s.trim().toUpperCase()))].filter(Boolean);
+  const out: Record<string, string> = {};
+  if (upper.length === 0) return out;
+
+  const tickerRes = await supabase
+    .from("ticker_data")
+    .select("symbol, sector")
+    .filter("symbol", "in", postgrestInList(upper));
+  if (!tickerRes.error) {
+    for (const row of (tickerRes.data ?? []) as Array<{ symbol?: string; sector?: string | null }>) {
+      const symbol = String(row.symbol ?? "").trim().toUpperCase();
+      const sector = typeof row.sector === "string" ? row.sector.trim() : "";
+      if (symbol && sector) out[symbol] = sector;
+    }
+  }
+
+  const missing = upper.filter((symbol) => !out[symbol]);
+  if (missing.length === 0) return out;
+
+  const profileRes = await supabase
+    .from("stock_event_profiles")
+    .select("symbol, sector")
+    .filter("symbol", "in", postgrestInList(missing));
+  if (profileRes.error) return out;
+  for (const row of (profileRes.data ?? []) as Array<{ symbol?: string; sector?: string | null }>) {
+    const symbol = String(row.symbol ?? "").trim().toUpperCase();
+    const sector = typeof row.sector === "string" ? row.sector.trim() : "";
+    if (symbol && sector && !out[symbol]) out[symbol] = sector;
+  }
+  return out;
+}
+
+function applySectorsToPrices(
+  prices: Record<string, TickerHydrationPriceRow>,
+  sectors: Record<string, string>
+) {
+  for (const [symbol, sector] of Object.entries(sectors)) {
+    const row = prices[symbol];
+    if (row) row.sector = sector;
+    else prices[symbol] = { symbol, sector };
+  }
+}
+
 /**
  * Load live prices + fundamentals from Supabase tables (same sources as fetch-ticker-data
  * refresh path). Works without invoking edge functions.
@@ -152,7 +199,7 @@ export async function fetchTickerHydrationFromTables(
     supabase
       .from("ticker_data")
       .select(
-        "symbol, analyst_average, market_cap, peg_ratio, return_on_equity, profit_margin, trailing_pe, debt_to_equity, dividend_yield, payout_ratio, analyst_target, beta, company_name, consensus_conclusion, is_etf, sector"
+        "symbol, analyst_average, market_cap, peg_ratio, return_on_equity, profit_margin, trailing_pe, debt_to_equity, dividend_yield, payout_ratio, analyst_target, beta, company_name, consensus_conclusion, is_etf"
         + ", analyst_target_low, analyst_target_median, analyst_target_high, analyst_target_mean"
       )
       .filter("symbol", "in", postgrestInList(upper)),
@@ -247,5 +294,6 @@ export async function fetchTickerHydrationFromTables(
     if (Number.isFinite(sc)) sentiment[sym] = { sentiment_score: sc };
   }
 
+  applySectorsToPrices(prices, await fetchSectorsBySymbol(supabase, upper));
   return { prices, sentiment };
 }

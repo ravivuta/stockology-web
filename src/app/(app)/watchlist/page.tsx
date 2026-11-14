@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Paintbrush } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { postgrestInList } from "@/lib/postgrest-symbol";
+import { fetchSectorsBySymbol } from "@/lib/ticker-direct-hydration";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import {
   dividendYieldPercent,
@@ -276,19 +276,7 @@ export default function WatchlistPage() {
         const filtered = [...deduped.values()]
           .sort((a, b) => (b.upside - a.upside) || (b.market_cap - a.market_cap) || a.symbol.localeCompare(b.symbol));
         const symbols = filtered.map((row) => row.symbol);
-        const sectorBySymbol: Record<string, string> = {};
-        if (symbols.length > 0) {
-          const { data: sectorRows, error: sectorError } = await supabase
-            .from("ticker_data")
-            .select("symbol, sector")
-            .filter("symbol", "in", postgrestInList(symbols));
-          if (sectorError) throw new Error(sectorError.message);
-          for (const row of (sectorRows ?? []) as Array<{ symbol?: string; sector?: string | null }>) {
-            const symbol = String(row.symbol ?? "").trim().toUpperCase();
-            const sector = typeof row.sector === "string" ? row.sector.trim() : "";
-            if (symbol && sector) sectorBySymbol[symbol] = sector;
-          }
-        }
+        const sectorBySymbol = symbols.length > 0 ? await fetchSectorsBySymbol(supabase, symbols) : {};
         const withSectors = filtered.map((row) => ({
           ...row,
           sector: sectorBySymbol[row.symbol] ?? null,

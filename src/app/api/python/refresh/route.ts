@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
 import {
+  fetchSectorsBySymbol,
   fetchTickerHydrationFromTables,
   type TickerHydrationPriceRow,
   type TickerHydrationSentimentRow,
@@ -200,6 +201,13 @@ export async function POST(request: NextRequest) {
         ? supabase.rpc("get_latest_portfolio_snapshot", { p_user_id: dataUserId })
         : Promise.resolve({ data: null, error: null }),
     ]);
+
+    const sectors = await fetchSectorsBySymbol(supabase, symbols);
+    for (const [symbol, sector] of Object.entries(sectors)) {
+      const row = prices[symbol];
+      if (row) row.sector = sector;
+      else prices[symbol] = { symbol, sector };
+    }
 
     const missingSymbols = symbols.filter((symbol) => !prices[symbol]);
     const sentimentMissingDate = symbols.filter((symbol) => !sentiment[symbol]?.last_updated);

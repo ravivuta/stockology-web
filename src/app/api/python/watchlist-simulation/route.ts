@@ -87,6 +87,8 @@ function toIosStockInput(stock: StockHolding): IosStockInput {
     isInWatchlistSize: stock.isInWatchlistSize,
     suppressTradeActions: stock.suppressTradeActions,
     excludeFromShortlist: stock.excludeFromShortlist,
+    includeInShortlist: stock.includeInShortlist,
+    sector: stock.sector ?? null,
     enableRSIReversalGate: stock.enableRSIReversalGate,
     rsiPeriod: stock.rsiPeriod,
     rsiOversoldThreshold: stock.rsiOversoldThreshold,
