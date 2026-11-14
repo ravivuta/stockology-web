@@ -882,7 +882,7 @@ export function shortlistSectorMixLine(
   const counts = shortlistNonETFSectorCounts(stocks, preferred);
   const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
   if (total <= 0) return "";
-  const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   const top = ranked.slice(0, 4);
   const restCount = ranked.slice(4).reduce((sum, [, count]) => sum + count, 0);
   const parts = top.map(([name, count]) => `${name} ${Math.round((count / total) * 100)}%`);
