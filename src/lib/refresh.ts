@@ -67,6 +67,7 @@ function currentStoreSettings() {
     marketOutlookCashTargetSevere: store.marketOutlookCashTargetSevere,
     traderModeEnabled: store.traderModeEnabled,
     limitWatchlistSize: store.limitWatchlistSize,
+    diversifyShortlistBySector: store.diversifyShortlistBySector,
     timezone: store.timezone,
     region: store.region,
   };
@@ -118,6 +119,7 @@ function keepLocalMarketFields(local: StockHolding, incoming: StockHolding): Sto
   }
   if (!next.name && local.name) next.name = local.name;
   if (next.isETF == null && local.isETF != null) next.isETF = local.isETF;
+  if ((next.sector == null || next.sector === "") && local.sector) next.sector = local.sector;
   const today = localCalendarDay();
   if (
     local.movingAvgComputedOn === today &&

@@ -26,6 +26,7 @@ export type TickerHydrationPriceRow = {
   beta?: number | null;
   company_name?: string | null;
   is_etf?: boolean | null;
+  sector?: string | null;
 };
 
 export type TickerHydrationSentimentRow = {
@@ -118,6 +119,9 @@ export function mapTickerHydrationPriceRowToPatch(
   }
   if (p.is_etf === true) patch.isETF = true;
   else if (p.is_etf === false) patch.isETF = false;
+  if (typeof p.sector === "string" && p.sector.trim()) {
+    patch.sector = p.sector.trim();
+  }
   if (sentiment?.sentiment_score != null && Number.isFinite(Number(sentiment.sentiment_score))) {
     patch.aiSentimentScore = Number(sentiment.sentiment_score);
   }
@@ -148,7 +152,7 @@ export async function fetchTickerHydrationFromTables(
     supabase
       .from("ticker_data")
       .select(
-        "symbol, analyst_average, market_cap, peg_ratio, return_on_equity, profit_margin, trailing_pe, debt_to_equity, dividend_yield, payout_ratio, analyst_target, beta, company_name, consensus_conclusion, is_etf"
+        "symbol, analyst_average, market_cap, peg_ratio, return_on_equity, profit_margin, trailing_pe, debt_to_equity, dividend_yield, payout_ratio, analyst_target, beta, company_name, consensus_conclusion, is_etf, sector"
         + ", analyst_target_low, analyst_target_median, analyst_target_high, analyst_target_mean"
       )
       .filter("symbol", "in", postgrestInList(upper)),
@@ -182,6 +186,7 @@ export async function fetchTickerHydrationFromTables(
     | "beta"
     | "company_name"
     | "is_etf"
+    | "sector"
   > {
     const rawAa = f.analyst_average;
     let analyst_average: number | string | null = null;
@@ -210,6 +215,7 @@ export async function fetchTickerHydrationFromTables(
       beta: f.beta != null ? Number(f.beta) : null,
       company_name: typeof f.company_name === "string" ? f.company_name : null,
       is_etf: typeof f.is_etf === "boolean" ? f.is_etf : null,
+      sector: typeof f.sector === "string" && f.sector.trim() ? f.sector.trim() : null,
     };
   }
 

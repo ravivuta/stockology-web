@@ -321,6 +321,7 @@ export function PortfolioCloudBridge({
           marketOutlookCashTargetSevere: usePortfolioStore.getState().marketOutlookCashTargetSevere,
           traderModeEnabled: usePortfolioStore.getState().traderModeEnabled,
           limitWatchlistSize: usePortfolioStore.getState().limitWatchlistSize,
+          diversifyShortlistBySector: usePortfolioStore.getState().diversifyShortlistBySector,
           timezone: usePortfolioStore.getState().timezone,
           region: usePortfolioStore.getState().region,
         },

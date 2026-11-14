@@ -32,6 +32,7 @@ type EdgeTickerPrice = {
   analyst_target_mean?: number | null;
   company_name?: string | null;
   is_etf?: boolean | null;
+  sector?: string | null;
 };
 
 type EdgeTickerSentiment = {
@@ -140,6 +141,7 @@ async function fetchFreshTickerHydration(symbols: string[]) {
       analyst_target_mean: row.analyst_target_mean ?? null,
       company_name: row.company_name ?? null,
       is_etf: row.is_etf ?? null,
+      sector: row.sector ?? null,
     };
   }
 

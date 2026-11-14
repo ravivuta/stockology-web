@@ -4,11 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Paintbrush } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { postgrestInList } from "@/lib/postgrest-symbol";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import {
   dividendYieldPercent,
   preferredSymbolsForShortlistIndicator,
   shortlistCapacityDiagnostics,
+  shortlistSectorMixLine,
+  shortlistNonETFSectorCounts,
+  prioritizeStockPickerByOpenSectors,
+  rankedStockSlotsForTopN,
   selectedAnalystTarget,
   symbolShortlistTextClass,
 } from "@/lib/ios-recommendation";
@@ -43,6 +48,7 @@ type QualifiedStockCandidate = {
   analyst_average: number;
   market_cap: number;
   company_name?: string | null;
+  sector?: string | null;
 };
 
 const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
@@ -167,6 +173,7 @@ export default function WatchlistPage() {
   const stocks = usePortfolioStore((s) => s.stocks);
   const portfolioSize = usePortfolioStore((s) => s.portfolioSize);
   const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
+  const diversifyShortlistBySector = usePortfolioStore((s) => s.diversifyShortlistBySector);
   const enableRiskFilter = usePortfolioStore((s) => s.enableRiskFilter);
   const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
   const removeStock = usePortfolioStore((s) => s.removeStock);
@@ -213,8 +220,9 @@ export default function WatchlistPage() {
         enableRiskFilter,
         riskAppetite,
         portfolioSize,
+        diversifyShortlistBySector,
       }),
-    [enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
+    [diversifyShortlistBySector, enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
   );
   const shortlistCapacity = useMemo(
     () =>
@@ -223,10 +231,15 @@ export default function WatchlistPage() {
         enableRiskFilter,
         riskAppetite,
         portfolioSize,
+        diversifyShortlistBySector,
       }, {
         etfPenaltyMultiplier: 3,
       }),
-    [enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
+    [diversifyShortlistBySector, enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
+  );
+  const sectorMixLine = useMemo(
+    () => shortlistSectorMixLine(stocks, shortlistedSymbols),
+    [shortlistedSymbols, stocks]
   );
   const shouldShowShortlistCapacityAlert = limitWatchlistSize && (
     shortlistCapacity.alertLevel !== "none" ||
@@ -261,9 +274,33 @@ export default function WatchlistPage() {
           if (!prior || candidate.upside > prior.upside) deduped.set(symbol, candidate);
         }
         const filtered = [...deduped.values()]
-          .sort((a, b) => (b.upside - a.upside) || (b.market_cap - a.market_cap) || a.symbol.localeCompare(b.symbol))
-          .slice(0, 30);
-        setQualifiedCandidates(filtered);
+          .sort((a, b) => (b.upside - a.upside) || (b.market_cap - a.market_cap) || a.symbol.localeCompare(b.symbol));
+        const symbols = filtered.map((row) => row.symbol);
+        const sectorBySymbol: Record<string, string> = {};
+        if (symbols.length > 0) {
+          const { data: sectorRows, error: sectorError } = await supabase
+            .from("ticker_data")
+            .select("symbol, sector")
+            .filter("symbol", "in", postgrestInList(symbols));
+          if (sectorError) throw new Error(sectorError.message);
+          for (const row of (sectorRows ?? []) as Array<{ symbol?: string; sector?: string | null }>) {
+            const symbol = String(row.symbol ?? "").trim().toUpperCase();
+            const sector = typeof row.sector === "string" ? row.sector.trim() : "";
+            if (symbol && sector) sectorBySymbol[symbol] = sector;
+          }
+        }
+        const withSectors = filtered.map((row) => ({
+          ...row,
+          sector: sectorBySymbol[row.symbol] ?? null,
+        }));
+        const prioritized = prioritizeStockPickerByOpenSectors(
+          withSectors,
+          (row) => row.sector,
+          shortlistNonETFSectorCounts(stocks, shortlistedSymbols),
+          rankedStockSlotsForTopN(stocks, portfolioSize),
+          diversifyShortlistBySector
+        );
+        setQualifiedCandidates(prioritized.slice(0, 30));
       } else {
         const { data, error } = await supabase
           .from("ticker_data")
@@ -472,6 +509,9 @@ export default function WatchlistPage() {
           </button>
           <p className="ml-auto shrink-0 text-xs text-subtle">{watchlistCountText}</p>
         </div>
+        {sectorMixLine ? (
+          <p className="mt-1 text-center text-[11px] leading-snug text-subtle">{sectorMixLine}</p>
+        ) : null}
         {searchOpen ? (
           <div className="mt-2 flex justify-end">
             <input
@@ -835,7 +875,7 @@ export default function WatchlistPage() {
                     <p className="text-sm font-semibold text-foreground">{candidate.symbol}</p>
                     <p className="text-xs text-subtle">
                       {qualifiedPickerMode === "stocks"
-                        ? `Upside ${formatPercent(candidate.upside, true)} · Analyst ${formatDecimal(candidate.analyst_average)} · Cap ${formatMarketCapCompact(candidate.market_cap)}`
+                        ? `${candidate.sector ? `${candidate.sector} · ` : ""}Upside ${formatPercent(candidate.upside, true)} · Analyst ${formatDecimal(candidate.analyst_average)} · Cap ${formatMarketCapCompact(candidate.market_cap)}`
                         : `${candidate.company_name ?? "ETF"} · Cap ${formatMarketCapCompact(candidate.market_cap)}`}
                     </p>
                   </div>

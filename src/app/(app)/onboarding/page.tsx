@@ -137,6 +137,7 @@ export default function OnboardingPage() {
             rsiMinRisingDays: store.rsiMinRisingDaysForRecommendations,
             sellOnlyLongTerm: store.sellOnlyLongTermQualified,
             limitWatchlistSize: store.limitWatchlistSize,
+            diversifyShortlistBySector: store.diversifyShortlistBySector,
             timezone: store.timezone,
             region: store.region,
           });

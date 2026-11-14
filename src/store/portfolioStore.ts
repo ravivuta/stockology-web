@@ -115,6 +115,7 @@ export type StockHolding = {
   suppressTradeActions?: boolean;
   excludeFromShortlist?: boolean;
   includeInShortlist?: boolean;
+  sector?: string | null;
   enableRSIReversalGate?: boolean;
   rsiPeriod?: number;
   rsiOversoldThreshold?: number;
@@ -130,6 +131,7 @@ type State = {
   riskAppetite: "Low" | "Medium" | "High";
   enableRiskFilter: boolean;
   limitWatchlistSize: boolean;
+  diversifyShortlistBySector: boolean;
   etfProfitTarget: number;
   stockProfitTarget: number;
   useAISentimentForRecommendations: boolean;
@@ -169,7 +171,7 @@ type State = {
     nextCash: number;
     markedPending: boolean;
   };
-  setSettings: (p: Partial<Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "etfProfitTarget" | "stockProfitTarget" | "useAISentimentForRecommendations" | "useRSIGatingForRecommendations" | "rsiPeriodForRecommendations" | "rsiOversoldThresholdForRecommendations" | "rsiOverboughtThresholdForRecommendations" | "rsiHysteresisPointsForRecommendations" | "rsiMinRisingDaysForRecommendations" | "sellOnlyLongTermQualified" | "useMarketRegimeCashTilt" | "marketOutlookCashTargetRiskOn" | "marketOutlookCashTargetNeutral" | "marketOutlookCashTargetElevated" | "marketOutlookCashTargetRiskOff" | "marketOutlookCashTargetSevere" | "traderModeEnabled" | "timezone" | "region">>) => void;
+  setSettings: (p: Partial<Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "diversifyShortlistBySector" | "etfProfitTarget" | "stockProfitTarget" | "useAISentimentForRecommendations" | "useRSIGatingForRecommendations" | "rsiPeriodForRecommendations" | "rsiOversoldThresholdForRecommendations" | "rsiOverboughtThresholdForRecommendations" | "rsiHysteresisPointsForRecommendations" | "rsiMinRisingDaysForRecommendations" | "sellOnlyLongTermQualified" | "useMarketRegimeCashTilt" | "marketOutlookCashTargetRiskOn" | "marketOutlookCashTargetNeutral" | "marketOutlookCashTargetElevated" | "marketOutlookCashTargetRiskOff" | "marketOutlookCashTargetSevere" | "traderModeEnabled" | "timezone" | "region">>) => void;
   addStock: (s: Partial<StockHolding> & { symbol: string }) => void;
   /** Merge fields into an existing symbol and rebuild recommendation. */
   updateStock: (symbol: string, patch: Partial<StockHolding>) => void;
@@ -417,7 +419,7 @@ type RecalcContext = {
   lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }>;
 };
 
-type ShortlistContext = Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "marketOutlookCashTargetRiskOn" | "marketOutlookCashTargetNeutral" | "marketOutlookCashTargetElevated" | "marketOutlookCashTargetRiskOff" | "marketOutlookCashTargetSevere" | "traderModeEnabled"> & {
+type ShortlistContext = Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "diversifyShortlistBySector" | "marketOutlookCashTargetRiskOn" | "marketOutlookCashTargetNeutral" | "marketOutlookCashTargetElevated" | "marketOutlookCashTargetRiskOff" | "marketOutlookCashTargetSevere" | "traderModeEnabled"> & {
   fixedIncomeByAccount?: Record<string, number>;
   useMarketRegimeCashTilt?: boolean;
   marketOutlook?: MarketOutlook | null;
@@ -958,6 +960,7 @@ function derivePortfolioState(
     enableRiskFilter: shortlistCtx.enableRiskFilter,
     riskAppetite: shortlistCtx.riskAppetite,
     portfolioSize,
+    diversifyShortlistBySector: shortlistCtx.diversifyShortlistBySector !== false,
   });
 
   if (shortlistCtx.limitWatchlistSize) {
@@ -978,6 +981,8 @@ function derivePortfolioState(
     const topN = rankedTopWatchlistCandidates(stocksWithRisk, {
       enableRiskFilter: shortlistCtx.enableRiskFilter,
       riskAppetite: shortlistCtx.riskAppetite,
+      portfolioSize,
+      diversifyBySector: shortlistCtx.diversifyShortlistBySector !== false,
     })
       .filter((stock) => !forceIncludedSymbols.has(stock.symbol))
       .slice(0, Math.max(idealWatchlistSize - (etfSymbols.length * 3) - forceIncluded.length, 0));
@@ -1005,6 +1010,7 @@ function derivePortfolioState(
           offloadHoldingOutsideShortlistIfNeeded(stock.recommendation, stock, {
             enableRiskFilter: shortlistCtx.enableRiskFilter,
             limitWatchlistSize: shortlistCtx.limitWatchlistSize,
+            diversifyShortlistBySector: shortlistCtx.diversifyShortlistBySector !== false,
             riskAppetite: shortlistCtx.riskAppetite,
             portfolioSize,
             cashBalance: cashEquivalent,
@@ -1018,6 +1024,7 @@ function derivePortfolioState(
           {
             enableRiskFilter: shortlistCtx.enableRiskFilter,
             limitWatchlistSize: shortlistCtx.limitWatchlistSize,
+            diversifyShortlistBySector: shortlistCtx.diversifyShortlistBySector !== false,
             riskAppetite: shortlistCtx.riskAppetite,
             portfolioSize,
             cashBalance: cashEquivalent,
@@ -1097,6 +1104,7 @@ export const usePortfolioStore = create<State>()(
       riskAppetite: "Medium",
       enableRiskFilter: true,
       limitWatchlistSize: true,
+      diversifyShortlistBySector: true,
       etfProfitTarget: 50,
       stockProfitTarget: 50,
       useAISentimentForRecommendations: false,
@@ -1303,7 +1311,8 @@ export const usePortfolioStore = create<State>()(
           const derived = derivePortfolioState(st.stocks, st.cashBalance, ctx, nextState, {
             shouldRecalculateLimits: true,
             forceRecalculateAllHoldingLimits:
-              p.limitWatchlistSize != null && p.limitWatchlistSize !== st.limitWatchlistSize,
+              (p.limitWatchlistSize != null && p.limitWatchlistSize !== st.limitWatchlistSize) ||
+              (p.diversifyShortlistBySector != null && p.diversifyShortlistBySector !== st.diversifyShortlistBySector),
           });
           return { ...p, stocks: derived.stocks, portfolioSize: derived.portfolioSize, lastLocalMutationAt: mutationAt };
         }),

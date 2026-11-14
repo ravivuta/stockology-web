@@ -137,6 +137,7 @@ export default function PortfolioPage() {
   const stocks = usePortfolioStore((s) => s.stocks);
   const portfolioSize = usePortfolioStore((s) => s.portfolioSize);
   const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
+  const diversifyShortlistBySector = usePortfolioStore((s) => s.diversifyShortlistBySector);
   const enableRiskFilter = usePortfolioStore((s) => s.enableRiskFilter);
   const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
   const fixedIncomeByAccount = usePortfolioStore((s) => s.fixedIncomeByAccount);
@@ -166,8 +167,9 @@ export default function PortfolioPage() {
         enableRiskFilter,
         riskAppetite,
         portfolioSize,
+        diversifyShortlistBySector,
       }),
-    [enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
+    [diversifyShortlistBySector, enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
   );
 
   /** Portfolio page lists positions only; watchlist-only symbols (0 qty) stay in store for trading elsewhere. */

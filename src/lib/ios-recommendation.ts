@@ -56,6 +56,7 @@ export type IosStockInput = {
   suppressTradeActions?: boolean;
   excludeFromShortlist?: boolean;
   includeInShortlist?: boolean;
+  sector?: string | null;
   enableRSIReversalGate?: boolean;
   rsiPeriod?: number;
   rsiOversoldThreshold?: number;
@@ -769,9 +770,130 @@ export function recommendedWatchlistSize(portfolioSize: number): number {
   return Math.max(7, Math.min(75, Math.round(stocks)));
 }
 
+export const UNKNOWN_TICKER_SECTOR = "Unknown";
+
+export function normalizedTickerSector(sector?: string | null): string {
+  const trimmed = (sector ?? "").trim();
+  return trimmed || UNKNOWN_TICKER_SECTOR;
+}
+
+/** Sector-focused ETFs have a real Yahoo/GICS label. Broad or unknown ETFs do not count toward caps. */
+export function focusedTickerSector(sector?: string | null): string | null {
+  const trimmed = (sector ?? "").trim();
+  if (!trimmed || trimmed.toLowerCase() === UNKNOWN_TICKER_SECTOR.toLowerCase()) return null;
+  return trimmed;
+}
+
+export function maxNamesPerSectorForShortlist(stockSlots: number): number {
+  return Math.max(1, Math.ceil(Math.max(0, stockSlots) * 0.25));
+}
+
+/** Greedy 25% per-sector cap. Force-included names always stay first and count toward the cap. */
+export function diversifyRankedWatchlistBySector<T extends { sector?: string | null }>(
+  forceIncluded: T[],
+  ranked: T[],
+  stockSlots: number,
+  enabled: boolean,
+  seedCounts?: Record<string, number>
+): T[] {
+  if (!enabled || stockSlots <= 0) return [...forceIncluded, ...ranked];
+  const maxPerSector = maxNamesPerSectorForShortlist(stockSlots);
+  const counts = new Map<string, number>();
+  for (const [sector, count] of Object.entries(seedCounts ?? {})) {
+    if (count > 0) counts.set(sector, count);
+  }
+  const accepted: T[] = [];
+  const deferred: T[] = [];
+  for (const stock of forceIncluded) {
+    accepted.push(stock);
+    const key = normalizedTickerSector(stock.sector);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  for (const stock of ranked) {
+    const key = normalizedTickerSector(stock.sector);
+    const used = counts.get(key) ?? 0;
+    if (used < maxPerSector) {
+      accepted.push(stock);
+      counts.set(key, used + 1);
+    } else {
+      deferred.push(stock);
+    }
+  }
+  return [...accepted, ...deferred];
+}
+
+export function shortlistNonETFSectorCounts(
+  stocks: Array<{ symbol: string; sector?: string | null; isETF?: boolean }>,
+  preferred: Set<string>
+): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const stock of stocks) {
+    if (!preferred.has(stock.symbol)) continue;
+    if (stock.isETF === true) {
+      const focused = focusedTickerSector(stock.sector);
+      if (!focused) continue;
+      counts[focused] = (counts[focused] ?? 0) + 1;
+      continue;
+    }
+    const key = normalizedTickerSector(stock.sector);
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+  return counts;
+}
+
+export function sectorFocusedEtfCounts(
+  stocks: Array<{ sector?: string | null; isETF?: boolean; excludeFromShortlist?: boolean; symbol?: string }>
+): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const stock of stocks) {
+    if (stock.isETF !== true || stock.excludeFromShortlist === true) continue;
+    if (stock.symbol === "$CASH") continue;
+    const focused = focusedTickerSector(stock.sector);
+    if (!focused) continue;
+    counts[focused] = (counts[focused] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/** Open-sector names first so the underfilled picker prefers names that can still take a diversified slot. */
+export function prioritizeStockPickerByOpenSectors<T>(
+  candidates: T[],
+  sectorOf: (candidate: T) => string | null | undefined,
+  currentCounts: Record<string, number>,
+  stockSlots: number,
+  enabled: boolean
+): T[] {
+  if (!enabled || stockSlots <= 0 || candidates.length === 0) return candidates;
+  const maxPerSector = maxNamesPerSectorForShortlist(stockSlots);
+  const open: T[] = [];
+  const full: T[] = [];
+  for (const candidate of candidates) {
+    const key = normalizedTickerSector(sectorOf(candidate));
+    if ((currentCounts[key] ?? 0) < maxPerSector) open.push(candidate);
+    else full.push(candidate);
+  }
+  return [...open, ...full];
+}
+
+export function shortlistSectorMixLine(
+  stocks: Array<{ symbol: string; sector?: string | null; isETF?: boolean }>,
+  preferred: Set<string>
+): string {
+  const counts = shortlistNonETFSectorCounts(stocks, preferred);
+  const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+  if (total <= 0) return "";
+  const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const top = ranked.slice(0, 4);
+  const restCount = ranked.slice(4).reduce((sum, [, count]) => sum + count, 0);
+  const parts = top.map(([name, count]) => `${name} ${Math.round((count / total) * 100)}%`);
+  if (restCount > 0) parts.push(`Other ${Math.round((restCount / total) * 100)}%`);
+  return parts.join(" · ");
+}
+
 export type AddGateContext = {
   enableRiskFilter: boolean;
   limitWatchlistSize: boolean;
+  diversifyShortlistBySector?: boolean;
   riskAppetite: "Low" | "Medium" | "High";
   portfolioSize: number;
   cashBalance?: number;
@@ -814,6 +936,7 @@ export function preferredSymbolsForShortlistIndicator(
     enableRiskFilter?: boolean;
     riskAppetite?: "Low" | "Medium" | "High";
     portfolioSize: number;
+    diversifyShortlistBySector?: boolean;
   }
 ): Set<string> {
   const eligible = stocks.filter(
@@ -836,6 +959,8 @@ export function preferredSymbolsForShortlistIndicator(
   const topStockSymbols = rankedTopWatchlistCandidates(eligible, {
     enableRiskFilter: options.enableRiskFilter,
     riskAppetite: options.riskAppetite,
+    portfolioSize: options.portfolioSize,
+    diversifyBySector: options.diversifyShortlistBySector !== false,
   })
     .filter((stock) => !forcedSymbols.includes(stock.symbol))
     .slice(0, rankedSlots)
@@ -856,6 +981,7 @@ export function symbolsForSimulation(
     enableRiskFilter: boolean;
     riskAppetite: "Low" | "Medium" | "High";
     portfolioSize: number;
+    diversifyShortlistBySector?: boolean;
   }
 ): Set<string> {
   const eligible = stocks.filter((stock) => stock.symbol !== "$CASH" && stock.excludeFromShortlist !== true);
@@ -865,6 +991,7 @@ export function symbolsForSimulation(
       enableRiskFilter: settings.enableRiskFilter,
       riskAppetite: settings.riskAppetite,
       portfolioSize: settings.portfolioSize,
+      diversifyShortlistBySector: settings.diversifyShortlistBySector,
     });
   }
   return new Set(
@@ -895,7 +1022,13 @@ export function symbolShortlistTextClass(
 /** Non-ETF names that compete for top-N. Risk Low/Medium/High is applied first when enabled. Rank N of N is included. */
 export function rankedTopWatchlistCandidates(
   stocks: IosStockInput[],
-  options?: { enableRiskFilter?: boolean; riskAppetite?: "Low" | "Medium" | "High"; includeLowScores?: boolean }
+  options?: {
+    enableRiskFilter?: boolean;
+    riskAppetite?: "Low" | "Medium" | "High";
+    includeLowScores?: boolean;
+    portfolioSize?: number;
+    diversifyBySector?: boolean;
+  }
 ): IosStockInput[] {
   const forceIncluded = stocks
     .filter(
@@ -921,7 +1054,60 @@ export function rankedTopWatchlistCandidates(
       return cmp === 0 ? a.symbol.localeCompare(b.symbol) : cmp;
     });
 
-  return [...forceIncluded, ...ranked];
+  const stockSlots =
+    options?.portfolioSize != null ? rankedStockSlotsForTopN(stocks, options.portfolioSize) : 0;
+  return diversifyRankedWatchlistBySector(
+    forceIncluded,
+    ranked,
+    stockSlots,
+    options?.diversifyBySector !== false,
+    sectorFocusedEtfCounts(stocks)
+  );
+}
+
+export function snapshotSectorDisplay(stock: { sector?: string | null; isETF?: boolean }): string {
+  const raw = (stock.sector ?? "").trim();
+  if (!raw) return "—";
+  if (raw.toLowerCase() === UNKNOWN_TICKER_SECTOR.toLowerCase()) {
+    return stock.isETF === true ? "Not sector-focused" : "—";
+  }
+  return raw;
+}
+
+/** True when this name would take a stock slot on score alone but is deferred by the 25% sector cap. */
+export function isDeferredBySectorCap(
+  stocks: IosStockInput[],
+  symbol: string,
+  options: {
+    enableRiskFilter?: boolean;
+    riskAppetite?: "Low" | "Medium" | "High";
+    portfolioSize: number;
+    diversifyBySector?: boolean;
+    limitWatchlistSize?: boolean;
+  }
+): boolean {
+  if (options.limitWatchlistSize === false || options.diversifyBySector === false) return false;
+  const target = stocks.find((stock) => stock.symbol === symbol);
+  if (!target || target.isETF === true) return false;
+  const slots = rankedStockSlotsForTopN(stocks, options.portfolioSize);
+  if (slots <= 0) return false;
+  const rankOptions = {
+    enableRiskFilter: options.enableRiskFilter,
+    riskAppetite: options.riskAppetite,
+    portfolioSize: options.portfolioSize,
+  };
+  const diversified = new Set(
+    rankedTopWatchlistCandidates(stocks, { ...rankOptions, diversifyBySector: true })
+      .slice(0, slots)
+      .map((stock) => stock.symbol)
+  );
+  if (diversified.has(symbol)) return false;
+  const scoreOnly = new Set(
+    rankedTopWatchlistCandidates(stocks, { ...rankOptions, diversifyBySector: false })
+      .slice(0, slots)
+      .map((stock) => stock.symbol)
+  );
+  return scoreOnly.has(symbol);
 }
 
 function rankInTopWatchlist(
@@ -929,7 +1115,12 @@ function rankInTopWatchlist(
   symbol: string,
   ctx?: AddGateContext
 ): number | null {
-  const ranked = rankedTopWatchlistCandidates(stocks, ctx);
+  const ranked = rankedTopWatchlistCandidates(stocks, {
+    enableRiskFilter: ctx?.enableRiskFilter,
+    riskAppetite: ctx?.riskAppetite,
+    portfolioSize: ctx?.portfolioSize,
+    diversifyBySector: ctx?.diversifyShortlistBySector !== false,
+  });
   const index = ranked.findIndex((stock) => stock.symbol === symbol);
   return index >= 0 ? index + 1 : null;
 }
@@ -952,6 +1143,7 @@ export function shortlistCapacityDiagnostics(
     enableRiskFilter: boolean;
     riskAppetite: "Low" | "Medium" | "High";
     portfolioSize: number;
+    diversifyShortlistBySector?: boolean;
   },
   options?: {
     etfPenaltyMultiplier?: number;
@@ -977,6 +1169,8 @@ export function shortlistCapacityDiagnostics(
     rankedTopWatchlistCandidates(eligible, {
       enableRiskFilter: settings.enableRiskFilter,
       riskAppetite: settings.riskAppetite,
+      portfolioSize: settings.portfolioSize,
+      diversifyBySector: settings.diversifyShortlistBySector !== false,
     }).length
   );
   const stockSlotShortfall = Math.max(0, targetStockSlots - qualifiedNonETFSlots);
@@ -1018,7 +1212,12 @@ export function shortlistCapacityDiagnostics(
 export function rankInWatchlistScoreUniverse(
   stocks: IosStockInput[],
   symbol: string,
-  options?: { enableRiskFilter?: boolean; riskAppetite?: "Low" | "Medium" | "High" }
+  options?: {
+    enableRiskFilter?: boolean;
+    riskAppetite?: "Low" | "Medium" | "High";
+    portfolioSize?: number;
+    diversifyBySector?: boolean;
+  }
 ): number | null {
   const ranked = rankedTopWatchlistCandidates(stocks, { ...options, includeLowScores: true });
   const index = ranked.findIndex((stock) => stock.symbol.toUpperCase() === symbol.toUpperCase());
@@ -1082,6 +1281,7 @@ export function holdingIsOutsideEnabledShortlistAndRisk(
     enableRiskFilter: ctx.enableRiskFilter,
     riskAppetite: ctx.riskAppetite,
     portfolioSize: ctx.portfolioSize,
+    diversifyShortlistBySector: ctx.diversifyShortlistBySector,
   });
   return !preferred.has(stock.symbol);
 }

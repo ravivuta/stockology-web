@@ -128,6 +128,7 @@ export default function SimulationPage() {
   const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
   const enableRiskFilter = usePortfolioStore((s) => s.enableRiskFilter);
   const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
+  const diversifyShortlistBySector = usePortfolioStore((s) => s.diversifyShortlistBySector);
   const etfProfitTarget = usePortfolioStore((s) => s.etfProfitTarget);
   const stockProfitTarget = usePortfolioStore((s) => s.stockProfitTarget);
   const useRSIGatingForRecommendations = usePortfolioStore((s) => s.useRSIGatingForRecommendations);
@@ -144,8 +145,9 @@ export default function SimulationPage() {
         enableRiskFilter,
         riskAppetite,
         portfolioSize,
+        diversifyShortlistBySector,
       }),
-    [enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
+    [diversifyShortlistBySector, enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
   );
   const simulationStocks = useMemo(
     () => stocks.filter((stock) => simulationSymbols.has(stock.symbol)),

@@ -124,6 +124,7 @@ function SettingsInner() {
   const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
   const enableRiskFilter = usePortfolioStore((s) => s.enableRiskFilter);
   const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
+  const diversifyShortlistBySector = usePortfolioStore((s) => s.diversifyShortlistBySector);
   const etfProfitTarget = usePortfolioStore((s) => s.etfProfitTarget);
   const stockProfitTarget = usePortfolioStore((s) => s.stockProfitTarget);
   const useAISentimentForRecommendations = usePortfolioStore((s) => s.useAISentimentForRecommendations);
@@ -234,6 +235,7 @@ function SettingsInner() {
         sellOnlyLongTerm: "sellOnlyLongTermQualified" in patch ? patch.sellOnlyLongTermQualified : store.sellOnlyLongTermQualified,
         traderModeEnabled: "traderModeEnabled" in patch ? patch.traderModeEnabled : store.traderModeEnabled,
         limitWatchlistSize: "limitWatchlistSize" in patch ? patch.limitWatchlistSize : store.limitWatchlistSize,
+        diversifyShortlistBySector: "diversifyShortlistBySector" in patch ? patch.diversifyShortlistBySector : store.diversifyShortlistBySector,
         timezone: "timezone" in patch ? patch.timezone : store.timezone,
         region: "region" in patch ? patch.region : store.region,
       });
@@ -474,6 +476,7 @@ function SettingsInner() {
             ? { traderModeEnabled: false, useAISentimentForRecommendations: false, useRSIGatingForRecommendations: false }
             : {}),
           ...(cloudSettings.limitWatchlistSize != null ? { limitWatchlistSize: cloudSettings.limitWatchlistSize } : {}),
+          ...(cloudSettings.diversifyShortlistBySector != null ? { diversifyShortlistBySector: cloudSettings.diversifyShortlistBySector } : {}),
           ...(cloudSettings.timezone ? { timezone: cloudSettings.timezone } : {}),
           ...(cloudSettings.region ? { region: cloudSettings.region } : {}),
         });
@@ -794,6 +797,23 @@ function SettingsInner() {
                     <span className="block text-[12px] font-medium leading-snug text-foreground">Shortlist & Limit stocks for Portfolio size</span>
                     <span className="mt-px block text-[10px] leading-snug text-subtle">
                       Uses your portfolio size to set an ideal shortlist. BUY/ADD are limited to top-scored names (plus ETFs). Holdings outside the shortlist can still REDUCE/SELL. Current ideal watchlist size: {idealWatchlistSize} of {stockCount} stocks.
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              <div className="self-start">
+                <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
+                    checked={diversifyShortlistBySector}
+                    onChange={(e) => persistSettingsPatch({ diversifyShortlistBySector: e.target.checked })}
+                  />
+                  <span>
+                    <span className="block text-[12px] font-medium leading-snug text-foreground">Diversify shortlist by sector</span>
+                    <span className="mt-px block text-[10px] leading-snug text-subtle">
+                      After ranking by score, fill stock slots with at most 25% from any one sector (minimum 1). Sector-focused ETFs count toward that cap; broad ETFs do not. Holdings are never dropped. Force-included names always stay and count toward the cap.
                     </span>
                   </span>
                 </label>

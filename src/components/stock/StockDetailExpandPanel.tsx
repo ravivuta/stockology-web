@@ -10,6 +10,8 @@ import {
   payoutRatioDecimal,
   rankInWatchlistScoreUniverse,
   rankedStockSlotsForTopN,
+  snapshotSectorDisplay,
+  isDeferredBySectorCap,
   selectedAnalystTarget,
   scoreBreakdownRows,
   sentimentLabelForScore,
@@ -345,6 +347,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const rsiMinRisingDaysForRecommendations = usePortfolioStore((s) => s.rsiMinRisingDaysForRecommendations);
   const sellOnlyLongTermQualified = usePortfolioStore((s) => s.sellOnlyLongTermQualified);
   const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
+  const diversifyShortlistBySector = usePortfolioStore((s) => s.diversifyShortlistBySector);
   const enableRiskFilter = usePortfolioStore((s) => s.enableRiskFilter);
   const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
   const portfolioSize = usePortfolioStore((s) => s.portfolioSize);
@@ -500,6 +503,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     const gateCtx = {
       enableRiskFilter,
       limitWatchlistSize,
+      diversifyShortlistBySector,
       riskAppetite,
       portfolioSize,
       cashBalance: cashEquivalentBalance,
@@ -546,6 +550,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     rsiMinRisingDaysForRecommendations,
     enableRiskFilter,
     limitWatchlistSize,
+    diversifyShortlistBySector,
     riskAppetite,
     portfolioSize,
     useMarketRegimeCashTilt,
@@ -635,10 +640,23 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
         },
         {
           label: "ETF handling",
-          detail: "ETFs are always included for recommendations regardless of filters",
+          detail: diversifyShortlistBySector
+            ? "ETFs always stay on the shortlist. Sector-focused ETFs count toward that sector's 25% cap."
+            : "ETFs are always included for recommendations regardless of filters",
           passes: true,
         },
       ];
+      if (diversifyShortlistBySector) {
+        const sectorLabel = snapshotSectorDisplay(stock);
+        rows.push({
+          label: "Sector mix (25% cap)",
+          detail:
+            sectorLabel === "Not sector-focused" || sectorLabel === "—"
+              ? "Broad ETF; not counted toward the sector cap"
+              : `Sector-focused ETF; counts toward ${sectorLabel}`,
+          passes: true,
+        });
+      }
 
       if (stock.excludeFromShortlist === true) {
         rows.push({
@@ -669,15 +687,36 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       const rank = rankInWatchlistScoreUniverse(stocks, stock.symbol, {
         enableRiskFilter,
         riskAppetite,
+        portfolioSize,
+        diversifyBySector: diversifyShortlistBySector,
       });
       const rankLabel = rank != null
         ? `Ranked ${rank} (effective top slots: ${topN})`
         : `Not ranked in effective top slots (${topN})`;
       rows.push({
         label: `Score-Driven Effective Top Slots (${topN})`,
-        detail: limitWatchlistSize ? rankLabel : "Limit disabled",
+        detail: limitWatchlistSize
+          ? `${rankLabel}${diversifyShortlistBySector ? "; then 25% per-sector cap" : ""}`
+          : "Limit disabled",
         passes: limitWatchlistSize ? stock.isInWatchlistSize === true : true,
       });
+      if (diversifyShortlistBySector && limitWatchlistSize) {
+        const deferred = isDeferredBySectorCap(stocks, stock.symbol, {
+          enableRiskFilter,
+          riskAppetite,
+          portfolioSize,
+          diversifyBySector: true,
+          limitWatchlistSize,
+        });
+        const sectorLabel = snapshotSectorDisplay(stock);
+        rows.push({
+          label: "Sector mix (25% cap)",
+          detail: deferred
+            ? `${sectorLabel} is at the 25% cap, so this name was deferred for higher-ranked names from other sectors`
+            : `${sectorLabel}: within the 25% shortlist cap (sector-focused ETFs count)`,
+          passes: !deferred,
+        });
+      }
     }
 
     if (stock.excludeFromShortlist === true) {
@@ -689,7 +728,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     }
 
     return rows;
-  }, [enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stock, stocks]);
+  }, [diversifyShortlistBySector, enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stock, stocks]);
   const shortlistReasons = useMemo(() => {
     if (!stock || isShortlistedForPortfolio) return [];
 
@@ -704,15 +743,26 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       const rank = rankInWatchlistScoreUniverse(stocks, stock.symbol, {
         enableRiskFilter,
         riskAppetite,
+        portfolioSize,
+        diversifyBySector: diversifyShortlistBySector,
+      });
+      const deferred = isDeferredBySectorCap(stocks, stock.symbol, {
+        enableRiskFilter,
+        riskAppetite,
+        portfolioSize,
+        diversifyBySector: diversifyShortlistBySector,
+        limitWatchlistSize,
       });
       reasons.push(
-        rank != null
-          ? `Ranked ${rank}; outside effective top slots (${topN}).`
-          : `Score ranks below the effective top slots limit (${topN}).`
+        deferred
+          ? `Ranked ${rank}; deferred by the 25% sector cap (${snapshotSectorDisplay(stock)}).`
+          : rank != null
+            ? `Ranked ${rank}; outside effective top slots (${topN}).`
+            : `Score ranks below the effective top slots limit (${topN}).`
       );
     }
     return reasons;
-  }, [enableRiskFilter, isShortlistedForPortfolio, limitWatchlistSize, portfolioSize, riskAppetite, stock, stocks]);
+  }, [diversifyShortlistBySector, enableRiskFilter, isShortlistedForPortfolio, limitWatchlistSize, portfolioSize, riskAppetite, stock, stocks]);
   const scoreRows = useMemo(() => (stock ? scoreBreakdownRows(stock) : null), [stock]);
   const dense = Boolean(embedded);
   const stockSymbol = stock?.symbol ?? null;
@@ -1238,7 +1288,14 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                       {
                         label: `SMA(${stock.shortSMA})`,
                         value: smaForSnapshot != null ? formatCurrency(smaForSnapshot) : "—",
-                        detail: stock.isETF ? "ETF" : "Stock",
+                      },
+                      {
+                        label: "ETF",
+                        value: stock.isETF === true ? "Yes" : stock.isETF === false ? "No" : "Unknown",
+                      },
+                      {
+                        label: "Sector",
+                        value: snapshotSectorDisplay(stock),
                       },
                     ]}
                   />
@@ -2118,7 +2175,7 @@ function sellFromWaitFactors({
   if (outside) {
     factors.push({
       label: "Outside shortlist and risk gates",
-      detail: "Not in the current shortlist",
+      detail: "Not in the current shortlist after score rank and sector mix",
       passes: true,
     });
     factors.push({
