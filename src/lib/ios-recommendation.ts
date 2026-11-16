@@ -1438,7 +1438,8 @@ function unrealizedGainPercent(stock: Pick<IosStockInput, "quantity" | "lastPric
 
 /**
  * Pair an underwater outside-shortlist holding with an underwater shortlisted holding
- * whose loss is within 2 percentage points. Full SELL + ADD; skip SMA/tax-gain gates.
+ * whose loss is within 2 percentage points. SELL only if score < 50; ADD only if score > 50.
+ * Full SELL + ADD; skip SMA/tax-gain gates.
  */
 export function applyLossRotationTowardShortlist<T extends IosStockInput & { recommendation?: IosRecOut }>(
   stocks: T[],
@@ -1477,8 +1478,14 @@ export function applyLossRotationTowardShortlist<T extends IosStockInput & { rec
   const dests: number[] = [];
   stocks.forEach((stock, index) => {
     if (!isEligibleLoser(stock) || isProtectedExit(stock)) return;
-    if (preferred.has(stock.symbol)) dests.push(index);
-    else sources.push(index);
+    const score = stock.score ?? 0;
+    if (preferred.has(stock.symbol)) {
+      if (score <= 50) return;
+      dests.push(index);
+    } else {
+      if (score >= 50) return;
+      sources.push(index);
+    }
   });
   if (sources.length === 0 || dests.length === 0) {
     return { stocks, rotationFundedSymbols: new Set() };
