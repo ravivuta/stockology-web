@@ -27,7 +27,15 @@ export const CSV_IMPORT_FIELDS: CsvImportField[] = [
   { key: "name", label: "Name", description: "Optional company name." },
 ];
 
-const CSV_AUTO_DETECT_FIELDS = new Set<CsvColumnStandard>(["symbol", "qty", "price", "purchaseDate"]);
+const CSV_AUTO_DETECT_FIELDS = new Set<CsvColumnStandard>([
+  "symbol",
+  "qty",
+  "price",
+  "purchaseDate",
+  "transaction",
+  "account",
+  "retirementAccount",
+]);
 
 const CSV_IMPORT_CANDIDATES: Record<CsvColumnStandard, string[]> = {
   symbol: ["symbol", "ticker", "code"],
@@ -599,6 +607,58 @@ export function shouldShowCsvMapping(text: string): boolean {
   return CSV_IMPORT_FIELDS.some((field) => field.key.toLowerCase() === only);
 }
 
+export function csvHasPopulatedAccountColumn(text: string): boolean {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const headerIdx = findHeaderLineIndex(lines);
+  const headerLine = lines[headerIdx];
+  if (!headerLine) return false;
+  const delimiter = detectDelimiter(headerLine);
+  const headers = splitCsvLine(headerLine, delimiter).map((header) => header.replace(/^"+|"+$/g, "").trim());
+  const accountIndex = headers.findIndex((header) =>
+    CSV_IMPORT_CANDIDATES.account.some((candidate) => normKey(header) === normKey(candidate))
+  );
+  if (accountIndex < 0) return false;
+  for (const line of lines.slice(headerIdx + 1)) {
+    const cells = splitCsvLine(line, delimiter).map((cell) => cell.replace(/^"+|"+$/g, "").trim());
+    if ((cells[accountIndex] ?? "").length > 0) return true;
+  }
+  return false;
+}
+
+/** Exact holdings export header row used by iOS and web. Import auto-detects these names. */
+export const PORTFOLIO_CSV_EXPORT_HEADERS = [
+  "purchaseDate",
+  "transaction",
+  "symbol",
+  "qty",
+  "price",
+  "account",
+  "retirementAccount",
+] as const satisfies readonly CsvColumnStandard[];
+
+export function csvMatchesPortfolioExportSchema(headers: string[]): boolean {
+  const compact = new Set(headers.map((header) => compactHeaderKey(header)));
+  return PORTFOLIO_CSV_EXPORT_HEADERS.every((field) => compact.has(compactHeaderKey(field)));
+}
+
+export function portfolioCsvIdentityMapping(headers: string[]): CsvColumnMapping | null {
+  if (!csvMatchesPortfolioExportSchema(headers)) return null;
+  const mapping: CsvColumnMapping = {};
+  for (const field of PORTFOLIO_CSV_EXPORT_HEADERS) {
+    const header = headers.find((item) => compactHeaderKey(item) === compactHeaderKey(field));
+    if (!header) return null;
+    mapping[field] = header;
+  }
+  return mapping;
+}
+
+export function canSkipCsvMapping(text: string): boolean {
+  return csvHasPopulatedAccountColumn(text) && csvMatchesPortfolioExportSchema(extractCsvHeaders(text));
+}
+
 export function suggestCsvColumnMapping(
   headers: string[],
   saved?: Partial<Record<string, CsvColumnStandard>>
@@ -1072,7 +1132,7 @@ export function exportPortfolioCsv(
     }
   >
 ): string {
-  const header = "purchaseDate,transaction,symbol,qty,price,account,retirementAccount";
+  const header = PORTFOLIO_CSV_EXPORT_HEADERS.join(",");
   const esc = (f: string) => {
     if (f.includes(",") || f.includes('"') || f.includes("\n")) return `"${f.replace(/"/g, '""')}"`;
     return f;

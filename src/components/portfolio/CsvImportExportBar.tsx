@@ -18,6 +18,9 @@ import {
   parsePortfolioCsv,
   parseWatchlistCsv,
   shouldShowCsvMapping,
+  csvHasPopulatedAccountColumn,
+  canSkipCsvMapping,
+  portfolioCsvIdentityMapping,
   suggestCsvColumnMapping,
   normalizeCsvHeader,
   extractCsvHeaders,
@@ -82,6 +85,7 @@ type PendingMappingImport = {
   defaultAccountName: string;
   defaultRetirementAccount: "no" | "yes" | "";
   activePresetId: string | null;
+  accountsPopulated: boolean;
 };
 
 type ImportProgress = {
@@ -122,6 +126,7 @@ function canSubmitMappingImport(pending: PendingMappingImport | null): boolean {
   if (!pending) return false;
   const symbol = pending.mapping.symbol;
   if (isBlankMappingValue(symbol) || symbol?.toLowerCase() === "none") return false;
+  if (pending.accountsPopulated) return true;
   if (!pending.defaultAccountName.trim()) return false;
   if (!(pending.defaultRetirementAccount === "no" || pending.defaultRetirementAccount === "yes")) return false;
   return true;
@@ -691,14 +696,30 @@ export function CsvImportExportBar({
           const text = String(reader.result ?? "");
           if (importMode === "portfolio" && shouldShowCsvMapping(text)) {
             const headers = extractCsvHeaders(text);
+            const mapping = suggestCsvColumnMapping(headers, loadSavedMappingMemory());
+            const identityMapping = portfolioCsvIdentityMapping(headers);
+            if (canSkipCsvMapping(text) && identityMapping) {
+              updateImportProgress("Parsing CSV", 36);
+              const res = await parsePortfolioCsv(text, { columnMapping: identityMapping });
+              if (!res.ok) {
+                setFlash({ kind: "err", text: res.error });
+                finishImportProgress();
+                return;
+              }
+              await applyImport(res.rows, res.skipped, undefined, res.trades, res.rowErrors);
+              updateImportProgress("Finishing import", 100);
+              finishImportProgress();
+              return;
+            }
             setSavedPresets((current) => (current.length > 0 ? current : loadSavedMappingPresets()));
             setPendingMappingImport({
               text,
               headers,
-              mapping: suggestCsvColumnMapping(headers, loadSavedMappingMemory()),
+              mapping,
               defaultAccountName: "",
               defaultRetirementAccount: "",
               activePresetId: null,
+              accountsPopulated: csvHasPopulatedAccountColumn(text),
             });
             finishImportProgress();
             return;
@@ -872,7 +893,7 @@ export function CsvImportExportBar({
         </ModalSection>
         <ModalSection className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <div className="space-y-3">
-            {importMode === "portfolio" ? (
+            {importMode === "portfolio" && !pendingMappingImport?.accountsPopulated ? (
               <>
                 <div className="rounded-2xl border border-border/80 bg-background/60 p-3">
                   <div className="flex flex-col gap-3">
@@ -1047,7 +1068,9 @@ export function CsvImportExportBar({
                 try {
                   beginImportProgress("Saving column mapping", 18);
                   saveMappingMemory(pendingMappingImport.mapping);
-                  const presetName = pendingMappingImport.defaultAccountName.trim();
+                  const presetName = pendingMappingImport.accountsPopulated
+                    ? ""
+                    : pendingMappingImport.defaultAccountName.trim();
                   if (presetName) {
                     const next = upsertSavedMappingPreset({
                       id: pendingMappingImport.activePresetId ?? undefined,
