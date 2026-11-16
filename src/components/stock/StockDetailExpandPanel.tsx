@@ -15,6 +15,7 @@ import {
   selectedAnalystTarget,
   scoreBreakdownRows,
   sentimentLabelForScore,
+  applyLossRotationTowardShortlist,
   offloadHoldingOutsideShortlistIfNeeded,
   raiseCashForMarketOutlookIfNeeded,
 } from "@/lib/ios-recommendation";
@@ -519,12 +520,23 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       gateCtx,
       { sellOnlyLongTermQualified }
     );
-    return raiseCashForMarketOutlookIfNeeded(
+    const gatedRec = raiseCashForMarketOutlookIfNeeded(
       outsideShortlistAdjusted,
       stock,
       gateCtx,
       { sellOnlyLongTermQualified }
     );
+    const rotated = applyLossRotationTowardShortlist(
+      stocks.map((item) => (item.symbol === stock.symbol ? { ...item, recommendation: gatedRec } : item)),
+      {
+        limitWatchlistSize,
+        enableRiskFilter,
+        riskAppetite,
+        portfolioSize,
+        diversifyShortlistBySector,
+      }
+    );
+    return rotated.stocks.find((item) => item.symbol === stock.symbol)?.recommendation ?? gatedRec;
   }, [
     cashEquivalentBalance,
     closes,

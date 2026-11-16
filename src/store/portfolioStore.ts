@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { setLocalStorageItem } from "@/lib/local-storage-quota";
-import { calculateTradingLimits, computeRiskReturnScore, localCalendarDay, rankedStockSlotsForTopN, rankedTopWatchlistCandidates, recommendedWatchlistSize, selectedAnalystTarget, stockPassesRiskFilter, offloadHoldingOutsideShortlistIfNeeded, preferredSymbolsForShortlistIndicator, raiseCashForMarketOutlookIfNeeded } from "@/lib/ios-recommendation";
+import { calculateTradingLimits, computeRiskReturnScore, localCalendarDay, rankedStockSlotsForTopN, rankedTopWatchlistCandidates, recommendedWatchlistSize, selectedAnalystTarget, stockPassesRiskFilter, applyLossRotationTowardShortlist, offloadHoldingOutsideShortlistIfNeeded, preferredSymbolsForShortlistIndicator, raiseCashForMarketOutlookIfNeeded } from "@/lib/ios-recommendation";
 import { getRecommendationHistoryCloses } from "@/lib/recommendation-history-cache";
 import { buildRecommendation } from "@/lib/recommendation";
 import type { CsvImportRow, CsvImportTrade } from "@/lib/csvPortfolio";
@@ -813,6 +813,7 @@ function applyCashAwareBuyPrioritization(
     portfolioSize: number;
     useMarketRegimeCashTilt: boolean;
     marketOutlookCashTargetPct?: number;
+    rotationFundedSymbols?: Set<string>;
   }
 ): StockHolding[] {
   const candidates = stocks
@@ -855,6 +856,10 @@ function applyCashAwareBuyPrioritization(
     const current = next[candidate.index];
     const rec = current?.recommendation;
     if (!current || !rec) continue;
+
+    if (options.rotationFundedSymbols?.has(current.symbol)) {
+      continue;
+    }
 
     if (remainingDeployableCash + 0.01 >= candidate.spend) {
       remainingDeployableCash -= candidate.spend;
@@ -1045,11 +1050,19 @@ function derivePortfolioState(
     };
   });
 
-  const budgetedStocks = applyCashAwareBuyPrioritization(stocks, {
+  const rotated = applyLossRotationTowardShortlist(stocks, {
+    limitWatchlistSize: shortlistCtx.limitWatchlistSize,
+    enableRiskFilter: shortlistCtx.enableRiskFilter,
+    riskAppetite: shortlistCtx.riskAppetite,
+    portfolioSize,
+    diversifyShortlistBySector: shortlistCtx.diversifyShortlistBySector !== false,
+  });
+  const budgetedStocks = applyCashAwareBuyPrioritization(rotated.stocks, {
     cashEquivalentBalance: cashEquivalent,
     portfolioSize,
     useMarketRegimeCashTilt: outlookCtx.useMarketRegimeCashTilt === true,
     marketOutlookCashTargetPct: outlookCtx.marketOutlookCashTargetPct,
+    rotationFundedSymbols: rotated.rotationFundedSymbols,
   });
 
   return { stocks: budgetedStocks, portfolioSize };

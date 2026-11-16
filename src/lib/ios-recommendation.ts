@@ -1426,6 +1426,132 @@ export function offloadHoldingOutsideShortlistIfNeeded<T extends IosRecOut>(
   };
 }
 
+export const LOSS_ROTATION_BAND_PCT = 2;
+
+function unrealizedGainPercent(stock: Pick<IosStockInput, "quantity" | "lastPrice" | "averageCost">): number | null {
+  const qty = stock.quantity ?? 0;
+  const price = stock.lastPrice ?? 0;
+  const avg = stock.averageCost ?? 0;
+  if (qty <= 0 || price <= 0 || avg <= 0) return null;
+  return ((price - avg) / avg) * 100;
+}
+
+/**
+ * Pair an underwater outside-shortlist holding with an underwater shortlisted holding
+ * whose loss is within 2 percentage points. Full SELL + ADD; skip SMA/tax-gain gates.
+ */
+export function applyLossRotationTowardShortlist<T extends IosStockInput & { recommendation?: IosRecOut }>(
+  stocks: T[],
+  options: {
+    limitWatchlistSize: boolean;
+    enableRiskFilter?: boolean;
+    riskAppetite?: "Low" | "Medium" | "High";
+    portfolioSize: number;
+    diversifyShortlistBySector?: boolean;
+  }
+): { stocks: T[]; rotationFundedSymbols: Set<string> } {
+  if (!options.limitWatchlistSize) {
+    return { stocks, rotationFundedSymbols: new Set() };
+  }
+
+  const preferred = preferredSymbolsForShortlistIndicator(stocks, {
+    limitWatchlistSize: true,
+    enableRiskFilter: options.enableRiskFilter,
+    riskAppetite: options.riskAppetite,
+    portfolioSize: options.portfolioSize,
+    diversifyShortlistBySector: options.diversifyShortlistBySector,
+  });
+
+  const isProtectedExit = (stock: T) => {
+    const action = stock.recommendation?.action;
+    return action === "SELL" || action === "REDUCE";
+  };
+  const isEligibleLoser = (stock: T) => {
+    if (stock.symbol === "$CASH" || stock.isETF === true) return false;
+    if (stock.suppressTradeActions === true || stock.excludeFromShortlist === true) return false;
+    const pct = unrealizedGainPercent(stock);
+    return pct != null && pct < 0;
+  };
+
+  const sources: number[] = [];
+  const dests: number[] = [];
+  stocks.forEach((stock, index) => {
+    if (!isEligibleLoser(stock) || isProtectedExit(stock)) return;
+    if (preferred.has(stock.symbol)) dests.push(index);
+    else sources.push(index);
+  });
+  if (sources.length === 0 || dests.length === 0) {
+    return { stocks, rotationFundedSymbols: new Set() };
+  }
+
+  sources.sort((a, b) => {
+    const valueA = (stocks[a].lastPrice ?? 0) * stocks[a].quantity;
+    const valueB = (stocks[b].lastPrice ?? 0) * stocks[b].quantity;
+    if (valueA !== valueB) return valueB - valueA;
+    return stocks[a].symbol.localeCompare(stocks[b].symbol);
+  });
+
+  const next = [...stocks];
+  const usedDest = new Set<number>();
+  const rotationFundedSymbols = new Set<string>();
+
+  for (const sourceIndex of sources) {
+    const source = next[sourceIndex];
+    const sourcePct = unrealizedGainPercent(source);
+    if (sourcePct == null) continue;
+    let best: { index: number; diff: number; score: number } | null = null;
+    for (const destIndex of dests) {
+      if (usedDest.has(destIndex)) continue;
+      const dest = next[destIndex];
+      const destPct = unrealizedGainPercent(dest);
+      if (destPct == null) continue;
+      const diff = Math.abs(sourcePct - destPct);
+      if (diff > LOSS_ROTATION_BAND_PCT) continue;
+      const score = dest.score ?? 0;
+      if (
+        !best ||
+        diff + 1e-9 < best.diff ||
+        (Math.abs(diff - best.diff) <= 1e-9 &&
+          (score > best.score || (score === best.score && dest.symbol.localeCompare(next[best.index].symbol) < 0)))
+      ) {
+        best = { index: destIndex, diff, score };
+      }
+    }
+    if (!best) continue;
+    usedDest.add(best.index);
+    const dest = next[best.index];
+    const destPct = unrealizedGainPercent(dest) ?? 0;
+    const sourceExisting = source.recommendation;
+    const destExisting = dest.recommendation;
+    next[sourceIndex] = {
+      ...source,
+      recommendation: {
+        action: "SELL",
+        comments:
+          `REPLACE: Loss rotation: this holding is outside the shortlist at ${sourcePct.toFixed(1)}% vs ${dest.symbol} in the shortlist at ${destPct.toFixed(1)}%. ` +
+          `SELL the full position and rotate into ${dest.symbol} instead of waiting for recovery.`,
+        nextBuyPrice: sourceExisting?.nextBuyPrice ?? 0,
+        movingAvg: sourceExisting?.movingAvg ?? source.movingAvg ?? 0,
+        expectedReturnPct: sourceExisting?.expectedReturnPct ?? 0,
+      },
+    };
+    next[best.index] = {
+      ...dest,
+      recommendation: {
+        action: "ADD",
+        comments:
+          `REPLACE: Loss rotation: ADD using proceeds from selling ${source.symbol} (${sourcePct.toFixed(1)}%), which is outside the shortlist and within 2% of this holding's ${destPct.toFixed(1)}% loss.`,
+        nextBuyPrice: destExisting?.nextBuyPrice ?? dest.lastPrice ?? 0,
+        movingAvg: destExisting?.movingAvg ?? dest.movingAvg ?? 0,
+        expectedReturnPct: destExisting?.expectedReturnPct ?? 0,
+      },
+    };
+    rotationFundedSymbols.add(dest.symbol);
+  }
+
+  return { stocks: next, rotationFundedSymbols };
+}
+
 function profitableOpenLotsForCashRaise(stock: IosStockInput, currentPrice: number): IosOpenLot[] {
   return (stock.openLots ?? [])
     .filter((lot) => (lot.quantity ?? 0) > 1e-6 && typeof lot.costBasis === "number" && lot.costBasis < currentPrice)
