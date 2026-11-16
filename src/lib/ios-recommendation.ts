@@ -1438,8 +1438,8 @@ function unrealizedGainPercent(stock: Pick<IosStockInput, "quantity" | "lastPric
 
 /**
  * Pair an underwater outside-shortlist holding with an underwater shortlisted holding
- * whose loss is within 2 percentage points. SELL only if score < 50; ADD only if score > 50.
- * Full SELL + ADD; skip SMA/tax-gain gates.
+ * whose loss is within 2 percentage points. SELL only if score < 50; ADD only if score > 50
+ * and cost basis is below 2× stock limit. Full SELL + ADD; skip SMA/tax-gain gates.
  */
 export function applyLossRotationTowardShortlist<T extends IosStockInput & { recommendation?: IosRecOut }>(
   stocks: T[],
@@ -1463,6 +1463,15 @@ export function applyLossRotationTowardShortlist<T extends IosStockInput & { rec
     diversifyShortlistBySector: options.diversifyShortlistBySector,
   });
 
+  const remainingAddCapacity = (stock: T) => {
+    const stockLimit = stock.stockLimit ?? 10000;
+    const costBasis = Math.max(0, stock.quantity) * Math.max(0, stock.averageCost ?? 0);
+    return Math.max(0, 2 * stockLimit - costBasis);
+  };
+  const canAddTowardAllocation = (stock: T) => {
+    const price = stock.lastPrice ?? 0;
+    return price > 0 && remainingAddCapacity(stock) + 1e-9 >= price;
+  };
   const isProtectedExit = (stock: T) => {
     const action = stock.recommendation?.action;
     return action === "SELL" || action === "REDUCE";
@@ -1480,7 +1489,7 @@ export function applyLossRotationTowardShortlist<T extends IosStockInput & { rec
     if (!isEligibleLoser(stock) || isProtectedExit(stock)) return;
     const score = stock.score ?? 0;
     if (preferred.has(stock.symbol)) {
-      if (score <= 50) return;
+      if (score <= 50 || !canAddTowardAllocation(stock)) return;
       dests.push(index);
     } else {
       if (score >= 50) return;
@@ -1530,6 +1539,12 @@ export function applyLossRotationTowardShortlist<T extends IosStockInput & { rec
     const destPct = unrealizedGainPercent(dest) ?? 0;
     const sourceExisting = source.recommendation;
     const destExisting = dest.recommendation;
+    const remaining = remainingAddCapacity(dest);
+    const sourceValue = Math.max(0, source.quantity) * Math.max(0, source.lastPrice ?? 0);
+    const capacityNote =
+      remaining + 1e-6 < sourceValue
+        ? ` Max add is $${remaining.toFixed(0)} remaining under 2× stock limit.`
+        : ` Stay within remaining room under 2× stock limit ($${remaining.toFixed(0)}).`;
     next[sourceIndex] = {
       ...source,
       recommendation: {
@@ -1547,7 +1562,7 @@ export function applyLossRotationTowardShortlist<T extends IosStockInput & { rec
       recommendation: {
         action: "ADD",
         comments:
-          `REPLACE: Loss rotation: ADD using proceeds from selling ${source.symbol} (${sourcePct.toFixed(1)}%), which is outside the shortlist and within 2% of this holding's ${destPct.toFixed(1)}% loss.`,
+          `REPLACE: Loss rotation: ADD using proceeds from selling ${source.symbol} (${sourcePct.toFixed(1)}%), which is outside the shortlist and within 2% of this holding's ${destPct.toFixed(1)}% loss.${capacityNote}`,
         nextBuyPrice: destExisting?.nextBuyPrice ?? dest.lastPrice ?? 0,
         movingAvg: destExisting?.movingAvg ?? dest.movingAvg ?? 0,
         expectedReturnPct: destExisting?.expectedReturnPct ?? 0,
