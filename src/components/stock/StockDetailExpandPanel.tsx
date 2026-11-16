@@ -441,7 +441,21 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       soldLots,
     };
   }, [lots, stock]);
-  const shouldScrollOpenLots = lotSummary.openLots.length > 4;
+  const lotHistoryRows = useMemo(() => {
+    const opens = lotSummary.openLots.map((lot) => ({
+      kind: "open" as const,
+      date: lot.purchaseDate,
+      lot,
+    }));
+    const sold = lotSummary.soldLots.map((lot, index) => ({
+      kind: "sold" as const,
+      date: lot.saleDate,
+      lot,
+      index,
+    }));
+    return [...opens, ...sold].sort((a, b) => a.date.localeCompare(b.date));
+  }, [lotSummary]);
+  const shouldScrollLots = lotHistoryRows.length > 4;
   const editingLot = useMemo(
     () => lotSummary.openLots.find((lot) => lot.id === editingLotId) ?? null,
     [editingLotId, lotSummary.openLots]
@@ -1151,40 +1165,44 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                   </button>
                 </div>
               </div>
-              {hasPosition ? (
+              {hasPosition || lotSummary.soldLots.length > 0 ? (
                 <div className="min-w-0 flex-1 rounded-xl border border-border/70 bg-background/60 p-3 dark:border-white/[0.08] dark:bg-white/[0.04]">
                   <div className="mb-2">
                     <p className={cn("font-semibold text-foreground", dense ? "text-[11px]" : "text-xs uppercase tracking-[0.12em]")}>
-                      Open lots
+                      Lots
                     </p>
                     <p className="mt-0.5 text-[11px] text-subtle">
-                      Active lots for {stock.symbol}.{shouldScrollOpenLots ? " Scroll for more rows." : ""}
+                      Lot history for {stock.symbol}
+                      {lotSummary.openLots.length > 0 ? ` · ${lotSummary.openLots.length} open` : ""}
+                      {lotSummary.soldLots.length > 0 ? ` · ${lotSummary.soldLots.length} sold` : ""}
+                      {shouldScrollLots ? ". Scroll for more rows." : "."}
                     </p>
                   </div>
-                  {lotSummary.openLots.length > 0 ? (
-                    <div className={cn("pr-1", shouldScrollOpenLots ? "h-[190px] overflow-y-auto" : "overflow-y-visible")}>
+                  {lotHistoryRows.length > 0 ? (
+                    <div className={cn("pr-1", shouldScrollLots ? "h-[190px] overflow-y-auto" : "overflow-y-visible")}>
                       <table className="w-full text-left">
                         <thead className="border-b border-border/60 text-[11px] uppercase tracking-[0.12em] text-subtle dark:border-white/[0.06]">
                           <tr>
-                            <th className="sticky top-0 z-10 bg-background/95 pb-2 pr-3 font-semibold backdrop-blur">Bought</th>
+                            <th className="sticky top-0 z-10 bg-background/95 pb-2 pr-3 font-semibold backdrop-blur">Date</th>
                             <th className="sticky top-0 z-10 bg-background/95 pb-2 pr-3 text-right font-semibold backdrop-blur">Qty</th>
-                            <th className="sticky top-0 z-10 bg-background/95 pb-2 pr-3 text-right font-semibold backdrop-blur">Cost/share</th>
+                            <th className="sticky top-0 z-10 bg-background/95 pb-2 pr-3 text-right font-semibold backdrop-blur">Price</th>
                             <th className="sticky top-0 z-10 bg-background/95 pb-2 pr-3 font-semibold backdrop-blur">Account</th>
                             <th className="sticky top-0 z-10 bg-background/95 pb-2 pr-3 text-right font-semibold backdrop-blur">Action</th>
                             <th className="sticky top-0 z-10 bg-background/95 pb-2 text-right font-semibold backdrop-blur">Edit</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {lotSummary.openLots.map((lot) => (
-                            <tr key={lot.id} className="border-b border-border/50 text-foreground last:border-b-0 dark:border-white/[0.06]">
-                              <td className="py-2 pr-3 text-sm">{formatDateLabel(lot.purchaseDate)}</td>
-                              <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatNumberMax2(lot.quantity)}</td>
-                              <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatCurrency(lot.costBasis)}</td>
-                              <td className="py-2 pr-3 text-sm text-subtle">{lot.account?.trim() || "—"}</td>
+                          {lotHistoryRows.map((row) =>
+                            row.kind === "open" ? (
+                            <tr key={row.lot.id} className="border-b border-border/50 text-foreground last:border-b-0 dark:border-white/[0.06]">
+                              <td className="py-2 pr-3 text-sm">{formatDateLabel(row.lot.purchaseDate)}</td>
+                              <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatNumberMax2(row.lot.quantity)}</td>
+                              <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatCurrency(row.lot.costBasis)}</td>
+                              <td className="py-2 pr-3 text-sm text-subtle">{row.lot.account?.trim() || "—"}</td>
                               <td className="py-2 pr-3 text-right">
                                 <button
                                   type="button"
-                                  onClick={() => openLotSellDialog(lot)}
+                                  onClick={() => openLotSellDialog(row.lot)}
                                   className="inline-flex items-center gap-1 rounded-lg border border-red-300/70 px-2.5 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-300/30 dark:text-red-200 dark:hover:bg-red-500/10"
                                 >
                                   Sell
@@ -1193,7 +1211,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                               <td className="py-2 text-right">
                                 <button
                                   type="button"
-                                  onClick={() => openLotEditor(lot)}
+                                  onClick={() => openLotEditor(row.lot)}
                                   className="inline-flex items-center gap-1 rounded-lg border border-border/70 px-2.5 py-1 text-xs text-foreground hover:bg-background/70 dark:border-white/[0.08] dark:hover:bg-white/[0.05]"
                                 >
                                   <Pencil className="h-3.5 w-3.5" />
@@ -1201,12 +1219,28 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                                 </button>
                               </td>
                             </tr>
-                          ))}
+                            ) : (
+                            <tr key={`sold-${row.index}-${row.lot.saleDate}-${row.lot.quantity}-${row.lot.salePrice}`} className="border-b border-border/50 text-subtle last:border-b-0 dark:border-white/[0.06]">
+                              <td className="py-2 pr-3 text-sm">{formatDateLabel(row.lot.saleDate)}</td>
+                              <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatNumberMax2(row.lot.quantity)}</td>
+                              <td className="py-2 pr-3 text-right text-sm tabular-nums">{formatCurrency(row.lot.salePrice)}</td>
+                              <td className="py-2 pr-3 text-sm">{row.lot.account?.trim() || "—"}</td>
+                              <td className="py-2 pr-3 text-right">
+                                <span className="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-subtle">
+                                  Sold
+                                </span>
+                              </td>
+                              <td className={cn("py-2 text-right text-sm tabular-nums", valueTone(row.lot.realizedGainLoss))}>
+                                {formatCurrency(row.lot.realizedGainLoss)}
+                              </td>
+                            </tr>
+                            )
+                          )}
                         </tbody>
                       </table>
                     </div>
                   ) : (
-                    <p className="text-sm text-subtle">No open lot records are available for this symbol yet.</p>
+                    <p className="text-sm text-subtle">No lot records are available for this symbol yet.</p>
                   )}
                 </div>
               ) : null}
