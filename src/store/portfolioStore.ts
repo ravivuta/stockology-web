@@ -688,6 +688,21 @@ function cashDeltasFromDetectedQtyChanges(
   return cash;
 }
 
+function soldLotMatchesImportedTrade(
+  lot: SoldLot,
+  trade: { qty: number; price: number; tradeDate: string },
+  account: string
+): boolean {
+  const lotDay = (lot.saleDate ?? "").slice(0, 10);
+  const tradeDay = (trade.tradeDate ?? "").slice(0, 10);
+  return (
+    normalizeAccountKey(lot.account) === normalizeAccountKey(account) &&
+    Math.abs(lot.quantity - trade.qty) <= 1e-6 &&
+    Math.abs(lot.salePrice - trade.price) <= 0.01 &&
+    lotDay === tradeDay
+  );
+}
+
 function explicitSellKey(account: string, symbol: string): string {
   return `${normalizeAccountKey(account)}|${symbol.toUpperCase()}`;
 }
@@ -2609,6 +2624,9 @@ export const usePortfolioStore = create<State>()(
             if (!existing) addedCount += 1;
           }
 
+          const hadExistingHoldings =
+            preOpenCostBasis > 1e-6 || [...preImportQtyBySymbol.values()].some((qty) => qty > 1e-6);
+
           if (mode === "portfolio") {
             const lastPriceBySymbol = new Map(
               [...preImportStockMap.values()]
@@ -2626,16 +2644,30 @@ export const usePortfolioStore = create<State>()(
               const symbol = trade.symbol.toUpperCase();
               const qty = Math.max(0, trade.qty);
               if (qty <= 0) continue;
-              importedTradeCount += 1;
               const lastPrice = lastPriceBySymbol.get(symbol) ?? 0;
               const salePrice = trade.price > 0 ? trade.price : lastPrice;
-
               const bundle = lotsBySymbol[symbol] ?? { open: [], sold: [] };
               const sellAccount = accountForImportedSell(
                 trade,
                 prePositionsByAccountSymbol,
                 importedAccountsBySymbol
               );
+              if (bundle.sold.some((lot) => soldLotMatchesImportedTrade(lot, { ...trade, price: salePrice }, sellAccount))) {
+                continue;
+              }
+              importedTradeCount += 1;
+              if (!hadExistingHoldings) {
+                bundle.sold.unshift({
+                  saleDate: trade.tradeDate || defaultImportPurchaseDate(),
+                  quantity: qty,
+                  salePrice: Math.max(0, salePrice),
+                  realizedGainLoss: 0,
+                  account: displayAccount(sellAccount),
+                  isRetirementAccount: trade.isRetirementAccount ?? null,
+                });
+                lotsBySymbol[symbol] = bundle;
+                continue;
+              }
               const reduction = reduceOpenLotsFifoForAccount(bundle.open, qty, sellAccount, {
                 saleDate: trade.tradeDate,
               });
@@ -2723,8 +2755,6 @@ export const usePortfolioStore = create<State>()(
             if (signatures.size > 0) postLotSignatureMap.set(symbol.toUpperCase(), signatures);
           }
 
-          const hadExistingHoldings =
-            preOpenCostBasis > 1e-6 || [...preImportQtyBySymbol.values()].some((qty) => qty > 1e-6);
           const allSymbolsForDiff = new Set<string>([
             ...preImportQtyBySymbol.keys(),
             ...postImportQtyBySymbol.keys(),

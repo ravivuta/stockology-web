@@ -1079,6 +1079,7 @@ export function exportPortfolioCsv(
   };
   const lines = [header];
   for (const s of stocks) {
+    if (s.symbol === "$CASH" || s.symbol === "CASH") continue;
     const bundle = lotsBySymbol?.[s.symbol];
     const openLots = bundle?.open ?? [];
     const soldLots = bundle?.sold ?? [];
