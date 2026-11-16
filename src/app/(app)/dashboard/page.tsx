@@ -119,6 +119,7 @@ export default function DashboardPage() {
   const stocks = usePortfolioStore((s) => s.stocks);
   const portfolioSize = usePortfolioStore((s) => s.portfolioSize);
   const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
+  const guideEtfShareByRisk = usePortfolioStore((s) => s.guideEtfShareByRisk);
   const enableRiskFilter = usePortfolioStore((s) => s.enableRiskFilter);
   const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
   const marketOutlook = usePortfolioStore((s) => s.marketOutlook);
@@ -210,14 +211,14 @@ export default function DashboardPage() {
   const etfTargetPct = useMemo(() => {
     const diagnostics = shortlistCapacityDiagnostics(
       stocks,
-      { limitWatchlistSize, enableRiskFilter, riskAppetite, portfolioSize },
+      { limitWatchlistSize, enableRiskFilter, riskAppetite, portfolioSize, guideEtfShareByRisk },
       { etfPenaltyMultiplier: 3 }
     );
     return ((diagnostics.etfMinTargetRatio + diagnostics.etfMaxTargetRatio) / 2) * 100;
-  }, [enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stocks]);
+  }, [enableRiskFilter, guideEtfShareByRisk, limitWatchlistSize, portfolioSize, riskAppetite, stocks]);
   const stockTargetPct = Math.max(0, 100 - cashEquivalentTargetPct - etfTargetPct);
   const showCashEquivalentBar = useMarketRegimeCashTilt === true;
-  const showEtfAndStockBars = limitWatchlistSize === true;
+  const showEtfAndStockBars = limitWatchlistSize === true && guideEtfShareByRisk === true;
   const totalPnlTextClass =
     holdingsPnL >= 0 ? "text-[color:var(--dashboard-chart-gain)]" : "text-[color:var(--dashboard-chart-loss)]";
   const todayText = showTodayChange

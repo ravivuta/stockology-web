@@ -7,6 +7,7 @@ import {
   Briefcase,
   CreditCard,
   History,
+  ListFilter,
   Loader2,
   Palette,
   RefreshCw,
@@ -37,6 +38,7 @@ import { SettingsPageSkeleton } from "@/components/route-loading/page-skeletons/
 const SECTIONS = [
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "subscription", label: "Subscription Plan", icon: CreditCard },
+  { id: "watchlist", label: "Watchlist / Shortlisting", icon: ListFilter },
   { id: "portfolio", label: "Recommendation Filtering", icon: Briefcase },
 ] as const;
 
@@ -125,6 +127,7 @@ function SettingsInner() {
   const enableRiskFilter = usePortfolioStore((s) => s.enableRiskFilter);
   const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
   const diversifyShortlistBySector = usePortfolioStore((s) => s.diversifyShortlistBySector);
+  const guideEtfShareByRisk = usePortfolioStore((s) => s.guideEtfShareByRisk);
   const etfProfitTarget = usePortfolioStore((s) => s.etfProfitTarget);
   const stockProfitTarget = usePortfolioStore((s) => s.stockProfitTarget);
   const useAISentimentForRecommendations = usePortfolioStore((s) => s.useAISentimentForRecommendations);
@@ -236,6 +239,7 @@ function SettingsInner() {
         traderModeEnabled: "traderModeEnabled" in patch ? patch.traderModeEnabled : store.traderModeEnabled,
         limitWatchlistSize: "limitWatchlistSize" in patch ? patch.limitWatchlistSize : store.limitWatchlistSize,
         diversifyShortlistBySector: "diversifyShortlistBySector" in patch ? patch.diversifyShortlistBySector : store.diversifyShortlistBySector,
+        guideEtfShareByRisk: "guideEtfShareByRisk" in patch ? patch.guideEtfShareByRisk : store.guideEtfShareByRisk,
         timezone: "timezone" in patch ? patch.timezone : store.timezone,
         region: "region" in patch ? patch.region : store.region,
       });
@@ -477,6 +481,7 @@ function SettingsInner() {
             : {}),
           ...(cloudSettings.limitWatchlistSize != null ? { limitWatchlistSize: cloudSettings.limitWatchlistSize } : {}),
           ...(cloudSettings.diversifyShortlistBySector != null ? { diversifyShortlistBySector: cloudSettings.diversifyShortlistBySector } : {}),
+          ...(cloudSettings.guideEtfShareByRisk != null ? { guideEtfShareByRisk: cloudSettings.guideEtfShareByRisk } : {}),
           ...(cloudSettings.timezone ? { timezone: cloudSettings.timezone } : {}),
           ...(cloudSettings.region ? { region: cloudSettings.region } : {}),
         });
@@ -780,9 +785,10 @@ function SettingsInner() {
           </div>
 
           <SettingsCard
-            id="portfolio"
-            icon={Briefcase}
-            title="Recommendation Filtering"
+            id="watchlist"
+            icon={ListFilter}
+            title="Watchlist / Shortlisting"
+            description="Controls which names make the shortlist. ETF share guidance is optional for small accounts."
           >
             <div className="grid gap-3 md:grid-cols-2">
               <div className="self-start">
@@ -853,6 +859,31 @@ function SettingsInner() {
                 ) : null}
               </div>
 
+              <div className="self-start">
+                <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-border/80 bg-background/40 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
+                    checked={guideEtfShareByRisk}
+                    onChange={(e) => persistSettingsPatch({ guideEtfShareByRisk: e.target.checked })}
+                  />
+                  <span>
+                    <span className="block text-[12px] font-medium leading-snug text-foreground">Guide ETF share by risk</span>
+                    <span className="mt-px block text-[10px] leading-snug text-subtle">
+                      ETF slot share never exceeds 60% of the ideal watchlist (each ETF costs 3 slots), at every risk level. Suggested ranges when this is on: Low 40–60%, Medium 20–40%, High 0–20%. Extra ETFs stay on the shortlist but stop crowding out stock slots past 60%. Turn the suggested min off for small accounts.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </div>
+          </SettingsCard>
+
+          <SettingsCard
+            id="portfolio"
+            icon={Briefcase}
+            title="Recommendation Filtering"
+          >
+            <div className="grid gap-3 md:grid-cols-2">
               <div className="md:col-span-2 grid gap-2">
                 <div className="rounded-md border border-border/80 bg-background/40 px-2.5 py-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
                   <div className="flex flex-wrap items-center justify-between gap-2">

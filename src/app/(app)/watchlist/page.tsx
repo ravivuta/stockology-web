@@ -174,6 +174,7 @@ export default function WatchlistPage() {
   const portfolioSize = usePortfolioStore((s) => s.portfolioSize);
   const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
   const diversifyShortlistBySector = usePortfolioStore((s) => s.diversifyShortlistBySector);
+  const guideEtfShareByRisk = usePortfolioStore((s) => s.guideEtfShareByRisk);
   const enableRiskFilter = usePortfolioStore((s) => s.enableRiskFilter);
   const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
   const removeStock = usePortfolioStore((s) => s.removeStock);
@@ -232,10 +233,11 @@ export default function WatchlistPage() {
         riskAppetite,
         portfolioSize,
         diversifyShortlistBySector,
+        guideEtfShareByRisk,
       }, {
         etfPenaltyMultiplier: 3,
       }),
-    [diversifyShortlistBySector, enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
+    [diversifyShortlistBySector, enableRiskFilter, guideEtfShareByRisk, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
   );
   const sectorMixLine = useMemo(
     () => shortlistSectorMixLine(stocks, shortlistedSymbols),
@@ -244,7 +246,8 @@ export default function WatchlistPage() {
   const shouldShowShortlistCapacityAlert = limitWatchlistSize && (
     shortlistCapacity.alertLevel !== "none" ||
     shortlistCapacity.isUnderfilled ||
-    shortlistCapacity.isBelowETFMinimumRange
+    shortlistCapacity.isBelowETFMinimumRange ||
+    shortlistCapacity.isAboveETFMaximumRange
   );
 
   async function loadQualifiedCandidates(mode: CandidatePickerMode) {

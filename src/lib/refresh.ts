@@ -68,6 +68,7 @@ function currentStoreSettings() {
     traderModeEnabled: store.traderModeEnabled,
     limitWatchlistSize: store.limitWatchlistSize,
     diversifyShortlistBySector: store.diversifyShortlistBySector,
+    guideEtfShareByRisk: store.guideEtfShareByRisk,
     timezone: store.timezone,
     region: store.region,
   };

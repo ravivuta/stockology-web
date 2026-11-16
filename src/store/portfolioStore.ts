@@ -132,6 +132,7 @@ type State = {
   enableRiskFilter: boolean;
   limitWatchlistSize: boolean;
   diversifyShortlistBySector: boolean;
+  guideEtfShareByRisk: boolean;
   etfProfitTarget: number;
   stockProfitTarget: number;
   useAISentimentForRecommendations: boolean;
@@ -171,7 +172,7 @@ type State = {
     nextCash: number;
     markedPending: boolean;
   };
-  setSettings: (p: Partial<Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "diversifyShortlistBySector" | "etfProfitTarget" | "stockProfitTarget" | "useAISentimentForRecommendations" | "useRSIGatingForRecommendations" | "rsiPeriodForRecommendations" | "rsiOversoldThresholdForRecommendations" | "rsiOverboughtThresholdForRecommendations" | "rsiHysteresisPointsForRecommendations" | "rsiMinRisingDaysForRecommendations" | "sellOnlyLongTermQualified" | "useMarketRegimeCashTilt" | "marketOutlookCashTargetRiskOn" | "marketOutlookCashTargetNeutral" | "marketOutlookCashTargetElevated" | "marketOutlookCashTargetRiskOff" | "marketOutlookCashTargetSevere" | "traderModeEnabled" | "timezone" | "region">>) => void;
+  setSettings: (p: Partial<Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "diversifyShortlistBySector" | "guideEtfShareByRisk" | "etfProfitTarget" | "stockProfitTarget" | "useAISentimentForRecommendations" | "useRSIGatingForRecommendations" | "rsiPeriodForRecommendations" | "rsiOversoldThresholdForRecommendations" | "rsiOverboughtThresholdForRecommendations" | "rsiHysteresisPointsForRecommendations" | "rsiMinRisingDaysForRecommendations" | "sellOnlyLongTermQualified" | "useMarketRegimeCashTilt" | "marketOutlookCashTargetRiskOn" | "marketOutlookCashTargetNeutral" | "marketOutlookCashTargetElevated" | "marketOutlookCashTargetRiskOff" | "marketOutlookCashTargetSevere" | "traderModeEnabled" | "timezone" | "region">>) => void;
   addStock: (s: Partial<StockHolding> & { symbol: string }) => void;
   /** Merge fields into an existing symbol and rebuild recommendation. */
   updateStock: (symbol: string, patch: Partial<StockHolding>) => void;
@@ -1105,6 +1106,7 @@ export const usePortfolioStore = create<State>()(
       enableRiskFilter: true,
       limitWatchlistSize: true,
       diversifyShortlistBySector: true,
+      guideEtfShareByRisk: true,
       etfProfitTarget: 50,
       stockProfitTarget: 50,
       useAISentimentForRecommendations: false,
@@ -2872,6 +2874,7 @@ export const usePortfolioStore = create<State>()(
         return {
           ...current,
           ...p,
+          guideEtfShareByRisk: typeof p?.guideEtfShareByRisk === "boolean" ? p.guideEtfShareByRisk : current.guideEtfShareByRisk,
           tradeJournal: Array.isArray(p?.tradeJournal) ? p.tradeJournal : current.tradeJournal,
           // Reset transient runtime flags — these should never survive a page reload.
           // If optimizing/importing was in-flight when the page was closed, the job

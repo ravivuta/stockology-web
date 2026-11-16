@@ -67,6 +67,7 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
   const portfolioSize = usePortfolioStore((s) => s.portfolioSize);
   const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
   const enableRiskFilter = usePortfolioStore((s) => s.enableRiskFilter);
+  const guideEtfShareByRisk = usePortfolioStore((s) => s.guideEtfShareByRisk);
   const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
   const fixedIncomeByAccount = usePortfolioStore((s) => s.fixedIncomeByAccount);
@@ -254,6 +255,7 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
           enableRiskFilter,
           riskAppetite,
           portfolioSize,
+          guideEtfShareByRisk,
         }, {
           etfPenaltyMultiplier: 3,
           additionalETFCount: 0,
@@ -263,6 +265,7 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
           enableRiskFilter,
           riskAppetite,
           portfolioSize,
+          guideEtfShareByRisk,
         }, {
           etfPenaltyMultiplier: 3,
           additionalETFCount: 1,

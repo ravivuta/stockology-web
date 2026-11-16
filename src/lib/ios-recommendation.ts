@@ -1125,6 +1125,14 @@ function rankInTopWatchlist(
   return index >= 0 ? index + 1 : null;
 }
 
+/** Universal ceiling on ETF slot share of the ideal watchlist (each ETF costs 3 slots). */
+export const ETF_SHARE_HARD_CAP_RATIO = 0.6;
+
+export function cappedEtfPenaltySlots(rawPenaltySlots: number, idealWatchlistSize: number): number {
+  const cap = Math.max(0, Math.floor(Math.max(0, idealWatchlistSize) * ETF_SHARE_HARD_CAP_RATIO));
+  return Math.min(Math.max(0, rawPenaltySlots), cap);
+}
+
 export function rankedStockSlotsForTopN(stocks: IosStockInput[], portfolioSize: number): number {
   const totalSlots = recommendedWatchlistSize(portfolioSize);
   const etfSlots = stocks.filter(
@@ -1133,7 +1141,7 @@ export function rankedStockSlotsForTopN(stocks: IosStockInput[], portfolioSize: 
       stock.excludeFromShortlist !== true &&
       stock.symbol !== "$CASH"
   ).length;
-  return Math.max(totalSlots - (etfSlots * 3), 0);
+  return Math.max(totalSlots - cappedEtfPenaltySlots(etfSlots * 3, totalSlots), 0);
 }
 
 export function shortlistCapacityDiagnostics(
@@ -1144,6 +1152,7 @@ export function shortlistCapacityDiagnostics(
     riskAppetite: "Low" | "Medium" | "High";
     portfolioSize: number;
     diversifyShortlistBySector?: boolean;
+    guideEtfShareByRisk?: boolean;
   },
   options?: {
     etfPenaltyMultiplier?: number;
@@ -1157,13 +1166,21 @@ export function shortlistCapacityDiagnostics(
   const effectiveETFCount = currentETFCount + additionalETFCount;
   const idealWatchlistSize = recommendedWatchlistSize(settings.portfolioSize);
   const etfPenaltySlots = effectiveETFCount * etfPenaltyMultiplier;
-  const targetStockSlots = Math.max(0, idealWatchlistSize - etfPenaltySlots);
-  const [etfMinTargetRatio, etfMaxTargetRatio] =
+  const targetStockSlots = Math.max(
+    0,
+    idealWatchlistSize - cappedEtfPenaltySlots(etfPenaltySlots, idealWatchlistSize)
+  );
+  const [etfMinTargetRatio, riskMaxTargetRatio] =
     settings.riskAppetite === "Low"
       ? [0.4, 0.6]
       : settings.riskAppetite === "Medium"
         ? [0.2, 0.4]
         : [0.0, 0.2];
+  const guideEtfShare = settings.guideEtfShareByRisk !== false;
+  const etfMaxTargetRatio = Math.min(
+    guideEtfShare ? riskMaxTargetRatio : ETF_SHARE_HARD_CAP_RATIO,
+    ETF_SHARE_HARD_CAP_RATIO
+  );
   const qualifiedNonETFSlots = Math.min(
     targetStockSlots,
     rankedTopWatchlistCandidates(eligible, {
@@ -1176,13 +1193,14 @@ export function shortlistCapacityDiagnostics(
   const stockSlotShortfall = Math.max(0, targetStockSlots - qualifiedNonETFSlots);
   const shortlistFillRate = targetStockSlots > 0 ? qualifiedNonETFSlots / targetStockSlots : 1;
   const etfPressureRatio = idealWatchlistSize > 0 ? etfPenaltySlots / idealWatchlistSize : 1;
-  const isBelowETFMinimumRange = etfPressureRatio < etfMinTargetRatio;
+  const uncappedStockSlots = Math.max(0, idealWatchlistSize - etfPenaltySlots);
+  const isBelowETFMinimumRange = guideEtfShare && etfPressureRatio < etfMinTargetRatio;
   const isAboveETFMaximumRange = etfPressureRatio > etfMaxTargetRatio;
 
   let alertLevel: ShortlistCapacityAlertLevel = "none";
-  if (effectiveETFCount > 0 && targetStockSlots === 0) {
+  if (effectiveETFCount > 0 && uncappedStockSlots === 0) {
     alertLevel = "critical";
-  } else if (etfPressureRatio >= 0.75) {
+  } else if (etfPressureRatio > ETF_SHARE_HARD_CAP_RATIO || etfPressureRatio >= 0.75) {
     alertLevel = "warning";
   } else if (etfPressureRatio >= 0.5) {
     alertLevel = "info";

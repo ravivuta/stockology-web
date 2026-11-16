@@ -488,6 +488,7 @@ export type GlobalSettings = {
   traderModeEnabled?: boolean;
   limitWatchlistSize?: boolean;
   diversifyShortlistBySector?: boolean;
+  guideEtfShareByRisk?: boolean;
   timezone?: string;
   region?: string;
 };
@@ -514,6 +515,7 @@ export type AppliedGlobalSettings = {
   traderModeEnabled?: boolean;
   limitWatchlistSize?: boolean;
   diversifyShortlistBySector?: boolean;
+  guideEtfShareByRisk?: boolean;
   timezone?: string;
   region?: string;
 };
@@ -542,6 +544,7 @@ type CurrentGlobalSettings = Required<
     | "traderModeEnabled"
     | "limitWatchlistSize"
     | "diversifyShortlistBySector"
+    | "guideEtfShareByRisk"
     | "timezone"
     | "region"
   >
@@ -634,6 +637,9 @@ export function patchFromCloudGlobalSettings(
   }
   if (cloud.diversifyShortlistBySector != null && cloud.diversifyShortlistBySector !== current.diversifyShortlistBySector) {
     patch.diversifyShortlistBySector = cloud.diversifyShortlistBySector;
+  }
+  if (cloud.guideEtfShareByRisk != null && cloud.guideEtfShareByRisk !== current.guideEtfShareByRisk) {
+    patch.guideEtfShareByRisk = cloud.guideEtfShareByRisk;
   }
   if (cloud.timezone && cloud.timezone !== current.timezone) {
     patch.timezone = cloud.timezone;

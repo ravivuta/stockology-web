@@ -322,6 +322,7 @@ export function PortfolioCloudBridge({
           traderModeEnabled: usePortfolioStore.getState().traderModeEnabled,
           limitWatchlistSize: usePortfolioStore.getState().limitWatchlistSize,
           diversifyShortlistBySector: usePortfolioStore.getState().diversifyShortlistBySector,
+          guideEtfShareByRisk: usePortfolioStore.getState().guideEtfShareByRisk,
           timezone: usePortfolioStore.getState().timezone,
           region: usePortfolioStore.getState().region,
         },

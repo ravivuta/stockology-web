@@ -138,6 +138,7 @@ export default function OnboardingPage() {
             sellOnlyLongTerm: store.sellOnlyLongTermQualified,
             limitWatchlistSize: store.limitWatchlistSize,
             diversifyShortlistBySector: store.diversifyShortlistBySector,
+            guideEtfShareByRisk: store.guideEtfShareByRisk,
             timezone: store.timezone,
             region: store.region,
           });
