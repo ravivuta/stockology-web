@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { setLocalStorageItem } from "@/lib/local-storage-quota";
-import { calculateTradingLimits, computeRiskReturnScore, localCalendarDay, rankedTopWatchlistCandidates, recommendedWatchlistSize, selectedAnalystTarget, stockPassesRiskFilter, offloadHoldingOutsideShortlistIfNeeded, preferredSymbolsForShortlistIndicator, raiseCashForMarketOutlookIfNeeded } from "@/lib/ios-recommendation";
+import { calculateTradingLimits, computeRiskReturnScore, localCalendarDay, rankedStockSlotsForTopN, rankedTopWatchlistCandidates, recommendedWatchlistSize, selectedAnalystTarget, stockPassesRiskFilter, offloadHoldingOutsideShortlistIfNeeded, preferredSymbolsForShortlistIndicator, raiseCashForMarketOutlookIfNeeded } from "@/lib/ios-recommendation";
 import { getRecommendationHistoryCloses } from "@/lib/recommendation-history-cache";
 import { buildRecommendation } from "@/lib/recommendation";
 import type { CsvImportRow, CsvImportTrade } from "@/lib/csvPortfolio";
@@ -972,7 +972,6 @@ function derivePortfolioState(
     const forceIncluded = stocksWithRisk
       .filter(
         (stock) =>
-          stock.quantity <= 0 &&
           stock.isETF !== true &&
           stock.excludeFromShortlist !== true &&
           stock.includeInShortlist === true
@@ -986,7 +985,7 @@ function derivePortfolioState(
       diversifyBySector: shortlistCtx.diversifyShortlistBySector !== false,
     })
       .filter((stock) => !forceIncludedSymbols.has(stock.symbol))
-      .slice(0, Math.max(idealWatchlistSize - (etfSymbols.length * 3) - forceIncluded.length, 0));
+      .slice(0, Math.max(rankedStockSlotsForTopN(stocksWithRisk, portfolioSize) - forceIncluded.length, 0));
 
     for (const stock of holdingSymbols) shortlistedSymbols.add(stock.symbol);
     for (const stock of etfSymbols) shortlistedSymbols.add(stock.symbol);
@@ -1634,7 +1633,6 @@ export const usePortfolioStore = create<State>()(
                   quantity: q1,
                   averageCost: avg1,
                   excludeFromShortlist: false,
-                  includeInShortlist: false,
                   pendingOptimization: q0 > 0 ? s.pendingOptimization : true,
                 };
               });

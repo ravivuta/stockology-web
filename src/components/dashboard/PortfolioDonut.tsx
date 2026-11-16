@@ -2,6 +2,13 @@
 
 import { useId, useMemo } from "react";
 import { motion, useReducedMotion } from "framer-motion";
+import {
+  ETF_HATCH_CROSS_D,
+  ETF_HATCH_DIAGONAL_D,
+  ETF_HATCH_SECONDARY_OPACITY,
+  ETF_HATCH_STROKE_PX,
+  ETF_HATCH_TILE_PX,
+} from "@/lib/etf-hatch";
 
 type Segment = {
   name: string;
@@ -182,20 +189,26 @@ export function PortfolioDonut({
       >
       <defs>
         {etfOverlayArcs.map((overlay) => (
-          <pattern key={overlay.patternId} id={overlay.patternId} patternUnits="userSpaceOnUse" width="4" height="4">
+          <pattern
+            key={overlay.patternId}
+            id={overlay.patternId}
+            patternUnits="userSpaceOnUse"
+            width={ETF_HATCH_TILE_PX}
+            height={ETF_HATCH_TILE_PX}
+          >
             <path
-              d="M -2,4 L 2,0 M 0,4 L 4,0 M 2,4 L 6,0"
+              d={ETF_HATCH_DIAGONAL_D}
               fill="none"
               stroke={overlay.stroke}
-              strokeWidth="0.95"
+              strokeWidth={ETF_HATCH_STROKE_PX}
               strokeLinecap="square"
             />
             <path
-              d="M -2,0 L 2,4 M 0,0 L 4,4 M 2,0 L 6,4"
+              d={ETF_HATCH_CROSS_D}
               fill="none"
               stroke={overlay.stroke}
-              strokeWidth="0.95"
-              strokeOpacity="0.74"
+              strokeWidth={ETF_HATCH_STROKE_PX}
+              strokeOpacity={ETF_HATCH_SECONDARY_OPACITY}
               strokeLinecap="square"
             />
           </pattern>

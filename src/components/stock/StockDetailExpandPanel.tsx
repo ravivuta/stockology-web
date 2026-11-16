@@ -719,6 +719,14 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       }
     }
 
+    if (stock.includeInShortlist === true) {
+      rows.push({
+        label: "User override: Included in shortlist",
+        detail: "Pinned in Top N — uses one stock slot when the shortlist limit is on",
+        passes: true,
+      });
+    }
+
     if (stock.excludeFromShortlist === true) {
       rows.push({
         label: "User override: Excluded from shortlist",
@@ -772,10 +780,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const suppressTradeActions = stock?.suppressTradeActions ?? false;
   const excludeFromShortlist = stock?.excludeFromShortlist ?? false;
   const includeInShortlist = stock?.includeInShortlist ?? false;
-  const showIncludeToggle =
-    (stock?.quantity ?? 0) <= 0 &&
-    stock?.isETF !== true &&
-    (isShortlistedForPortfolio === false || includeInShortlist === true);
+  const showIncludeToggle = Boolean(stock) && stock?.isETF !== true && stock?.symbol !== "$CASH";
   const canToggleShortlistExclusion = (stock?.quantity ?? 0) <= 0 || excludeFromShortlist;
 
   useEffect(() => {
@@ -1609,7 +1614,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                           Include in shortlist
                         </span>
                         <span className="mt-0.5 block text-[11px] text-subtle">
-                          Force include this stock in Top N shortlisting.
+                          Pin in Top N. Uses one stock slot when the shortlist limit is on.
                         </span>
                       </span>
                     </label>

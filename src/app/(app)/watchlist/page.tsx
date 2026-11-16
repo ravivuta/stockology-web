@@ -10,6 +10,7 @@ import {
   dividendYieldPercent,
   preferredSymbolsForShortlistIndicator,
   shortlistCapacityDiagnostics,
+  shortlistCapacityAlertCopy,
   shortlistSectorMixLine,
   shortlistNonETFSectorCounts,
   prioritizeStockPickerByOpenSectors,
@@ -525,62 +526,18 @@ export default function WatchlistPage() {
       {shouldShowShortlistCapacityAlert ? (
         <div className="rounded-2xl border border-amber-400/35 bg-elevated px-4 py-3">
           {(() => {
-            const hasMaterialEtfPressure =
-              shortlistCapacity.alertLevel === "warning" ||
-              shortlistCapacity.alertLevel === "critical" ||
-              shortlistCapacity.isAboveETFMaximumRange;
-            const etfPressureTargetPercent =
-              Math.round(shortlistCapacity.etfMaxTargetRatio * 100);
-            const etfMinTargetPercent = Math.round(shortlistCapacity.etfMinTargetRatio * 100);
-            const etfSlotsNeededForMinimum = Math.max(
-              0,
-              Math.ceil((shortlistCapacity.etfMinTargetRatio * shortlistCapacity.idealWatchlistSize) - shortlistCapacity.etfPenaltySlots)
-            );
-            const etfsToAddForMinimum = Math.max(
-              0,
-              Math.ceil(etfSlotsNeededForMinimum / Math.max(1, shortlistCapacity.etfPenaltyMultiplier))
-            );
-            const etfNoun = etfsToAddForMinimum === 1 ? "ETF" : "ETFs";
-            const removeEtfRecommendation =
-              `remove some ETFs from your watchlist (to bring ETF slots below ${etfPressureTargetPercent}% of your portfolio target)`;
-            const addEtfRecommendation =
-              `add ${etfsToAddForMinimum} ${etfNoun} to reach at least ${etfMinTargetPercent}% ETF slots first`;
-            const recommendationText = shortlistCapacity.isUnderfilled
-              ? hasMaterialEtfPressure
-                ? "Recommendation: either add more qualified stocks for your risk profile or remove some ETFs from your watchlist."
-                : shortlistCapacity.isBelowETFMinimumRange
-                  ? `Recommendation: ${addEtfRecommendation}. After that, pick qualified stocks to fill remaining slots.`
-                  : "Recommendation: add more qualified stocks for your risk profile."
-              : `Recommendation: ${removeEtfRecommendation}, those slots will be used for shortlisting more qualified stocks.`;
-            const finalRecommendationText =
-              !shortlistCapacity.isUnderfilled && shortlistCapacity.isBelowETFMinimumRange
-                ? `Recommendation: ${addEtfRecommendation}.`
-                : recommendationText;
+            const copy = shortlistCapacityAlertCopy(shortlistCapacity, {
+              enableRiskFilter,
+              riskAppetite,
+            });
             return (
               <>
-          <p className="text-sm font-semibold text-foreground">
-            {shortlistCapacity.alertLevel === "critical"
-              ? "ETF share in your watchlist is too high and fully uses stock slots"
-              : shortlistCapacity.alertLevel === "warning"
-                ? "ETF share in your watchlist is high and reducing stock slots"
-                : shortlistCapacity.alertLevel === "info"
-                  ? "ETF share in your watchlist is getting high"
-                  : shortlistCapacity.isBelowETFMinimumRange
-                    ? "ETF share in your watchlist is below your risk-profile target"
-                    : "Shortlist capacity check"}
-          </p>
-          <p className="mt-1 text-xs text-subtle">
-            You have {shortlistCapacity.effectiveETFCount} ETFs in watchlist leaving {shortlistCapacity.targetStockSlots} stocks for shortlisting.
-          </p>
-          <p className="mt-1 text-xs text-subtle">
-            {shortlistCapacity.isUnderfilled
-              ? `You have ${shortlistCapacity.qualifiedNonETFSlots} qualified stocks, and do not have enough risk-qualified stocks. Add ${shortlistCapacity.stockSlotShortfall} more qualified stocks.`
-              : `You have ${shortlistCapacity.qualifiedNonETFSlots} qualified stocks, and have enough risk-qualified stocks.`}
-          </p>
-          <p className="mt-1 text-xs text-subtle">
-            {finalRecommendationText}
-          </p>
-          {shortlistCapacity.isBelowETFMinimumRange ? (
+          <p className="text-sm font-semibold text-foreground">{copy.title}</p>
+          <p className="mt-1 text-xs text-subtle">{copy.body}</p>
+          {copy.recommendation ? (
+            <p className="mt-1 text-xs text-subtle">{copy.recommendation}</p>
+          ) : null}
+          {copy.showPickEtfs ? (
             <button
               type="button"
               onClick={() => {
@@ -593,7 +550,7 @@ export default function WatchlistPage() {
               Pick ETFs from list
             </button>
           ) : null}
-          {shortlistCapacity.isUnderfilled && !shortlistCapacity.isBelowETFMinimumRange ? (
+          {copy.showPickStocks ? (
             <button
               type="button"
               onClick={() => {

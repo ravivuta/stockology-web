@@ -25,6 +25,7 @@ import { isUsMarketTradingDay } from "@/lib/market-hours";
 import { formatCompactNumber, formatWholeCurrency, formatWholePercent } from "@/lib/numberFormat";
 import { cashByAccount, displayAccount, isCashSymbol, preferredAccountLabel } from "@/lib/cash-accounts";
 import { fixedIncomeTotal } from "@/lib/fixed-income-accounts";
+import { etfHatchBackgroundImage as etfHatchFor, etfPatternStrokeFor as etfPatternPrimaryFor } from "@/lib/etf-hatch";
 
 const CURRENT_VALUE_COLOR = "#14b8a6";
 
@@ -37,27 +38,7 @@ const PALETTE = {
   loss: "var(--dashboard-chart-loss)",
 } as const;
 
-const ETF_PATTERN_PRIMARY =
-  "color-mix(in srgb, var(--dashboard-chart-cost-basis) 52%, black)";
-
-function etfPatternPrimaryFor(baseColor: string): string {
-  return `color-mix(in srgb, ${baseColor} 52%, black)`;
-}
-
-function etfPatternSecondaryFor(baseColor: string): string {
-  return `color-mix(in srgb, ${baseColor} 52%, black 74%)`;
-}
-
-function etfHatchFor(baseColor: string): string {
-  const primary = etfPatternPrimaryFor(baseColor);
-  const secondary = etfPatternSecondaryFor(baseColor);
-  const line = 0.85;
-  const period = 1.7;
-  return (
-    `repeating-linear-gradient(45deg, ${primary} 0 ${line}px, transparent ${line}px ${period}px), ` +
-    `repeating-linear-gradient(135deg, ${secondary} 0 ${line}px, transparent ${line}px ${period}px)`
-  );
-}
+const ETF_PATTERN_PRIMARY = etfPatternPrimaryFor("var(--dashboard-chart-cost-basis)");
 
 type SummaryComparisonSegment = {
   key: string;

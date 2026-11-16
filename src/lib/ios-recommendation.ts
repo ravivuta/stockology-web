@@ -924,6 +924,78 @@ export type ShortlistCapacityDiagnostics = {
   isUnderfilled: boolean;
 };
 
+export type ShortlistCapacityAlertCopy = {
+  title: string;
+  body: string;
+  recommendation: string | null;
+  showPickStocks: boolean;
+  showPickEtfs: boolean;
+};
+
+/** Watchlist capacity card: one body line, qualify rules in parentheses, no repeated "qualified stocks". */
+export function shortlistCapacityAlertCopy(
+  diagnostics: ShortlistCapacityDiagnostics,
+  options: { enableRiskFilter: boolean; riskAppetite: "Low" | "Medium" | "High" }
+): ShortlistCapacityAlertCopy {
+  const criteria = options.enableRiskFilter
+    ? `score > 50, ${options.riskAppetite} risk`
+    : "score > 50";
+  const etfMaxPct = Math.round(diagnostics.etfMaxTargetRatio * 100);
+  const etfMinPct = Math.round(diagnostics.etfMinTargetRatio * 100);
+  const etfSlotsNeededForMinimum = Math.max(
+    0,
+    Math.ceil(diagnostics.etfMinTargetRatio * diagnostics.idealWatchlistSize - diagnostics.etfPenaltySlots)
+  );
+  const etfsToAdd = Math.max(
+    0,
+    Math.ceil(etfSlotsNeededForMinimum / Math.max(1, diagnostics.etfPenaltyMultiplier))
+  );
+  const etfNoun = etfsToAdd === 1 ? "ETF" : "ETFs";
+  const overEtfCap =
+    diagnostics.alertLevel === "warning" ||
+    diagnostics.alertLevel === "critical" ||
+    diagnostics.isAboveETFMaximumRange;
+
+  let title: string;
+  if (diagnostics.alertLevel === "critical") title = "ETFs fill the shortlist";
+  else if (diagnostics.alertLevel === "warning") title = "ETF share is high";
+  else if (diagnostics.alertLevel === "info") title = "ETF share is getting high";
+  else if (diagnostics.isBelowETFMinimumRange) title = "ETF share is below target";
+  else if (diagnostics.isAboveETFMaximumRange) title = "ETF share is above the cap";
+  else if (diagnostics.isUnderfilled) title = "Need more qualifying stocks";
+  else title = "Shortlist capacity";
+
+  let body: string;
+  if (diagnostics.effectiveETFCount > 0 && diagnostics.targetStockSlots <= 0) {
+    body = `${diagnostics.effectiveETFCount} ETFs leave 0 stock slots.`;
+  } else if (diagnostics.isUnderfilled) {
+    body = `${diagnostics.effectiveETFCount} ETFs · ${diagnostics.qualifiedNonETFSlots}/${diagnostics.targetStockSlots} stock slots filled. Add ${diagnostics.stockSlotShortfall} more (${criteria}).`;
+  } else {
+    body = `${diagnostics.effectiveETFCount} ETFs · ${diagnostics.qualifiedNonETFSlots}/${diagnostics.targetStockSlots} stock slots filled.`;
+  }
+
+  let recommendation: string | null = null;
+  if (diagnostics.isUnderfilled && overEtfCap) {
+    recommendation = `Or remove ETFs (keep ETF slots under ${etfMaxPct}%).`;
+  } else if (diagnostics.isUnderfilled && diagnostics.isBelowETFMinimumRange) {
+    recommendation = `Add ${etfsToAdd} ${etfNoun} first to reach ${etfMinPct}% ETF slots.`;
+  } else if (diagnostics.isUnderfilled) {
+    recommendation = null;
+  } else if (overEtfCap) {
+    recommendation = `Remove ETFs to keep ETF slots under ${etfMaxPct}%.`;
+  } else if (diagnostics.isBelowETFMinimumRange) {
+    recommendation = `Add ${etfsToAdd} ${etfNoun} to reach ${etfMinPct}% ETF slots.`;
+  }
+
+  return {
+    title,
+    body,
+    recommendation,
+    showPickStocks: diagnostics.isUnderfilled && !diagnostics.isBelowETFMinimumRange,
+    showPickEtfs: diagnostics.isBelowETFMinimumRange,
+  };
+}
+
 /**
  * Symbols that show as in-shortlist (green) on Portfolio and Watchlist.
  * All eligible ETFs are included and consume top-N slots. When the size limit is off,
@@ -949,11 +1021,11 @@ export function preferredSymbolsForShortlistIndicator(
     .filter((stock) => stock.isETF === true)
     .map((stock) => stock.symbol);
   const forced = eligible
-    .filter((stock) => stock.quantity <= 0 && stock.isETF !== true && stock.includeInShortlist === true)
+    .filter((stock) => stock.isETF !== true && stock.includeInShortlist === true)
     .sort((a, b) => a.symbol.localeCompare(b.symbol));
   const forcedSymbols = forced.map((stock) => stock.symbol);
   const rankedSlots = Math.max(
-    recommendedWatchlistSize(options.portfolioSize) - (etfSymbols.length * 3) - forcedSymbols.length,
+    rankedStockSlotsForTopN(eligible, options.portfolioSize) - forcedSymbols.length,
     0
   );
   const topStockSymbols = rankedTopWatchlistCandidates(eligible, {
@@ -1035,7 +1107,6 @@ export function rankedTopWatchlistCandidates(
       (stock) =>
         stock.isETF !== true &&
         stock.excludeFromShortlist !== true &&
-        stock.quantity <= 0 &&
         stock.includeInShortlist === true
     )
     .sort((a, b) => a.symbol.localeCompare(b.symbol));
@@ -1253,6 +1324,7 @@ function upsidePct(stock: IosStockInput): number {
 export function holdingQualifiesForAdd(stock: IosStockInput, ctx: AddGateContext): boolean {
   if (stock.excludeFromShortlist === true) return false;
   if (stock.isETF === true) return true;
+  if (stock.includeInShortlist === true) return true;
 
   if (ctx.limitWatchlistSize) {
     if (ctx.enableRiskFilter && !stockPassesRiskAppetiteOnly(stock, ctx.riskAppetite, upsidePct(stock), false)) {
