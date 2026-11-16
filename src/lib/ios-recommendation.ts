@@ -1439,7 +1439,7 @@ function unrealizedGainPercent(stock: Pick<IosStockInput, "quantity" | "lastPric
 /**
  * Pair an underwater outside-shortlist holding with an underwater shortlisted holding
  * whose loss is within 2 percentage points. SELL only if score < 50; ADD only if score > 50
- * and cost basis is below 2× stock limit. Full SELL + ADD; skip SMA/tax-gain gates.
+ * (stocks) or any ETF, and cost basis is below 2× stock limit. Full SELL + ADD; skip SMA/tax-gain gates.
  */
 export function applyLossRotationTowardShortlist<T extends IosStockInput & { recommendation?: IosRecOut }>(
   stocks: T[],
@@ -1477,7 +1477,7 @@ export function applyLossRotationTowardShortlist<T extends IosStockInput & { rec
     return action === "SELL" || action === "REDUCE";
   };
   const isEligibleLoser = (stock: T) => {
-    if (stock.symbol === "$CASH" || stock.isETF === true) return false;
+    if (stock.symbol === "$CASH") return false;
     if (stock.suppressTradeActions === true || stock.excludeFromShortlist === true) return false;
     const pct = unrealizedGainPercent(stock);
     return pct != null && pct < 0;
@@ -1487,8 +1487,12 @@ export function applyLossRotationTowardShortlist<T extends IosStockInput & { rec
   const dests: number[] = [];
   stocks.forEach((stock, index) => {
     if (!isEligibleLoser(stock) || isProtectedExit(stock)) return;
+    const isETF = stock.isETF === true;
     const score = stock.score ?? 0;
-    if (preferred.has(stock.symbol)) {
+    if (isETF) {
+      if (!preferred.has(stock.symbol) || !canAddTowardAllocation(stock)) return;
+      dests.push(index);
+    } else if (preferred.has(stock.symbol)) {
       if (score <= 50 || !canAddTowardAllocation(stock)) return;
       dests.push(index);
     } else {
