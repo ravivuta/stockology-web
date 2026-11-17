@@ -86,9 +86,16 @@ function cachedSeriesNeedsFullReload(cached: PricePoint[], incoming: PricePoint[
 }
 
 function rowDate(value: unknown): string {
-  if (typeof value === "string") return value.slice(0, 10);
-  if (value != null) return String(value).slice(0, 10);
-  return "";
+  const raw =
+    typeof value === "string"
+      ? value
+      : value instanceof Date
+        ? value.toISOString()
+        : value != null
+          ? String(value)
+          : "";
+  const iso = raw.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : "";
 }
 
 function inferSplitRatio(
@@ -160,17 +167,8 @@ async function loadHistoryRows(
   symbol: string,
   daysToLoad: number
 ): Promise<{ rows: HistoryRow[]; closeIsRaw: boolean; error: string | null }> {
-  const rest = await supabase
-    .from("historical_prices")
-    .select("date, close, adjusted_close")
-    .eq("symbol", symbol)
-    .order("date", { ascending: false })
-    .limit(daysToLoad);
-
-  if (!rest.error) {
-    return { rows: (rest.data ?? []) as HistoryRow[], closeIsRaw: true, error: null };
-  }
-
+  // Web charts use this RPC (same path as before). iOS charts read the table over REST;
+  // a successful empty table read must not skip the RPC or the line disappears.
   const rpc = await supabase.rpc("get_historical_prices", {
     p_symbol: symbol,
     p_days: daysToLoad,
@@ -182,8 +180,8 @@ async function loadHistoryRows(
 }
 
 /**
- * Loads daily closes from `historical_prices`, preferring `adjusted_close` like iOS
- * `ChartDataService` (REST). Falls back to `get_historical_prices` if the table read fails.
+ * Loads daily closes via `get_historical_prices`. Prefer `adjusted_close` when the RPC
+ * returns it; `close` is COALESCE(adjusted_close, close) after the adjusted-close migration.
  * Returns points sorted ascending by calendar date (oldest first) for charting and SMA.
  */
 export async function fetchHistoricalPricePoints(

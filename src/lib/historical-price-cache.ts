@@ -1,7 +1,7 @@
 import { setLocalStorageItem, shouldPersistRegenerableCache } from "@/lib/local-storage-quota";
 import type { PricePoint } from "@/lib/stock-chart";
 
-const STORAGE_PREFIX = "stocks-pm-historical-price-cache:v3:";
+const STORAGE_PREFIX = "stocks-pm-historical-price-cache:v4:";
 const MAX_POINTS_PER_SYMBOL = 2500;
 
 type HistoricalPriceCacheEntry = {
@@ -35,7 +35,7 @@ function sanitizePoints(points: PricePoint[]): PricePoint[] {
   for (const point of points) {
     const date = typeof point.date === "string" ? point.date.slice(0, 10) : "";
     const close = Number(point.close);
-    if (date.length !== 10 || !Number.isFinite(close) || close <= 0) continue;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(close) || close <= 0) continue;
     byDate.set(date, close);
   }
 
