@@ -3,13 +3,12 @@ import { getCachedHistoricalPricePoints, setCachedHistoricalPricePoints } from "
 import type { PricePoint } from "@/lib/stock-chart";
 
 type HistoryRow = {
-  date: string;
+  date: unknown;
   close: number | null;
   adjusted_close?: number | null;
 };
 
 const MAX_DAYS = 2000;
-const MASTER_CACHE_DAYS = MAX_DAYS;
 const CANONICAL_SPLIT_RATIOS = [1.25, 4 / 3, 1.5, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
 const SPLIT_RATIO_MATCH_TOLERANCE = 0.08;
 
@@ -29,7 +28,6 @@ function nearestCanonicalSplitRatio(observed: number): number | null {
   return best != null && bestError <= SPLIT_RATIO_MATCH_TOLERANCE ? best : null;
 }
 
-/** Scale to apply to `older` so it matches the newer price regime after a split. */
 function splitScaleForOlder(older: number, newer: number): number | null {
   if (!(older > 0) || !(newer > 0)) return null;
   const forward = nearestCanonicalSplitRatio(older / newer);
@@ -66,36 +64,22 @@ function normalizeSplitContinuity(pointsAsc: PricePoint[]): PricePoint[] {
   return normalized.filter((p) => Number.isFinite(p.close) && p.close > 0);
 }
 
-function cachedSeriesNeedsFullReload(cached: PricePoint[], incoming: PricePoint[]): boolean {
-  if (cached.length === 0 || incoming.length === 0) return false;
-
-  const byDate = new Map(cached.map((point) => [point.date.slice(0, 10), point.close]));
-  for (const point of incoming) {
-    const previous = byDate.get(point.date.slice(0, 10));
-    if (previous != null && splitScaleForOlder(previous, point.close) != null) {
-      return true;
-    }
+/** Match iOS ChartDataService / SupabaseHistoricalService date parsing. */
+function rowDate(value: unknown): string {
+  if (value instanceof Date && Number.isFinite(value.getTime())) {
+    return value.toISOString().slice(0, 10);
   }
 
-  const lastCached = cached[cached.length - 1];
-  if (!lastCached) return false;
-  const firstNewer = incoming
-    .filter((point) => point.date.slice(0, 10) > lastCached.date.slice(0, 10))
-    .sort((a, b) => a.date.localeCompare(b.date))[0];
-  return firstNewer != null && splitScaleForOlder(lastCached.close, firstNewer.close) != null;
+  const raw = typeof value === "string" ? value.trim() : value != null ? String(value).trim() : "";
+  const matched = raw.match(/(\d{4}-\d{2}-\d{2})/);
+  return matched?.[1] ?? "";
 }
 
-function rowDate(value: unknown): string {
-  const raw =
-    typeof value === "string"
-      ? value
-      : value instanceof Date
-        ? value.toISOString()
-        : value != null
-          ? String(value)
-          : "";
-  const iso = raw.slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : "";
+function fromDateIso(days: number): string {
+  const calendarDaysBack = Math.max(1, Math.ceil(days * 1.5));
+  const from = new Date();
+  from.setUTCDate(from.getUTCDate() - calendarDaysBack);
+  return from.toISOString().slice(0, 10);
 }
 
 function inferSplitRatio(
@@ -117,9 +101,9 @@ function inferSplitRatio(
 }
 
 /**
- * Prefer split-adjusted closes the same way iOS ChartDataService does.
- * `closeIsRaw` is true for REST `historical_prices.close`; false when the RPC already
- * COALESCE'd adjusted_close into `close`.
+ * Same rules as iOS `resolvedHistoricalCloses`: prefer `adjusted_close`, infer a split
+ * ratio from neighbors when adj is missing, and only stitch crash-like jumps when the
+ * series has no real adj vs raw evidence.
  */
 function pointsFromHistoryRows(rows: HistoryRow[], closeIsRaw: boolean): PricePoint[] {
   const rowTuples = rows.map((row) => {
@@ -149,7 +133,7 @@ function pointsFromHistoryRows(rows: HistoryRow[], closeIsRaw: boolean): PricePo
   });
 
   const sortedResolved = resolved
-    .filter((p) => p.date.length >= 10 && Number.isFinite(p.close) && p.close > 0)
+    .filter((p) => p.date.length === 10 && Number.isFinite(p.close) && p.close > 0)
     .sort((a, b) => a.date.localeCompare(b.date));
 
   const hasTrueAdjustedClose = rowTuples.some((row) => {
@@ -158,31 +142,47 @@ function pointsFromHistoryRows(rows: HistoryRow[], closeIsRaw: boolean): PricePo
     return Math.abs(row.adjustedClose - row.rawClose) / row.rawClose > 0.005;
   });
 
-  // Already-adjusted series must not be stitched again (a 50% crash looks like a 2:1 split).
   return hasTrueAdjustedClose ? sortedResolved : normalizeSplitContinuity(sortedResolved);
 }
 
-async function loadHistoryRows(
+async function loadFromRest(
   supabase: SupabaseClient,
   symbol: string,
   daysToLoad: number
-): Promise<{ rows: HistoryRow[]; closeIsRaw: boolean; error: string | null }> {
-  // Web charts use this RPC (same path as before). iOS charts read the table over REST;
-  // a successful empty table read must not skip the RPC or the line disappears.
+): Promise<{ rows: HistoryRow[]; error: string | null }> {
+  const fromStr = fromDateIso(daysToLoad);
+  const rest = await supabase
+    .from("historical_prices")
+    .select("date, close, adjusted_close")
+    .eq("symbol", symbol)
+    .gte("date", fromStr)
+    .order("date", { ascending: false })
+    .limit(daysToLoad);
+
+  if (rest.error) {
+    return { rows: [], error: rest.error.message };
+  }
+  return { rows: (rest.data ?? []) as HistoryRow[], error: null };
+}
+
+async function loadFromRpc(
+  supabase: SupabaseClient,
+  symbol: string,
+  daysToLoad: number
+): Promise<{ rows: HistoryRow[]; error: string | null }> {
   const rpc = await supabase.rpc("get_historical_prices", {
     p_symbol: symbol,
     p_days: daysToLoad,
   });
   if (rpc.error) {
-    return { rows: [], closeIsRaw: false, error: rpc.error.message };
+    return { rows: [], error: rpc.error.message };
   }
-  return { rows: (rpc.data ?? []) as HistoryRow[], closeIsRaw: false, error: null };
+  return { rows: (rpc.data ?? []) as HistoryRow[], error: null };
 }
 
 /**
- * Loads daily closes via `get_historical_prices`. Prefer `adjusted_close` when the RPC
- * returns it; `close` is COALESCE(adjusted_close, close) after the adjusted-close migration.
- * Returns points sorted ascending by calendar date (oldest first) for charting and SMA.
+ * iOS chart/SMA/vs-SPY history: GET `historical_prices` and plot `adjusted_close`.
+ * Web uses the same table read; RPC is only a fallback when that read is empty or errors.
  */
 export async function fetchHistoricalPricePoints(
   supabase: SupabaseClient,
@@ -194,37 +194,27 @@ export async function fetchHistoricalPricePoints(
 
   const n = Math.min(Math.max(Math.floor(days), 1), MAX_DAYS);
   const cached = getCachedHistoricalPricePoints(sym, n);
-  if (cached?.isFresh) {
+  if (cached?.isFresh && cached.points.length > 0) {
     return { points: cached.points, error: null };
   }
 
-  // A saved series is reused. Only the latest sessions are fetched and appended.
-  // The full horizon is downloaded when this symbol has no local history yet.
-  const savedSeries = getCachedHistoricalPricePoints(sym, 1);
-  const requestDays = savedSeries && savedSeries.points.length >= 60 ? 10 : MASTER_CACHE_DAYS;
+  const rest = await loadFromRest(supabase, sym, n);
+  let points = pointsFromHistoryRows(rest.rows, true);
 
-  const loaded = await loadHistoryRows(supabase, sym, requestDays);
-  if (loaded.error) {
-    if (cached) {
-      return { points: cached.points, error: null };
+  if (points.length === 0) {
+    const rpc = await loadFromRpc(supabase, sym, n);
+    if (rpc.error && rest.error) {
+      if (cached?.points.length) return { points: cached.points, error: null };
+      return { points: [], error: rpc.error };
     }
-    return { points: [], error: loaded.error };
+    points = pointsFromHistoryRows(rpc.rows, false);
   }
 
-  let points = pointsFromHistoryRows(loaded.rows, loaded.closeIsRaw);
-  const incremental = requestDays < MASTER_CACHE_DAYS;
-  const savedPoints = savedSeries?.points ?? [];
-
-  if (incremental && cachedSeriesNeedsFullReload(savedPoints, points)) {
-    const full = await loadHistoryRows(supabase, sym, MASTER_CACHE_DAYS);
-    if (!full.error) {
-      points = pointsFromHistoryRows(full.rows, full.closeIsRaw);
-      setCachedHistoricalPricePoints(sym, points, { replace: true });
-      return { points, error: null };
-    }
+  if (points.length === 0) {
+    if (cached?.points.length) return { points: cached.points, error: null };
+    return { points: [], error: rest.error ?? "No data available" };
   }
 
-  setCachedHistoricalPricePoints(sym, points, { replace: !incremental });
-  const merged = getCachedHistoricalPricePoints(sym, 1);
-  return { points: merged?.points ?? points, error: null };
+  setCachedHistoricalPricePoints(sym, points, { replace: true });
+  return { points, error: null };
 }

@@ -1,7 +1,7 @@
 import { setLocalStorageItem, shouldPersistRegenerableCache } from "@/lib/local-storage-quota";
 import type { PricePoint } from "@/lib/stock-chart";
 
-const STORAGE_PREFIX = "stocks-pm-historical-price-cache:v4:";
+const STORAGE_PREFIX = "stocks-pm-historical-price-cache:v5:";
 const MAX_POINTS_PER_SYMBOL = 2500;
 
 type HistoricalPriceCacheEntry = {
@@ -81,7 +81,7 @@ export function getCachedHistoricalPricePoints(
   if (!normalized) return null;
 
   const entry = readEntry(normalized);
-  if (!entry || entry.points.length < days) return null;
+  if (!entry || entry.points.length === 0) return null;
 
   return {
     points: sliceForDays(entry.points, days),
