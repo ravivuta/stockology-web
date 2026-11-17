@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Pencil } from "lucide-react";
+import { CashAccountsEditor } from "@/components/dashboard/CashAccountsEditor";
+import { FixedIncomeAccountsEditor } from "@/components/dashboard/FixedIncomeAccountsEditor";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import { usePortfolioStore } from "@/store/portfolioStore";
 import { PortfolioDonut } from "@/components/dashboard/PortfolioDonut";
@@ -116,6 +118,8 @@ export default function DashboardPage() {
   const [bars, setBars] = useState(true);
   const [dashStockDetail, setDashStockDetail] = useState<string | null>(null);
   const [summaryTab, setSummaryTab] = useState<"summary" | "performance">("summary");
+  const [cashEditorOpen, setCashEditorOpen] = useState(false);
+  const [fixedIncomeEditorOpen, setFixedIncomeEditorOpen] = useState(false);
   // Pre-seed from the same cache used by DashboardReturnComparison for instant today-value display
   const [cloudHistory, setCloudHistory] = useState<NetWorthPoint[] | null>(() => {
     try {
@@ -550,7 +554,18 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="rounded-xl border border-border/45 bg-background/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
-            <p className="text-[11px] font-semibold text-subtle">Cash</p>
+            <div className="flex items-center gap-1">
+              <p className="min-w-0 flex-1 text-[11px] font-semibold text-subtle">Cash</p>
+              <button
+                type="button"
+                onClick={() => setCashEditorOpen(true)}
+                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-subtle transition-colors hover:bg-white/50 hover:text-foreground dark:hover:bg-white/10"
+                aria-label="Edit cash"
+                title="Edit cash"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            </div>
             <p className="mt-1 text-sm font-semibold tabular-nums text-[color:var(--dashboard-chart-cash)]">
               {homeShowsAmountValues
                 ? `${formatSummaryNumber(cash)} (${Math.round(cashSharePct)}%)`
@@ -558,7 +573,18 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="rounded-xl border border-border/45 bg-background/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
-            <p className="text-[11px] font-semibold text-subtle">Bonds/CDs</p>
+            <div className="flex items-center gap-1">
+              <p className="min-w-0 flex-1 text-[11px] font-semibold text-subtle">Bonds/CDs</p>
+              <button
+                type="button"
+                onClick={() => setFixedIncomeEditorOpen(true)}
+                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-subtle transition-colors hover:bg-white/50 hover:text-foreground dark:hover:bg-white/10"
+                aria-label="Edit bonds and CDs"
+                title="Edit bonds and CDs"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            </div>
             <p className="mt-1 text-sm font-semibold tabular-nums text-[color:var(--dashboard-chart-fixed-income)]">
               {homeShowsAmountValues
                 ? `${formatSummaryNumber(fixedIncomeValue)} (${Math.round(fixedIncomeSharePct)}%)`
@@ -994,6 +1020,8 @@ export default function DashboardPage() {
           </div>
         ) : null}
       </motion.section>
+      <CashAccountsEditor open={cashEditorOpen} onClose={() => setCashEditorOpen(false)} />
+      <FixedIncomeAccountsEditor open={fixedIncomeEditorOpen} onClose={() => setFixedIncomeEditorOpen(false)} />
     </div>
   );
 }
