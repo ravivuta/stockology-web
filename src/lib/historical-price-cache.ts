@@ -1,7 +1,7 @@
 import { setLocalStorageItem, shouldPersistRegenerableCache } from "@/lib/local-storage-quota";
 import type { PricePoint } from "@/lib/stock-chart";
 
-const STORAGE_PREFIX = "stocks-pm-historical-price-cache:v2:";
+const STORAGE_PREFIX = "stocks-pm-historical-price-cache:v3:";
 const MAX_POINTS_PER_SYMBOL = 2500;
 
 type HistoricalPriceCacheEntry = {
@@ -89,11 +89,15 @@ export function getCachedHistoricalPricePoints(
   };
 }
 
-export function setCachedHistoricalPricePoints(symbol: string, points: PricePoint[]): void {
+export function setCachedHistoricalPricePoints(
+  symbol: string,
+  points: PricePoint[],
+  options?: { replace?: boolean }
+): void {
   const normalized = normalizeSymbol(symbol);
   if (!normalized) return;
 
-  const previous = readEntry(normalized);
+  const previous = options?.replace ? null : readEntry(normalized);
   const merged = sanitizePoints([...(previous?.points ?? []), ...points]);
   if (merged.length === 0) return;
 
