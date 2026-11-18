@@ -352,6 +352,13 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   const enableRiskFilter = usePortfolioStore((s) => s.enableRiskFilter);
   const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
   const portfolioSize = usePortfolioStore((s) => s.portfolioSize);
+  const guideEtfShareByRisk = usePortfolioStore((s) => s.guideEtfShareByRisk);
+  const etfShareMinPctLow = usePortfolioStore((s) => s.etfShareMinPctLow);
+  const etfShareMaxPctLow = usePortfolioStore((s) => s.etfShareMaxPctLow);
+  const etfShareMinPctMedium = usePortfolioStore((s) => s.etfShareMinPctMedium);
+  const etfShareMaxPctMedium = usePortfolioStore((s) => s.etfShareMaxPctMedium);
+  const etfShareMinPctHigh = usePortfolioStore((s) => s.etfShareMinPctHigh);
+  const etfShareMaxPctHigh = usePortfolioStore((s) => s.etfShareMaxPctHigh);
   const cashBalance = usePortfolioStore((s) => s.cashBalance);
   const fixedIncomeByAccount = usePortfolioStore((s) => s.fixedIncomeByAccount);
   const useMarketRegimeCashTilt = usePortfolioStore((s) => s.useMarketRegimeCashTilt);
@@ -709,7 +716,16 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       },
     ];
     if (riskPasses) {
-      const topN = rankedStockSlotsForTopN(stocks, portfolioSize);
+      const topN = rankedStockSlotsForTopN(stocks, portfolioSize, {
+        riskAppetite,
+        guideEtfShareByRisk,
+        etfShareMinPctLow,
+        etfShareMaxPctLow,
+        etfShareMinPctMedium,
+        etfShareMaxPctMedium,
+        etfShareMinPctHigh,
+        etfShareMaxPctHigh,
+      });
       const rank = rankInWatchlistScoreUniverse(stocks, stock.symbol, {
         enableRiskFilter,
         riskAppetite,
@@ -733,6 +749,13 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
           portfolioSize,
           diversifyBySector: true,
           limitWatchlistSize,
+          guideEtfShareByRisk,
+          etfShareMinPctLow,
+          etfShareMaxPctLow,
+          etfShareMinPctMedium,
+          etfShareMaxPctMedium,
+          etfShareMinPctHigh,
+          etfShareMaxPctHigh,
         });
         const sectorLabel = snapshotSectorDisplay(stock);
         rows.push({
@@ -762,7 +785,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     }
 
     return rows;
-  }, [diversifyShortlistBySector, enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stock, stocks]);
+  }, [diversifyShortlistBySector, enableRiskFilter, etfShareMaxPctHigh, etfShareMaxPctLow, etfShareMaxPctMedium, etfShareMinPctHigh, etfShareMinPctLow, etfShareMinPctMedium, guideEtfShareByRisk, limitWatchlistSize, portfolioSize, riskAppetite, stock, stocks]);
   const shortlistReasons = useMemo(() => {
     if (!stock || isShortlistedForPortfolio) return [];
 
@@ -773,7 +796,16 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     if (!stock.isETF && stock.isVisibleInRisk === false) {
       reasons.push("Does not meet the current risk appetite criteria.");
     } else if (!stock.isETF && limitWatchlistSize && stock.isInWatchlistSize === false) {
-      const topN = rankedStockSlotsForTopN(stocks, portfolioSize);
+      const topN = rankedStockSlotsForTopN(stocks, portfolioSize, {
+        riskAppetite,
+        guideEtfShareByRisk,
+        etfShareMinPctLow,
+        etfShareMaxPctLow,
+        etfShareMinPctMedium,
+        etfShareMaxPctMedium,
+        etfShareMinPctHigh,
+        etfShareMaxPctHigh,
+      });
       const rank = rankInWatchlistScoreUniverse(stocks, stock.symbol, {
         enableRiskFilter,
         riskAppetite,
@@ -786,6 +818,13 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
         portfolioSize,
         diversifyBySector: diversifyShortlistBySector,
         limitWatchlistSize,
+        guideEtfShareByRisk,
+        etfShareMinPctLow,
+        etfShareMaxPctLow,
+        etfShareMinPctMedium,
+        etfShareMaxPctMedium,
+        etfShareMinPctHigh,
+        etfShareMaxPctHigh,
       });
       reasons.push(
         deferred
@@ -796,7 +835,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       );
     }
     return reasons;
-  }, [diversifyShortlistBySector, enableRiskFilter, isShortlistedForPortfolio, limitWatchlistSize, portfolioSize, riskAppetite, stock, stocks]);
+  }, [diversifyShortlistBySector, enableRiskFilter, etfShareMaxPctHigh, etfShareMaxPctLow, etfShareMaxPctMedium, etfShareMinPctHigh, etfShareMinPctLow, etfShareMinPctMedium, guideEtfShareByRisk, isShortlistedForPortfolio, limitWatchlistSize, portfolioSize, riskAppetite, stock, stocks]);
   const scoreRows = useMemo(() => (stock ? scoreBreakdownRows(stock) : null), [stock]);
   const dense = Boolean(embedded);
   const stockSymbol = stock?.symbol ?? null;

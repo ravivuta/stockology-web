@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { ACTIVE_DATA_USER_KEY } from "@/lib/clear-portfolio-client-state";
 import { resolveStocksPmDataUserId } from "@/lib/resolve-stocks-pm-data-user-id";
-import { snapshotSaveBlockReason, type PortfolioSlice } from "@/lib/portfolio-cloud-sync";
+import { globalSettingsFromStore, snapshotSaveBlockReason, type PortfolioSlice } from "@/lib/portfolio-cloud-sync";
 import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
 import { pushPortfolioSnapshotSlice } from "@/lib/portfolio-snapshot-client";
 import { fetchTickerHydrationFromTables, type TickerHydrationPriceRow } from "@/lib/ticker-direct-hydration";
@@ -517,11 +517,13 @@ export function CsvImportExportBar({
       dataUserId = await syncStocksPmAuthUser(supabase, authUserId);
     }
     const state = sliceOverride ?? usePortfolioStore.getState();
+    const live = usePortfolioStore.getState();
     const slice: PortfolioSlice = {
       cashBalance: state.cashBalance,
       fixedIncomeByAccount: state.fixedIncomeByAccount,
       stocks: state.stocks,
       lotsBySymbol: state.lotsBySymbol,
+      globalSettings: globalSettingsFromStore(live),
     };
     const saved = await pushPortfolioSnapshotSlice(dataUserId, slice, {
       force: true,

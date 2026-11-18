@@ -1,7 +1,8 @@
 import { computeRiskReturnScore } from "@/lib/ios-recommendation";
 import { parseStockPeg } from "@/lib/stock-metric-parse";
 import type { LotStatus, SoldLot, StockHolding, TradeLot } from "@/store/portfolioStore";
-import { CASH_SYMBOL, canonicalAccount, cashLotQuantity, isCashSymbol, migrateCashLots } from "@/lib/cash-accounts";
+import { CASH_SYMBOL, canonicalAccount, cashLotQuantity, isCashSymbol, isSettingsSymbol, migrateCashLots } from "@/lib/cash-accounts";
+import type { GlobalSettings } from "@/lib/portfolio-cloud-sync";
 import { fixedIncomeAccountNameFromSnapshotSymbol, isFixedIncomeSymbol, sanitizeFixedIncomeByAccount } from "@/lib/fixed-income-accounts";
 
 /** Raw holding JSON from iOS `user_portfolio_snapshots.holdings`. */
@@ -174,7 +175,7 @@ function parseRawHolding(raw: unknown): { stock: StockHolding; lots: { open: Tra
   if (!isRecord(raw)) return null;
   const h = raw as RawHolding;
   const symbol = typeof h.symbol === "string" ? h.symbol.trim().toUpperCase() : "";
-  if (!symbol) return null;
+  if (!symbol || isSettingsSymbol(symbol)) return null;
 
   const quantity = Number(h.quantity ?? h.qty) || 0;
   const averageCost = Number(h.averageCost ?? h.average_cost) || 0;
@@ -326,6 +327,7 @@ export function parseCloudSnapshotForStore(row: CloudSnapshotHydrationInput): {
   stocks: StockHolding[];
   lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }>;
   fixedIncomeByAccount: Record<string, number>;
+  globalSettings: GlobalSettings | null;
 } {
   const cashBalance = Number(row.cash_balance) || 0;
   const holdings = row.holdings;
@@ -336,14 +338,23 @@ export function parseCloudSnapshotForStore(row: CloudSnapshotHydrationInput): {
       stocks: [],
       lotsBySymbol,
       fixedIncomeByAccount: {},
+      globalSettings: null,
     };
   }
 
   const stocks: StockHolding[] = [];
   let lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }> = {};
   const fixedIncomeByAccount: Record<string, number> = {};
+  let globalSettings: GlobalSettings | null = null;
 
   for (const item of holdings) {
+    if (isRecord(item) && isSettingsSymbol(typeof item.symbol === "string" ? item.symbol : "")) {
+      const nested = item.globalSettings;
+      if (isRecord(nested)) {
+        globalSettings = nested as GlobalSettings;
+      }
+      continue;
+    }
     const parsed = parseRawHolding(item);
     if (!parsed) continue;
     if (isFixedIncomeSymbol(parsed.stock.symbol)) {
@@ -382,5 +393,11 @@ export function parseCloudSnapshotForStore(row: CloudSnapshotHydrationInput): {
     const name = canonicalAccount(account, knownAccounts);
     alignedFixedIncome[name] = (alignedFixedIncome[name] ?? 0) + amount;
   }
-  return { cashBalance: resolvedCash, stocks, lotsBySymbol, fixedIncomeByAccount: alignedFixedIncome };
+  return {
+    cashBalance: resolvedCash,
+    stocks,
+    lotsBySymbol,
+    fixedIncomeByAccount: alignedFixedIncome,
+    globalSettings,
+  };
 }

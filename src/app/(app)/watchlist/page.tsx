@@ -229,8 +229,15 @@ export default function WatchlistPage() {
         riskAppetite,
         portfolioSize,
         diversifyShortlistBySector,
+        guideEtfShareByRisk,
+        etfShareMinPctLow,
+        etfShareMaxPctLow,
+        etfShareMinPctMedium,
+        etfShareMaxPctMedium,
+        etfShareMinPctHigh,
+        etfShareMaxPctHigh,
       }),
-    [diversifyShortlistBySector, enableRiskFilter, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
+    [diversifyShortlistBySector, enableRiskFilter, etfShareMaxPctHigh, etfShareMaxPctLow, etfShareMaxPctMedium, etfShareMinPctHigh, etfShareMinPctLow, etfShareMinPctMedium, guideEtfShareByRisk, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
   );
   const shortlistCapacity = useMemo(
     () =>
@@ -301,7 +308,16 @@ export default function WatchlistPage() {
           withSectors,
           (row) => row.sector,
           shortlistNonETFSectorCounts(stocks, shortlistedSymbols),
-          rankedStockSlotsForTopN(stocks, portfolioSize),
+          rankedStockSlotsForTopN(stocks, portfolioSize, {
+            riskAppetite,
+            guideEtfShareByRisk,
+            etfShareMinPctLow,
+            etfShareMaxPctLow,
+            etfShareMinPctMedium,
+            etfShareMaxPctMedium,
+            etfShareMinPctHigh,
+            etfShareMaxPctHigh,
+          }),
           diversifyShortlistBySector
         );
         setQualifiedCandidates(prioritized.slice(0, 30));

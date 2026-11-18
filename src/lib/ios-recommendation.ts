@@ -894,6 +894,13 @@ export type AddGateContext = {
   enableRiskFilter: boolean;
   limitWatchlistSize: boolean;
   diversifyShortlistBySector?: boolean;
+  guideEtfShareByRisk?: boolean;
+  etfShareMinPctLow?: number;
+  etfShareMaxPctLow?: number;
+  etfShareMinPctMedium?: number;
+  etfShareMaxPctMedium?: number;
+  etfShareMinPctHigh?: number;
+  etfShareMaxPctHigh?: number;
   riskAppetite: "Low" | "Medium" | "High";
   portfolioSize: number;
   cashBalance?: number;
@@ -1011,6 +1018,13 @@ export function preferredSymbolsForShortlistIndicator(
     riskAppetite?: "Low" | "Medium" | "High";
     portfolioSize: number;
     diversifyShortlistBySector?: boolean;
+    guideEtfShareByRisk?: boolean;
+    etfShareMinPctLow?: number;
+    etfShareMaxPctLow?: number;
+    etfShareMinPctMedium?: number;
+    etfShareMaxPctMedium?: number;
+    etfShareMinPctHigh?: number;
+    etfShareMaxPctHigh?: number;
   }
 ): Set<string> {
   const eligible = stocks.filter(
@@ -1027,7 +1041,7 @@ export function preferredSymbolsForShortlistIndicator(
     .sort((a, b) => a.symbol.localeCompare(b.symbol));
   const forcedSymbols = forced.map((stock) => stock.symbol);
   const rankedSlots = Math.max(
-    rankedStockSlotsForTopN(eligible, options.portfolioSize) - forcedSymbols.length,
+    rankedStockSlotsForTopN(eligible, options.portfolioSize, options) - forcedSymbols.length,
     0
   );
   const topStockSymbols = rankedTopWatchlistCandidates(eligible, {
@@ -1035,6 +1049,13 @@ export function preferredSymbolsForShortlistIndicator(
     riskAppetite: options.riskAppetite,
     portfolioSize: options.portfolioSize,
     diversifyBySector: options.diversifyShortlistBySector !== false,
+    guideEtfShareByRisk: options.guideEtfShareByRisk,
+    etfShareMinPctLow: options.etfShareMinPctLow,
+    etfShareMaxPctLow: options.etfShareMaxPctLow,
+    etfShareMinPctMedium: options.etfShareMinPctMedium,
+    etfShareMaxPctMedium: options.etfShareMaxPctMedium,
+    etfShareMinPctHigh: options.etfShareMinPctHigh,
+    etfShareMaxPctHigh: options.etfShareMaxPctHigh,
   })
     .filter((stock) => !forcedSymbols.includes(stock.symbol))
     .slice(0, rankedSlots)
@@ -1056,6 +1077,13 @@ export function symbolsForSimulation(
     riskAppetite: "Low" | "Medium" | "High";
     portfolioSize: number;
     diversifyShortlistBySector?: boolean;
+    guideEtfShareByRisk?: boolean;
+    etfShareMinPctLow?: number;
+    etfShareMaxPctLow?: number;
+    etfShareMinPctMedium?: number;
+    etfShareMaxPctMedium?: number;
+    etfShareMinPctHigh?: number;
+    etfShareMaxPctHigh?: number;
   }
 ): Set<string> {
   const eligible = stocks.filter((stock) => stock.symbol !== "$CASH" && stock.excludeFromShortlist !== true);
@@ -1066,6 +1094,13 @@ export function symbolsForSimulation(
       riskAppetite: settings.riskAppetite,
       portfolioSize: settings.portfolioSize,
       diversifyShortlistBySector: settings.diversifyShortlistBySector,
+      guideEtfShareByRisk: settings.guideEtfShareByRisk,
+      etfShareMinPctLow: settings.etfShareMinPctLow,
+      etfShareMaxPctLow: settings.etfShareMaxPctLow,
+      etfShareMinPctMedium: settings.etfShareMinPctMedium,
+      etfShareMaxPctMedium: settings.etfShareMaxPctMedium,
+      etfShareMinPctHigh: settings.etfShareMinPctHigh,
+      etfShareMaxPctHigh: settings.etfShareMaxPctHigh,
     });
   }
   return new Set(
@@ -1102,6 +1137,13 @@ export function rankedTopWatchlistCandidates(
     includeLowScores?: boolean;
     portfolioSize?: number;
     diversifyBySector?: boolean;
+    guideEtfShareByRisk?: boolean;
+    etfShareMinPctLow?: number;
+    etfShareMaxPctLow?: number;
+    etfShareMinPctMedium?: number;
+    etfShareMaxPctMedium?: number;
+    etfShareMinPctHigh?: number;
+    etfShareMaxPctHigh?: number;
   }
 ): IosStockInput[] {
   const forceIncluded = stocks
@@ -1128,7 +1170,7 @@ export function rankedTopWatchlistCandidates(
     });
 
   const stockSlots =
-    options?.portfolioSize != null ? rankedStockSlotsForTopN(stocks, options.portfolioSize) : 0;
+    options?.portfolioSize != null ? rankedStockSlotsForTopN(stocks, options.portfolioSize, options) : 0;
   return diversifyRankedWatchlistBySector(
     forceIncluded,
     ranked,
@@ -1157,12 +1199,19 @@ export function isDeferredBySectorCap(
     portfolioSize: number;
     diversifyBySector?: boolean;
     limitWatchlistSize?: boolean;
+    guideEtfShareByRisk?: boolean;
+    etfShareMinPctLow?: number;
+    etfShareMaxPctLow?: number;
+    etfShareMinPctMedium?: number;
+    etfShareMaxPctMedium?: number;
+    etfShareMinPctHigh?: number;
+    etfShareMaxPctHigh?: number;
   }
 ): boolean {
   if (options.limitWatchlistSize === false || options.diversifyBySector === false) return false;
   const target = stocks.find((stock) => stock.symbol === symbol);
   if (!target || target.isETF === true) return false;
-  const slots = rankedStockSlotsForTopN(stocks, options.portfolioSize);
+  const slots = rankedStockSlotsForTopN(stocks, options.portfolioSize, options);
   if (slots <= 0) return false;
   const rankOptions = {
     enableRiskFilter: options.enableRiskFilter,
@@ -1201,6 +1250,11 @@ function rankInTopWatchlist(
 /** Universal ceiling on ETF slot share of the ideal watchlist (each ETF costs 3 slots). */
 export const ETF_SHARE_HARD_CAP_RATIO = 0.6;
 export const ETF_SHARE_HARD_CAP_PCT = 60;
+export const ETF_SHARE_LOW_RISK_CEILING_PCT = 100;
+
+export function etfShareCeilingPct(risk: "Low" | "Medium" | "High"): number {
+  return risk === "Low" ? ETF_SHARE_LOW_RISK_CEILING_PCT : ETF_SHARE_HARD_CAP_PCT;
+}
 
 export const ETF_SHARE_GUIDANCE_DEFAULTS = {
   Low: { min: 40, max: 60 },
@@ -1217,9 +1271,14 @@ export type EtfShareGuidancePercents = {
   etfShareMaxPctHigh?: number;
 };
 
-export function clampEtfShareGuidancePercents(minPct: number, maxPct: number): { min: number; max: number } {
-  let lo = Math.round(Math.min(ETF_SHARE_HARD_CAP_PCT, Math.max(0, minPct)));
-  let hi = Math.round(Math.min(ETF_SHARE_HARD_CAP_PCT, Math.max(0, maxPct)));
+export function clampEtfShareGuidancePercents(
+  minPct: number,
+  maxPct: number,
+  risk: "Low" | "Medium" | "High" = "Medium"
+): { min: number; max: number } {
+  const ceiling = etfShareCeilingPct(risk);
+  let lo = Math.round(Math.min(ceiling, Math.max(0, minPct)));
+  let hi = Math.round(Math.min(ceiling, Math.max(0, maxPct)));
   if (lo > hi) {
     const swap = lo;
     lo = hi;
@@ -1245,7 +1304,23 @@ export function etfShareRangeForRisk(
       : risk === "High"
         ? settings?.etfShareMaxPctHigh
         : settings?.etfShareMaxPctMedium;
-  return clampEtfShareGuidancePercents(min ?? fallback.min, max ?? fallback.max);
+  return clampEtfShareGuidancePercents(min ?? fallback.min, max ?? fallback.max, risk);
+}
+
+export function etfSlotCapRatioForRisk(
+  risk: "Low" | "Medium" | "High",
+  settings?: EtfShareGuidancePercents & { guideEtfShareByRisk?: boolean }
+): number {
+  if (settings?.guideEtfShareByRisk === false) return ETF_SHARE_HARD_CAP_RATIO;
+  const range = etfShareRangeForRisk(risk, settings);
+  return Math.min(range.max / 100, etfShareCeilingPct(risk) / 100);
+}
+
+export function etfCrowdingCapRatio(
+  risk: "Low" | "Medium" | "High",
+  settings?: EtfShareGuidancePercents & { guideEtfShareByRisk?: boolean }
+): number {
+  return Math.max(ETF_SHARE_HARD_CAP_RATIO, etfSlotCapRatioForRisk(risk, settings));
 }
 
 /** ETFs to drop so slot share is at or under `etfMaxTargetRatio` (each ETF costs `etfPenaltyMultiplier` slots). */
@@ -1262,12 +1337,24 @@ export function etfsToRemoveToMeetCap(diagnostics: ShortlistCapacityDiagnostics)
   return Math.min(diagnostics.effectiveETFCount, count);
 }
 
-export function cappedEtfPenaltySlots(rawPenaltySlots: number, idealWatchlistSize: number): number {
-  const cap = Math.max(0, Math.floor(Math.max(0, idealWatchlistSize) * ETF_SHARE_HARD_CAP_RATIO));
+export function cappedEtfPenaltySlots(
+  rawPenaltySlots: number,
+  idealWatchlistSize: number,
+  maxShareRatio = ETF_SHARE_HARD_CAP_RATIO
+): number {
+  const ratio = Math.min(1, Math.max(0, maxShareRatio));
+  const cap = Math.max(0, Math.floor(Math.max(0, idealWatchlistSize) * ratio));
   return Math.min(Math.max(0, rawPenaltySlots), cap);
 }
 
-export function rankedStockSlotsForTopN(stocks: IosStockInput[], portfolioSize: number): number {
+export function rankedStockSlotsForTopN(
+  stocks: IosStockInput[],
+  portfolioSize: number,
+  guidance?: EtfShareGuidancePercents & {
+    riskAppetite?: "Low" | "Medium" | "High";
+    guideEtfShareByRisk?: boolean;
+  }
+): number {
   const totalSlots = recommendedWatchlistSize(portfolioSize);
   const etfSlots = stocks.filter(
     (stock) =>
@@ -1275,7 +1362,10 @@ export function rankedStockSlotsForTopN(stocks: IosStockInput[], portfolioSize: 
       stock.excludeFromShortlist !== true &&
       stock.symbol !== "$CASH"
   ).length;
-  return Math.max(totalSlots - cappedEtfPenaltySlots(etfSlots * 3, totalSlots), 0);
+  const crowding = guidance?.riskAppetite
+    ? etfCrowdingCapRatio(guidance.riskAppetite, guidance)
+    : ETF_SHARE_HARD_CAP_RATIO;
+  return Math.max(totalSlots - cappedEtfPenaltySlots(etfSlots * 3, totalSlots, crowding), 0);
 }
 
 export function shortlistCapacityDiagnostics(
@@ -1300,17 +1390,14 @@ export function shortlistCapacityDiagnostics(
   const effectiveETFCount = currentETFCount + additionalETFCount;
   const idealWatchlistSize = recommendedWatchlistSize(settings.portfolioSize);
   const etfPenaltySlots = effectiveETFCount * etfPenaltyMultiplier;
-  const targetStockSlots = Math.max(
-    0,
-    idealWatchlistSize - cappedEtfPenaltySlots(etfPenaltySlots, idealWatchlistSize)
-  );
   const range = etfShareRangeForRisk(settings.riskAppetite, settings);
   const etfMinTargetRatio = range.min / 100;
-  const riskMaxTargetRatio = range.max / 100;
   const guideEtfShare = settings.guideEtfShareByRisk !== false;
-  const etfMaxTargetRatio = Math.min(
-    guideEtfShare ? riskMaxTargetRatio : ETF_SHARE_HARD_CAP_RATIO,
-    ETF_SHARE_HARD_CAP_RATIO
+  const etfMaxTargetRatio = etfSlotCapRatioForRisk(settings.riskAppetite, settings);
+  const crowdingCapRatio = Math.max(ETF_SHARE_HARD_CAP_RATIO, etfMaxTargetRatio);
+  const targetStockSlots = Math.max(
+    0,
+    idealWatchlistSize - cappedEtfPenaltySlots(etfPenaltySlots, idealWatchlistSize, crowdingCapRatio)
   );
   const qualifiedNonETFSlots = Math.min(
     targetStockSlots,
@@ -1319,6 +1406,13 @@ export function shortlistCapacityDiagnostics(
       riskAppetite: settings.riskAppetite,
       portfolioSize: settings.portfolioSize,
       diversifyBySector: settings.diversifyShortlistBySector !== false,
+      guideEtfShareByRisk: settings.guideEtfShareByRisk,
+      etfShareMinPctLow: settings.etfShareMinPctLow,
+      etfShareMaxPctLow: settings.etfShareMaxPctLow,
+      etfShareMinPctMedium: settings.etfShareMinPctMedium,
+      etfShareMaxPctMedium: settings.etfShareMaxPctMedium,
+      etfShareMinPctHigh: settings.etfShareMinPctHigh,
+      etfShareMaxPctHigh: settings.etfShareMaxPctHigh,
     }).length
   );
   const stockSlotShortfall = Math.max(0, targetStockSlots - qualifiedNonETFSlots);
@@ -1392,7 +1486,7 @@ export function holdingQualifiesForAdd(stock: IosStockInput, ctx: AddGateContext
     }
     if ((stock.score ?? 0) <= 50) return false;
     const rank = rankInTopWatchlist(ctx.allStocks, stock.symbol, ctx);
-    const size = rankedStockSlotsForTopN(ctx.allStocks, ctx.portfolioSize);
+    const size = rankedStockSlotsForTopN(ctx.allStocks, ctx.portfolioSize, ctx);
     return rank != null && rank <= size;
   }
 
@@ -1432,6 +1526,13 @@ export function holdingIsOutsideEnabledShortlistAndRisk(
     riskAppetite: ctx.riskAppetite,
     portfolioSize: ctx.portfolioSize,
     diversifyShortlistBySector: ctx.diversifyShortlistBySector,
+    guideEtfShareByRisk: ctx.guideEtfShareByRisk,
+    etfShareMinPctLow: ctx.etfShareMinPctLow,
+    etfShareMaxPctLow: ctx.etfShareMaxPctLow,
+    etfShareMinPctMedium: ctx.etfShareMinPctMedium,
+    etfShareMaxPctMedium: ctx.etfShareMaxPctMedium,
+    etfShareMinPctHigh: ctx.etfShareMinPctHigh,
+    etfShareMaxPctHigh: ctx.etfShareMaxPctHigh,
   });
   return !preferred.has(stock.symbol);
 }
@@ -1509,6 +1610,13 @@ export function applyLossRotationTowardShortlist<T extends IosStockInput & { rec
     riskAppetite?: "Low" | "Medium" | "High";
     portfolioSize: number;
     diversifyShortlistBySector?: boolean;
+    guideEtfShareByRisk?: boolean;
+    etfShareMinPctLow?: number;
+    etfShareMaxPctLow?: number;
+    etfShareMinPctMedium?: number;
+    etfShareMaxPctMedium?: number;
+    etfShareMinPctHigh?: number;
+    etfShareMaxPctHigh?: number;
   }
 ): { stocks: T[]; rotationFundedSymbols: Set<string> } {
   if (!options.limitWatchlistSize) {
@@ -1521,6 +1629,13 @@ export function applyLossRotationTowardShortlist<T extends IosStockInput & { rec
     riskAppetite: options.riskAppetite,
     portfolioSize: options.portfolioSize,
     diversifyShortlistBySector: options.diversifyShortlistBySector,
+    guideEtfShareByRisk: options.guideEtfShareByRisk,
+    etfShareMinPctLow: options.etfShareMinPctLow,
+    etfShareMaxPctLow: options.etfShareMaxPctLow,
+    etfShareMinPctMedium: options.etfShareMinPctMedium,
+    etfShareMaxPctMedium: options.etfShareMaxPctMedium,
+    etfShareMinPctHigh: options.etfShareMinPctHigh,
+    etfShareMaxPctHigh: options.etfShareMaxPctHigh,
   });
 
   const remainingAddCapacity = (stock: T) => {

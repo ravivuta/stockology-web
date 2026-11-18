@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SoldLot, StockHolding, TradeLot } from "@/store/portfolioStore";
-import { CASH_SYMBOL, CASH_UNIT_PRICE, cashLotQuantity, isCashSymbol } from "@/lib/cash-accounts";
+import { CASH_SYMBOL, CASH_UNIT_PRICE, SETTINGS_SYMBOL, cashLotQuantity, isCashSymbol, isSettingsSymbol } from "@/lib/cash-accounts";
 import {
   fixedIncomeSnapshotHoldings,
   fixedIncomeTotal,
@@ -13,6 +13,7 @@ export type PortfolioSlice = {
   fixedIncomeByAccount: Record<string, number>;
   stocks: StockHolding[];
   lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }>;
+  globalSettings?: GlobalSettings;
 };
 
 function finiteOrNull(value: unknown): number | null {
@@ -154,7 +155,18 @@ function holdingPayload(s: StockHolding, lots: { open: TradeLot[]; sold: SoldLot
     payload.rsiMinRisingDays = Math.round(s.rsiMinRisingDays);
   }
   if (typeof s.isETF === "boolean") payload.isETF = s.isETF;
+  if (typeof s.enableRSIReversalGate === "boolean") payload.enableRSIReversalGate = s.enableRSIReversalGate;
   return payload;
+}
+
+function settingsSnapshotHolding(settings: GlobalSettings): Record<string, unknown> {
+  return {
+    symbol: SETTINGS_SYMBOL,
+    quantity: 0,
+    averageCost: 0,
+    pendingOptimization: false,
+    globalSettings: settings,
+  };
 }
 
 function cashSnapshotHolding(lots: { open: TradeLot[]; sold: SoldLot[] } | undefined): Record<string, unknown> {
@@ -175,10 +187,13 @@ function cashSnapshotHolding(lots: { open: TradeLot[]; sold: SoldLot[] } | undef
 
 function iosSnapshotHoldings(state: PortfolioSlice): Record<string, unknown>[] {
   const holdings = state.stocks
-    .filter((stock) => !isCashSymbol(stock.symbol) && !isFixedIncomeSymbol(stock.symbol))
+    .filter((stock) => !isCashSymbol(stock.symbol) && !isFixedIncomeSymbol(stock.symbol) && !isSettingsSymbol(stock.symbol))
     .map((stock) => holdingPayload(stock, state.lotsBySymbol[stock.symbol]));
   holdings.push(cashSnapshotHolding(state.lotsBySymbol[CASH_SYMBOL]));
   holdings.push(...fixedIncomeSnapshotHoldings(state.fixedIncomeByAccount));
+  if (state.globalSettings) {
+    holdings.push(settingsSnapshotHolding(state.globalSettings));
+  }
   return holdings;
 }
 
@@ -198,6 +213,7 @@ function totals(state: PortfolioSlice) {
 export function portfolioSyncFingerprint(state: PortfolioSlice): string {
   return JSON.stringify({
     c: state.cashBalance,
+    gs: state.globalSettings ?? null,
     fi: Object.entries(sanitizeFixedIncomeByAccount(state.fixedIncomeByAccount)).sort(([a], [b]) => a.localeCompare(b)),
     st: state.stocks.map((s) => [
       s.symbol,
@@ -498,6 +514,107 @@ export type GlobalSettings = {
   timezone?: string;
   region?: string;
 };
+
+export function globalSettingsFromStore(store: {
+  etfProfitTarget: number;
+  stockProfitTarget: number;
+  riskAppetite: "Low" | "Medium" | "High";
+  enableRiskFilter: boolean;
+  useAISentimentForRecommendations: boolean;
+  useMarketRegimeCashTilt: boolean;
+  marketOutlookCashTargetRiskOn: number;
+  marketOutlookCashTargetNeutral: number;
+  marketOutlookCashTargetElevated: number;
+  marketOutlookCashTargetRiskOff: number;
+  marketOutlookCashTargetSevere: number;
+  useRSIGatingForRecommendations: boolean;
+  rsiPeriodForRecommendations: number;
+  rsiOversoldThresholdForRecommendations: number;
+  rsiOverboughtThresholdForRecommendations: number;
+  rsiHysteresisPointsForRecommendations: number;
+  rsiMinRisingDaysForRecommendations: number;
+  sellOnlyLongTermQualified: boolean;
+  traderModeEnabled: boolean;
+  limitWatchlistSize: boolean;
+  diversifyShortlistBySector: boolean;
+  guideEtfShareByRisk: boolean;
+  etfShareMinPctLow: number;
+  etfShareMaxPctLow: number;
+  etfShareMinPctMedium: number;
+  etfShareMaxPctMedium: number;
+  etfShareMinPctHigh: number;
+  etfShareMaxPctHigh: number;
+  timezone: string;
+  region: string;
+}): GlobalSettings {
+  return {
+    etfProfitTarget: store.etfProfitTarget,
+    stockProfitTarget: store.stockProfitTarget,
+    riskAppetite: store.riskAppetite,
+    enableRiskFilter: store.enableRiskFilter,
+    useAISentiment: store.useAISentimentForRecommendations,
+    useMarketRegimeCashTilt: store.useMarketRegimeCashTilt,
+    marketOutlookCashTargetRiskOn: store.marketOutlookCashTargetRiskOn,
+    marketOutlookCashTargetNeutral: store.marketOutlookCashTargetNeutral,
+    marketOutlookCashTargetElevated: store.marketOutlookCashTargetElevated,
+    marketOutlookCashTargetRiskOff: store.marketOutlookCashTargetRiskOff,
+    marketOutlookCashTargetSevere: store.marketOutlookCashTargetSevere,
+    useRSIGating: store.useRSIGatingForRecommendations,
+    rsiPeriod: store.rsiPeriodForRecommendations,
+    rsiOversoldThreshold: store.rsiOversoldThresholdForRecommendations,
+    rsiOverboughtThreshold: store.rsiOverboughtThresholdForRecommendations,
+    rsiHysteresisPoints: store.rsiHysteresisPointsForRecommendations,
+    rsiMinRisingDays: store.rsiMinRisingDaysForRecommendations,
+    sellOnlyLongTerm: store.sellOnlyLongTermQualified,
+    traderModeEnabled: store.traderModeEnabled,
+    limitWatchlistSize: store.limitWatchlistSize,
+    diversifyShortlistBySector: store.diversifyShortlistBySector,
+    guideEtfShareByRisk: store.guideEtfShareByRisk,
+    etfShareMinPctLow: store.etfShareMinPctLow,
+    etfShareMaxPctLow: store.etfShareMaxPctLow,
+    etfShareMinPctMedium: store.etfShareMinPctMedium,
+    etfShareMaxPctMedium: store.etfShareMaxPctMedium,
+    etfShareMinPctHigh: store.etfShareMinPctHigh,
+    etfShareMaxPctHigh: store.etfShareMaxPctHigh,
+    timezone: store.timezone,
+    region: store.region,
+  };
+}
+
+export function storePatchFromGlobalSettings(cloud: GlobalSettings): AppliedGlobalSettings {
+  const patch: AppliedGlobalSettings = {};
+  if (cloud.etfProfitTarget != null) patch.etfProfitTarget = cloud.etfProfitTarget;
+  if (cloud.stockProfitTarget != null) patch.stockProfitTarget = cloud.stockProfitTarget;
+  if (cloud.riskAppetite != null) patch.riskAppetite = cloud.riskAppetite;
+  if (cloud.enableRiskFilter != null) patch.enableRiskFilter = cloud.enableRiskFilter;
+  if (cloud.useAISentiment != null) patch.useAISentimentForRecommendations = cloud.useAISentiment;
+  if (cloud.useMarketRegimeCashTilt != null) patch.useMarketRegimeCashTilt = cloud.useMarketRegimeCashTilt;
+  if (cloud.marketOutlookCashTargetRiskOn != null) patch.marketOutlookCashTargetRiskOn = cloud.marketOutlookCashTargetRiskOn;
+  if (cloud.marketOutlookCashTargetNeutral != null) patch.marketOutlookCashTargetNeutral = cloud.marketOutlookCashTargetNeutral;
+  if (cloud.marketOutlookCashTargetElevated != null) patch.marketOutlookCashTargetElevated = cloud.marketOutlookCashTargetElevated;
+  if (cloud.marketOutlookCashTargetRiskOff != null) patch.marketOutlookCashTargetRiskOff = cloud.marketOutlookCashTargetRiskOff;
+  if (cloud.marketOutlookCashTargetSevere != null) patch.marketOutlookCashTargetSevere = cloud.marketOutlookCashTargetSevere;
+  if (cloud.useRSIGating != null) patch.useRSIGatingForRecommendations = cloud.useRSIGating;
+  if (cloud.rsiPeriod != null) patch.rsiPeriodForRecommendations = cloud.rsiPeriod;
+  if (cloud.rsiOversoldThreshold != null) patch.rsiOversoldThresholdForRecommendations = cloud.rsiOversoldThreshold;
+  if (cloud.rsiOverboughtThreshold != null) patch.rsiOverboughtThresholdForRecommendations = cloud.rsiOverboughtThreshold;
+  if (cloud.rsiHysteresisPoints != null) patch.rsiHysteresisPointsForRecommendations = cloud.rsiHysteresisPoints;
+  if (cloud.rsiMinRisingDays != null) patch.rsiMinRisingDaysForRecommendations = cloud.rsiMinRisingDays;
+  if (cloud.sellOnlyLongTerm != null) patch.sellOnlyLongTermQualified = cloud.sellOnlyLongTerm;
+  if (cloud.traderModeEnabled != null) patch.traderModeEnabled = cloud.traderModeEnabled;
+  if (cloud.limitWatchlistSize != null) patch.limitWatchlistSize = cloud.limitWatchlistSize;
+  if (cloud.diversifyShortlistBySector != null) patch.diversifyShortlistBySector = cloud.diversifyShortlistBySector;
+  if (cloud.guideEtfShareByRisk != null) patch.guideEtfShareByRisk = cloud.guideEtfShareByRisk;
+  if (cloud.etfShareMinPctLow != null) patch.etfShareMinPctLow = cloud.etfShareMinPctLow;
+  if (cloud.etfShareMaxPctLow != null) patch.etfShareMaxPctLow = cloud.etfShareMaxPctLow;
+  if (cloud.etfShareMinPctMedium != null) patch.etfShareMinPctMedium = cloud.etfShareMinPctMedium;
+  if (cloud.etfShareMaxPctMedium != null) patch.etfShareMaxPctMedium = cloud.etfShareMaxPctMedium;
+  if (cloud.etfShareMinPctHigh != null) patch.etfShareMinPctHigh = cloud.etfShareMinPctHigh;
+  if (cloud.etfShareMaxPctHigh != null) patch.etfShareMaxPctHigh = cloud.etfShareMaxPctHigh;
+  if (cloud.timezone) patch.timezone = cloud.timezone;
+  if (cloud.region) patch.region = cloud.region;
+  return patch;
+}
 
 export type AppliedGlobalSettings = {
   etfProfitTarget?: number;

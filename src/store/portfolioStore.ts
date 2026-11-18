@@ -426,7 +426,7 @@ type RecalcContext = {
   lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }>;
 };
 
-type ShortlistContext = Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "diversifyShortlistBySector" | "marketOutlookCashTargetRiskOn" | "marketOutlookCashTargetNeutral" | "marketOutlookCashTargetElevated" | "marketOutlookCashTargetRiskOff" | "marketOutlookCashTargetSevere" | "traderModeEnabled"> & {
+type ShortlistContext = Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "diversifyShortlistBySector" | "guideEtfShareByRisk" | "etfShareMinPctLow" | "etfShareMaxPctLow" | "etfShareMinPctMedium" | "etfShareMaxPctMedium" | "etfShareMinPctHigh" | "etfShareMaxPctHigh" | "marketOutlookCashTargetRiskOn" | "marketOutlookCashTargetNeutral" | "marketOutlookCashTargetElevated" | "marketOutlookCashTargetRiskOff" | "marketOutlookCashTargetSevere" | "traderModeEnabled"> & {
   fixedIncomeByAccount?: Record<string, number>;
   useMarketRegimeCashTilt?: boolean;
   marketOutlook?: MarketOutlook | null;
@@ -988,6 +988,13 @@ function derivePortfolioState(
     riskAppetite: shortlistCtx.riskAppetite,
     portfolioSize,
     diversifyShortlistBySector: shortlistCtx.diversifyShortlistBySector !== false,
+    guideEtfShareByRisk: shortlistCtx.guideEtfShareByRisk,
+    etfShareMinPctLow: shortlistCtx.etfShareMinPctLow,
+    etfShareMaxPctLow: shortlistCtx.etfShareMaxPctLow,
+    etfShareMinPctMedium: shortlistCtx.etfShareMinPctMedium,
+    etfShareMaxPctMedium: shortlistCtx.etfShareMaxPctMedium,
+    etfShareMinPctHigh: shortlistCtx.etfShareMinPctHigh,
+    etfShareMaxPctHigh: shortlistCtx.etfShareMaxPctHigh,
   });
 
   if (shortlistCtx.limitWatchlistSize) {
@@ -1009,9 +1016,16 @@ function derivePortfolioState(
       riskAppetite: shortlistCtx.riskAppetite,
       portfolioSize,
       diversifyBySector: shortlistCtx.diversifyShortlistBySector !== false,
+      guideEtfShareByRisk: shortlistCtx.guideEtfShareByRisk,
+      etfShareMinPctLow: shortlistCtx.etfShareMinPctLow,
+      etfShareMaxPctLow: shortlistCtx.etfShareMaxPctLow,
+      etfShareMinPctMedium: shortlistCtx.etfShareMinPctMedium,
+      etfShareMaxPctMedium: shortlistCtx.etfShareMaxPctMedium,
+      etfShareMinPctHigh: shortlistCtx.etfShareMinPctHigh,
+      etfShareMaxPctHigh: shortlistCtx.etfShareMaxPctHigh,
     })
       .filter((stock) => !forceIncludedSymbols.has(stock.symbol))
-      .slice(0, Math.max(rankedStockSlotsForTopN(stocksWithRisk, portfolioSize) - forceIncluded.length, 0));
+      .slice(0, Math.max(rankedStockSlotsForTopN(stocksWithRisk, portfolioSize, shortlistCtx) - forceIncluded.length, 0));
 
     for (const stock of holdingSymbols) shortlistedSymbols.add(stock.symbol);
     for (const stock of etfSymbols) shortlistedSymbols.add(stock.symbol);
@@ -1037,6 +1051,13 @@ function derivePortfolioState(
             enableRiskFilter: shortlistCtx.enableRiskFilter,
             limitWatchlistSize: shortlistCtx.limitWatchlistSize,
             diversifyShortlistBySector: shortlistCtx.diversifyShortlistBySector !== false,
+            guideEtfShareByRisk: shortlistCtx.guideEtfShareByRisk,
+            etfShareMinPctLow: shortlistCtx.etfShareMinPctLow,
+            etfShareMaxPctLow: shortlistCtx.etfShareMaxPctLow,
+            etfShareMinPctMedium: shortlistCtx.etfShareMinPctMedium,
+            etfShareMaxPctMedium: shortlistCtx.etfShareMaxPctMedium,
+            etfShareMinPctHigh: shortlistCtx.etfShareMinPctHigh,
+            etfShareMaxPctHigh: shortlistCtx.etfShareMaxPctHigh,
             riskAppetite: shortlistCtx.riskAppetite,
             portfolioSize,
             cashBalance: cashEquivalent,
@@ -1051,6 +1072,13 @@ function derivePortfolioState(
             enableRiskFilter: shortlistCtx.enableRiskFilter,
             limitWatchlistSize: shortlistCtx.limitWatchlistSize,
             diversifyShortlistBySector: shortlistCtx.diversifyShortlistBySector !== false,
+            guideEtfShareByRisk: shortlistCtx.guideEtfShareByRisk,
+            etfShareMinPctLow: shortlistCtx.etfShareMinPctLow,
+            etfShareMaxPctLow: shortlistCtx.etfShareMaxPctLow,
+            etfShareMinPctMedium: shortlistCtx.etfShareMinPctMedium,
+            etfShareMaxPctMedium: shortlistCtx.etfShareMaxPctMedium,
+            etfShareMinPctHigh: shortlistCtx.etfShareMinPctHigh,
+            etfShareMaxPctHigh: shortlistCtx.etfShareMaxPctHigh,
             riskAppetite: shortlistCtx.riskAppetite,
             portfolioSize,
             cashBalance: cashEquivalent,
@@ -1077,6 +1105,13 @@ function derivePortfolioState(
     riskAppetite: shortlistCtx.riskAppetite,
     portfolioSize,
     diversifyShortlistBySector: shortlistCtx.diversifyShortlistBySector !== false,
+    guideEtfShareByRisk: shortlistCtx.guideEtfShareByRisk,
+    etfShareMinPctLow: shortlistCtx.etfShareMinPctLow,
+    etfShareMaxPctLow: shortlistCtx.etfShareMaxPctLow,
+    etfShareMinPctMedium: shortlistCtx.etfShareMinPctMedium,
+    etfShareMaxPctMedium: shortlistCtx.etfShareMaxPctMedium,
+    etfShareMinPctHigh: shortlistCtx.etfShareMinPctHigh,
+    etfShareMaxPctHigh: shortlistCtx.etfShareMaxPctHigh,
   });
   const budgetedStocks = applyCashAwareBuyPrioritization(rotated.stocks, {
     cashEquivalentBalance: cashEquivalent,

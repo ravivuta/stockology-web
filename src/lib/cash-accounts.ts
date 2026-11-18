@@ -1,4 +1,5 @@
 export const CASH_SYMBOL = "$CASH";
+export const SETTINGS_SYMBOL = "$SETTINGS";
 export const CASH_UNIT_PRICE = 1;
 export const DEFAULT_ACCOUNT = "Default Account";
 export const UNASSIGNED_ACCOUNT = DEFAULT_ACCOUNT;
@@ -8,6 +9,10 @@ const EPSILON = 0.005;
 
 export function isCashSymbol(symbol: string | null | undefined): boolean {
   return (symbol ?? "").trim().toUpperCase() === CASH_SYMBOL;
+}
+
+export function isSettingsSymbol(symbol: string | null | undefined): boolean {
+  return (symbol ?? "").trim().toUpperCase() === SETTINGS_SYMBOL;
 }
 
 export function displayAccount(account: string | null | undefined): string {

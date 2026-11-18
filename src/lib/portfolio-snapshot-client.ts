@@ -7,6 +7,7 @@ import {
   upsertPortfolioSnapshotForCloudUser,
   patchPortfolioSnapshotCashForCloudUser,
   patchPortfolioSnapshotHoldingsForCloudUser,
+  globalSettingsFromStore,
   type PortfolioSlice,
 } from "@/lib/portfolio-cloud-sync";
 import { usePortfolioStore } from "@/store/portfolioStore";
@@ -58,6 +59,16 @@ export function setAccountDeletionBlocksSnapshotPush(blocked: boolean) {
   } catch {
     /* ignore quota / private mode */
   }
+}
+
+function portfolioSliceFromStore(state: ReturnType<typeof usePortfolioStore.getState>): PortfolioSlice {
+  return {
+    cashBalance: state.cashBalance,
+    fixedIncomeByAccount: state.fixedIncomeByAccount,
+    stocks: state.stocks,
+    lotsBySymbol: state.lotsBySymbol,
+    globalSettings: globalSettingsFromStore(state),
+  };
 }
 
 function validateSnapshotSlice(
@@ -434,12 +445,7 @@ export async function flushCurrentPortfolioSnapshotNow(
   if (!dataUserId) return { error: new Error("Not signed in."), skipped: true };
 
   const state = usePortfolioStore.getState();
-  const slice: PortfolioSlice = {
-    cashBalance: state.cashBalance,
-    fixedIncomeByAccount: state.fixedIncomeByAccount,
-    stocks: state.stocks,
-    lotsBySymbol: state.lotsBySymbol,
-  };
+  const slice = portfolioSliceFromStore(state);
   noteUnsavedLocalPortfolioMutation(dataUserId, state.lastLocalMutationAt);
 
   const result = await pushPortfolioSnapshotSlice(dataUserId, slice, {
@@ -476,12 +482,7 @@ export async function patchCurrentPortfolioSnapshotCash(
   if (!result.error && result.patched) {
     markLastPushedPortfolioFingerprint(
       dataUserId,
-      portfolioSyncFingerprint({
-        cashBalance: state.cashBalance,
-        fixedIncomeByAccount: state.fixedIncomeByAccount,
-        stocks: state.stocks,
-        lotsBySymbol: state.lotsBySymbol,
-      })
+      portfolioSyncFingerprint(portfolioSliceFromStore(state))
     );
   }
   return result;
@@ -503,12 +504,7 @@ export async function patchCurrentPortfolioSnapshotHoldings(
   if (!dataUserId) return { error: null, patched: false };
 
   const state = usePortfolioStore.getState();
-  const slice: PortfolioSlice = {
-    cashBalance: state.cashBalance,
-    fixedIncomeByAccount: state.fixedIncomeByAccount,
-    stocks: state.stocks,
-    lotsBySymbol: state.lotsBySymbol,
-  };
+  const slice = portfolioSliceFromStore(state);
   const supabase = createClient();
   const result = await patchPortfolioSnapshotHoldingsForCloudUser(supabase, dataUserId, slice, removedSymbols);
   if (!result.error && result.patched) {

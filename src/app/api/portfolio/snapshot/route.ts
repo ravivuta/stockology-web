@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { syncStocksPmAuthUser } from "@/lib/stocks-pm-account";
-import { upsertPortfolioSnapshotForCloudUser, type PortfolioSlice } from "@/lib/portfolio-cloud-sync";
+import { upsertPortfolioSnapshotForCloudUser, type GlobalSettings, type PortfolioSlice } from "@/lib/portfolio-cloud-sync";
 
 export const runtime = "nodejs";
 
@@ -51,6 +51,7 @@ function sanitizeSlice(value: unknown): PortfolioSlice | null {
     fixedIncomeByAccount,
     stocks: stocks as PortfolioSlice["stocks"],
     lotsBySymbol: lotsBySymbol as PortfolioSlice["lotsBySymbol"],
+    globalSettings: isRecord(value.globalSettings) ? (value.globalSettings as GlobalSettings) : undefined,
   };
 }
 

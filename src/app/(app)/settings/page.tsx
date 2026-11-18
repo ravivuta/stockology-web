@@ -30,7 +30,7 @@ import { formatCurrency } from "@/lib/numberFormat";
 import { flushCurrentPortfolioSnapshotNow, deleteAllPortfolioSnapshots, setAccountDeletionBlocksSnapshotPush } from "@/lib/portfolio-snapshot-client";
 import { wipePortfolioAfterAccountDeletion } from "@/lib/clear-portfolio-client-state";
 import { deleteAllExternalCashFlows } from "@/lib/external-cash-flows";
-import { saveGlobalSettingsForUser, loadGlobalSettingsForUser } from "@/lib/portfolio-cloud-sync";
+import { saveGlobalSettingsForUser, loadGlobalSettingsForUser, globalSettingsFromStore, storePatchFromGlobalSettings } from "@/lib/portfolio-cloud-sync";
 import { isPaidSubscriptionTier, paidSubscriptionIsActive } from "@/lib/subscription-state";
 import { hasPremiumFeatureAccess } from "@/lib/subscription-limits";
 import { APP_MANAGED_TRIAL_LABEL } from "@/lib/trial-config";
@@ -224,7 +224,7 @@ function SettingsInner() {
     patch: Parameters<typeof setSettings>[0]
   ) {
     setSettings(patch);
-    // Settings live in users.global_settings. Do not rewrite snapshot holdings.
+    // Persist live settings and embed a $SETTINGS row in today's snapshot.
     if (userId) {
       const supabase = supabaseRef.current;
       const store = usePortfolioStore.getState();
@@ -259,6 +259,8 @@ function SettingsInner() {
         etfShareMaxPctHigh: "etfShareMaxPctHigh" in patch ? patch.etfShareMaxPctHigh : store.etfShareMaxPctHigh,
         timezone: "timezone" in patch ? patch.timezone : store.timezone,
         region: "region" in patch ? patch.region : store.region,
+      }).then(() => {
+        void flushCurrentPortfolioSnapshotNow(true);
       });
     }
   }
@@ -370,13 +372,21 @@ function SettingsInner() {
         holdings: restoreTarget.holdings,
         cash_balance: restoreTarget.cash_balance,
       });
+      const { globalSettings, ...holdingsState } = parsed;
       replaceFromCloudSync({
-        ...parsed,
+        ...holdingsState,
         onboardingComplete:
           parsed.cashBalance > 0 ||
           Object.values(parsed.fixedIncomeByAccount).some((value) => Number(value) > 0.005) ||
           parsed.stocks.length > 0,
       });
+      if (globalSettings) {
+        const settingsPatch = storePatchFromGlobalSettings(globalSettings);
+        setSettings(settingsPatch);
+        if (userId) {
+          await saveGlobalSettingsForUser(supabaseRef.current, userId, globalSettingsFromStore(usePortfolioStore.getState()));
+        }
+      }
       // Push restored state as today's snapshot so other devices sync
       await flushCurrentPortfolioSnapshotNow(true);
     } finally {
@@ -893,7 +903,7 @@ function SettingsInner() {
                   <span>
                     <span className="block text-[12px] font-medium leading-snug text-foreground">Guide ETF share by risk</span>
                     <span className="mt-px block text-[10px] leading-snug text-subtle">
-                      ETF slot share never exceeds 60% of the ideal watchlist (each ETF costs 3 slots). Recommended ranges: Low {ETF_SHARE_GUIDANCE_DEFAULTS.Low.min}–{ETF_SHARE_GUIDANCE_DEFAULTS.Low.max}%, Medium {ETF_SHARE_GUIDANCE_DEFAULTS.Medium.min}–{ETF_SHARE_GUIDANCE_DEFAULTS.Medium.max}%, High {ETF_SHARE_GUIDANCE_DEFAULTS.High.min}–{ETF_SHARE_GUIDANCE_DEFAULTS.High.max}%. Overwrite min/max below. Extra ETFs stay on the shortlist but stop crowding out stock slots past 60%.
+                      Recommended ranges: Low {ETF_SHARE_GUIDANCE_DEFAULTS.Low.min}–{ETF_SHARE_GUIDANCE_DEFAULTS.Low.max}%, Medium {ETF_SHARE_GUIDANCE_DEFAULTS.Medium.min}–{ETF_SHARE_GUIDANCE_DEFAULTS.Medium.max}%, High {ETF_SHARE_GUIDANCE_DEFAULTS.High.min}–{ETF_SHARE_GUIDANCE_DEFAULTS.High.max}%. Low can be raised to 100% ETFs; Medium and High stay at or below 60%. Extra ETFs stay on the shortlist.
                     </span>
                   </span>
                 </label>
@@ -910,7 +920,7 @@ function SettingsInner() {
                         etfShareMaxPctHigh,
                       });
                       const persistRange = (min: number, max: number) => {
-                        const next = clampEtfShareGuidancePercents(min, max);
+                        const next = clampEtfShareGuidancePercents(min, max, risk);
                         if (risk === "Low") persistSettingsPatch({ etfShareMinPctLow: next.min, etfShareMaxPctLow: next.max });
                         else if (risk === "Medium") persistSettingsPatch({ etfShareMinPctMedium: next.min, etfShareMaxPctMedium: next.max });
                         else persistSettingsPatch({ etfShareMinPctHigh: next.min, etfShareMaxPctHigh: next.max });
@@ -932,7 +942,7 @@ function SettingsInner() {
                               <input
                                 type="number"
                                 min={0}
-                                max={60}
+                                max={risk === "Low" ? 100 : 60}
                                 value={range.min}
                                 onChange={(e) => persistRange(Number(e.target.value), range.max)}
                                 className={inputClass}
@@ -943,7 +953,7 @@ function SettingsInner() {
                               <input
                                 type="number"
                                 min={0}
-                                max={60}
+                                max={risk === "Low" ? 100 : 60}
                                 value={range.max}
                                 onChange={(e) => persistRange(range.min, Number(e.target.value))}
                                 className={inputClass}
