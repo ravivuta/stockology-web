@@ -475,7 +475,7 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
             />
           </label>
           <p className="text-[10px] leading-snug text-subtle md:col-span-2">
-            Enter ticker (not company name) for stocks traded (NYSE)
+            Enter ticker (not company name) for US-listed stocks and ETFs (NYSE, Nasdaq, Arca, and similar US venues)
           </p>
           {mode === "full" ? (
             <>
