@@ -104,6 +104,8 @@ function keepLocalMarketFields(local: StockHolding, incoming: StockHolding): Sto
   if ((next.lastPrice ?? 0) <= 0 && (local.lastPrice ?? 0) > 0) {
     next.lastPrice = local.lastPrice;
     next.dailyChangePercent = local.dailyChangePercent;
+  } else if ((next.lastPrice ?? 0) > 0 && next.dailyChangePercent == null) {
+    next.dailyChangePercent = 0;
   }
   if (next.analystTarget == null && local.analystTarget != null) next.analystTarget = local.analystTarget;
   if (next.analystTargetLow == null && local.analystTargetLow != null) next.analystTargetLow = local.analystTargetLow;

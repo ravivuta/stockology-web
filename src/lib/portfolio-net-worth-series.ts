@@ -122,24 +122,31 @@ export function computeTodayChangeFromHistory(
 }
 
 export function computeTodayChangeFromLiveQuotes(
-  stocks: Array<{ quantity: number; lastPrice?: number; dailyChangePercent?: number }>,
+  stocks: Array<{ symbol?: string; quantity: number; lastPrice?: number; dailyChangePercent?: number }>,
   cash: number
 ): TodayChangeDelta {
   let currentHoldings = 0;
   let previousHoldings = 0;
+  let quotedValue = 0;
   let hasAnyQuoteDelta = false;
+  const seen = new Set<string>();
 
   for (const stock of stocks) {
+    const symbol = (stock.symbol ?? "").trim().toUpperCase();
+    if (symbol && seen.has(symbol)) continue;
+    if (symbol) seen.add(symbol);
+
     const value = stock.quantity * (stock.lastPrice ?? 0);
     if (!Number.isFinite(value) || value <= 0) continue;
     currentHoldings += value;
 
     const pct = stock.dailyChangePercent;
-    if (pct != null && Number.isFinite(pct)) {
+    if (pct != null && Number.isFinite(pct) && Math.abs(pct) < 80) {
       const ratio = 1 + pct / 100;
-      if (ratio > 0) {
+      if (ratio > 0.2) {
         previousHoldings += value / ratio;
-        hasAnyQuoteDelta = true;
+        quotedValue += value;
+        if (Math.abs(pct) > 0.0001) hasAnyQuoteDelta = true;
         continue;
       }
     }
@@ -147,7 +154,9 @@ export function computeTodayChangeFromLiveQuotes(
     previousHoldings += value;
   }
 
-  if (!hasAnyQuoteDelta) return { change: 0, percent: 0, hasBaseline: false };
+  if (!hasAnyQuoteDelta || currentHoldings <= 0 || quotedValue / currentHoldings < 0.5) {
+    return { change: 0, percent: 0, hasBaseline: false };
+  }
 
   const currentTotal = currentHoldings + cash;
   const previousTotal = previousHoldings + cash;

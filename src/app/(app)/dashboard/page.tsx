@@ -26,7 +26,7 @@ import {
 import { isUsMarketTradingDay } from "@/lib/market-hours";
 import { formatCompactNumber, formatWholeCurrency, formatWholePercent } from "@/lib/numberFormat";
 import { cashByAccount, displayAccount, isCashSymbol, preferredAccountLabel } from "@/lib/cash-accounts";
-import { fixedIncomeTotal } from "@/lib/fixed-income-accounts";
+import { fixedIncomeTotal, isFixedIncomeSymbol } from "@/lib/fixed-income-accounts";
 import { etfHatchBackgroundImage as etfHatchFor, etfPatternStrokeFor as etfPatternPrimaryFor } from "@/lib/etf-hatch";
 
 const CURRENT_VALUE_COLOR = "#14b8a6";
@@ -165,7 +165,11 @@ export default function DashboardPage() {
     [cloudHistory, totalBalance]
   );
   const todayQuoteChange = useMemo(
-    () => computeTodayChangeFromLiveQuotes(stocks.filter((s) => !isCashSymbol(s.symbol)), cash + fixedIncomeValue),
+    () =>
+      computeTodayChangeFromLiveQuotes(
+        stocks.filter((s) => !isCashSymbol(s.symbol) && !isFixedIncomeSymbol(s.symbol)),
+        cash + fixedIncomeValue
+      ),
     [stocks, cash, fixedIncomeValue]
   );
   // Prefer live-quote delta only when it's non-trivial (avoids using defaulted dailyChangePercent:0

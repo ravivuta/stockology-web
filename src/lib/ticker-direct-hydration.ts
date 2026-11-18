@@ -44,6 +44,8 @@ export function mapTickerHydrationPriceRowToPatch(
   }
   if (p.daily_pct_change != null && Number.isFinite(Number(p.daily_pct_change))) {
     patch.dailyChangePercent = Number(p.daily_pct_change);
+  } else if (p.last_price != null && Number.isFinite(Number(p.last_price)) && Number(p.last_price) > 0) {
+    patch.dailyChangePercent = 0;
   }
   if (typeof p.company_name === "string" && p.company_name.trim()) {
     patch.name = p.company_name.trim();
