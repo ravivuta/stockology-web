@@ -134,13 +134,20 @@ function filterIconButtonClass(active: boolean, tone: "green" | "gold") {
 
 function candidatePassesRisk(
   candidate: QualifiedStockCandidate,
-  riskAppetite: "Low" | "Medium" | "High"
+  riskAppetite: "Low" | "Medium" | "High",
+  options?: { allowMissingAnalyst?: boolean }
 ): boolean {
   const marketCap = Number(candidate.market_cap) || 0;
   const analystRating = Number(candidate.analyst_average) || 0;
   const upside = Number(candidate.upside) || 0;
   const lowCap = 50_000_000_000;
   const mediumCap = 10_000_000_000;
+
+  if (options?.allowMissingAnalyst && analystRating <= 0) {
+    if (riskAppetite === "Low") return marketCap >= lowCap;
+    if (riskAppetite === "Medium") return marketCap >= mediumCap;
+    return marketCap > 0;
+  }
 
   if (riskAppetite === "Low") {
     return marketCap >= lowCap && analystRating >= 4.5;
@@ -299,11 +306,27 @@ export default function WatchlistPage() {
         const filtered = [...deduped.values()]
           .sort((a, b) => (b.upside - a.upside) || (b.market_cap - a.market_cap) || a.symbol.localeCompare(b.symbol));
         const symbols = filtered.map((row) => row.symbol);
-        const sectorBySymbol = symbols.length > 0 ? await fetchSectorsBySymbol(supabase, symbols) : {};
-        const withSectors = filtered.map((row) => ({
-          ...row,
-          sector: sectorBySymbol[row.symbol] ?? null,
-        }));
+        const metaBySymbol: Record<string, { sector: string | null; isEtf: boolean }> = {};
+        if (symbols.length > 0) {
+          const { data: tickerRows } = await supabase
+            .from("ticker_data")
+            .select("symbol, sector, is_etf")
+            .in("symbol", symbols);
+          for (const row of (tickerRows ?? []) as Array<{ symbol?: string; sector?: string | null; is_etf?: boolean | null }>) {
+            const symbol = String(row.symbol ?? "").trim().toUpperCase();
+            if (!symbol) continue;
+            metaBySymbol[symbol] = {
+              sector: typeof row.sector === "string" && row.sector.trim() ? row.sector.trim() : null,
+              isEtf: row.is_etf === true,
+            };
+          }
+        }
+        const withSectors = filtered
+          .filter((row) => metaBySymbol[row.symbol]?.isEtf !== true)
+          .map((row) => ({
+            ...row,
+            sector: metaBySymbol[row.symbol]?.sector ?? null,
+          }));
         const prioritized = prioritizeStockPickerByOpenSectors(
           withSectors,
           (row) => row.sector,
@@ -324,22 +347,62 @@ export default function WatchlistPage() {
       } else {
         const { data, error } = await supabase
           .from("ticker_data")
-          .select("symbol, company_name, market_cap")
+          .select("symbol, company_name, market_cap, analyst_average, analyst_target")
           .eq("is_etf", true)
-          .eq("sync_skip", false)
+          .or("sync_skip.eq.false,sync_skip.is.null")
           .order("market_cap", { ascending: false })
-          .limit(150);
+          .limit(400);
         if (error) throw new Error(error.message);
-        const raw = (data ?? []) as Array<{ symbol: string; company_name: string | null; market_cap: number | null }>;
-        const filtered = raw
-          .map((row) => ({
-            symbol: String(row.symbol ?? "").trim().toUpperCase(),
-            company_name: row.company_name,
-            market_cap: Number(row.market_cap) || 0,
-            upside: 0,
-            analyst_average: 0,
-          }))
-          .filter((row) => row.symbol.length > 0 && !existing.has(row.symbol))
+        const raw = (data ?? []) as Array<{
+          symbol: string;
+          company_name: string | null;
+          market_cap: number | null;
+          analyst_average: number | null;
+          analyst_target: number | null;
+        }>;
+        const unique = new Map<string, (typeof raw)[number]>();
+        for (const row of raw) {
+          const symbol = String(row.symbol ?? "").trim().toUpperCase();
+          if (!symbol || existing.has(symbol) || unique.has(symbol)) continue;
+          unique.set(symbol, row);
+        }
+        const etfSymbols = [...unique.keys()];
+        const lastPriceBySymbol: Record<string, number> = {};
+        for (let i = 0; i < etfSymbols.length; i += 80) {
+          const chunk = etfSymbols.slice(i, i + 80);
+          const { data: priceRows } = await supabase
+            .from("ticker_prices")
+            .select("symbol, last_price")
+            .in("symbol", chunk);
+          for (const row of (priceRows ?? []) as Array<{ symbol?: string; last_price?: number | null }>) {
+            const symbol = String(row.symbol ?? "").trim().toUpperCase();
+            const last = Number(row.last_price) || 0;
+            if (symbol && last > 0) lastPriceBySymbol[symbol] = last;
+          }
+        }
+        const filtered = [...unique.values()]
+          .map((row) => {
+            const symbol = String(row.symbol ?? "").trim().toUpperCase();
+            const marketCap = Number(row.market_cap) || 0;
+            const lastPrice = lastPriceBySymbol[symbol] || 0;
+            const target = Number(row.analyst_target) || 0;
+            const upside = lastPrice > 0 && target > 0 ? ((target - lastPrice) / lastPrice) * 100 : 0;
+            return {
+              symbol,
+              company_name: row.company_name,
+              market_cap: marketCap,
+              upside,
+              analyst_average: Number(row.analyst_average) || 0,
+            };
+          })
+          .filter((row) => {
+            if (!row.symbol || row.market_cap <= 0) return false;
+            if (enableRiskFilter && !candidatePassesRisk(row, riskAppetite, { allowMissingAnalyst: true })) {
+              return false;
+            }
+            return true;
+          })
+          .sort((a, b) => (b.upside - a.upside) || (b.market_cap - a.market_cap) || a.symbol.localeCompare(b.symbol))
           .slice(0, 30);
         setQualifiedCandidates(filtered);
       }
@@ -866,7 +929,7 @@ export default function WatchlistPage() {
                     <p className="text-xs text-subtle">
                       {qualifiedPickerMode === "stocks"
                         ? `${candidate.sector ? `${candidate.sector} · ` : ""}Upside ${formatPercent(candidate.upside, true)} · Analyst ${formatDecimal(candidate.analyst_average)} · Cap ${formatMarketCapCompact(candidate.market_cap)}`
-                        : `${candidate.company_name ?? "ETF"} · Cap ${formatMarketCapCompact(candidate.market_cap)}`}
+                        : `${candidate.company_name ?? "ETF"} · Upside ${formatPercent(candidate.upside, true)} · Cap ${formatMarketCapCompact(candidate.market_cap)}`}
                     </p>
                   </div>
                   <button
