@@ -489,7 +489,17 @@ export default function WatchlistPage() {
           >
             <Paintbrush className="h-3.5 w-3.5" />
           </button>
-          <AddAssetButton idPrefix="watchlist-add" className={filterChipClass(false, "gold")} mode="stockOnly" />
+          <AddAssetButton
+            idPrefix="watchlist-add"
+            className={filterChipClass(false, "gold")}
+            mode="stockOnly"
+            onAdded={(symbol) => {
+              setShowShortlisted(false);
+              setShowActionable(false);
+              setQuery(symbol);
+              setSearchOpen(true);
+            }}
+          />
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
@@ -620,10 +630,14 @@ export default function WatchlistPage() {
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-subtle md:hidden">
-                  No watchlist symbols yet. Add a symbol in the toolbar above or import a watchlist CSV.
+                  {hasActiveFilters
+                    ? "No symbols match the current filters. Turn off Shortlisted or Actionable to see every tracked name."
+                    : "No watchlist symbols yet. Add a symbol in the toolbar above or import a watchlist CSV."}
                 </td>
                 <td colSpan={13} className="hidden px-4 py-8 text-center text-subtle md:table-cell sm:px-5">
-                  No watchlist symbols yet. Add a symbol in the toolbar above or import a watchlist CSV.
+                  {hasActiveFilters
+                    ? "No symbols match the current filters. Turn off Shortlisted or Actionable to see every tracked name."
+                    : "No watchlist symbols yet. Add a symbol in the toolbar above or import a watchlist CSV."}
                 </td>
               </tr>
             ) : (

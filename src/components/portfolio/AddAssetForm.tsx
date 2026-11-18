@@ -62,7 +62,15 @@ function rememberReturnRate(account: string, rate: number) {
   }
 }
 
-export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mode?: AddAssetMode }) {
+export function AddAssetForm({
+  idPrefix,
+  mode = "full",
+  onAdded,
+}: {
+  idPrefix: string;
+  mode?: AddAssetMode;
+  onAdded?: (symbol: string) => void;
+}) {
   const stocks = usePortfolioStore((s) => s.stocks);
   const portfolioSize = usePortfolioStore((s) => s.portfolioSize);
   const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
@@ -197,6 +205,7 @@ export function AddAssetForm({ idPrefix, mode = "full" }: { idPrefix: string; mo
     setSaving(false);
     setStatus(hasTrade ? `Added ${qty} ${sym} @ ${formatCurrency(price)}.` : `Added ${sym} without a holding.`);
     resetStockFields();
+    onAdded?.(sym);
   }
 
   async function submitStock() {
@@ -624,11 +633,13 @@ export function AddAssetButton({
   className,
   mode = "full",
   label = "Add",
+  onAdded,
 }: {
   idPrefix: string;
   className?: string;
   mode?: AddAssetMode;
   label?: string;
+  onAdded?: (symbol: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const titleId = `${idPrefix}-title`;
@@ -654,7 +665,14 @@ export function AddAssetButton({
           </button>
         </div>
         <div className="overflow-y-auto px-4 py-3">
-          <AddAssetForm idPrefix={idPrefix} mode={mode} />
+          <AddAssetForm
+            idPrefix={idPrefix}
+            mode={mode}
+            onAdded={(symbol) => {
+              setOpen(false);
+              onAdded?.(symbol);
+            }}
+          />
         </div>
       </AppModal>
     </>
