@@ -133,6 +133,12 @@ type State = {
   limitWatchlistSize: boolean;
   diversifyShortlistBySector: boolean;
   guideEtfShareByRisk: boolean;
+  etfShareMinPctLow: number;
+  etfShareMaxPctLow: number;
+  etfShareMinPctMedium: number;
+  etfShareMaxPctMedium: number;
+  etfShareMinPctHigh: number;
+  etfShareMaxPctHigh: number;
   etfProfitTarget: number;
   stockProfitTarget: number;
   useAISentimentForRecommendations: boolean;
@@ -172,7 +178,7 @@ type State = {
     nextCash: number;
     markedPending: boolean;
   };
-  setSettings: (p: Partial<Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "diversifyShortlistBySector" | "guideEtfShareByRisk" | "etfProfitTarget" | "stockProfitTarget" | "useAISentimentForRecommendations" | "useRSIGatingForRecommendations" | "rsiPeriodForRecommendations" | "rsiOversoldThresholdForRecommendations" | "rsiOverboughtThresholdForRecommendations" | "rsiHysteresisPointsForRecommendations" | "rsiMinRisingDaysForRecommendations" | "sellOnlyLongTermQualified" | "useMarketRegimeCashTilt" | "marketOutlookCashTargetRiskOn" | "marketOutlookCashTargetNeutral" | "marketOutlookCashTargetElevated" | "marketOutlookCashTargetRiskOff" | "marketOutlookCashTargetSevere" | "traderModeEnabled" | "timezone" | "region">>) => void;
+  setSettings: (p: Partial<Pick<State, "riskAppetite" | "enableRiskFilter" | "limitWatchlistSize" | "diversifyShortlistBySector" | "guideEtfShareByRisk" | "etfShareMinPctLow" | "etfShareMaxPctLow" | "etfShareMinPctMedium" | "etfShareMaxPctMedium" | "etfShareMinPctHigh" | "etfShareMaxPctHigh" | "etfProfitTarget" | "stockProfitTarget" | "useAISentimentForRecommendations" | "useRSIGatingForRecommendations" | "rsiPeriodForRecommendations" | "rsiOversoldThresholdForRecommendations" | "rsiOverboughtThresholdForRecommendations" | "rsiHysteresisPointsForRecommendations" | "rsiMinRisingDaysForRecommendations" | "sellOnlyLongTermQualified" | "useMarketRegimeCashTilt" | "marketOutlookCashTargetRiskOn" | "marketOutlookCashTargetNeutral" | "marketOutlookCashTargetElevated" | "marketOutlookCashTargetRiskOff" | "marketOutlookCashTargetSevere" | "traderModeEnabled" | "timezone" | "region">>) => void;
   addStock: (s: Partial<StockHolding> & { symbol: string }) => void;
   /** Merge fields into an existing symbol and rebuild recommendation. */
   updateStock: (symbol: string, patch: Partial<StockHolding>) => void;
@@ -1134,6 +1140,12 @@ export const usePortfolioStore = create<State>()(
       limitWatchlistSize: true,
       diversifyShortlistBySector: true,
       guideEtfShareByRisk: true,
+      etfShareMinPctLow: 40,
+      etfShareMaxPctLow: 60,
+      etfShareMinPctMedium: 20,
+      etfShareMaxPctMedium: 40,
+      etfShareMinPctHigh: 0,
+      etfShareMaxPctHigh: 20,
       etfProfitTarget: 50,
       stockProfitTarget: 50,
       useAISentimentForRecommendations: false,
@@ -1341,7 +1353,14 @@ export const usePortfolioStore = create<State>()(
             shouldRecalculateLimits: true,
             forceRecalculateAllHoldingLimits:
               (p.limitWatchlistSize != null && p.limitWatchlistSize !== st.limitWatchlistSize) ||
-              (p.diversifyShortlistBySector != null && p.diversifyShortlistBySector !== st.diversifyShortlistBySector),
+              (p.diversifyShortlistBySector != null && p.diversifyShortlistBySector !== st.diversifyShortlistBySector) ||
+              (p.guideEtfShareByRisk != null && p.guideEtfShareByRisk !== st.guideEtfShareByRisk) ||
+              (p.etfShareMinPctLow != null && p.etfShareMinPctLow !== st.etfShareMinPctLow) ||
+              (p.etfShareMaxPctLow != null && p.etfShareMaxPctLow !== st.etfShareMaxPctLow) ||
+              (p.etfShareMinPctMedium != null && p.etfShareMinPctMedium !== st.etfShareMinPctMedium) ||
+              (p.etfShareMaxPctMedium != null && p.etfShareMaxPctMedium !== st.etfShareMaxPctMedium) ||
+              (p.etfShareMinPctHigh != null && p.etfShareMinPctHigh !== st.etfShareMinPctHigh) ||
+              (p.etfShareMaxPctHigh != null && p.etfShareMaxPctHigh !== st.etfShareMaxPctHigh),
           });
           return { ...p, stocks: derived.stocks, portfolioSize: derived.portfolioSize, lastLocalMutationAt: mutationAt };
         }),

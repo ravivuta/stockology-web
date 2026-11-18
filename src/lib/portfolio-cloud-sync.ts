@@ -489,6 +489,12 @@ export type GlobalSettings = {
   limitWatchlistSize?: boolean;
   diversifyShortlistBySector?: boolean;
   guideEtfShareByRisk?: boolean;
+  etfShareMinPctLow?: number;
+  etfShareMaxPctLow?: number;
+  etfShareMinPctMedium?: number;
+  etfShareMaxPctMedium?: number;
+  etfShareMinPctHigh?: number;
+  etfShareMaxPctHigh?: number;
   timezone?: string;
   region?: string;
 };
@@ -516,6 +522,12 @@ export type AppliedGlobalSettings = {
   limitWatchlistSize?: boolean;
   diversifyShortlistBySector?: boolean;
   guideEtfShareByRisk?: boolean;
+  etfShareMinPctLow?: number;
+  etfShareMaxPctLow?: number;
+  etfShareMinPctMedium?: number;
+  etfShareMaxPctMedium?: number;
+  etfShareMinPctHigh?: number;
+  etfShareMaxPctHigh?: number;
   timezone?: string;
   region?: string;
 };
@@ -545,6 +557,12 @@ type CurrentGlobalSettings = Required<
     | "limitWatchlistSize"
     | "diversifyShortlistBySector"
     | "guideEtfShareByRisk"
+    | "etfShareMinPctLow"
+    | "etfShareMaxPctLow"
+    | "etfShareMinPctMedium"
+    | "etfShareMaxPctMedium"
+    | "etfShareMinPctHigh"
+    | "etfShareMaxPctHigh"
     | "timezone"
     | "region"
   >
@@ -640,6 +658,24 @@ export function patchFromCloudGlobalSettings(
   }
   if (cloud.guideEtfShareByRisk != null && cloud.guideEtfShareByRisk !== current.guideEtfShareByRisk) {
     patch.guideEtfShareByRisk = cloud.guideEtfShareByRisk;
+  }
+  if (cloud.etfShareMinPctLow != null && numbersDiffer(current.etfShareMinPctLow, cloud.etfShareMinPctLow)) {
+    patch.etfShareMinPctLow = cloud.etfShareMinPctLow;
+  }
+  if (cloud.etfShareMaxPctLow != null && numbersDiffer(current.etfShareMaxPctLow, cloud.etfShareMaxPctLow)) {
+    patch.etfShareMaxPctLow = cloud.etfShareMaxPctLow;
+  }
+  if (cloud.etfShareMinPctMedium != null && numbersDiffer(current.etfShareMinPctMedium, cloud.etfShareMinPctMedium)) {
+    patch.etfShareMinPctMedium = cloud.etfShareMinPctMedium;
+  }
+  if (cloud.etfShareMaxPctMedium != null && numbersDiffer(current.etfShareMaxPctMedium, cloud.etfShareMaxPctMedium)) {
+    patch.etfShareMaxPctMedium = cloud.etfShareMaxPctMedium;
+  }
+  if (cloud.etfShareMinPctHigh != null && numbersDiffer(current.etfShareMinPctHigh, cloud.etfShareMinPctHigh)) {
+    patch.etfShareMinPctHigh = cloud.etfShareMinPctHigh;
+  }
+  if (cloud.etfShareMaxPctHigh != null && numbersDiffer(current.etfShareMaxPctHigh, cloud.etfShareMaxPctHigh)) {
+    patch.etfShareMaxPctHigh = cloud.etfShareMaxPctHigh;
   }
   if (cloud.timezone && cloud.timezone !== current.timezone) {
     patch.timezone = cloud.timezone;

@@ -176,6 +176,12 @@ export default function WatchlistPage() {
   const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
   const diversifyShortlistBySector = usePortfolioStore((s) => s.diversifyShortlistBySector);
   const guideEtfShareByRisk = usePortfolioStore((s) => s.guideEtfShareByRisk);
+  const etfShareMinPctLow = usePortfolioStore((s) => s.etfShareMinPctLow);
+  const etfShareMaxPctLow = usePortfolioStore((s) => s.etfShareMaxPctLow);
+  const etfShareMinPctMedium = usePortfolioStore((s) => s.etfShareMinPctMedium);
+  const etfShareMaxPctMedium = usePortfolioStore((s) => s.etfShareMaxPctMedium);
+  const etfShareMinPctHigh = usePortfolioStore((s) => s.etfShareMinPctHigh);
+  const etfShareMaxPctHigh = usePortfolioStore((s) => s.etfShareMaxPctHigh);
   const enableRiskFilter = usePortfolioStore((s) => s.enableRiskFilter);
   const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
   const removeStock = usePortfolioStore((s) => s.removeStock);
@@ -235,10 +241,16 @@ export default function WatchlistPage() {
         portfolioSize,
         diversifyShortlistBySector,
         guideEtfShareByRisk,
+        etfShareMinPctLow,
+        etfShareMaxPctLow,
+        etfShareMinPctMedium,
+        etfShareMaxPctMedium,
+        etfShareMinPctHigh,
+        etfShareMaxPctHigh,
       }, {
         etfPenaltyMultiplier: 3,
       }),
-    [diversifyShortlistBySector, enableRiskFilter, guideEtfShareByRisk, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
+    [diversifyShortlistBySector, enableRiskFilter, etfShareMaxPctHigh, etfShareMaxPctLow, etfShareMaxPctMedium, etfShareMinPctHigh, etfShareMinPctLow, etfShareMinPctMedium, guideEtfShareByRisk, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
   );
   const sectorMixLine = useMemo(
     () => shortlistSectorMixLine(stocks, shortlistedSymbols),

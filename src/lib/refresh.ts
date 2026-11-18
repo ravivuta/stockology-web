@@ -69,6 +69,12 @@ function currentStoreSettings() {
     limitWatchlistSize: store.limitWatchlistSize,
     diversifyShortlistBySector: store.diversifyShortlistBySector,
     guideEtfShareByRisk: store.guideEtfShareByRisk,
+    etfShareMinPctLow: store.etfShareMinPctLow,
+    etfShareMaxPctLow: store.etfShareMaxPctLow,
+    etfShareMinPctMedium: store.etfShareMinPctMedium,
+    etfShareMaxPctMedium: store.etfShareMaxPctMedium,
+    etfShareMinPctHigh: store.etfShareMinPctHigh,
+    etfShareMaxPctHigh: store.etfShareMaxPctHigh,
     timezone: store.timezone,
     region: store.region,
   };

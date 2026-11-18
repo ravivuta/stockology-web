@@ -10,7 +10,7 @@ import { cashByAccount, displayAccount, isCashSymbol, CASH_SYMBOL } from "@/lib/
 import { isValidTicker } from "@/lib/csvPortfolio";
 import { recordExternalCashFlow } from "@/lib/external-cash-flows";
 import { isFixedIncomeSymbol } from "@/lib/fixed-income-accounts";
-import { shortlistCapacityDiagnostics } from "@/lib/ios-recommendation";
+import { etfsToRemoveToMeetCap, shortlistCapacityDiagnostics } from "@/lib/ios-recommendation";
 import { formatCurrency } from "@/lib/numberFormat";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
 import { hasPremiumFeatureAccess, trackedStockLimit, trackedStockLimitMessage } from "@/lib/subscription-limits";
@@ -76,6 +76,12 @@ export function AddAssetForm({
   const limitWatchlistSize = usePortfolioStore((s) => s.limitWatchlistSize);
   const enableRiskFilter = usePortfolioStore((s) => s.enableRiskFilter);
   const guideEtfShareByRisk = usePortfolioStore((s) => s.guideEtfShareByRisk);
+  const etfShareMinPctLow = usePortfolioStore((s) => s.etfShareMinPctLow);
+  const etfShareMaxPctLow = usePortfolioStore((s) => s.etfShareMaxPctLow);
+  const etfShareMinPctMedium = usePortfolioStore((s) => s.etfShareMinPctMedium);
+  const etfShareMaxPctMedium = usePortfolioStore((s) => s.etfShareMaxPctMedium);
+  const etfShareMinPctHigh = usePortfolioStore((s) => s.etfShareMinPctHigh);
+  const etfShareMaxPctHigh = usePortfolioStore((s) => s.etfShareMaxPctHigh);
   const riskAppetite = usePortfolioStore((s) => s.riskAppetite);
   const lotsBySymbol = usePortfolioStore((s) => s.lotsBySymbol);
   const fixedIncomeByAccount = usePortfolioStore((s) => s.fixedIncomeByAccount);
@@ -259,12 +265,21 @@ export function AddAssetForm({
     if (!exists && limitWatchlistSize) {
       const isEtf = await preflightETFClassification(sym);
       if (isEtf === true) {
+        const etfShareGuidance = {
+          etfShareMinPctLow,
+          etfShareMaxPctLow,
+          etfShareMinPctMedium,
+          etfShareMaxPctMedium,
+          etfShareMinPctHigh,
+          etfShareMaxPctHigh,
+        };
         const current = shortlistCapacityDiagnostics(stocks, {
           limitWatchlistSize,
           enableRiskFilter,
           riskAppetite,
           portfolioSize,
           guideEtfShareByRisk,
+          ...etfShareGuidance,
         }, {
           etfPenaltyMultiplier: 3,
           additionalETFCount: 0,
@@ -275,6 +290,7 @@ export function AddAssetForm({
           riskAppetite,
           portfolioSize,
           guideEtfShareByRisk,
+          ...etfShareGuidance,
         }, {
           etfPenaltyMultiplier: 3,
           additionalETFCount: 1,
@@ -606,8 +622,10 @@ export function AddAssetForm({
                   pendingEtfConfirmation.projected.alertLevel === "warning" ||
                   pendingEtfConfirmation.projected.alertLevel === "critical";
                 const etfPressureTargetPercent = Math.round(pendingEtfConfirmation.projected.etfMaxTargetRatio * 100);
+                const etfsToRemove = Math.max(1, etfsToRemoveToMeetCap(pendingEtfConfirmation.projected));
+                const removeEtfNoun = etfsToRemove === 1 ? "ETF" : "ETFs";
                 const removeEtfRecommendation =
-                  `remove some ETFs from your watchlist (to bring ETF slots below ${etfPressureTargetPercent}% of your portfolio target)`;
+                  `remove ${etfsToRemove} ${removeEtfNoun} from your watchlist (to bring ETF slots below ${etfPressureTargetPercent}% of your portfolio target)`;
                 const recommendationText = pendingEtfConfirmation.projected.isUnderfilled
                   ? hasMaterialEtfPressure
                     ? `Recommendation: either add more qualified stocks for your risk profile or ${removeEtfRecommendation}.`
