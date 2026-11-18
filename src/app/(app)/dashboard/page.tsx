@@ -35,6 +35,7 @@ const PALETTE = {
   cash: "var(--dashboard-chart-cash)",
   fixedIncome: "var(--dashboard-chart-fixed-income)",
   costBasis: "var(--dashboard-chart-cost-basis)",
+  costBasisStock: "var(--dashboard-chart-cost-basis-stock)",
   gain: "var(--dashboard-chart-gain)",
   holdingsValue: CURRENT_VALUE_COLOR,
   loss: "var(--dashboard-chart-loss)",
@@ -262,7 +263,7 @@ export default function DashboardPage() {
             label: "Stocks",
             actualPct: stockInvestedPct,
             recommendedPct: stockTargetPct,
-            color: costBasisColor,
+            color: PALETTE.costBasisStock,
             usesETFPattern: false,
           },
         ]
@@ -847,7 +848,7 @@ export default function DashboardPage() {
                   <div className="relative mt-1 h-3 w-full">
                     <div
                       className="absolute inset-y-0 left-0"
-                      style={{ width: `${valueWidthPct}%`, backgroundColor: "var(--dashboard-chart-cost-basis)" }}
+                      style={{ width: `${valueWidthPct}%`, backgroundColor: "var(--dashboard-chart-cost-basis-stock)" }}
                     />
                     {etfValuePct > 0 ? (
                       <div
@@ -1346,7 +1347,7 @@ function GainerLoserBars({
                       className="w-full"
                       style={{
                         height: costH,
-                        backgroundColor: "color-mix(in srgb, var(--dashboard-chart-cost-basis) 78%, var(--theme-surface-elevated))",
+                        backgroundColor: "var(--dashboard-chart-cost-basis-stock)",
                       }}
                     />
                   </div>
@@ -1399,7 +1400,7 @@ function GainerLoserBars({
                       className="w-full"
                       style={{
                         height: curH,
-                        backgroundColor: "color-mix(in srgb, var(--dashboard-chart-cost-basis) 78%, var(--theme-surface-elevated))",
+                        backgroundColor: "var(--dashboard-chart-cost-basis-stock)",
                       }}
                     />
                   </div>

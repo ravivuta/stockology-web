@@ -50,6 +50,7 @@
   --dashboard-chart-cash: #da8800;
   --dashboard-chart-fixed-income: #9e80d6;
   --dashboard-chart-cost-basis: #3370c2;
+  --dashboard-chart-cost-basis-stock: #b7d4f7;
   --dashboard-chart-holdings: #4dccbf;
   --dashboard-chart-gain: #009900;
   --dashboard-chart-loss: #a60000;
@@ -106,6 +107,7 @@
   --dashboard-chart-cash: #facc15;
   --dashboard-chart-fixed-income: #e0c7ff;
   --dashboard-chart-cost-basis: #66abf5;
+  --dashboard-chart-cost-basis-stock: #c4dffd;
   --dashboard-chart-holdings: #4dccbf;
   --dashboard-chart-gain: #34c759;
   --dashboard-chart-loss: #db2e2e;
