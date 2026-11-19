@@ -100,10 +100,23 @@ function inferSplitRatio(
   return null;
 }
 
+function hasSplitAdjustedEvidence(
+  rows: { rawClose: number; adjustedClose: number | null }[],
+  closeIsRaw: boolean
+): boolean {
+  return rows.some((row) => {
+    if (row.adjustedClose == null || !(row.rawClose > 0)) return false;
+    if (!closeIsRaw) return true;
+    // Dividends move adj a little; splits move it a lot. Only treat large gaps as
+    // real adjusted_close so we still stitch raw split cliffs.
+    return Math.abs(row.adjustedClose - row.rawClose) / row.rawClose > 0.2;
+  });
+}
+
 /**
- * Same rules as iOS `resolvedHistoricalCloses`: prefer `adjusted_close`, infer a split
- * ratio from neighbors when adj is missing, and only stitch crash-like jumps when the
- * series has no real adj vs raw evidence.
+ * Same rules as iOS `resolvedHistoricalCloses`: plot `adjusted_close`, infer a split
+ * ratio when adj is missing, and never mix raw `close` into an adjusted series
+ * (that is the split jump on web charts).
  */
 function pointsFromHistoryRows(rows: HistoryRow[], closeIsRaw: boolean): PricePoint[] {
   const rowTuples = rows.map((row) => {
@@ -115,6 +128,8 @@ function pointsFromHistoryRows(rows: HistoryRow[], closeIsRaw: boolean): PricePo
       adjustedClose: Number.isFinite(adjusted) && adjusted > 0 ? adjusted : null,
     };
   });
+
+  const hasTrueAdjustedClose = hasSplitAdjustedEvidence(rowTuples, closeIsRaw);
 
   const resolved = rowTuples.map((row, index) => {
     if (row.adjustedClose != null) {
@@ -128,6 +143,10 @@ function pointsFromHistoryRows(rows: HistoryRow[], closeIsRaw: boolean): PricePo
       if (ratio != null && ratio > 1) {
         return { date: row.date, close: row.rawClose / ratio };
       }
+      // Mixing unadjusted closes with adjusted ones draws the split cliff.
+      if (hasTrueAdjustedClose) {
+        return { date: row.date, close: NaN };
+      }
     }
     return { date: row.date, close: row.rawClose };
   });
@@ -135,12 +154,6 @@ function pointsFromHistoryRows(rows: HistoryRow[], closeIsRaw: boolean): PricePo
   const sortedResolved = resolved
     .filter((p) => p.date.length === 10 && Number.isFinite(p.close) && p.close > 0)
     .sort((a, b) => a.date.localeCompare(b.date));
-
-  const hasTrueAdjustedClose = rowTuples.some((row) => {
-    if (row.adjustedClose == null || !(row.rawClose > 0)) return false;
-    if (!closeIsRaw) return true;
-    return Math.abs(row.adjustedClose - row.rawClose) / row.rawClose > 0.005;
-  });
 
   return hasTrueAdjustedClose ? sortedResolved : normalizeSplitContinuity(sortedResolved);
 }
