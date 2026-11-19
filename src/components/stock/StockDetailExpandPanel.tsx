@@ -22,7 +22,7 @@ import {
 import { analystTargetUpsidePct, formatScore, formatUpsidePct } from "@/lib/marketFormat";
 import { effectiveOutlookCashTargetPct } from "@/lib/market-outlook";
 import { formatNewsRelativeDate, parseNewsPublishedAt, sentimentDotClass, type NewsSourceRow } from "@/lib/news-feed";
-import { buildRecommendation } from "@/lib/recommendation";
+import { buildRecommendation, recommendationActionDisplay } from "@/lib/recommendation";
 import { formatCompactCurrency, formatCurrency, formatDecimal, formatNumberMax2, formatPercent } from "@/lib/numberFormat";
 import { safeHttpUrlForHref } from "@/lib/safe-external-url";
 import { postgrestEqValue } from "@/lib/postgrest-symbol";
@@ -506,6 +506,8 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       }
       return storedRec;
     }
+    const cashSharePct = portfolioSize > 0 ? (cashEquivalentBalance / portfolioSize) * 100 : 100;
+    const marketTiltOn = useMarketRegimeCashTilt && marketOutlook?.preferCash === true;
     const baseRec = buildRecommendation(stock, {
       closes,
       etfProfitTarget,
@@ -521,6 +523,10 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       sellOnlyLongTermQualified,
       openLots: lotSummary.openLots,
       soldLots: lotSummary.soldLots,
+      useMarketRegimeCashTilt: marketTiltOn,
+      marketOutlookCashTargetPct,
+      marketOutlookLabel: marketOutlook?.label,
+      cashSharePct,
     });
     const gateCtx = {
       enableRiskFilter,
@@ -529,8 +535,8 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       riskAppetite,
       portfolioSize,
       cashBalance: cashEquivalentBalance,
-      cashSharePct: portfolioSize > 0 ? (cashEquivalentBalance / portfolioSize) * 100 : 100,
-      useMarketRegimeCashTilt: useMarketRegimeCashTilt && marketOutlook?.preferCash === true,
+      cashSharePct,
+      useMarketRegimeCashTilt: marketTiltOn,
       marketOutlookCashTargetPct,
       marketOutlookLabel: marketOutlook?.label,
       allStocks: stocks,
@@ -1556,7 +1562,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
                           dense ? "px-2.5 py-1 text-sm" : "px-3 py-1.5 text-lg"
                         )}
                       >
-                        {rec.action}
+                        {recommendationActionDisplay(rec.action)}
                       </p>
                     ) : null}
                     {rec ? (

@@ -1893,6 +1893,28 @@ export function calculateTradingLimits(
 
 export type RecFactor = { label: string; detail: string; passes: boolean };
 
+function pushMarketOutlookBuyPauseFactor(rec: IosRecOut, factors: RecFactor[]) {
+  if (!rec.comments.includes("new buys are paused")) return;
+  const cashMatch = rec.comments.match(
+    /Cash equivalents are (\d+(?:\.\d+)?)% and the target is (\d+(?:\.\d+)?)%/i
+  );
+  if (!cashMatch) {
+    factors.push({
+      label: "Cash at/above market-outlook target",
+      detail: rec.comments,
+      passes: false,
+    });
+    return;
+  }
+  const cashPct = Number.parseFloat(cashMatch[1] ?? "0");
+  const targetPct = Number.parseFloat(cashMatch[2] ?? "0");
+  factors.push({
+    label: "Cash at/above market-outlook target",
+    detail: `${cashPct.toFixed(0)}% vs ${targetPct.toFixed(0)}% target`,
+    passes: Number.isFinite(cashPct) && Number.isFinite(targetPct) ? cashPct + 0.5 >= targetPct : false,
+  });
+}
+
 export type RecommendationFactorOptions = {
   skipWashSale?: boolean;
   useRSIGating?: boolean;
@@ -1969,6 +1991,7 @@ export function computeRecommendationFactors(
           passes: currentPrice <= rec.movingAvg,
         });
       }
+      pushMarketOutlookBuyPauseFactor(rec, factors);
       break;
     case "ADD":
     case "WAIT_ADD":
@@ -1979,6 +2002,7 @@ export function computeRecommendationFactors(
           passes: currentPrice <= rec.nextBuyPrice,
         });
       }
+      pushMarketOutlookBuyPauseFactor(rec, factors);
       break;
     case "SELL":
       const isMarketOutlookSell = rec.comments.includes("Market outlook is");
