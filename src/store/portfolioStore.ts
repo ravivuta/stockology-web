@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { setLocalStorageItem } from "@/lib/local-storage-quota";
-import { calculateTradingLimits, computeRiskReturnScore, localCalendarDay, rankedStockSlotsForTopN, rankedTopWatchlistCandidates, recommendedWatchlistSize, selectedAnalystTarget, stockPassesRiskFilter, applyLossRotationTowardShortlist, offloadHoldingOutsideShortlistIfNeeded, preferredSymbolsForShortlistIndicator, raiseCashForMarketOutlookIfNeeded } from "@/lib/ios-recommendation";
+import { calculateTradingLimits, computeRiskReturnScore, etfConcentrationFactorFromGuidance, localCalendarDay, rankedStockSlotsForTopN, rankedTopWatchlistCandidates, recommendedWatchlistSize, selectedAnalystTarget, stockPassesRiskFilter, applyLossRotationTowardShortlist, offloadHoldingOutsideShortlistIfNeeded, preferredSymbolsForShortlistIndicator, raiseCashForMarketOutlookIfNeeded } from "@/lib/ios-recommendation";
 import { getRecommendationHistoryCloses } from "@/lib/recommendation-history-cache";
 import { buildRecommendation } from "@/lib/recommendation";
 import type { CsvImportRow, CsvImportTrade } from "@/lib/csvPortfolio";
@@ -444,6 +444,15 @@ async function requestOptimizedStrategy(
     | "etfProfitTarget"
     | "stockProfitTarget"
     | "useRSIGatingForRecommendations"
+    | "stocks"
+    | "riskAppetite"
+    | "guideEtfShareByRisk"
+    | "etfShareMinPctLow"
+    | "etfShareMaxPctLow"
+    | "etfShareMinPctMedium"
+    | "etfShareMaxPctMedium"
+    | "etfShareMinPctHigh"
+    | "etfShareMaxPctHigh"
   >
 ): Promise<OptimizedStrategyPayload> {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
@@ -472,6 +481,25 @@ async function requestOptimizedStrategy(
       rsiMinRisingDays: stock.rsiMinRisingDays,
       portfolioSize: state.portfolioSize,
       watchlistCount: recommendedWatchlistSize(state.portfolioSize),
+      etfConcentrationFactor:
+        stock.isETF === true
+          ? etfConcentrationFactorFromGuidance(
+              state.stocks.filter(
+                (item) => item.isETF === true && item.excludeFromShortlist !== true && item.symbol !== "$CASH"
+              ).length,
+              state.portfolioSize,
+              {
+                riskAppetite: state.riskAppetite,
+                guideEtfShareByRisk: state.guideEtfShareByRisk,
+                etfShareMinPctLow: state.etfShareMinPctLow,
+                etfShareMaxPctLow: state.etfShareMaxPctLow,
+                etfShareMinPctMedium: state.etfShareMinPctMedium,
+                etfShareMaxPctMedium: state.etfShareMaxPctMedium,
+                etfShareMinPctHigh: state.etfShareMinPctHigh,
+                etfShareMaxPctHigh: state.etfShareMaxPctHigh,
+              }
+            )
+          : 1,
       etfProfitTargetPercent: state.etfProfitTarget,
       stockProfitTargetPercent: state.stockProfitTarget,
       useRSIGating: state.useRSIGatingForRecommendations,
@@ -935,6 +963,19 @@ function derivePortfolioState(
       ? idealWatchlistSize
       : Math.max(stocksWithLimits.filter((stock) => stock.excludeFromShortlist !== true).length, 1);
 
+    const etfCount = stocksWithLimits.filter(
+      (stock) => stock.isETF === true && stock.excludeFromShortlist !== true && stock.symbol !== "$CASH"
+    ).length;
+    const etfFactor = etfConcentrationFactorFromGuidance(etfCount, portfolioSize, {
+      riskAppetite: shortlistCtx.riskAppetite,
+      guideEtfShareByRisk: shortlistCtx.guideEtfShareByRisk,
+      etfShareMinPctLow: shortlistCtx.etfShareMinPctLow,
+      etfShareMaxPctLow: shortlistCtx.etfShareMaxPctLow,
+      etfShareMinPctMedium: shortlistCtx.etfShareMinPctMedium,
+      etfShareMaxPctMedium: shortlistCtx.etfShareMaxPctMedium,
+      etfShareMinPctHigh: shortlistCtx.etfShareMinPctHigh,
+      etfShareMaxPctHigh: shortlistCtx.etfShareMaxPctHigh,
+    });
     stocksWithLimits = stocksWithLimits.map((stock) => {
       const limits = calculateTradingLimits(
         portfolioSize,
@@ -942,7 +983,8 @@ function derivePortfolioState(
         stock.score,
         recommendedWatchlistSizeForLimits,
         stock.marketCap,
-        stock.beta
+        stock.beta,
+        stock.isETF === true ? etfFactor : 1
       );
       return {
         ...stock,

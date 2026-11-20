@@ -57,7 +57,7 @@ const SECTIONS: Section[] = [
   {
     category: "portfolio",
     title: "Enforce Ideal Watchlist Size",
-    body: "Profile setting that limits recommendations and portfolio views to your ideal portfolio size (based on portfolio amount) ranked by composite score. When enabled, only top-scored stocks are included in recommendation display and sizing views. When disabled, all stocks in watchlist are considered. Helps focus on highest-conviction picks. Note: Holdings are always included in recommendations. ETFs are included first and each ETF consumes weighted shortlist capacity (4 slots per ETF) before remaining stock slots are filled by score rank.",
+    body: "Profile setting that limits recommendations and portfolio views to your ideal portfolio size (based on portfolio amount) ranked by composite score. When enabled, only top-scored stocks are included in recommendation display and sizing views. When disabled, all stocks in watchlist are considered. Helps focus on highest-conviction picks. Note: Holdings are always included in recommendations. ETFs are included first and each ETF consumes 3 shortlist slots by default. If you have at least one ETF but fewer names than the min ETF share, slot cost and ETF size limits scale up instead of asking you to add more ETFs.",
   },
   {
     category: "portfolio",
@@ -67,7 +67,7 @@ const SECTIONS: Section[] = [
   {
     category: "portfolio",
     title: "Stock Limit Calculation",
-    body: "Stock Limit = (Portfolio Size ÷ Recommended Watchlist Size) × Risk Multiplier. Risk multipliers: ETFs get 10x base allocation for larger positions, stocks with score ≥50 get 1x base allocation, stocks with score <50 get 0.5x for smaller positions. Example: $100k portfolio with 20 recommended stocks = $5k base per stock. High-score stock gets $5k limit, low-score gets $2.5k, ETF gets $50k.",
+    body: "Stock Limit = (Portfolio Size ÷ Recommended Watchlist Size) × Risk Multiplier. ETFs start at 10×; if you have fewer ETF names than the min share, that 10× is multiplied by needed/current ETFs (and transaction limit scales with it). Large-cap stocks use 1×; small/unknown cap uses 2/3×.",
   },
   {
     category: "portfolio",
@@ -102,7 +102,7 @@ const SECTIONS: Section[] = [
   {
     category: "filters",
     title: "Stock Shortlisting Process",
-    body: "Stocks PM intelligently filters your watchlist to focus on high-quality opportunities. When Shortlist by Risk Appetite is enabled in Settings, stocks are screened based on market capitalization and analyst ratings. Composite score ranking then uses the same score as the rest of the app: analyst rating, market cap, and quality metrics when available. Leftover upside is applied later as the 25% expected-return gate for BUY/ADD, not as a ranking factor. The same filters apply to both watchlist views and live recommendations for consistency. When Shortlist & Limit stocks for Portfolio size is enabled, ETFs are included first and each ETF consumes 4 slots from the ideal watchlist size before non-ETF stock slots are filled by score rank. Names outside the shortlisted set show HOLD or no recommendation. When disabled, all qualifying stocks receive recommendations.",
+    body: "Stocks PM intelligently filters your watchlist to focus on high-quality opportunities. When Shortlist by Risk Appetite is enabled in Settings, stocks are screened based on market capitalization and analyst ratings. Composite score ranking then uses the same score as the rest of the app: analyst rating, market cap, and quality metrics when available. Leftover upside is applied later as the 25% expected-return gate for BUY/ADD, not as a ranking factor. The same filters apply to both watchlist views and live recommendations for consistency. When Shortlist & Limit stocks for Portfolio size is enabled, ETFs are included first and each ETF consumes 3 slots from the ideal watchlist size (scaled up if fewer ETF names than the min share) before non-ETF stock slots are filled by score rank. Names outside the shortlisted set show HOLD or no recommendation. When disabled, all qualifying stocks receive recommendations.",
   },
   {
     category: "signals",

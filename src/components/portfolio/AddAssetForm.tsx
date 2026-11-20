@@ -281,7 +281,6 @@ export function AddAssetForm({
           guideEtfShareByRisk,
           ...etfShareGuidance,
         }, {
-          etfPenaltyMultiplier: 3,
           additionalETFCount: 0,
         });
         const projected = shortlistCapacityDiagnostics(stocks, {
@@ -292,7 +291,6 @@ export function AddAssetForm({
           guideEtfShareByRisk,
           ...etfShareGuidance,
         }, {
-          etfPenaltyMultiplier: 3,
           additionalETFCount: 1,
         });
         const shouldConfirmEtfAdd =
@@ -632,11 +630,12 @@ export function AddAssetForm({
                     : "Recommendation: add more qualified stocks for your risk profile."
                   : `Recommendation: ${removeEtfRecommendation}, those slots will be used for shortlisting more qualified stocks.`;
 
+                const slotRule = `${Math.max(1, pendingEtfConfirmation.projected.etfPenaltyMultiplier)}x ETF slot rule`;
                 if (pendingEtfConfirmation.projected.targetStockSlots === 0) {
-                  return `${pendingEtfConfirmation.sym} is classified as an ETF. With the 3x ETF slot rule, adding it reduces stock shortlist slots to 0 at your current portfolio size. ETFs would use ${pendingEtfConfirmation.projected.etfPenaltySlots} of ${pendingEtfConfirmation.projected.idealWatchlistSize} ideal slots (${Math.round(pendingEtfConfirmation.projected.etfPressureRatio * 100)}% pressure). Recommendation: ${removeEtfRecommendation}, those slots will be used for shortlisting more qualified stocks. Add anyway?`;
+                  return `${pendingEtfConfirmation.sym} is classified as an ETF. With the ${slotRule}, adding it reduces stock shortlist slots to 0 at your current portfolio size. ETFs would use ${pendingEtfConfirmation.projected.etfPenaltySlots} of ${pendingEtfConfirmation.projected.idealWatchlistSize} ideal slots (${Math.round(pendingEtfConfirmation.projected.etfPressureRatio * 100)}% pressure). Recommendation: ${removeEtfRecommendation}, those slots will be used for shortlisting more qualified stocks. Add anyway?`;
                 }
 
-                return `${pendingEtfConfirmation.sym} is classified as an ETF. With the 3x ETF slot rule, stock shortlist slots move from ${pendingEtfConfirmation.current.targetStockSlots} to ${pendingEtfConfirmation.projected.targetStockSlots}. ETF share impact becomes ${pendingEtfConfirmation.projected.etfPenaltySlots}/${pendingEtfConfirmation.projected.idealWatchlistSize} slots (${Math.round(pendingEtfConfirmation.projected.etfPressureRatio * 100)}%). Current stock fill ${pendingEtfConfirmation.current.qualifiedNonETFSlots}/${pendingEtfConfirmation.current.targetStockSlots}, projected fill ${pendingEtfConfirmation.projected.qualifiedNonETFSlots}/${pendingEtfConfirmation.projected.targetStockSlots}. ${recommendationText} Add anyway?`;
+                return `${pendingEtfConfirmation.sym} is classified as an ETF. With the ${slotRule}, stock shortlist slots move from ${pendingEtfConfirmation.current.targetStockSlots} to ${pendingEtfConfirmation.projected.targetStockSlots}. ETF share impact becomes ${pendingEtfConfirmation.projected.etfPenaltySlots}/${pendingEtfConfirmation.projected.idealWatchlistSize} slots (${Math.round(pendingEtfConfirmation.projected.etfPressureRatio * 100)}%). Current stock fill ${pendingEtfConfirmation.current.qualifiedNonETFSlots}/${pendingEtfConfirmation.current.targetStockSlots}, projected fill ${pendingEtfConfirmation.projected.qualifiedNonETFSlots}/${pendingEtfConfirmation.projected.targetStockSlots}. ${recommendationText} Add anyway?`;
               })()}
             </span>
           ) : null

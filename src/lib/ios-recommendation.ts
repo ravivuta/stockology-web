@@ -987,13 +987,19 @@ export function shortlistCapacityAlertCopy(
   if (diagnostics.isUnderfilled && overEtfCap) {
     recommendation = `Or remove ${etfsToRemove} ${removeEtfNoun} (keep ETF slots under ${etfMaxPct}%).`;
   } else if (diagnostics.isUnderfilled && diagnostics.isBelowETFMinimumRange) {
-    recommendation = `Add ${etfsToAdd} ${etfNoun} first to reach ${etfMinPct}% ETF slots.`;
+    recommendation =
+      diagnostics.effectiveETFCount === 0
+        ? `Add at least 1 ETF first; slot cost and size limits scale if you keep fewer names than the ${etfMinPct}% target.`
+        : `Add ${etfsToAdd} ${etfNoun} first to reach ${etfMinPct}% ETF slots.`;
   } else if (diagnostics.isUnderfilled) {
     recommendation = null;
   } else if (overEtfCap) {
     recommendation = `Remove ${etfsToRemove} ${removeEtfNoun} to keep ETF slots under ${etfMaxPct}%.`;
   } else if (diagnostics.isBelowETFMinimumRange) {
-    recommendation = `Add ${etfsToAdd} ${etfNoun} to reach ${etfMinPct}% ETF slots.`;
+    recommendation =
+      diagnostics.effectiveETFCount === 0
+        ? `Add at least 1 ETF; slot cost and size limits scale if you keep fewer names than the ${etfMinPct}% target.`
+        : `Add ${etfsToAdd} ${etfNoun} to reach ${etfMinPct}% ETF slots.`;
   }
 
   return {
@@ -1247,8 +1253,9 @@ function rankInTopWatchlist(
   return index >= 0 ? index + 1 : null;
 }
 
-/** Universal ceiling on ETF slot share of the ideal watchlist (each ETF costs 3 slots). */
+/** Universal ceiling on ETF slot share of the ideal watchlist (each ETF costs 3 slots, scaled when names are few). */
 export const ETF_SHARE_HARD_CAP_RATIO = 0.6;
+export const ETF_SLOT_BASE_MULTIPLIER = 3;
 export const ETF_SHARE_HARD_CAP_PCT = 60;
 export const ETF_SHARE_LOW_RISK_CEILING_PCT = 100;
 
@@ -1323,6 +1330,60 @@ export function etfCrowdingCapRatio(
   return Math.max(ETF_SHARE_HARD_CAP_RATIO, etfSlotCapRatioForRisk(risk, settings));
 }
 
+export function etfsNeededForMinimumShare(
+  idealWatchlistSize: number,
+  minRatio: number,
+  baseMultiplier = ETF_SLOT_BASE_MULTIPLIER
+): number {
+  if (idealWatchlistSize <= 0 || minRatio <= 0) return 0;
+  return Math.ceil((minRatio * idealWatchlistSize) / Math.max(1, baseMultiplier));
+}
+
+export function etfConcentrationFactor(args: {
+  etfCount: number;
+  idealWatchlistSize: number;
+  minRatio: number;
+  maxRatio: number;
+  guideByRisk: boolean;
+  baseMultiplier?: number;
+}): number {
+  const base = Math.max(1, args.baseMultiplier ?? ETF_SLOT_BASE_MULTIPLIER);
+  if (!args.guideByRisk || args.etfCount <= 0 || args.idealWatchlistSize <= 0 || args.minRatio <= 0) return 1;
+  const needed = etfsNeededForMinimumShare(args.idealWatchlistSize, args.minRatio, base);
+  if (needed <= args.etfCount) return 1;
+  const raw = needed / args.etfCount;
+  const baseSlots = args.etfCount * base;
+  const maxSlots = Math.max(0, args.maxRatio) * args.idealWatchlistSize;
+  const maxFactor = baseSlots > 0 && maxSlots > 0 ? maxSlots / baseSlots : raw;
+  return Math.min(raw, Math.max(1, maxFactor));
+}
+
+export function concentratedEtfSlotMultiplier(
+  factor: number,
+  baseMultiplier = ETF_SLOT_BASE_MULTIPLIER
+): number {
+  return Math.max(baseMultiplier, Math.ceil(baseMultiplier * Math.max(1, factor)));
+}
+
+export function etfConcentrationFactorFromGuidance(
+  etfCount: number,
+  portfolioSize: number,
+  guidance?: EtfShareGuidancePercents & {
+    riskAppetite?: "Low" | "Medium" | "High";
+    guideEtfShareByRisk?: boolean;
+  }
+): number {
+  const risk = guidance?.riskAppetite ?? "Medium";
+  const range = etfShareRangeForRisk(risk, guidance);
+  return etfConcentrationFactor({
+    etfCount,
+    idealWatchlistSize: recommendedWatchlistSize(portfolioSize),
+    minRatio: range.min / 100,
+    maxRatio: etfSlotCapRatioForRisk(risk, guidance),
+    guideByRisk: guidance?.guideEtfShareByRisk !== false,
+  });
+}
+
 /** ETFs to drop so slot share is at or under `etfMaxTargetRatio` (each ETF costs `etfPenaltyMultiplier` slots). */
 export function etfsToRemoveToMeetCap(diagnostics: ShortlistCapacityDiagnostics): number {
   const multiplier = Math.max(1, diagnostics.etfPenaltyMultiplier);
@@ -1365,7 +1426,9 @@ export function rankedStockSlotsForTopN(
   const crowding = guidance?.riskAppetite
     ? etfCrowdingCapRatio(guidance.riskAppetite, guidance)
     : ETF_SHARE_HARD_CAP_RATIO;
-  return Math.max(totalSlots - cappedEtfPenaltySlots(etfSlots * 3, totalSlots, crowding), 0);
+  const factor = etfConcentrationFactorFromGuidance(etfSlots, portfolioSize, guidance);
+  const multiplier = concentratedEtfSlotMultiplier(factor);
+  return Math.max(totalSlots - cappedEtfPenaltySlots(etfSlots * multiplier, totalSlots, crowding), 0);
 }
 
 export function shortlistCapacityDiagnostics(
@@ -1383,17 +1446,29 @@ export function shortlistCapacityDiagnostics(
     additionalETFCount?: number;
   }
 ): ShortlistCapacityDiagnostics {
-  const etfPenaltyMultiplier = Math.max(1, options?.etfPenaltyMultiplier ?? 3);
   const additionalETFCount = Math.max(0, options?.additionalETFCount ?? 0);
   const eligible = stocks.filter((stock) => stock.symbol !== "$CASH" && stock.excludeFromShortlist !== true);
   const currentETFCount = eligible.filter((stock) => stock.isETF === true).length;
   const effectiveETFCount = currentETFCount + additionalETFCount;
   const idealWatchlistSize = recommendedWatchlistSize(settings.portfolioSize);
-  const etfPenaltySlots = effectiveETFCount * etfPenaltyMultiplier;
-  const range = etfShareRangeForRisk(settings.riskAppetite, settings);
-  const etfMinTargetRatio = range.min / 100;
+  const rangeForFactor = etfShareRangeForRisk(settings.riskAppetite, settings);
   const guideEtfShare = settings.guideEtfShareByRisk !== false;
   const etfMaxTargetRatio = etfSlotCapRatioForRisk(settings.riskAppetite, settings);
+  const etfPenaltyMultiplier = Math.max(
+    1,
+    options?.etfPenaltyMultiplier ??
+      concentratedEtfSlotMultiplier(
+        etfConcentrationFactor({
+          etfCount: effectiveETFCount,
+          idealWatchlistSize,
+          minRatio: rangeForFactor.min / 100,
+          maxRatio: etfMaxTargetRatio,
+          guideByRisk: guideEtfShare,
+        })
+      )
+  );
+  const etfPenaltySlots = effectiveETFCount * etfPenaltyMultiplier;
+  const etfMinTargetRatio = rangeForFactor.min / 100;
   const crowdingCapRatio = Math.max(ETF_SHARE_HARD_CAP_RATIO, etfMaxTargetRatio);
   const targetStockSlots = Math.max(
     0,
@@ -1867,7 +1942,8 @@ export function calculateTradingLimits(
   score?: number | null,
   watchlistSize = 10,
   marketCap?: number | null,
-  beta?: number | null
+  beta?: number | null,
+  etfConcentrationFactor = 1
 ): { stockLimit: number; transactionLimit: number } {
   void beta;
   const safeWatchlistSize = Math.max(1, Math.round(watchlistSize) || 1);
@@ -1875,7 +1951,7 @@ export function calculateTradingLimits(
 
   let riskMultiplier = 1;
   if (isETF === true) {
-    riskMultiplier = 10;
+    riskMultiplier = 10 * Math.max(1, etfConcentrationFactor);
   } else {
     // Conservative adjustment: apply 2/3 multiplier by default
     // Only give full allocation to confirmed large/mega caps (≥$10B)

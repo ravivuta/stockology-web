@@ -219,8 +219,7 @@ export default function DashboardPage() {
         etfShareMaxPctMedium,
         etfShareMinPctHigh,
         etfShareMaxPctHigh,
-      },
-      { etfPenaltyMultiplier: 3 }
+      }
     );
     return ((diagnostics.etfMinTargetRatio + diagnostics.etfMaxTargetRatio) / 2) * 100;
   }, [enableRiskFilter, etfShareMaxPctHigh, etfShareMaxPctLow, etfShareMaxPctMedium, etfShareMinPctHigh, etfShareMinPctLow, etfShareMinPctMedium, guideEtfShareByRisk, limitWatchlistSize, portfolioSize, riskAppetite, stocks]);

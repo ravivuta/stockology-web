@@ -252,7 +252,16 @@ export async function POST(request: NextRequest) {
     rsiMinRisingDays,
   };
   const score = baseStock.isETF ? undefined : computeRiskReturnScore(baseStock);
-  const limits = calculateTradingLimits(portfolioSize, isETF, score, watchlistCount, marketCap, undefined);
+  const etfConcentrationFactor = clampNumber(payload.etfConcentrationFactor ?? 1, 1, 1, 50);
+  const limits = calculateTradingLimits(
+    portfolioSize,
+    isETF,
+    score,
+    watchlistCount,
+    marketCap,
+    undefined,
+    isETF ? etfConcentrationFactor : 1
+  );
 
   const inputs: SimulationInputs = {
     symbol,

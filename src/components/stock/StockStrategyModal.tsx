@@ -175,7 +175,28 @@ export function StockStrategyModal({ open, onClose, stock, etfProfitTarget, stoc
                           <span className="font-medium">× Risk multiplier</span><br />
                           <span className="text-subtle">
                             {stock.isETF
-                              ? <>ETF → <strong>10×</strong></>
+                              ? (() => {
+                                  const recommended = Math.max(
+                                    7,
+                                    Math.min(
+                                      75,
+                                      Math.round(
+                                        7 +
+                                          ((Math.max(10000, Math.min(1000000, portfolioSize)) - 10000) / 990000) *
+                                            68
+                                      )
+                                    )
+                                  );
+                                  const divisor = limitWatchlistSize ? recommended : Math.max(activeStockCount, 1);
+                                  const base = portfolioSize / divisor;
+                                  const inferred = base > 0 ? stock.stockLimit / base : 10;
+                                  const concentration = inferred / 10;
+                                  return concentration > 1.01 ? (
+                                    <>ETF → <strong>10×</strong> × {concentration.toFixed(1)} (fewer ETF names than min share)</>
+                                  ) : (
+                                    <>ETF → <strong>10×</strong></>
+                                  );
+                                })()
                               : <><strong>1×</strong> (standard)</>}
                           </span>
                         </span>

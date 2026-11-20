@@ -261,8 +261,6 @@ export default function WatchlistPage() {
         etfShareMaxPctMedium,
         etfShareMinPctHigh,
         etfShareMaxPctHigh,
-      }, {
-        etfPenaltyMultiplier: 3,
       }),
     [diversifyShortlistBySector, enableRiskFilter, etfShareMaxPctHigh, etfShareMaxPctLow, etfShareMaxPctMedium, etfShareMinPctHigh, etfShareMinPctLow, etfShareMinPctMedium, guideEtfShareByRisk, limitWatchlistSize, portfolioSize, riskAppetite, stocks]
   );
