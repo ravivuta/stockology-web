@@ -311,8 +311,8 @@ export default function PortfolioPage() {
   }, [holdings, lotsBySymbol, query, selectedAccount, showActionable, sort, sortDirection, stockMatchesAccount]);
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
         <PortfolioSimulateLink />
         <div className="flex flex-wrap gap-2">
           <CsvImportExportBar exportFilename="stocks-pm-portfolio.csv" compact importMode="portfolio" />
@@ -322,8 +322,8 @@ export default function PortfolioPage() {
         </div>
       </div>
 
-      <div className="space-y-3">
-        <div className="ui-hover-lift rounded-2xl border border-border bg-elevated px-3 py-1">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+        <div className="ui-hover-lift shrink-0 rounded-2xl border border-border bg-elevated px-3 py-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <select
               value={selectedAccount}
@@ -389,8 +389,8 @@ export default function PortfolioPage() {
           ) : null}
         </div>
 
-        <div className="ui-hover-lift overflow-x-auto rounded-2xl border border-border bg-elevated">
-            <table className="w-full table-auto border-collapse text-xs sm:text-sm md:table-fixed">
+        <div className="table-scroll-frame ui-hover-lift rounded-2xl border border-border bg-elevated">
+            <table className="w-full table-auto text-xs sm:text-sm md:table-fixed">
               <colgroup>
                 <col className="w-[20%] md:w-[10%]" />
                 <col className="w-[18%] md:hidden" />
@@ -407,7 +407,7 @@ export default function PortfolioPage() {
                 <col className="hidden md:table-column md:w-[6%]" />
                 <col className="w-[22%] md:w-[9%]" />
               </colgroup>
-              <thead className="border-b border-zinc-400/70 bg-zinc-300/95 text-subtle dark:border-zinc-600 dark:bg-zinc-700/85">
+              <thead className="border-b border-zinc-400/70 bg-zinc-300 text-subtle dark:border-zinc-600 dark:bg-zinc-700 [&_th]:bg-zinc-300 dark:[&_th]:bg-zinc-700">
                 <tr>
                   <SortableHeaderCell label="Symbol" column="symbol" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 md:px-4 md:pt-3" />
                   <SortableHeaderCell label="Last / Chg" column="lastPrice" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-2 pb-2 pt-2.5 md:hidden" />

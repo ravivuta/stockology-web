@@ -208,8 +208,15 @@ export function AppShell({
     );
   }
 
+  const lockTablePage = pathname === "/watchlist" || pathname === "/portfolio";
+
   return (
-    <div className="app-interactive-ui min-h-screen bg-background">
+    <div
+      className={cn(
+        "app-interactive-ui bg-background",
+        lockTablePage ? "flex h-dvh flex-col overflow-hidden" : "min-h-screen"
+      )}
+    >
       <MobileHeader pathname={pathname} />
       <Sidebar
         isExpanded={sidebarExpanded}
@@ -220,8 +227,14 @@ export function AppShell({
         planLabel={planLabel}
         planVariant={planVariant}
       />
-      <main className="app-shell-main">
-        <div className={cn("mx-auto w-full pb-2", pathname === "/dashboard" || pathname === "/watchlist" || pathname === "/portfolio" ? "max-w-none" : "max-w-6xl")}>
+      <main className={cn("app-shell-main", lockTablePage && "app-shell-main--fill")}>
+        <div
+          className={cn(
+            "mx-auto w-full pb-2",
+            pathname === "/dashboard" || pathname === "/watchlist" || pathname === "/portfolio" ? "max-w-none" : "max-w-6xl",
+            lockTablePage && "flex min-h-0 flex-1 flex-col"
+          )}
+        >
           {children}
         </div>
       </main>

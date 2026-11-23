@@ -314,6 +314,32 @@ body {
   }
 }
 
+/* Portfolio / Watchlist: page chrome stays put; the table scroller owns overflow. */
+.app-shell-main--fill {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 0%;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.table-scroll-frame {
+  min-height: 0;
+  flex: 1 1 0%;
+  overflow: auto;
+}
+
+.table-scroll-frame table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.table-scroll-frame thead th {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
 /* Avoid transition on every node (Recharts creates hundreds of SVG elements — was causing main-thread jank). */
 .recharts-layer,
 .recharts-surface,

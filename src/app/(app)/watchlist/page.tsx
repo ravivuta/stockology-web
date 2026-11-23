@@ -536,9 +536,9 @@ export default function WatchlistPage() {
   const watchlistCountText = hasActiveFilters ? `Showing ${rows.length} of ${totalTrackedCount}` : `Total: ${totalTrackedCount}`;
 
   return (
-    <div className="space-y-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
       {removeError ? <p className="text-sm text-error">{removeError}</p> : null}
-      <div className="flex flex-wrap justify-end gap-3">
+      <div className="flex shrink-0 flex-wrap justify-end gap-3">
         <CsvImportExportBar exportFilename="stocks-pm-watchlist.csv" importMode="watchlist" />
         <Link
           href="/csv-help"
@@ -548,7 +548,7 @@ export default function WatchlistPage() {
         </Link>
       </div>
 
-      <div className="ui-hover-lift rounded-2xl border border-border bg-elevated px-3 py-1">
+      <div className="ui-hover-lift shrink-0 rounded-2xl border border-border bg-elevated px-3 py-1">
         <div className="flex flex-wrap items-center gap-1.5">
           {limitWatchlistSize ? (
             <button
@@ -623,7 +623,7 @@ export default function WatchlistPage() {
       </div>
 
       {shouldShowShortlistCapacityAlert ? (
-        <div className="rounded-2xl border border-amber-400/35 bg-elevated px-4 py-3">
+        <div className="shrink-0 rounded-2xl border border-amber-400/35 bg-elevated px-4 py-3">
           {(() => {
             const copy = shortlistCapacityAlertCopy(shortlistCapacity, {
               enableRiskFilter,
@@ -668,8 +668,8 @@ export default function WatchlistPage() {
         </div>
       ) : null}
 
-      <div className="w-full overflow-x-auto rounded-2xl border border-border bg-elevated">
-        <table className="w-full table-auto border-collapse text-xs sm:text-sm md:table-fixed">
+      <div className="table-scroll-frame w-full rounded-2xl border border-border bg-elevated">
+        <table className="w-full table-auto text-xs sm:text-sm md:table-fixed">
           <colgroup>
             <col className="w-[24%] md:w-[12%]" />
             <col className="w-[20%] md:hidden" />
@@ -685,7 +685,7 @@ export default function WatchlistPage() {
             <col className="w-[34%] sm:w-[18%] md:w-[12%]" />
             <col className="hidden md:table-column md:w-[6%]" />
           </colgroup>
-          <thead className="border-b border-zinc-400/70 bg-zinc-300/95 text-xs font-semibold uppercase tracking-wide text-subtle dark:border-zinc-600 dark:bg-zinc-700/85">
+          <thead className="border-b border-zinc-400/70 bg-zinc-300 text-xs font-semibold uppercase tracking-wide text-subtle dark:border-zinc-600 dark:bg-zinc-700 [&_th]:bg-zinc-300 dark:[&_th]:bg-zinc-700">
             <tr>
               <SortableHeaderCell label="Symbol" column="symbol" activeColumn={sort} direction={sortDirection} onSort={toggleSort} align="center" className="px-1.5 py-2.5 sm:px-3 sm:py-3" />
               <SortableHeaderCell
