@@ -428,6 +428,7 @@ export default function WatchlistPage() {
         averageCost: 0,
         lastPrice: 0,
         pendingOptimization: true,
+        isETF: qualifiedPickerMode === "etfs" ? true : qualifiedPickerMode === "stocks" ? false : undefined,
       });
       recalc();
       await flushCurrentPortfolioSnapshotNow(true);

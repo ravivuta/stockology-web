@@ -901,7 +901,7 @@ function SettingsInner() {
                     onChange={(e) => persistSettingsPatch({ guideEtfShareByRisk: e.target.checked })}
                   />
                   <span>
-                    <span className="block text-[12px] font-medium leading-snug text-foreground">Guide ETF share by risk</span>
+                    <span className="block text-[12px] font-medium leading-snug text-foreground">Guide ETF share by risk appetite</span>
                     <span className="mt-px block text-[10px] leading-snug text-subtle">
                       Recommended ranges: Low {ETF_SHARE_GUIDANCE_DEFAULTS.Low.min}–{ETF_SHARE_GUIDANCE_DEFAULTS.Low.max}%, Medium {ETF_SHARE_GUIDANCE_DEFAULTS.Medium.min}–{ETF_SHARE_GUIDANCE_DEFAULTS.Medium.max}%, High {ETF_SHARE_GUIDANCE_DEFAULTS.High.min}–{ETF_SHARE_GUIDANCE_DEFAULTS.High.max}%. Low can be raised to 100% ETFs; Medium and High stay at or below 60%. Extra ETFs stay on the shortlist.
                     </span>

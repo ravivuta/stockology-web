@@ -188,8 +188,9 @@ export function AddAssetForm({
     tradeDate: string;
     accountName: string;
     retirementFlag: boolean | null;
+    isETF?: boolean;
   }) {
-    const { sym, exists, hasTrade, qty, price, tradeDate, accountName, retirementFlag } = args;
+    const { sym, exists, hasTrade, qty, price, tradeDate, accountName, retirementFlag, isETF } = args;
     setSaving(true);
     if (!exists) {
       addStock({
@@ -198,6 +199,7 @@ export function AddAssetForm({
         averageCost: 0,
         lastPrice: hasTrade ? price : 0,
         pendingOptimization: true,
+        isETF,
       });
     }
     if (hasTrade) {
@@ -262,8 +264,8 @@ export function AddAssetForm({
     }
 
     const hasTrade = mode === "full" || hasQty;
+    const isEtf = !exists ? await preflightETFClassification(sym) : undefined;
     if (!exists && limitWatchlistSize) {
-      const isEtf = await preflightETFClassification(sym);
       if (isEtf === true) {
         const etfShareGuidance = {
           etfShareMinPctLow,
@@ -325,6 +327,7 @@ export function AddAssetForm({
       tradeDate,
       accountName,
       retirementFlag,
+      isETF: isEtf === true ? true : isEtf === false ? false : undefined,
     });
   }
 
@@ -606,6 +609,7 @@ export function AddAssetForm({
             tradeDate: pending.tradeDate,
             accountName: pending.accountName,
             retirementFlag: pending.retirementFlag,
+            isETF: true,
           });
           setPendingEtfConfirmation(null);
         }}

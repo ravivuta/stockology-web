@@ -28,7 +28,6 @@ import { safeHttpUrlForHref } from "@/lib/safe-external-url";
 import { postgrestEqValue } from "@/lib/postgrest-symbol";
 import { createClient } from "@/lib/supabase/client";
 import { flushCurrentPortfolioSnapshotNow } from "@/lib/portfolio-snapshot-client";
-import { parseSuggestedQuantity, suggestedTradeType } from "@/lib/tradePrefill";
 import { usePortfolioStore, type StockHolding } from "@/store/portfolioStore";
 import { useSupabaseStockHistory } from "@/hooks/useSupabaseStockHistory";
 import { appendOrReplaceIntradayPricePoint, lastSma } from "@/lib/stock-chart";
@@ -229,16 +228,6 @@ function loadSavedTradeAccountProfiles(): SavedTradeAccountProfile[] {
   } catch {
     return [];
   }
-}
-
-function formatShareQuantity(value: number): string {
-  const isWhole = Math.abs(Math.round(value) - value) < SHARE_FRACTION_TOLERANCE;
-  if (isWhole) return String(Math.round(value));
-
-  let text = value.toFixed(4);
-  while (text.includes(".") && text.endsWith("0")) text = text.slice(0, -1);
-  if (text.endsWith(".")) text = text.slice(0, -1);
-  return text;
 }
 
 function SectionCard({
@@ -906,7 +895,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
   }, [stockIsEtf, stockSymbol]);
 
   useEffect(() => {
-    if (!tradeModalOpen || !stock) return;
+    if (!tradeModalOpen) return;
 
     const nextProfiles = loadSavedTradeAccountProfiles();
     setSavedTradeProfiles(nextProfiles);
@@ -916,20 +905,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     setTradeDate(new Date().toISOString().slice(0, 10));
     setQty("");
     setPrice("");
-
-    const lastPrice = stock.lastPrice ?? 0;
-
-    if (lastPrice > 0) {
-      setPrice(lastPrice.toFixed(2));
-    }
-
-    if (rec && suggestedTradeType(rec.action) === "BUY") {
-      const suggestedQty = parseSuggestedQuantity(rec?.comments ?? "");
-      if (suggestedQty && suggestedQty > 0) {
-        setQty(formatShareQuantity(suggestedQty));
-      }
-    }
-  }, [rec, stock, tradeModalOpen]);
+  }, [tradeModalOpen]);
 
   useEffect(() => {
     if (selectedTradeProfile === NEW_PROFILE_VALUE) return;

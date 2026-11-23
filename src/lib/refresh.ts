@@ -291,8 +291,11 @@ export async function runRefreshPipeline(
       }
     }
 
+    const etfClassChanged = patches.some((item) => item.patch.isETF !== undefined);
     if (patches.length > 0) {
-      usePortfolioStore.getState().bulkUpdateStocks(patches, { shouldRecalculateLimits: recalculateLimits });
+      usePortfolioStore.getState().bulkUpdateStocks(patches, {
+        shouldRecalculateLimits: recalculateLimits || etfClassChanged,
+      });
     } else if (!snapshotWritten || recalculateLimits || settingsChanged) {
       usePortfolioStore.getState().recalcMetrics({
         shouldRecalculateLimits: recalculateLimits,
@@ -305,6 +308,10 @@ export async function runRefreshPipeline(
       if (optimizedCount > 0) {
         await flushCurrentPortfolioSnapshotNow(true);
       }
+    }
+
+    if (etfClassChanged) {
+      await flushCurrentPortfolioSnapshotNow(true);
     }
 
     await runDailySoldLotCleanupIfNeeded();

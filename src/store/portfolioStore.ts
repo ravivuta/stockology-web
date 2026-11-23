@@ -1511,15 +1511,21 @@ export const usePortfolioStore = create<State>()(
             sellOnlyLongTermQualified: st.sellOnlyLongTermQualified,
             lotsBySymbol: st.lotsBySymbol,
           };
+          let etfClassChanged = false;
           const stocks = st.stocks.map((stock) => {
             const patch = patchMap.get(stock.symbol);
             if (!patch) return stock;
+            if (patch.isETF !== undefined && patch.isETF !== stock.isETF) etfClassChanged = true;
             return { ...stock, ...patch, symbol: stock.symbol };
           });
           const derived = derivePortfolioState(stocks, st.cashBalance, ctx, st, {
-            shouldRecalculateLimits: options?.shouldRecalculateLimits !== false,
+            shouldRecalculateLimits: options?.shouldRecalculateLimits !== false || etfClassChanged,
           });
-          return { stocks: derived.stocks, portfolioSize: derived.portfolioSize };
+          return {
+            stocks: derived.stocks,
+            portfolioSize: derived.portfolioSize,
+            ...(etfClassChanged ? { lastLocalMutationAt: new Date().toISOString() } : {}),
+          };
         }),
       editOpenLot: (symbol, lotId, updates) =>
         set((st) => {
