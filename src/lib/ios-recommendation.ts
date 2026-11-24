@@ -331,10 +331,14 @@ export function passesRSIReversalWithHysteresis(
   return amplitudeRecovered;
 }
 
-/** Index-level buy-again signal. Stock BUY/ADD still uses the strict oversold-30 gate. */
-export function passesIndexMarketRecovery(closes: number[]): boolean {
+/** Confirmed oversold RSI reversal on an index. */
+export function passesIndexOversoldRecovery(closes: number[]): boolean {
   if (passesRSIReversalWithHysteresis(closes, 14, 30, 5, 2)) return true;
-  if (passesRSIReversalWithHysteresis(closes, 14, 40, 8, 1)) return true;
+  return passesRSIReversalWithHysteresis(closes, 14, 40, 8, 1);
+}
+
+/** Live ≥2% bounce from RSI under 40. Eases a drawdown only — not a stretched-tape buy. */
+export function passesIndexThrustBounce(closes: number[]): boolean {
   if (closes.length < 3) return false;
   const prevClose = closes[closes.length - 2] ?? 0;
   const lastClose = closes[closes.length - 1] ?? 0;
@@ -345,7 +349,12 @@ export function passesIndexMarketRecovery(closes: number[]): boolean {
   const rsiNow = series[series.length - 1] ?? 0;
   const rsiPrev = series[series.length - 2] ?? 0;
   const recentMin = Math.min(...series.slice(-10));
-  return dayReturn >= 0.015 && rsiNow > rsiPrev && recentMin < 50;
+  return dayReturn >= 0.02 && rsiNow > rsiPrev && recentMin < 40;
+}
+
+/** Index-level ease-cash signal. Stock BUY/ADD still uses the strict oversold-30 gate. */
+export function passesIndexMarketRecovery(closes: number[]): boolean {
+  return passesIndexOversoldRecovery(closes) || passesIndexThrustBounce(closes);
 }
 
 export function passesRSISellSignalWithHysteresis(

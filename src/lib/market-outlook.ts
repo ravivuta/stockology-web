@@ -1,7 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchTickerHydrationFromTables } from "@/lib/ticker-direct-hydration";
 import { fetchHistoricalPricePoints } from "@/lib/supabase-stock-history";
-import { passesIndexMarketRecovery, rsiSeries } from "@/lib/ios-recommendation";
+import {
+  passesIndexOversoldRecovery,
+  passesIndexThrustBounce,
+  rsiSeries,
+} from "@/lib/ios-recommendation";
 
 export type MarketOutlook = {
   computedAt: string;
@@ -24,7 +28,8 @@ type IntradayIndexMetrics = {
   sma200: number;
   vsSma200Pct: number;
   rsi: number;
-  rsiRecovery: boolean;
+  oversoldRecovery: boolean;
+  thrustBounce: boolean;
 };
 
 export const defaultOutlookCashTargets = {
@@ -52,29 +57,33 @@ function deriveMarketRegimeNowcast(
   macroScore: number,
   spyVsSma200Pct: number | undefined,
   iwmVsSma200Pct: number | undefined,
-  rsiRecovery: boolean
+  oversoldRecovery: boolean,
+  thrustBounce: boolean
 ): { regime: MarketOutlook["regime"]; cashTargetPct: number } {
   const deepDrawdown = (spyVsSma200Pct ?? 100) <= -5 || (iwmVsSma200Pct ?? 100) <= -5;
   const overextended = (spyVsSma200Pct ?? -100) >= 6 || (iwmVsSma200Pct ?? -100) >= 6;
   const mildlyExtended = (spyVsSma200Pct ?? -100) >= 3 || (iwmVsSma200Pct ?? -100) >= 3;
+  const easeDefensive = oversoldRecovery || thrustBounce;
 
   if (macroScore <= 20) return { regime: "risk_off", cashTargetPct: 90 };
-  // A live bounce can print as “overextended” vs the 200-day; do not keep BUY/ADD paused that day.
   if (macroScore <= 35 || (macroScore <= 45 && overextended)) {
-    return rsiRecovery
+    return easeDefensive
       ? { regime: "elevated", cashTargetPct: 50 }
       : { regime: "risk_off", cashTargetPct: 70 };
   }
   if (deepDrawdown) {
-    return rsiRecovery
+    return easeDefensive
       ? { regime: "elevated", cashTargetPct: 50 }
       : { regime: "risk_off", cashTargetPct: 70 };
   }
-  if (macroScore <= 50 || overextended || (macroScore < 55 && mildlyExtended)) {
-    if (rsiRecovery && macroScore >= 45) return { regime: "neutral", cashTargetPct: 30 };
+  if (overextended) {
     return { regime: "elevated", cashTargetPct: 50 };
   }
-  if (macroScore >= 65 || (rsiRecovery && macroScore >= 55)) {
+  if (macroScore <= 50 || (macroScore < 55 && mildlyExtended)) {
+    if (oversoldRecovery && macroScore >= 45) return { regime: "neutral", cashTargetPct: 30 };
+    return { regime: "elevated", cashTargetPct: 50 };
+  }
+  if (macroScore >= 65 || (oversoldRecovery && macroScore >= 55)) {
     return { regime: "risk_on", cashTargetPct: 10 };
   }
   return { regime: "neutral", cashTargetPct: 30 };
@@ -118,8 +127,14 @@ async function fetchIntradayIndexMetrics(
   if (!Number.isFinite(close) || close <= 0 || !Number.isFinite(sma200) || sma200 <= 0) return null;
   const vsSma200Pct = ((close - sma200) / sma200) * 100;
   const rsi = rsiSeries(closes, 14).at(-1) ?? 50;
-  const rsiRecovery = passesIndexMarketRecovery(closes);
-  return { close, sma200, vsSma200Pct, rsi, rsiRecovery };
+  return {
+    close,
+    sma200,
+    vsSma200Pct,
+    rsi,
+    oversoldRecovery: passesIndexOversoldRecovery(closes),
+    thrustBounce: passesIndexThrustBounce(closes),
+  };
 }
 
 async function applyIntradayMarketOutlookNowcast(
@@ -139,7 +154,8 @@ async function applyIntradayMarketOutlookNowcast(
     snapshot.score,
     spyMetrics.vsSma200Pct,
     iwmMetrics.vsSma200Pct,
-    spyMetrics.rsiRecovery || iwmMetrics.rsiRecovery
+    spyMetrics.oversoldRecovery || iwmMetrics.oversoldRecovery,
+    spyMetrics.thrustBounce || iwmMetrics.thrustBounce
   );
   const weakerIsRussell = iwmMetrics.vsSma200Pct < spyMetrics.vsSma200Pct;
   const weakerLabel = weakerIsRussell ? "Russell 2000" : "S&P 500";
@@ -148,17 +164,24 @@ async function applyIntradayMarketOutlookNowcast(
     `Indexes vs 200-day avg — S&P 500 ${fmtPct(spyMetrics.vsSma200Pct)}, Russell 2000 ${fmtPct(iwmMetrics.vsSma200Pct)} ` +
     `(weaker: ${weakerLabel}, intraday nowcast)`;
   const recoveringLabels = [
-    spyMetrics.rsiRecovery ? "S&P 500" : null,
-    iwmMetrics.rsiRecovery ? "Russell 2000" : null,
+    spyMetrics.oversoldRecovery || spyMetrics.thrustBounce ? "S&P 500" : null,
+    iwmMetrics.oversoldRecovery || iwmMetrics.thrustBounce ? "Russell 2000" : null,
   ].filter((value): value is string => !!value);
   const rsiHighlight =
-    spyMetrics.rsiRecovery || iwmMetrics.rsiRecovery
-      ? `Index RSI recovering — ${recoveringLabels.join(" & ")} live bounce / momentum turning up ` +
-        `(S&P: ${fmtRSI(spyMetrics.rsi)}, Russell: ${fmtRSI(iwmMetrics.rsi)}). Sign to ease cash and start buying again. [intraday nowcast]`
-      : `Index RSI — S&P 500: ${fmtRSI(spyMetrics.rsi)}, Russell 2000: ${fmtRSI(iwmMetrics.rsi)} ` +
-        `(no live bounce or oversold-bottom recovery yet) [intraday nowcast]`;
+    spyMetrics.oversoldRecovery || iwmMetrics.oversoldRecovery
+      ? `Index RSI recovering — ${recoveringLabels.join(" & ")} confirmed oversold trough turning up ` +
+        `(S&P: ${fmtRSI(spyMetrics.rsi)}, Russell: ${fmtRSI(iwmMetrics.rsi)}) [intraday nowcast]`
+      : spyMetrics.thrustBounce || iwmMetrics.thrustBounce
+        ? `Index RSI — live ≥2% bounce with recent RSI under 40 ` +
+          `(S&P: ${fmtRSI(spyMetrics.rsi)}, Russell: ${fmtRSI(iwmMetrics.rsi)}). Eases a drawdown; does not authorize buying while stretched vs the 200-day. [intraday nowcast]`
+        : `Index RSI — S&P 500: ${fmtRSI(spyMetrics.rsi)}, Russell 2000: ${fmtRSI(iwmMetrics.rsi)} ` +
+          `(no oversold-bottom recovery yet) [intraday nowcast]`;
   const retainedInfluences = snapshot.influences.filter(
-    (line) => !line.startsWith("Indexes vs 200-day") && !line.startsWith("Index RSI")
+    (line) =>
+      !line.startsWith("Indexes vs 200-day") &&
+      !line.startsWith("Index RSI") &&
+      !line.toLowerCase().includes("buy-again") &&
+      !line.toLowerCase().includes("index rsi recovery")
   );
 
   const severe = nowcast.regime === "risk_off" && snapshot.score <= 20;
@@ -175,11 +198,11 @@ async function applyIntradayMarketOutlookNowcast(
   const explanation = severe
     ? "Macro news is crisis-level (≤20/100) — severe early warning; use the Severe cash target even if indexes are still high."
     : nowcast.regime === "risk_on"
-      ? "Macro news looks supportive, and/or index RSI shows an oversold bottom turning up — conditions favor buying again."
+      ? "Macro news is supportive and indexes are not stretched vs the 200-day average — or a confirmed oversold RSI reversal has turned up."
       : nowcast.regime === "neutral"
         ? "Signals are mixed — no strong push to buy or to raise cash."
         : nowcast.regime === "elevated"
-          ? "Macro news and/or a high S&P 500 or Russell 2000 vs its long-term average suggest holding more cash. An RSI recovery can ease this."
+          ? "Macro news is only mixed and/or the S&P 500 or Russell 2000 is extended vs its 200-day average. Prefer cash; a bounce while stretched does not flip this to buy."
           : "Macro news looks weak or the S&P 500 or Russell 2000 has dropped sharply — prioritize cash over new buys.";
 
   return {

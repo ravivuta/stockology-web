@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const MARKETSTACK_BASE = "https://api.marketstack.com/v1/tickers";
+/** Keep Marketstack search code in place, but never call the API. */
+const MARKETSTACK_ENABLED = false;
 
 const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
 const RATE_WINDOW_MS = 60 * 1000;
@@ -95,6 +97,10 @@ function isUSListing(ticker: MSTicker): boolean {
 }
 
 export async function GET(req: NextRequest) {
+  if (!MARKETSTACK_ENABLED) {
+    return NextResponse.json([]);
+  }
+
   const query = req.nextUrl.searchParams.get("q")?.trim() ?? "";
   if (query.length < 1) return NextResponse.json([]);
 
