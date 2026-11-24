@@ -500,7 +500,7 @@ function washSaleWindowLabel(info: Pick<WashSaleInfo, "restrictedUntil" | "daysR
 }
 
 export function washSaleAllowsRetirementPurchaseComment(info: WashSaleInfo): string {
-  return `Wash sale flag is on ${washSaleWindowLabel(info)}. You can still buy/add in a retirement account because retirement cash is available.`;
+  return `Wash sale flag is on ${washSaleWindowLabel(info)}. Buy is allowed in a retirement account only.`;
 }
 
 export function washSaleNeedsRetirementCashComment(info: WashSaleInfo): string {
@@ -544,6 +544,38 @@ export function getWashSaleInfo(stock: IosStockInput, now = new Date()): WashSal
   }
 
   return { canBuy, restrictedUntil, daysRemaining, restrictingLoss, displayText };
+}
+
+/** Any loss sale in the 30-day window, including retirement lots — used for BUY/ADD comments. */
+export function getRecentLossSaleWindow(stock: IosStockInput, now = new Date()): WashSaleInfo {
+  const washSaleRestrictionDays = 30;
+  const soldLotRetentionDays = 90;
+  let restrictedUntil: Date | null = null;
+  let restrictingLoss: number | null = null;
+
+  for (const sold of stock.soldLots ?? []) {
+    const saleDate = parseDate(sold.saleDate);
+    const realized = Number(sold.realizedGainLoss ?? 0);
+    if (!saleDate || !Number.isFinite(realized) || realized >= 0) continue;
+    const ageMs = now.getTime() - saleDate.getTime();
+    if (ageMs < 0 || ageMs > soldLotRetentionDays * DAY_MS) continue;
+    const end = new Date(saleDate.getTime() + washSaleRestrictionDays * DAY_MS);
+    if (end.getTime() > now.getTime() && (!restrictedUntil || end.getTime() > restrictedUntil.getTime())) {
+      restrictedUntil = end;
+      restrictingLoss = realized;
+    }
+  }
+
+  const canBuy = restrictedUntil == null;
+  const daysRemaining =
+    restrictedUntil == null ? 0 : Math.max(0, Math.ceil((restrictedUntil.getTime() - now.getTime()) / DAY_MS));
+  return {
+    canBuy,
+    restrictedUntil,
+    daysRemaining,
+    restrictingLoss,
+    displayText: canBuy ? "✅ Can buy (no wash sale restriction)" : "Wash sale window active",
+  };
 }
 
 /**
@@ -2319,7 +2351,9 @@ export function computeRecommendationFactors(
     });
 
     const washSaleInfo = getWashSaleInfo(stock);
-    const allowsRetirementBuy = rec.comments.includes("You can still buy/add in a retirement account");
+    const allowsRetirementBuy =
+      rec.comments.includes("Buy is allowed in a retirement account only") ||
+      rec.comments.includes("You can still buy/add in a retirement account");
     const washPasses = skipWashSale || washSaleInfo.canBuy || allowsRetirementBuy;
     let washDetail = "No restriction active";
     if (skipWashSale) {
@@ -2825,21 +2859,26 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
 
     let washSaleRetirementNote: string | undefined;
     let washSaleSuggestedShares: number | undefined;
-    if (!skipWashSaleCheck && washSaleInfo && !washSaleInfo.canBuy) {
-      const retirementShares = Math.floor(
-        Math.min(transactionLimit, Math.max(retirementAvailableCash, 0)) / Math.max(currentPrice, 0.0001)
-      );
-      if (retirementShares >= 1) {
-        washSaleSuggestedShares = retirementShares;
-        washSaleRetirementNote = washSaleAllowsRetirementPurchaseComment(washSaleInfo);
-      } else {
-        return {
-          action: numStock === 0 ? "WAIT_BUY" : "WAIT_ADD",
-          comments: washSaleNeedsRetirementCashComment(washSaleInfo),
-          nextBuyPrice,
-          movingAvg,
-          expectedReturnPct,
-        };
+    if (!skipWashSaleCheck) {
+      const lossWindow = getRecentLossSaleWindow(stock);
+      if (!lossWindow.canBuy) {
+        const retirementShares = Math.floor(
+          Math.min(transactionLimit, Math.max(retirementAvailableCash, 0)) / Math.max(currentPrice, 0.0001)
+        );
+        const taxableBlocked = Boolean(washSaleInfo && !washSaleInfo.canBuy);
+        if (taxableBlocked && retirementShares < 1) {
+          return {
+            action: numStock === 0 ? "WAIT_BUY" : "WAIT_ADD",
+            comments: washSaleNeedsRetirementCashComment(lossWindow),
+            nextBuyPrice,
+            movingAvg,
+            expectedReturnPct,
+          };
+        }
+        if (taxableBlocked && retirementShares >= 1) {
+          washSaleSuggestedShares = retirementShares;
+        }
+        washSaleRetirementNote = washSaleAllowsRetirementPurchaseComment(lossWindow);
       }
     }
 
