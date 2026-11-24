@@ -18,6 +18,7 @@ import {
   isCashSymbol,
   migrateCashLots,
   replaceCashLots,
+  retirementCashAvailable,
 } from "@/lib/cash-accounts";
 import { fixedIncomeTotal, isFixedIncomeSymbol, sanitizeFixedIncomeByAccount } from "@/lib/fixed-income-accounts";
 import { effectiveOutlookCashTargetPct, type MarketOutlook } from "@/lib/market-outlook";
@@ -423,6 +424,7 @@ type RecalcContext = {
   marketOutlookCashTargetPct?: number;
   marketOutlookLabel?: string;
   cashSharePct?: number;
+  retirementAvailableCash?: number;
   lotsBySymbol: Record<string, { open: TradeLot[]; sold: SoldLot[] }>;
 };
 
@@ -821,6 +823,7 @@ function recalcHolding(
       rsiHysteresisPoints: ctx.rsiHysteresisPointsForRecommendations,
       rsiMinRisingDays: ctx.rsiMinRisingDaysForRecommendations,
       sellOnlyLongTermQualified: ctx.sellOnlyLongTermQualified,
+      retirementAvailableCash: ctx.retirementAvailableCash,
       openLots: lots.open,
       soldLots: lots.sold,
     });
@@ -1010,6 +1013,7 @@ function derivePortfolioState(
       : undefined,
     marketOutlookLabel: shortlistCtx.marketOutlook?.label,
     cashSharePct: portfolioSize > 0 ? (cashEquivalent / portfolioSize) * 100 : 100,
+    retirementAvailableCash: retirementCashAvailable(recalcCtx.lotsBySymbol),
   };
   const recalcedStocks = stocksWithLimits.map((s) => recalcHolding(s, outlookCtx));
 

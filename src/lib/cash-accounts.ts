@@ -93,6 +93,37 @@ export function cashLotQuantity(lots: CashLotBundle | undefined): number {
   return Math.max(0, (lots?.open ?? []).reduce((sum, lot) => sum + (Number(lot.quantity) || 0), 0));
 }
 
+function accountLooksRetirement(
+  lot: { account?: string; isRetirementAccount?: boolean | null },
+  retirementAccounts: Set<string>
+): boolean {
+  if (lot.isRetirementAccount === true) return true;
+  return retirementAccounts.has(accountKey(lot.account));
+}
+
+/** Cash in accounts tagged retirement via lot flags or same-name holdings. */
+export function retirementCashAvailable(
+  lotsBySymbol: Record<string, CashLotBundle | { open?: Array<{ account?: string; isRetirementAccount?: boolean | null; quantity?: number }>; sold?: Array<{ account?: string; isRetirementAccount?: boolean | null }> }>
+): number {
+  const retirementAccounts = new Set<string>();
+  for (const [symbol, bundle] of Object.entries(lotsBySymbol)) {
+    if (isCashSymbol(symbol) || isSettingsSymbol(symbol)) continue;
+    for (const lot of bundle?.open ?? []) {
+      if (lot.isRetirementAccount === true) retirementAccounts.add(accountKey(lot.account));
+    }
+    for (const lot of bundle?.sold ?? []) {
+      if (lot.isRetirementAccount === true) retirementAccounts.add(accountKey(lot.account));
+    }
+  }
+  let total = 0;
+  for (const lot of lotsBySymbol[CASH_SYMBOL]?.open ?? []) {
+    const qty = Number(lot.quantity) || 0;
+    if (Math.abs(qty) <= EPSILON) continue;
+    if (accountLooksRetirement(lot, retirementAccounts)) total += Math.max(0, qty);
+  }
+  return total;
+}
+
 export function cashByAccount(lots: CashLotBundle | undefined): Record<string, number> {
   const totals = new Map<string, { name: string; amount: number }>();
   for (const lot of lots?.open ?? []) {

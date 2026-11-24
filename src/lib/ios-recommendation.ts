@@ -18,6 +18,7 @@ export type IosSoldLot = {
   quantity?: number;
   salePrice?: number;
   realizedGainLoss?: number;
+  isRetirementAccount?: boolean | null;
 };
 
 export type IosStockInput = {
@@ -236,6 +237,7 @@ export type IosRecOptions = {
   marketOutlookCashTargetPct?: number;
   marketOutlookLabel?: string;
   cashSharePct?: number;
+  retirementAvailableCash?: number;
 };
 
 export type WashSaleInfo = {
@@ -468,6 +470,26 @@ export function passesLongTermCheckForReduce(
   return taxAwareEligibleReduceQuantity(stock, currentPrice) + 1e-6 >= reduceQty;
 }
 
+function washSaleWindowLabel(info: Pick<WashSaleInfo, "restrictedUntil" | "daysRemaining">): string {
+  if (info.restrictedUntil) {
+    const until = info.restrictedUntil.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    return `until ${until} (${info.daysRemaining} days)`;
+  }
+  return "for the 30-day window";
+}
+
+export function washSaleAllowsRetirementPurchaseComment(info: WashSaleInfo): string {
+  return `Wash sale flag is on ${washSaleWindowLabel(info)}. You can still buy/add in a retirement account because retirement cash is available.`;
+}
+
+export function washSaleNeedsRetirementCashComment(info: WashSaleInfo): string {
+  return `Wash sale flag is on ${washSaleWindowLabel(info)}. Taxable repurchase is restricted. Buy/add is allowed in a retirement account when retirement cash can cover at least one share.`;
+}
+
 export function getWashSaleInfo(stock: IosStockInput, now = new Date()): WashSaleInfo {
   const washSaleRestrictionDays = 30;
   const soldLotRetentionDays = 90;
@@ -476,6 +498,8 @@ export function getWashSaleInfo(stock: IosStockInput, now = new Date()): WashSal
   let restrictingLoss: number | null = null;
 
   for (const sold of stock.soldLots ?? []) {
+    // IRA/401(k) losses are not deductible, so they do not create a wash-sale buy restriction.
+    if (sold.isRetirementAccount === true) continue;
     const saleDate = parseDate(sold.saleDate);
     const realized = Number(sold.realizedGainLoss ?? 0);
     if (!saleDate || !Number.isFinite(realized) || realized >= 0) continue;
@@ -2277,14 +2301,23 @@ export function computeRecommendationFactors(
       passes: costBasis < maxHoldingLimit,
     });
 
+    const washSaleInfo = getWashSaleInfo(stock);
+    const allowsRetirementBuy = rec.comments.includes("You can still buy/add in a retirement account");
+    const washPasses = skipWashSale || washSaleInfo.canBuy || allowsRetirementBuy;
+    let washDetail = "No restriction active";
+    if (skipWashSale) {
+      washDetail = "Skipped";
+    } else if (washSaleInfo.canBuy) {
+      washDetail = "No restriction active";
+    } else if (allowsRetirementBuy) {
+      washDetail = `Flag on until ${washSaleInfo.restrictedUntil?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) ?? "unknown"} — BUY/ADD still allowed in a retirement account`;
+    } else {
+      washDetail = `Restricted until ${washSaleInfo.restrictedUntil?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) ?? "unknown"} — needs retirement cash for at least one share`;
+    }
     factors.push({
-      label: "Wash sale clear",
-      detail: skipWashSale
-        ? "Skipped"
-        : getWashSaleInfo(stock).canBuy
-          ? "No restriction active"
-          : `Restricted until ${getWashSaleInfo(stock).restrictedUntil?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) ?? "unknown"}`,
-      passes: skipWashSale ? true : getWashSaleInfo(stock).canBuy,
+      label: "Wash sale",
+      detail: washDetail,
+      passes: washPasses,
     });
   }
 
@@ -2492,6 +2525,7 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
     marketOutlookCashTargetPct,
     marketOutlookLabel,
     cashSharePct,
+    retirementAvailableCash = 0,
   } = options;
 
   const currentPrice = stock.lastPrice ?? 0;
@@ -2772,14 +2806,24 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
       }
     }
 
+    let washSaleRetirementNote: string | undefined;
+    let washSaleSuggestedShares: number | undefined;
     if (!skipWashSaleCheck && washSaleInfo && !washSaleInfo.canBuy) {
-      return {
-        action: numStock === 0 ? "WAIT_BUY" : "WAIT_ADD",
-        comments: washSaleInfo.displayText,
-        nextBuyPrice,
-        movingAvg,
-        expectedReturnPct,
-      };
+      const retirementShares = Math.floor(
+        Math.min(transactionLimit, Math.max(retirementAvailableCash, 0)) / Math.max(currentPrice, 0.0001)
+      );
+      if (retirementShares >= 1) {
+        washSaleSuggestedShares = retirementShares;
+        washSaleRetirementNote = washSaleAllowsRetirementPurchaseComment(washSaleInfo);
+      } else {
+        return {
+          action: numStock === 0 ? "WAIT_BUY" : "WAIT_ADD",
+          comments: washSaleNeedsRetirementCashComment(washSaleInfo),
+          nextBuyPrice,
+          movingAvg,
+          expectedReturnPct,
+        };
+      }
     }
 
     if (shouldApplyAISentimentGate) {
@@ -2814,11 +2858,14 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
       };
     }
 
+    const withWashSaleNote = (comment: string) =>
+      washSaleRetirementNote ? `${comment} ${washSaleRetirementNote}` : comment;
+
     if (numStock === 0) {
-      const suggestedShares = Math.round(transactionLimit / currentPrice);
+      const suggestedShares = washSaleSuggestedShares ?? Math.round(transactionLimit / currentPrice);
       return {
         action: "BUY",
-          comments: `Buy ${suggestedShares.toFixed(0)} stocks. Current price is below ${actualSmaPeriod.toFixed(0)} day moving avg ${formatCurrency(movingAvg)}`,
+          comments: withWashSaleNote(`Buy ${suggestedShares.toFixed(0)} stocks. Current price is below ${actualSmaPeriod.toFixed(0)} day moving avg ${formatCurrency(movingAvg)}`),
         nextBuyPrice,
         movingAvg,
         expectedReturnPct,
@@ -2828,17 +2875,17 @@ export function computeIosRecommendation(stock: IosStockInput, options: IosRecOp
     if (metricScore > 0 && metricScore < 50) {
       return {
         action: "WAIT_ADD",
-        comments: `Score ${metricScore.toFixed(0)}/100 below threshold (50) for adding to position. Wait for improvement.`,
+        comments: withWashSaleNote(`Score ${metricScore.toFixed(0)}/100 below threshold (50) for adding to position. Wait for improvement.`),
         nextBuyPrice,
         movingAvg,
         expectedReturnPct,
       };
     }
 
-    const addQty = Math.round(transactionLimit / currentPrice);
+    const addQty = washSaleSuggestedShares ?? Math.round(transactionLimit / currentPrice);
     return {
       action: "ADD",
-      comments: `Add ${addQty.toFixed(0)} stocks. Current price is below next target buy price ${formatCurrency(nextBuyPrice)}`,
+      comments: withWashSaleNote(`Add ${addQty.toFixed(0)} stocks. Current price is below next target buy price ${formatCurrency(nextBuyPrice)}`),
       nextBuyPrice,
       movingAvg,
       expectedReturnPct,

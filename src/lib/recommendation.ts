@@ -23,6 +23,7 @@ export type BuildRecommendationOptions = Pick<IosRecOptions, "closes"> & {
   marketOutlookCashTargetPct?: number;
   marketOutlookLabel?: string;
   cashSharePct?: number;
+  retirementAvailableCash?: number;
   openLots?: IosStockInput["openLots"];
   soldLots?: IosStockInput["soldLots"];
 };
@@ -57,6 +58,7 @@ export function buildRecommendation(stock: RecInput, options?: BuildRecommendati
       marketOutlookCashTargetPct: options?.marketOutlookCashTargetPct,
       marketOutlookLabel: options?.marketOutlookLabel,
       cashSharePct: options?.cashSharePct,
+      retirementAvailableCash: options?.retirementAvailableCash,
     }
   );
 }

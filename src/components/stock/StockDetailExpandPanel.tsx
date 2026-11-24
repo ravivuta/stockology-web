@@ -23,6 +23,7 @@ import { analystTargetUpsidePct, formatScore, formatUpsidePct } from "@/lib/mark
 import { effectiveOutlookCashTargetPct } from "@/lib/market-outlook";
 import { formatNewsRelativeDate, parseNewsPublishedAt, sentimentDotClass, type NewsSourceRow } from "@/lib/news-feed";
 import { buildRecommendation, recommendationActionDisplay } from "@/lib/recommendation";
+import { retirementCashAvailable } from "@/lib/cash-accounts";
 import { formatCompactCurrency, formatCurrency, formatDecimal, formatNumberMax2, formatPercent } from "@/lib/numberFormat";
 import { safeHttpUrlForHref } from "@/lib/safe-external-url";
 import { postgrestEqValue } from "@/lib/postgrest-symbol";
@@ -516,6 +517,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       marketOutlookCashTargetPct,
       marketOutlookLabel: marketOutlook?.label,
       cashSharePct,
+      retirementAvailableCash: retirementCashAvailable(lotsBySymbol),
     });
     const gateCtx = {
       enableRiskFilter,
@@ -582,6 +584,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
     riskAppetite,
     portfolioSize,
     useMarketRegimeCashTilt,
+    lotsBySymbol,
     stocks,
   ]);
   const recommendationFactors = useMemo(() => {
@@ -2134,7 +2137,7 @@ const ADD_FACTOR_LABELS = new Set([
   "RSI overbought",
   "RSI not blocking",
   "Holding size within limits",
-  "Wash sale clear",
+  "Wash sale",
   "Eligible to ADD",
   "Cash for at least 1 share",
 ]);
@@ -2305,7 +2308,7 @@ function recommendationFactorGroups(
     const addForWait = selectiveWaitFactors(addPath, new Set([
       "Price below next buy target",
       "Holding limit OK",
-      "Wash sale clear",
+      "Wash sale",
     ]));
     if (addForWait.length > 0) {
       groups.push({
