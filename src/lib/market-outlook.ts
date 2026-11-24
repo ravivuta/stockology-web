@@ -200,7 +200,7 @@ async function applyIntradayMarketOutlookNowcast(
     : nowcast.regime === "risk_on"
       ? "Macro news is supportive and indexes are not stretched vs the 200-day average — or a confirmed oversold RSI reversal has turned up."
       : nowcast.regime === "neutral"
-        ? "Signals are mixed — no strong push to buy or to raise cash."
+        ? "Signals are mixed. New buys pause until cash equivalents reach the Mixed target; the app does not force sells just to get there."
         : nowcast.regime === "elevated"
           ? "Macro news is only mixed and/or the S&P 500 or Russell 2000 is extended vs its 200-day average. Prefer cash; a bounce while stretched does not flip this to buy."
           : "Macro news looks weak or the S&P 500 or Russell 2000 has dropped sharply — prioritize cash over new buys.";
@@ -285,7 +285,7 @@ export function mapMarketOutlookRow(row: Record<string, unknown>): MarketOutlook
     : regimeRaw === "risk_on"
       ? "Macro news looks supportive, and/or index RSI shows an oversold bottom turning up — conditions favor buying again."
       : regimeRaw === "neutral"
-        ? "Signals are mixed — no strong push to buy or to raise cash."
+        ? "Signals are mixed. New buys pause until cash equivalents reach the Mixed target; the app does not force sells just to get there."
         : regimeRaw === "elevated"
           ? "Macro news and/or a high S&P 500 or Russell 2000 vs its long-term average suggest holding more cash. An RSI recovery can ease this."
           : "Macro news looks weak or the S&P 500 or Russell 2000 has dropped sharply — prioritize cash over new buys.";

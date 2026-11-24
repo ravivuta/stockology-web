@@ -171,7 +171,7 @@ export function RecommendedActionsWidget({ stocks }: { stocks: StockHolding[] })
               const cashShare = portfolioSize > 0 ? (cashEquivalent / portfolioSize) * 100 : 0;
               const belowTarget = cashShare + 0.5 < outlook.cashTargetPct;
               return belowTarget
-                ? `Cash-equivalent target: ${Math.round(outlook.cashTargetPct)}%. You currently have ${Math.round(cashShare)}% (cash + fixed income). New buys may pause until this is rebuilt.`
+                ? `Cash-equivalent target: ${Math.round(outlook.cashTargetPct)}%. You currently have ${Math.round(cashShare)}% (cash + fixed income). New buys are paused until this is rebuilt.`
                 : `Cash-equivalent target: ${Math.round(outlook.cashTargetPct)}%. You currently have ${Math.round(cashShare)}% (cash + fixed income).`;
             })()}
           </p>

@@ -1001,7 +1001,8 @@ function derivePortfolioState(
   const outlookCtx: RecalcContext = {
     ...recalcCtx,
     traderModeEnabled: shortlistCtx.traderModeEnabled === true,
-    useMarketRegimeCashTilt: shortlistCtx.useMarketRegimeCashTilt === true && shortlistCtx.marketOutlook?.preferCash === true,
+    useMarketRegimeCashTilt:
+      shortlistCtx.useMarketRegimeCashTilt === true && shortlistCtx.marketOutlook?.stale !== true,
     marketOutlookCashTargetPct: shortlistCtx.marketOutlook
       ? effectiveOutlookCashTargetPct(shortlistCtx.marketOutlook, {
           riskOn: shortlistCtx.marketOutlookCashTargetRiskOn ?? 10,
@@ -1109,6 +1110,7 @@ function derivePortfolioState(
             cashBalance: cashEquivalent,
             cashSharePct: outlookCtx.cashSharePct,
             useMarketRegimeCashTilt: outlookCtx.useMarketRegimeCashTilt,
+            marketOutlookPrefersCash: shortlistCtx.marketOutlook?.preferCash === true,
             marketOutlookCashTargetPct: outlookCtx.marketOutlookCashTargetPct,
             marketOutlookLabel: outlookCtx.marketOutlookLabel,
             allStocks: stocksWithRisk,
@@ -1130,6 +1132,7 @@ function derivePortfolioState(
             cashBalance: cashEquivalent,
             cashSharePct: outlookCtx.cashSharePct,
             useMarketRegimeCashTilt: outlookCtx.useMarketRegimeCashTilt,
+            marketOutlookPrefersCash: shortlistCtx.marketOutlook?.preferCash === true,
             marketOutlookCashTargetPct: outlookCtx.marketOutlookCashTargetPct,
             marketOutlookLabel: outlookCtx.marketOutlookLabel,
             allStocks: stocksWithRisk,

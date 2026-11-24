@@ -988,6 +988,7 @@ export type AddGateContext = {
   cashBalance?: number;
   cashSharePct?: number;
   useMarketRegimeCashTilt?: boolean;
+  marketOutlookPrefersCash?: boolean;
   marketOutlookCashTargetPct?: number;
   marketOutlookLabel?: string;
   allStocks: IosStockInput[];
@@ -1936,7 +1937,7 @@ export function raiseCashForMarketOutlookIfNeeded<T extends IosRecOut>(
   if (rec.action === "SELL" || rec.action === "REDUCE") return rec;
   if (stock.averageCost <= 0 || (stock.lastPrice ?? 0) <= 0) return rec;
 
-  const marketTiltOn = ctx.useMarketRegimeCashTilt === true;
+  const marketTiltOn = ctx.useMarketRegimeCashTilt === true && ctx.marketOutlookPrefersCash === true;
   const targetPct = Number(ctx.marketOutlookCashTargetPct ?? 0);
   const hasTarget = Number.isFinite(targetPct) && targetPct > 0;
   if (!marketTiltOn || !hasTarget) return rec;

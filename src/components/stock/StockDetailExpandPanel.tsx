@@ -497,7 +497,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       return storedRec;
     }
     const cashSharePct = portfolioSize > 0 ? (cashEquivalentBalance / portfolioSize) * 100 : 100;
-    const marketTiltOn = useMarketRegimeCashTilt && marketOutlook?.preferCash === true;
+    const marketTiltOn = useMarketRegimeCashTilt && marketOutlook?.stale !== true;
     const baseRec = buildRecommendation(stock, {
       closes,
       etfProfitTarget,
@@ -528,6 +528,7 @@ export function StockDetailExpandPanel({ symbol, embedded, onClose, showBackLink
       cashBalance: cashEquivalentBalance,
       cashSharePct,
       useMarketRegimeCashTilt: marketTiltOn,
+      marketOutlookPrefersCash: marketOutlook?.preferCash === true,
       marketOutlookCashTargetPct,
       marketOutlookLabel: marketOutlook?.label,
       allStocks: stocks,
