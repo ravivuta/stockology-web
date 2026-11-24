@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchTickerHydrationFromTables } from "@/lib/ticker-direct-hydration";
 import { fetchHistoricalPricePoints } from "@/lib/supabase-stock-history";
-import { passesRSIReversalWithHysteresis, rsiSeries } from "@/lib/ios-recommendation";
+import { passesIndexMarketRecovery, rsiSeries } from "@/lib/ios-recommendation";
 
 export type MarketOutlook = {
   computedAt: string;
@@ -48,25 +48,6 @@ function etDateString(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function isUsMarketOpenForIntradayOverlay(now = new Date()): boolean {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(now);
-  const weekday = parts.find((part) => part.type === "weekday")?.value ?? "";
-  if (weekday === "Sat" || weekday === "Sun") return false;
-  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? Number.NaN);
-  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? Number.NaN);
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return false;
-  const totalMinutes = hour * 60 + minute;
-  const openMinutes = 9 * 60 + 30;
-  const closeMinutes = 16 * 60 + 30;
-  return totalMinutes >= openMinutes && totalMinutes < closeMinutes;
-}
-
 function deriveMarketRegimeNowcast(
   macroScore: number,
   spyVsSma200Pct: number | undefined,
@@ -78,8 +59,9 @@ function deriveMarketRegimeNowcast(
   const mildlyExtended = (spyVsSma200Pct ?? -100) >= 3 || (iwmVsSma200Pct ?? -100) >= 3;
 
   if (macroScore <= 20) return { regime: "risk_off", cashTargetPct: 90 };
+  // A live bounce can print as “overextended” vs the 200-day; do not keep BUY/ADD paused that day.
   if (macroScore <= 35 || (macroScore <= 45 && overextended)) {
-    return rsiRecovery && !overextended
+    return rsiRecovery
       ? { regime: "elevated", cashTargetPct: 50 }
       : { regime: "risk_off", cashTargetPct: 70 };
   }
@@ -89,11 +71,10 @@ function deriveMarketRegimeNowcast(
       : { regime: "risk_off", cashTargetPct: 70 };
   }
   if (macroScore <= 50 || overextended || (macroScore < 55 && mildlyExtended)) {
-    return rsiRecovery && !overextended && macroScore >= 45
-      ? { regime: "neutral", cashTargetPct: 30 }
-      : { regime: "elevated", cashTargetPct: 50 };
+    if (rsiRecovery && macroScore >= 45) return { regime: "neutral", cashTargetPct: 30 };
+    return { regime: "elevated", cashTargetPct: 50 };
   }
-  if ((macroScore >= 65 || (rsiRecovery && macroScore >= 55)) && !overextended) {
+  if (macroScore >= 65 || (rsiRecovery && macroScore >= 55)) {
     return { regime: "risk_on", cashTargetPct: 10 };
   }
   return { regime: "neutral", cashTargetPct: 30 };
@@ -120,7 +101,7 @@ async function fetchIntradayIndexMetrics(
     .filter((close) => Number.isFinite(close) && close > 0);
   if (closes.length === 0) return null;
 
-  if (isUsMarketOpenForIntradayOverlay() && Number.isFinite(livePrice) && (livePrice ?? 0) > 0) {
+  if (Number.isFinite(livePrice) && (livePrice ?? 0) > 0) {
     const today = etDateString(new Date());
     const lastDate = history.points.at(-1)?.date?.slice(0, 10);
     if (lastDate === today) {
@@ -137,7 +118,7 @@ async function fetchIntradayIndexMetrics(
   if (!Number.isFinite(close) || close <= 0 || !Number.isFinite(sma200) || sma200 <= 0) return null;
   const vsSma200Pct = ((close - sma200) / sma200) * 100;
   const rsi = rsiSeries(closes, 14).at(-1) ?? 50;
-  const rsiRecovery = passesRSIReversalWithHysteresis(closes, 14, 30, 5, 2);
+  const rsiRecovery = passesIndexMarketRecovery(closes);
   return { close, sma200, vsSma200Pct, rsi, rsiRecovery };
 }
 
@@ -145,8 +126,6 @@ async function applyIntradayMarketOutlookNowcast(
   supabase: SupabaseClient,
   snapshot: MarketOutlook
 ): Promise<MarketOutlook> {
-  if (!isUsMarketOpenForIntradayOverlay()) return snapshot;
-
   const hydration = await fetchTickerHydrationFromTables(supabase, ["SPY", "IWM"]);
   const spyLive = hydration.prices.SPY?.last_price;
   const iwmLive = hydration.prices.IWM?.last_price;
@@ -174,10 +153,10 @@ async function applyIntradayMarketOutlookNowcast(
   ].filter((value): value is string => !!value);
   const rsiHighlight =
     spyMetrics.rsiRecovery || iwmMetrics.rsiRecovery
-      ? `Index RSI recovering — ${recoveringLabels.join(" & ")} oversold trough with upward trend ` +
+      ? `Index RSI recovering — ${recoveringLabels.join(" & ")} live bounce / momentum turning up ` +
         `(S&P: ${fmtRSI(spyMetrics.rsi)}, Russell: ${fmtRSI(iwmMetrics.rsi)}). Sign to ease cash and start buying again. [intraday nowcast]`
       : `Index RSI — S&P 500: ${fmtRSI(spyMetrics.rsi)}, Russell 2000: ${fmtRSI(iwmMetrics.rsi)} ` +
-        `(no oversold-bottom recovery yet) [intraday nowcast]`;
+        `(no live bounce or oversold-bottom recovery yet) [intraday nowcast]`;
   const retainedInfluences = snapshot.influences.filter(
     (line) => !line.startsWith("Indexes vs 200-day") && !line.startsWith("Index RSI")
   );
