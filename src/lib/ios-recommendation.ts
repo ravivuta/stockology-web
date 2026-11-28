@@ -1003,6 +1003,7 @@ export type ShortlistCapacityDiagnostics = {
   etfPenaltySlots: number;
   etfMinTargetRatio: number;
   etfMaxTargetRatio: number;
+  etfsNeededForMinimum: number;
   targetStockSlots: number;
   qualifiedNonETFSlots: number;
   stockSlotShortfall: number;
@@ -1032,33 +1033,28 @@ export function shortlistCapacityAlertCopy(
     : "score > 50";
   const etfMaxPct = Math.round(diagnostics.etfMaxTargetRatio * 100);
   const etfMinPct = Math.round(diagnostics.etfMinTargetRatio * 100);
-  const etfSlotsNeededForMinimum = Math.max(
-    0,
-    Math.ceil(diagnostics.etfMinTargetRatio * diagnostics.idealWatchlistSize - diagnostics.etfPenaltySlots)
-  );
-  const etfsToAdd = Math.max(
-    0,
-    Math.ceil(etfSlotsNeededForMinimum / Math.max(1, diagnostics.etfPenaltyMultiplier))
-  );
+  const etfsToAdd = Math.max(0, diagnostics.etfsNeededForMinimum - diagnostics.effectiveETFCount);
   const etfNoun = etfsToAdd === 1 ? "ETF" : "ETFs";
   const etfsToRemove = etfsToRemoveToMeetCap(diagnostics);
   const removeEtfNoun = etfsToRemove === 1 ? "ETF" : "ETFs";
   const overEtfCap =
-    diagnostics.alertLevel === "warning" ||
-    diagnostics.alertLevel === "critical" ||
-    diagnostics.isAboveETFMaximumRange;
+    !diagnostics.isBelowETFMinimumRange &&
+    (diagnostics.alertLevel === "warning" ||
+      diagnostics.alertLevel === "critical" ||
+      diagnostics.isAboveETFMaximumRange);
 
   let title: string;
-  if (diagnostics.alertLevel === "critical") title = "ETFs fill the shortlist";
-  else if (diagnostics.alertLevel === "warning") title = "ETF share is high";
-  else if (diagnostics.alertLevel === "info") title = "ETF share is getting high";
-  else if (diagnostics.isBelowETFMinimumRange) title = "ETF share is below target";
-  else if (diagnostics.isAboveETFMaximumRange) title = "ETF share is above the cap";
-  else if (diagnostics.isUnderfilled) title = "Need more qualifying stocks";
+  if (diagnostics.isBelowETFMinimumRange) title = "ETF share is below the min";
+  else if (diagnostics.alertLevel === "critical") title = "ETFs fill the shortlist";
+  else if (diagnostics.alertLevel === "warning" || diagnostics.isAboveETFMaximumRange) {
+    title = "ETF share is above the cap";
+  } else if (diagnostics.isUnderfilled) title = "Need more qualifying stocks";
   else title = "Shortlist capacity";
 
   let body: string;
-  if (diagnostics.effectiveETFCount > 0 && diagnostics.targetStockSlots <= 0) {
+  if (diagnostics.isBelowETFMinimumRange) {
+    body = `${diagnostics.effectiveETFCount} of ${diagnostics.etfsNeededForMinimum} ETFs for the ${etfMinPct}% min. Slot cost and size limits scale until you reach that count.`;
+  } else if (diagnostics.effectiveETFCount > 0 && diagnostics.targetStockSlots <= 0) {
     body = `${diagnostics.effectiveETFCount} ETFs leave 0 stock slots.`;
   } else if (diagnostics.isUnderfilled) {
     body = `${diagnostics.effectiveETFCount} ETFs · ${diagnostics.qualifiedNonETFSlots}/${diagnostics.targetStockSlots} stock slots filled. Add ${diagnostics.stockSlotShortfall} more (${criteria}).`;
@@ -1067,22 +1063,15 @@ export function shortlistCapacityAlertCopy(
   }
 
   let recommendation: string | null = null;
-  if (diagnostics.isUnderfilled && overEtfCap) {
-    recommendation = `Or remove ${etfsToRemove} ${removeEtfNoun} (keep ETF slots under ${etfMaxPct}%).`;
-  } else if (diagnostics.isUnderfilled && diagnostics.isBelowETFMinimumRange) {
+  if (diagnostics.isBelowETFMinimumRange) {
     recommendation =
       diagnostics.effectiveETFCount === 0
-        ? `Add at least 1 ETF first; slot cost and size limits scale if you keep fewer names than the ${etfMinPct}% target.`
-        : `Add ${etfsToAdd} ${etfNoun} first to reach ${etfMinPct}% ETF slots.`;
-  } else if (diagnostics.isUnderfilled) {
-    recommendation = null;
+        ? `Add at least 1 ETF; slot cost and size limits scale if you keep fewer names than the ${etfMinPct}% min.`
+        : `Add ${etfsToAdd} ${etfNoun} to reach the ${etfMinPct}% min.`;
+  } else if (diagnostics.isUnderfilled && overEtfCap) {
+    recommendation = `Or remove ${etfsToRemove} ${removeEtfNoun} (keep ETF slots under ${etfMaxPct}%).`;
   } else if (overEtfCap) {
     recommendation = `Remove ${etfsToRemove} ${removeEtfNoun} to keep ETF slots under ${etfMaxPct}%.`;
-  } else if (diagnostics.isBelowETFMinimumRange) {
-    recommendation =
-      diagnostics.effectiveETFCount === 0
-        ? `Add at least 1 ETF; slot cost and size limits scale if you keep fewer names than the ${etfMinPct}% target.`
-        : `Add ${etfsToAdd} ${etfNoun} to reach ${etfMinPct}% ETF slots.`;
   }
 
   return {
@@ -1347,9 +1336,9 @@ export function etfShareCeilingPct(risk: "Low" | "Medium" | "High"): number {
 }
 
 export const ETF_SHARE_GUIDANCE_DEFAULTS = {
-  Low: { min: 40, max: 60 },
-  Medium: { min: 20, max: 40 },
-  High: { min: 0, max: 20 },
+  Low: { min: 40, max: ETF_SHARE_LOW_RISK_CEILING_PCT },
+  Medium: { min: 20, max: ETF_SHARE_HARD_CAP_PCT },
+  High: { min: 0, max: ETF_SHARE_HARD_CAP_PCT },
 } as const;
 
 export type EtfShareGuidancePercents = {
@@ -1361,20 +1350,20 @@ export type EtfShareGuidancePercents = {
   etfShareMaxPctHigh?: number;
 };
 
+export function clampEtfShareMinPct(
+  minPct: number,
+  risk: "Low" | "Medium" | "High" = "Medium"
+): number {
+  const ceiling = etfShareCeilingPct(risk);
+  return Math.round(Math.min(ceiling, Math.max(0, minPct)));
+}
+
 export function clampEtfShareGuidancePercents(
   minPct: number,
-  maxPct: number,
+  _maxPct: number,
   risk: "Low" | "Medium" | "High" = "Medium"
 ): { min: number; max: number } {
-  const ceiling = etfShareCeilingPct(risk);
-  let lo = Math.round(Math.min(ceiling, Math.max(0, minPct)));
-  let hi = Math.round(Math.min(ceiling, Math.max(0, maxPct)));
-  if (lo > hi) {
-    const swap = lo;
-    lo = hi;
-    hi = swap;
-  }
-  return { min: lo, max: hi };
+  return { min: clampEtfShareMinPct(minPct, risk), max: etfShareCeilingPct(risk) };
 }
 
 export function etfShareRangeForRisk(
@@ -1388,13 +1377,10 @@ export function etfShareRangeForRisk(
       : risk === "High"
         ? settings?.etfShareMinPctHigh
         : settings?.etfShareMinPctMedium;
-  const max =
-    risk === "Low"
-      ? settings?.etfShareMaxPctLow
-      : risk === "High"
-        ? settings?.etfShareMaxPctHigh
-        : settings?.etfShareMaxPctMedium;
-  return clampEtfShareGuidancePercents(min ?? fallback.min, max ?? fallback.max, risk);
+  return {
+    min: clampEtfShareMinPct(min ?? fallback.min, risk),
+    max: etfShareCeilingPct(risk),
+  };
 }
 
 export function etfSlotCapRatioForRisk(
@@ -1402,8 +1388,7 @@ export function etfSlotCapRatioForRisk(
   settings?: EtfShareGuidancePercents & { guideEtfShareByRisk?: boolean }
 ): number {
   if (settings?.guideEtfShareByRisk === false) return ETF_SHARE_HARD_CAP_RATIO;
-  const range = etfShareRangeForRisk(risk, settings);
-  return Math.min(range.max / 100, etfShareCeilingPct(risk) / 100);
+  return etfShareCeilingPct(risk) / 100;
 }
 
 export function etfCrowdingCapRatio(
@@ -1467,15 +1452,16 @@ export function etfConcentrationFactorFromGuidance(
   });
 }
 
-/** ETFs to drop so slot share is at or under `etfMaxTargetRatio` (each ETF costs `etfPenaltyMultiplier` slots). */
+/** ETFs to drop so unscaled 3x slot share is at or under the built-in ceiling. */
 export function etfsToRemoveToMeetCap(diagnostics: ShortlistCapacityDiagnostics): number {
-  const multiplier = Math.max(1, diagnostics.etfPenaltyMultiplier);
+  const multiplier = ETF_SLOT_BASE_MULTIPLIER;
   const ideal = Math.max(0, diagnostics.idealWatchlistSize);
   if (ideal <= 0) return Math.max(0, diagnostics.effectiveETFCount);
   const maxAllowedSlots = Math.floor(diagnostics.etfMaxTargetRatio * ideal + 1e-9);
-  const excessSlots = Math.max(0, diagnostics.etfPenaltySlots - maxAllowedSlots);
+  const baseSlots = diagnostics.effectiveETFCount * multiplier;
+  const excessSlots = Math.max(0, baseSlots - maxAllowedSlots);
   const count = Math.ceil(excessSlots / multiplier);
-  if (diagnostics.etfPressureRatio > diagnostics.etfMaxTargetRatio) {
+  if (baseSlots > maxAllowedSlots) {
     return Math.min(diagnostics.effectiveETFCount, Math.max(1, count));
   }
   return Math.min(diagnostics.effectiveETFCount, count);
@@ -1576,17 +1562,21 @@ export function shortlistCapacityDiagnostics(
   const stockSlotShortfall = Math.max(0, targetStockSlots - qualifiedNonETFSlots);
   const shortlistFillRate = targetStockSlots > 0 ? qualifiedNonETFSlots / targetStockSlots : 1;
   const etfPressureRatio = idealWatchlistSize > 0 ? etfPenaltySlots / idealWatchlistSize : 1;
-  const uncappedStockSlots = Math.max(0, idealWatchlistSize - etfPenaltySlots);
-  const isBelowETFMinimumRange = guideEtfShare && etfPressureRatio < etfMinTargetRatio;
-  const isAboveETFMaximumRange = etfPressureRatio > etfMaxTargetRatio;
+  const baseEtfPenaltySlots = effectiveETFCount * ETF_SLOT_BASE_MULTIPLIER;
+  const basePressureRatio = idealWatchlistSize > 0 ? baseEtfPenaltySlots / idealWatchlistSize : 1;
+  const etfsNeededForMinimum = guideEtfShare
+    ? etfsNeededForMinimumShare(idealWatchlistSize, etfMinTargetRatio)
+    : 0;
+  const isBelowETFMinimumRange = guideEtfShare && effectiveETFCount < etfsNeededForMinimum;
+  const isAboveETFMaximumRange = basePressureRatio > etfMaxTargetRatio;
 
   let alertLevel: ShortlistCapacityAlertLevel = "none";
-  if (effectiveETFCount > 0 && uncappedStockSlots === 0) {
-    alertLevel = "critical";
-  } else if (etfPressureRatio > ETF_SHARE_HARD_CAP_RATIO || etfPressureRatio >= 0.75) {
-    alertLevel = "warning";
-  } else if (etfPressureRatio >= 0.5) {
+  if (isBelowETFMinimumRange) {
     alertLevel = "info";
+  } else if (effectiveETFCount > 0 && targetStockSlots === 0) {
+    alertLevel = "critical";
+  } else if (isAboveETFMaximumRange) {
+    alertLevel = "warning";
   }
 
   const isUnderfilled = targetStockSlots > 0 && (stockSlotShortfall >= 3 || shortlistFillRate < 0.7);
@@ -1598,6 +1588,7 @@ export function shortlistCapacityDiagnostics(
     etfPenaltySlots,
     etfMinTargetRatio,
     etfMaxTargetRatio,
+    etfsNeededForMinimum,
     targetStockSlots,
     qualifiedNonETFSlots,
     stockSlotShortfall,

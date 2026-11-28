@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SoldLot, StockHolding, TradeLot } from "@/store/portfolioStore";
 import { CASH_SYMBOL, CASH_UNIT_PRICE, SETTINGS_SYMBOL, cashLotQuantity, isCashSymbol, isSettingsSymbol } from "@/lib/cash-accounts";
+import { etfShareCeilingPct } from "@/lib/ios-recommendation";
 import {
   fixedIncomeSnapshotHoldings,
   fixedIncomeTotal,
@@ -571,11 +572,11 @@ export function globalSettingsFromStore(store: {
     diversifyShortlistBySector: store.diversifyShortlistBySector,
     guideEtfShareByRisk: store.guideEtfShareByRisk,
     etfShareMinPctLow: store.etfShareMinPctLow,
-    etfShareMaxPctLow: store.etfShareMaxPctLow,
+    etfShareMaxPctLow: etfShareCeilingPct("Low"),
     etfShareMinPctMedium: store.etfShareMinPctMedium,
-    etfShareMaxPctMedium: store.etfShareMaxPctMedium,
+    etfShareMaxPctMedium: etfShareCeilingPct("Medium"),
     etfShareMinPctHigh: store.etfShareMinPctHigh,
-    etfShareMaxPctHigh: store.etfShareMaxPctHigh,
+    etfShareMaxPctHigh: etfShareCeilingPct("High"),
     timezone: store.timezone,
     region: store.region,
   };
@@ -606,11 +607,8 @@ export function storePatchFromGlobalSettings(cloud: GlobalSettings): AppliedGlob
   if (cloud.diversifyShortlistBySector != null) patch.diversifyShortlistBySector = cloud.diversifyShortlistBySector;
   if (cloud.guideEtfShareByRisk != null) patch.guideEtfShareByRisk = cloud.guideEtfShareByRisk;
   if (cloud.etfShareMinPctLow != null) patch.etfShareMinPctLow = cloud.etfShareMinPctLow;
-  if (cloud.etfShareMaxPctLow != null) patch.etfShareMaxPctLow = cloud.etfShareMaxPctLow;
   if (cloud.etfShareMinPctMedium != null) patch.etfShareMinPctMedium = cloud.etfShareMinPctMedium;
-  if (cloud.etfShareMaxPctMedium != null) patch.etfShareMaxPctMedium = cloud.etfShareMaxPctMedium;
   if (cloud.etfShareMinPctHigh != null) patch.etfShareMinPctHigh = cloud.etfShareMinPctHigh;
-  if (cloud.etfShareMaxPctHigh != null) patch.etfShareMaxPctHigh = cloud.etfShareMaxPctHigh;
   if (cloud.timezone) patch.timezone = cloud.timezone;
   if (cloud.region) patch.region = cloud.region;
   return patch;
@@ -779,20 +777,11 @@ export function patchFromCloudGlobalSettings(
   if (cloud.etfShareMinPctLow != null && numbersDiffer(current.etfShareMinPctLow, cloud.etfShareMinPctLow)) {
     patch.etfShareMinPctLow = cloud.etfShareMinPctLow;
   }
-  if (cloud.etfShareMaxPctLow != null && numbersDiffer(current.etfShareMaxPctLow, cloud.etfShareMaxPctLow)) {
-    patch.etfShareMaxPctLow = cloud.etfShareMaxPctLow;
-  }
   if (cloud.etfShareMinPctMedium != null && numbersDiffer(current.etfShareMinPctMedium, cloud.etfShareMinPctMedium)) {
     patch.etfShareMinPctMedium = cloud.etfShareMinPctMedium;
   }
-  if (cloud.etfShareMaxPctMedium != null && numbersDiffer(current.etfShareMaxPctMedium, cloud.etfShareMaxPctMedium)) {
-    patch.etfShareMaxPctMedium = cloud.etfShareMaxPctMedium;
-  }
   if (cloud.etfShareMinPctHigh != null && numbersDiffer(current.etfShareMinPctHigh, cloud.etfShareMinPctHigh)) {
     patch.etfShareMinPctHigh = cloud.etfShareMinPctHigh;
-  }
-  if (cloud.etfShareMaxPctHigh != null && numbersDiffer(current.etfShareMaxPctHigh, cloud.etfShareMaxPctHigh)) {
-    patch.etfShareMaxPctHigh = cloud.etfShareMaxPctHigh;
   }
   if (cloud.timezone && cloud.timezone !== current.timezone) {
     patch.timezone = cloud.timezone;

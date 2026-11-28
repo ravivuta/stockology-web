@@ -21,8 +21,9 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { appCtaButton } from "@/lib/appCtaClasses";
 import {
-  clampEtfShareGuidancePercents,
+  clampEtfShareMinPct,
   ETF_SHARE_GUIDANCE_DEFAULTS,
+  etfShareCeilingPct,
   etfShareRangeForRisk,
   recommendedWatchlistSize,
 } from "@/lib/ios-recommendation";
@@ -134,11 +135,8 @@ function SettingsInner() {
   const diversifyShortlistBySector = usePortfolioStore((s) => s.diversifyShortlistBySector);
   const guideEtfShareByRisk = usePortfolioStore((s) => s.guideEtfShareByRisk);
   const etfShareMinPctLow = usePortfolioStore((s) => s.etfShareMinPctLow);
-  const etfShareMaxPctLow = usePortfolioStore((s) => s.etfShareMaxPctLow);
   const etfShareMinPctMedium = usePortfolioStore((s) => s.etfShareMinPctMedium);
-  const etfShareMaxPctMedium = usePortfolioStore((s) => s.etfShareMaxPctMedium);
   const etfShareMinPctHigh = usePortfolioStore((s) => s.etfShareMinPctHigh);
-  const etfShareMaxPctHigh = usePortfolioStore((s) => s.etfShareMaxPctHigh);
   const etfProfitTarget = usePortfolioStore((s) => s.etfProfitTarget);
   const stockProfitTarget = usePortfolioStore((s) => s.stockProfitTarget);
   const useAISentimentForRecommendations = usePortfolioStore((s) => s.useAISentimentForRecommendations);
@@ -252,11 +250,11 @@ function SettingsInner() {
         diversifyShortlistBySector: "diversifyShortlistBySector" in patch ? patch.diversifyShortlistBySector : store.diversifyShortlistBySector,
         guideEtfShareByRisk: "guideEtfShareByRisk" in patch ? patch.guideEtfShareByRisk : store.guideEtfShareByRisk,
         etfShareMinPctLow: "etfShareMinPctLow" in patch ? patch.etfShareMinPctLow : store.etfShareMinPctLow,
-        etfShareMaxPctLow: "etfShareMaxPctLow" in patch ? patch.etfShareMaxPctLow : store.etfShareMaxPctLow,
+        etfShareMaxPctLow: etfShareCeilingPct("Low"),
         etfShareMinPctMedium: "etfShareMinPctMedium" in patch ? patch.etfShareMinPctMedium : store.etfShareMinPctMedium,
-        etfShareMaxPctMedium: "etfShareMaxPctMedium" in patch ? patch.etfShareMaxPctMedium : store.etfShareMaxPctMedium,
+        etfShareMaxPctMedium: etfShareCeilingPct("Medium"),
         etfShareMinPctHigh: "etfShareMinPctHigh" in patch ? patch.etfShareMinPctHigh : store.etfShareMinPctHigh,
-        etfShareMaxPctHigh: "etfShareMaxPctHigh" in patch ? patch.etfShareMaxPctHigh : store.etfShareMaxPctHigh,
+        etfShareMaxPctHigh: etfShareCeilingPct("High"),
         timezone: "timezone" in patch ? patch.timezone : store.timezone,
         region: "region" in patch ? patch.region : store.region,
       }).then(() => {
@@ -510,11 +508,8 @@ function SettingsInner() {
           ...(cloudSettings.diversifyShortlistBySector != null ? { diversifyShortlistBySector: cloudSettings.diversifyShortlistBySector } : {}),
           ...(cloudSettings.guideEtfShareByRisk != null ? { guideEtfShareByRisk: cloudSettings.guideEtfShareByRisk } : {}),
           ...(cloudSettings.etfShareMinPctLow != null ? { etfShareMinPctLow: cloudSettings.etfShareMinPctLow } : {}),
-          ...(cloudSettings.etfShareMaxPctLow != null ? { etfShareMaxPctLow: cloudSettings.etfShareMaxPctLow } : {}),
           ...(cloudSettings.etfShareMinPctMedium != null ? { etfShareMinPctMedium: cloudSettings.etfShareMinPctMedium } : {}),
-          ...(cloudSettings.etfShareMaxPctMedium != null ? { etfShareMaxPctMedium: cloudSettings.etfShareMaxPctMedium } : {}),
           ...(cloudSettings.etfShareMinPctHigh != null ? { etfShareMinPctHigh: cloudSettings.etfShareMinPctHigh } : {}),
-          ...(cloudSettings.etfShareMaxPctHigh != null ? { etfShareMaxPctHigh: cloudSettings.etfShareMaxPctHigh } : {}),
           ...(cloudSettings.timezone ? { timezone: cloudSettings.timezone } : {}),
           ...(cloudSettings.region ? { region: cloudSettings.region } : {}),
         });
@@ -903,7 +898,7 @@ function SettingsInner() {
                   <span>
                     <span className="block text-[12px] font-medium leading-snug text-foreground">Guide ETF share by risk appetite</span>
                     <span className="mt-px block text-[10px] leading-snug text-subtle">
-                      Recommended ranges: Low {ETF_SHARE_GUIDANCE_DEFAULTS.Low.min}–{ETF_SHARE_GUIDANCE_DEFAULTS.Low.max}%, Medium {ETF_SHARE_GUIDANCE_DEFAULTS.Medium.min}–{ETF_SHARE_GUIDANCE_DEFAULTS.Medium.max}%, High {ETF_SHARE_GUIDANCE_DEFAULTS.High.min}–{ETF_SHARE_GUIDANCE_DEFAULTS.High.max}%. Low can be raised to 100% ETFs; Medium and High stay at or below 60%. Extra ETFs stay on the shortlist.
+                      Suggested ETF slot floors: Low min {ETF_SHARE_GUIDANCE_DEFAULTS.Low.min}%, Medium min {ETF_SHARE_GUIDANCE_DEFAULTS.Medium.min}%, High min {ETF_SHARE_GUIDANCE_DEFAULTS.High.min}%. There is no per-risk max setting. Medium and High still cap slot share at 60%; Low can go to 100%. Extra ETFs stay on the shortlist.
                     </span>
                   </span>
                 </label>
@@ -913,17 +908,15 @@ function SettingsInner() {
                       const recommended = ETF_SHARE_GUIDANCE_DEFAULTS[risk];
                       const range = etfShareRangeForRisk(risk, {
                         etfShareMinPctLow,
-                        etfShareMaxPctLow,
                         etfShareMinPctMedium,
-                        etfShareMaxPctMedium,
                         etfShareMinPctHigh,
-                        etfShareMaxPctHigh,
                       });
-                      const persistRange = (min: number, max: number) => {
-                        const next = clampEtfShareGuidancePercents(min, max, risk);
-                        if (risk === "Low") persistSettingsPatch({ etfShareMinPctLow: next.min, etfShareMaxPctLow: next.max });
-                        else if (risk === "Medium") persistSettingsPatch({ etfShareMinPctMedium: next.min, etfShareMaxPctMedium: next.max });
-                        else persistSettingsPatch({ etfShareMinPctHigh: next.min, etfShareMaxPctHigh: next.max });
+                      const persistMin = (min: number) => {
+                        const next = clampEtfShareMinPct(min, risk);
+                        const ceiling = etfShareCeilingPct(risk);
+                        if (risk === "Low") persistSettingsPatch({ etfShareMinPctLow: next, etfShareMaxPctLow: ceiling });
+                        else if (risk === "Medium") persistSettingsPatch({ etfShareMinPctMedium: next, etfShareMaxPctMedium: ceiling });
+                        else persistSettingsPatch({ etfShareMinPctHigh: next, etfShareMaxPctHigh: ceiling });
                       };
                       return (
                         <div key={risk} className="grid gap-1">
@@ -934,32 +927,19 @@ function SettingsInner() {
                                 <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-primary">Active</span>
                               ) : null}
                             </span>
-                            <span className="text-[10px] text-subtle">Recommended {recommended.min}–{recommended.max}%</span>
+                            <span className="text-[10px] text-subtle">Suggested min {recommended.min}%</span>
                           </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <label className="block">
-                              <FieldLabel>Min</FieldLabel>
-                              <input
-                                type="number"
-                                min={0}
-                                max={risk === "Low" ? 100 : 60}
-                                value={range.min}
-                                onChange={(e) => persistRange(Number(e.target.value), range.max)}
-                                className={inputClass}
-                              />
-                            </label>
-                            <label className="block">
-                              <FieldLabel>Max</FieldLabel>
-                              <input
-                                type="number"
-                                min={0}
-                                max={risk === "Low" ? 100 : 60}
-                                value={range.max}
-                                onChange={(e) => persistRange(range.min, Number(e.target.value))}
-                                className={inputClass}
-                              />
-                            </label>
-                          </div>
+                          <label className="block">
+                            <FieldLabel>Min</FieldLabel>
+                            <input
+                              type="number"
+                              min={0}
+                              max={risk === "Low" ? 100 : 60}
+                              value={range.min}
+                              onChange={(e) => persistMin(Number(e.target.value))}
+                              className={inputClass}
+                            />
+                          </label>
                         </div>
                       );
                     })}

@@ -221,7 +221,7 @@ export default function DashboardPage() {
         etfShareMaxPctHigh,
       }
     );
-    return ((diagnostics.etfMinTargetRatio + diagnostics.etfMaxTargetRatio) / 2) * 100;
+    return diagnostics.etfMinTargetRatio * 100;
   }, [enableRiskFilter, etfShareMaxPctHigh, etfShareMaxPctLow, etfShareMaxPctMedium, etfShareMinPctHigh, etfShareMinPctLow, etfShareMinPctMedium, guideEtfShareByRisk, limitWatchlistSize, portfolioSize, riskAppetite, stocks]);
   const stockTargetPct = Math.max(0, 100 - cashEquivalentTargetPct - etfTargetPct);
   const showCashEquivalentBar = useMarketRegimeCashTilt === true;
